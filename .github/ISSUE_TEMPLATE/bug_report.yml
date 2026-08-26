@@ -1,0 +1,56 @@
+name: Relatar um bug
+description: Informe um problema reproduzível no BRUMCLASSICS.
+title: "[BUG] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Não publique senhas, tokens, cookies, QR Codes, ROMs ou arquivos de conta."
+  - type: input
+    id: version
+    attributes:
+      label: Versão
+      placeholder: "1.40.0"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows
+      placeholder: "Windows 11 64 bits"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options:
+        - Biblioteca
+        - Conexões de lojas
+        - CLASSICS / RetroArch
+        - Living Room Mode
+        - Conquistas
+        - BRUMCLASSICS MOVEL
+        - BRUMNEWS / BRUMWORLD
+        - Outro
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Etapas para reproduzir
+      description: Explique o que clicou e o que aconteceu.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Resultado esperado
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidências sem dados privados
+      description: Mensagem de erro ou captura de tela, com credenciais removidas.
+

@@ -1,0 +1,29 @@
+# Release assets belong to GitHub Releases, not Git history.
+release-assets/
+*.exe
+*.apk
+*.zip
+*.7z
+*.rar
+*.001
+
+# Personal launcher data must never be committed.
+RETROGAMES/
+RetroArch-Win64/
+library.json
+accounts.json
+collections.json
+favorites.json
+mobile-bridge.json
+*.state
+*.srm
+*.sav
+*.log
+
+# Local tooling.
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+

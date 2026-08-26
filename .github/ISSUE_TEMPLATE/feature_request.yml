@@ -1,0 +1,30 @@
+name: Sugerir melhoria
+description: Proponha uma melhoria para o launcher ou aplicativo móvel.
+title: "[IDEIA] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Qual problema a ideia resolve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Como deveria funcionar?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área principal
+      options:
+        - Launcher desktop
+        - CLASSICS
+        - Living Room Mode
+        - BRUMCLASSICS MOVEL
+        - BRUMNEWS / BRUMWORLD
+        - Integrações
+        - Outro
+

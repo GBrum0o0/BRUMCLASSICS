@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">BRUMCLASSICS — Cartucho Atemporal</title>
+  <desc id="desc">Cartucho de videogame com etiqueta central limpa e contatos inferiores.</desc>
+  <path fill="#9DFF3B" fill-rule="evenodd" d="M44 38h168l18 18v140l-22 22H48l-22-22V56l18-18Zm8 28h152l12 12v75l-12 12H52l-12-12V78l12-12Zm20 116h112v36H72v-36Z"/>
+  <path fill="#9DFF3B" d="M83 190h16v28H83v-28Zm25 0h16v28h-16v-28Zm25 0h16v28h-16v-28Zm25 0h16v28h-16v-28Z"/>
+</svg>
