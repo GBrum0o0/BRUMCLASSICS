@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="../../releases/latest"><strong>Baixar a versão mais recente</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/latest"><strong>Baixar a versão mais recente</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
   <a href="PRIVACY.md">Privacidade</a> ·
   <a href="SECURITY.md">Segurança</a>
@@ -36,7 +36,7 @@ Esta página distribui a edição **OFC DISTRIBUIÇÃO**, criada para instalaç�
 
 ## Download
 
-Abra a página de [Releases](../../releases/latest). Cada versão oferece:
+Abra a página de [Releases](https://github.com/GBrum0o0/BRUMCLASSICS/releases/latest). Cada versão oferece:
 
 1. **Launcher Windows** — executável portátil da OFC DISTRIBUIÇÃO.
 2. **Pacote completo** — launcher, RetroArch limpo, pasta RETROGAMES vazia e APK.
@@ -72,7 +72,10 @@ Leia a política completa em [PRIVACY.md](PRIVACY.md).
 
 O BRUMCLASSICS está em desenvolvimento ativo. Integrações de lojas dependem dos clientes e serviços oficiais e podem exigir ajustes quando os provedores alteram seus fluxos.
 
+### Versão 1.40.1 — capas de CLASSICS
+
+A distribuição limpa agora consegue localizar capas públicas dos jogos clássicos sem depender de uma chave pessoal. Para jogos já cadastrados sem imagem, abra **CLASSICS** e use **Atualizar**. A primeira consulta exige internet; depois, a capa fica disponível no cache local.
+
 ## Aviso
 
 BRUMCLASSICS é um projeto independente e não é afiliado, endossado ou patrocinado por Valve, Epic Games, GOG, Electronic Arts, Ubisoft, Sony, Nintendo, Microsoft, Libretro ou RetroAchievements. Marcas pertencem aos seus respectivos proprietários.
-
