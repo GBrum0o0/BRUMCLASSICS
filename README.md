@@ -21,7 +21,7 @@
 
 O BRUMCLASSICS reúne bibliotecas de jogos, CLASSICS, conquistas, sessões, coleções, saves, capturas e uma experiência para televisão chamada Living Room Mode. O BRUMCLASSICS MOVEL funciona como extensão do launcher e mantém uma cópia offline dos dados sincronizados pelo próprio usuário.
 
-Esta página distribui a edição **OFC DISTRIBUIÇÃO**, criada para instalação limpa em outros computadores. Ela não contém contas, tokens, biblioteca, capas pessoais, favoritos, saves ou ROMs do computador usado no desenvolvimento.
+Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalação limpa em outros computadores. O pacote não contém contas, tokens, biblioteca, capas pessoais, favoritos, saves ou ROMs do computador usado no desenvolvimento.
 
 ## Principais recursos
 
@@ -38,7 +38,7 @@ Esta página distribui a edição **OFC DISTRIBUIÇÃO**, criada para instalaç�
 
 Abra a página de [Releases](https://github.com/GBrum0o0/BRUMCLASSICS/releases/latest). Cada versão oferece:
 
-1. **Launcher Windows** — executável portátil da OFC DISTRIBUIÇÃO.
+1. **Launcher Windows** — executável portátil do BRUMCLASSICS OFICIAL.
 2. **Pacote completo** — launcher, RetroArch limpo, pasta RETROGAMES vazia e APK.
 3. **APK Android** — versão móvel de teste.
 4. **SHA256SUMS.txt** — hashes para verificar os arquivos baixados.
@@ -48,7 +48,7 @@ O GitHub hospeda os arquivos grandes na área de Releases; executáveis não sã
 ## Instalação rápida
 
 1. Baixe e extraia o pacote completo da Release mais recente.
-2. Execute `BRUMCLASSICS-OFC-DISTRIBUICAO-<versão>-portable.exe`.
+2. Execute `BRUMCLASSICS-OFICIAL-<versão>-portable.exe`.
 3. Abra **Configurações → Conexões** e vincule somente suas próprias contas.
 4. Para CLASSICS, coloque somente suas próprias ROMs na pasta `RETROGAMES`.
 5. Para o celular, instale o APK e faça o pareamento em **Configurações → MOVEL** na mesma rede local.
@@ -61,7 +61,7 @@ Na aba BRUMNEWS, clique na capa da BRUMWORLD. Use `A` e `D` ou as setas laterais
 
 ## Privacidade
 
-- A OFC DISTRIBUIÇÃO usa um perfil separado da edição Oficial.
+- O pacote público é gerado com um perfil local limpo e isolado, sem dados do computador de desenvolvimento.
 - Nenhuma credencial é incluída nos arquivos publicados.
 - O pareamento móvel acontece na rede local e exige autorização do usuário.
 - ROMs, BIOS e jogos comerciais não são fornecidos.
@@ -72,9 +72,9 @@ Leia a política completa em [PRIVACY.md](PRIVACY.md).
 
 O BRUMCLASSICS está em desenvolvimento ativo. Integrações de lojas dependem dos clientes e serviços oficiais e podem exigir ajustes quando os provedores alteram seus fluxos.
 
-### Versão 1.40.1 — capas de CLASSICS
+### Versão 1.42.2 — BRUMCLASSICS OFICIAL
 
-A distribuição limpa agora consegue localizar capas públicas dos jogos clássicos sem depender de uma chave pessoal. Para jogos já cadastrados sem imagem, abra **CLASSICS** e use **Atualizar**. A primeira consulta exige internet; depois, a capa fica disponível no cache local.
+A edição publicada assume definitivamente o nome **BRUMCLASSICS OFICIAL**. Esta versão também inclui atualização segura pelo launcher, anotações por jogo, guia visual na BRUMWORLD e a nova tela de preparação que apresenta suas anotações antes de entregar o foco ao jogo.
 
 ## Aviso
 

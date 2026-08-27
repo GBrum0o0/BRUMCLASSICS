@@ -1,5 +1,37 @@
 # Histórico de versões
 
+## 1.42.2 — Identidade pública oficial
+
+- A edição publicada passa a se chamar BRUMCLASSICS OFICIAL.
+- Executáveis e pacotes usam o padrão `BRUMCLASSICS-OFICIAL-<versão>`.
+- O perfil limpo de publicação continua tecnicamente isolado, sem expor dados pessoais.
+- Atualizador, BRUMNEWS e linha do tempo reconhecem a nova identidade pública.
+
+## 1.42.1 — Foco da tela de preparação
+
+- A tela intermediária passa a usar uma janela dedicada.
+- O launcher permanece minimizado enquanto o jogo é preparado.
+- Quando o processo real fica pronto, teclado, mouse e controle recuperam o foco.
+- Falhas restauram o launcher com segurança.
+
+## 1.42.0 — Anotações antes de jogar
+
+- JOGOS e CLASSICS exibem Onde parei, Objetivos, Dicas e Comandos durante a abertura.
+- O aviso para continuar aparece somente quando o processo real do jogo é detectado.
+- Qualquer botão de teclado, mouse ou controle entrega a tela ao jogo.
+
+## 1.41.1 — Anotações na BRUMWORLD
+
+- A revista ganha um tutorial visual para abrir, preencher e salvar anotações por jogo.
+- O guia explica a sincronização e consulta offline pelo BRUMCLASSICS MOVEL.
+
+## 1.41.0 — Atualizações e anotações
+
+- Atualização segura pelo próprio launcher com SHA-256 e cópia recuperável da versão anterior.
+- Perfil, contas, coleções e saves são preservados durante a troca do executável.
+- Perfil do Jogo ganha Onde parei, Objetivos, Dicas e Comandos.
+- Anotações passam a sincronizar com o aplicativo móvel.
+
 ## 1.40.1 — Capas de CLASSICS na distribuição limpa
 
 - Corrigida a busca de capas dos jogos clássicos em instalações limpas.

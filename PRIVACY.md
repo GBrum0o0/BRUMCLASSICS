@@ -2,7 +2,7 @@
 
 ## Edição publicada
 
-Somente a **BRUMCLASSICS OFC DISTRIBUIÇÃO** é destinada à publicação neste repositório. Ela utiliza um perfil separado e não acessa automaticamente o perfil histórico da edição Oficial.
+Somente o pacote público do **BRUMCLASSICS OFICIAL** é destinado à publicação neste repositório. Ele é gerado em um perfil limpo e tecnicamente separado, sem acessar automaticamente dados históricos do computador usado no desenvolvimento.
 
 ## O que não está incluído
 
@@ -23,4 +23,3 @@ O aplicativo móvel sincroniza pela rede local após pareamento explícito. Ele 
 ## Serviços externos
 
 Ao vincular uma loja ou serviço, aplicam-se também os termos e políticas do respectivo provedor. O BRUMCLASSICS não promete disponibilidade permanente de APIs não públicas.
-
