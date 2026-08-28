@@ -32,7 +32,8 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - CLASSICS com RetroArch, save states e Quick Resume.
 - Living Room Mode com controle e mídia física 3D.
 - BRUMWORLD: revista interativa com guias visuais do launcher e do aplicativo.
-- Aplicativo Android com biblioteca, capas, estatísticas e controle remoto local.
+- Aplicativo Android com biblioteca offline, capas, estatísticas e BRUMCOMPANION.
+- BRUMCOMPANION identifica o jogo ativo e permite consultar ou editar Onde parei, Objetivos, Dicas e Comandos no celular.
 
 ## Download
 
@@ -72,9 +73,11 @@ Leia a política completa em [PRIVACY.md](PRIVACY.md).
 
 O BRUMCLASSICS está em desenvolvimento ativo. Integrações de lojas dependem dos clientes e serviços oficiais e podem exigir ajustes quando os provedores alteram seus fluxos.
 
-### Versão 1.42.2 — BRUMCLASSICS OFICIAL
+### Versão 1.43.0 — BRUMCOMPANION
 
-A edição publicada assume definitivamente o nome **BRUMCLASSICS OFICIAL**. Esta versão também inclui atualização segura pelo launcher, anotações por jogo, guia visual na BRUMWORLD e a nova tela de preparação que apresenta suas anotações antes de entregar o foco ao jogo.
+A nova aba Companion substitui o controle remoto como segunda tela do launcher. Jogos modernos e CLASSICS abertos pelo BRUMCLASSICS OFICIAL são identificados automaticamente. As anotações podem ser editadas no celular e sincronizadas pela rede local; rascunhos salvos offline ficam em fila até a conexão retornar. Edições conflitantes pedem qual versão manter.
+
+Use **launcher 1.43.0 e APK 0.8.0** juntos. Feche o executável antigo antes de abrir o novo: deixar a versão anterior em execução impede o envio do jogo ativo. Consulte o [guia do BRUMCOMPANION](docs/BRUMCOMPANION.md).
 
 ## Aviso
 

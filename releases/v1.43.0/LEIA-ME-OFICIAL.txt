@@ -1,0 +1,27 @@
+BRUMCLASSICS OFICIAL 1.43.0 — BRUMCOMPANION
+
+INSTALAÇÃO NOVA
+1. Extraia o pacote completo em uma pasta de sua escolha.
+2. Abra BRUMCLASSICS-OFICIAL-1.43.0-portable.exe.
+3. Conecte suas próprias lojas em Configurações e escolha seus caminhos.
+4. Coloque somente suas próprias ROMs na pasta RETROGAMES, entregue vazia.
+5. O RetroArch acompanha o pacote sem dados, BIOS ou saves pessoais.
+
+ATUALIZAÇÃO
+Feche o executável antigo ANTES de abrir o novo. Mantenha uma cópia anterior
+para recuperação e não apague RETROGAMES, saves, configurações ou dados locais.
+
+CELULAR
+Instale BRUMCLASSICS-MOVEL-0.8.0-debug.apk sobre a versão anterior.
+Na mesma rede local, use Configurações → MOVEL no launcher e Perfil no APK
+para parear. Não é necessário refazer um pareamento ainda válido.
+Abra a aba COMPANION, inicie um jogo pelo launcher e aguarde a sessão real.
+Onde parei, Objetivos, Dicas e Comandos podem ser lidos e editados no celular.
+Toque em SALVAR NO BRUMCOMPANION. Sem rede, o rascunho aguarda reconexão.
+Leia GUIA-BRUMCOMPANION.md ou a BRUMWORLD para mais instruções.
+
+REQUISITOS E PRIVACIDADE
+Windows 10/11 de 64 bits. Android 8.0 ou superior para o APK debug.
+O pacote é limpo, sem contas, biblioteca, tokens, pareamentos, ROMs ou saves.
+O executável Windows não possui certificado Authenticode comercial.
+O APK usa assinatura de teste. Verifique os hashes no SHA256SUMS.txt.

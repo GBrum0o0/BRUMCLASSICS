@@ -1,5 +1,17 @@
 # Histórico de versões
 
+## 1.43.0 — BRUMCOMPANION
+
+- Nova segunda tela no APK 0.8.0, em lugar do controle remoto.
+- Identificação da sessão ativa de jogos modernos e CLASSICS iniciados pelo launcher.
+- Consulta e edição de Onde parei, Objetivos, Dicas e Comandos no celular.
+- Sincronização local autenticada, com protocolo móvel v4.
+- Rascunhos offline persistentes enviados quando a conexão retorna.
+- Mesclagem de alterações em campos independentes e escolha explícita em caso de conflito.
+- BRUMWORLD, BRUMNEWS e linha do tempo atualizadas.
+- Build reutiliza os assets oficiais existentes para evitar falhas de captura gráfica sem janela.
+- Pacotes Windows e Android preservam o formato de publicação sem contas, ROMs ou saves pessoais.
+
 ## 1.42.2 — Identidade pública oficial
 
 - A edição publicada passa a se chamar BRUMCLASSICS OFICIAL.
