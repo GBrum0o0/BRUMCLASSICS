@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## 1.43.3 — Reinício confiável após atualizar
+
+- O helper de atualização passa a ser criado pelo serviço WMI do Windows, fora da árvore de processos do Electron.
+- A substituição continua mesmo depois que a versão anterior fecha.
+- O launcher atualizado volta com uma janela visível, sem iniciar oculto.
+- O helper valida que o novo processo iniciou e mantém restauração, SHA-256 e vínculo de perfil.
+- BRUMNEWS e a linha do tempo registram a correção.
+
 ## 1.43.2 — Vermelho Arcade
 
 - Novo tema disponível em Configurações → Visual → Tema.

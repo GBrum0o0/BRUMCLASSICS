@@ -74,11 +74,13 @@ Leia a política completa em [PRIVACY.md](PRIVACY.md).
 
 O BRUMCLASSICS está em desenvolvimento ativo. Integrações de lojas dependem dos clientes e serviços oficiais e podem exigir ajustes quando os provedores alteram seus fluxos.
 
-### Versão 1.43.2 — Vermelho Arcade e atualização de perfil segura
+### Versão 1.43.3 — Reinício confiável e atualização de perfil segura
 
-O novo tema **Vermelho Arcade** pode ser escolhido em **Configurações → Visual → Tema**. Destaques, brilhos, foco, progresso e superfícies reativas acompanham a cor selecionada sem alterar capas, organização ou mídias físicas 3D.
+O atualizador agora mantém o helper ativo fora da árvore de processos do Electron e relança o BRUMCLASSICS com uma janela visível. A troca conserva validação SHA-256, cópia recuperável e o vínculo da instalação ao perfil original.
 
-A versão também incorpora a preservação de perfil da 1.43.1: uma atualização pelo launcher mantém contas, biblioteca, coleções, anotações, configurações e saves no diretório original, mesmo quando o executável publicado usa o perfil limpo por padrão. Instalações novas continuam isoladas. O APK permanece na versão 0.8.0.
+O tema **Vermelho Arcade**, introduzido na 1.43.2, continua disponível em **Configurações → Visual → Tema**. Contas, biblioteca, coleções, anotações, configurações e saves permanecem no diretório original. Instalações novas continuam isoladas. O APK permanece na versão 0.8.0.
+
+Se o atualizador da 1.43.1/1.43.2 fechou sem voltar, consulte a [recuperação segura nas notas da 1.43.3](releases/v1.43.3/RELEASE-NOTES.md). O novo mecanismo só passa a ser utilizado após instalar a correção.
 
 ![Tema Vermelho Arcade](docs/images/red-theme-1.43.2.png)
 

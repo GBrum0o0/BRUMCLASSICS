@@ -1,0 +1,8 @@
+BRUMCLASSICS OFICIAL 1.43.3 — REINÍCIO CONFIÁVEL
+
+Esta atualização corrige o fechamento sem retorno após usar REINICIAR E ATUALIZAR.
+
+O helper passa a continuar fora da árvore do Electron e abre a nova versão com
+janela visível. Perfil, contas, biblioteca, coleções, anotações, configurações,
+saves e capas permanecem preservados. A versão anterior continua disponível no
+histórico de recuperação.
