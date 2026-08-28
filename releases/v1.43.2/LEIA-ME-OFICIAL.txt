@@ -1,0 +1,18 @@
+BRUMCLASSICS OFICIAL 1.43.2 — VERMELHO ARCADE
+
+ATUALIZAR PELO LAUNCHER
+
+1. Abra a versão 1.43.1.
+2. Entre em Configurações > Sistema > Atualizações.
+3. Clique em VERIFICAR, BAIXAR e REINICIAR E ATUALIZAR.
+4. Depois do reinício, abra Configurações > Visual > Tema.
+5. Escolha Vermelho Arcade.
+
+O perfil original é preservado durante a troca do executável. Contas, biblioteca, coleções, favoritos, anotações, configurações e saves permanecem no mesmo diretório.
+
+Uma instalação nova em outro computador continua usando um perfil limpo. O pacote público não inclui contas, tokens, pareamentos, biblioteca pessoal, ROMs ou saves.
+
+O APK continua na versão 0.8.0 e não precisa ser reinstalado para testar o novo tema do launcher.
+
+PROJETO OFICIAL
+https://github.com/GBrum0o0/BRUMCLASSICS

@@ -34,6 +34,7 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - BRUMWORLD: revista interativa com guias visuais do launcher e do aplicativo.
 - Aplicativo Android com biblioteca offline, capas, estatísticas e BRUMCOMPANION.
 - BRUMCOMPANION identifica o jogo ativo e permite consultar ou editar Onde parei, Objetivos, Dicas e Comandos no celular.
+- Temas de destaque preservam o layout, incluindo o novo **Vermelho Arcade**.
 
 ## Download
 
@@ -73,11 +74,13 @@ Leia a política completa em [PRIVACY.md](PRIVACY.md).
 
 O BRUMCLASSICS está em desenvolvimento ativo. Integrações de lojas dependem dos clientes e serviços oficiais e podem exigir ajustes quando os provedores alteram seus fluxos.
 
-### Versão 1.43.0 — BRUMCOMPANION
+### Versão 1.43.2 — Vermelho Arcade e atualização de perfil segura
 
-A nova aba Companion substitui o controle remoto como segunda tela do launcher. Jogos modernos e CLASSICS abertos pelo BRUMCLASSICS OFICIAL são identificados automaticamente. As anotações podem ser editadas no celular e sincronizadas pela rede local; rascunhos salvos offline ficam em fila até a conexão retornar. Edições conflitantes pedem qual versão manter.
+O novo tema **Vermelho Arcade** pode ser escolhido em **Configurações → Visual → Tema**. Destaques, brilhos, foco, progresso e superfícies reativas acompanham a cor selecionada sem alterar capas, organização ou mídias físicas 3D.
 
-Use **launcher 1.43.0 e APK 0.8.0** juntos. Feche o executável antigo antes de abrir o novo: deixar a versão anterior em execução impede o envio do jogo ativo. Consulte o [guia do BRUMCOMPANION](docs/BRUMCOMPANION.md).
+A versão também incorpora a preservação de perfil da 1.43.1: uma atualização pelo launcher mantém contas, biblioteca, coleções, anotações, configurações e saves no diretório original, mesmo quando o executável publicado usa o perfil limpo por padrão. Instalações novas continuam isoladas. O APK permanece na versão 0.8.0.
+
+![Tema Vermelho Arcade](docs/images/red-theme-1.43.2.png)
 
 ## Aviso
 
