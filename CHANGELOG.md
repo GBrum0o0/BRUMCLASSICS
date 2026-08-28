@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## 1.43.4 — Novas atmosferas
+
+- Temas Violeta Nebulosa, Ciano Polar e Rosa Synthwave em Configurações → Experiência → Tema.
+- Destaques e brilho de fundo seguem a cor, sem alterar layout, capas ou mídias 3D.
+- Seleção atual preservada; novos temas são opcionais e persistem após reabrir.
+- Contraste e compatibilidade com os cinco temas anteriores validados.
+- BRUMNEWS e linha do tempo atualizadas.
+- Mantém o mecanismo de atualização e preservação de perfil da 1.43.3.
+
 ## 1.43.3 — Reinício confiável após atualizar
 
 - O helper de atualização passa a ser criado pelo serviço WMI do Windows, fora da árvore de processos do Electron.
