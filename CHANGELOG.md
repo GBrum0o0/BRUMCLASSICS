@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## 1.44.2 — Guias completos na BRUMWORLD
+
+- BRUMWORLD ampliada de 11 para 14 páginas com sumário atualizado.
+- Guia completo para instalar, parear, sincronizar e usar o BRUMCLASSICS MOVEL offline.
+- Guia do BRUMCOMPANION para acompanhar o jogo ativo e editar anotações em tempo real ou offline.
+- Atualização do MOVEL explicada com GitHub, fallback local, SHA-256 e confirmação do Android.
+- Atualização do launcher explicada com aviso, download, reinício, preservação de perfil e recuperação.
+- BRUMNEWS e linha do tempo atualizadas sem apagar o arquivo histórico.
+
 ## 1.44.1 — BRUMNEWS compacta e Perfil móvel direto
 
 - A linha do tempo passa a mostrar somente as seis versões mais recentes.

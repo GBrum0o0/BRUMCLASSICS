@@ -1,6 +1,6 @@
 # BRUMCOMPANION — suas anotações durante o jogo
 
-Requisitos recomendados: BRUMCLASSICS OFICIAL 1.44.1 e BRUMCLASSICS MOVEL 0.9.1.
+Requisitos recomendados: BRUMCLASSICS OFICIAL 1.44.2 e BRUMCLASSICS MOVEL 0.9.1.
 
 ## Preparação
 
@@ -24,7 +24,7 @@ Se ambos os dispositivos alterarem o mesmo campo, o aplicativo preserva o rascun
 
 ## O jogo não aparece?
 
-- Confira se o executável aberto é realmente o 1.44.1, não apenas um arquivo novo na pasta enquanto o anterior continua rodando.
+- Confira se o executável aberto é realmente o 1.44.2, não apenas um arquivo novo na pasta enquanto o anterior continua rodando.
 - Confira se o APK instalado é o 0.9.1. As próximas versões aparecerão em **Perfil → Atualizações**.
 - Veja se o celular está conectado ao launcher correto na mesma rede.
 - Abra o jogo pelo launcher e aguarde a detecção do processo.
