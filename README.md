@@ -74,11 +74,11 @@ Leia a política completa em [PRIVACY.md](PRIVACY.md).
 
 O BRUMCLASSICS está em desenvolvimento ativo. Integrações de lojas dependem dos clientes e serviços oficiais e podem exigir ajustes quando os provedores alteram seus fluxos.
 
-### Versão 1.43.4 — Novas atmosferas
+### Versão 1.44.0 — Atualizações conectadas
 
-**Violeta Nebulosa**, **Ciano Polar** e **Rosa Synthwave** chegam a **Configurações → Experiência → Tema**. Destaques e o brilho sutil do fundo acompanham a paleta, preservando layout, capas e mídias físicas 3D. Seu tema atual continua selecionado até você escolher outro.
+O launcher sinaliza uma nova versão discretamente nas **Configurações** e mostra o aviso apenas uma vez. O BRUMCLASSICS MOVEL 0.9.0 pode localizar, baixar e verificar seus próximos APKs pelo GitHub, usando o launcher pareado como fallback na rede local.
 
-Para testar pelo software, use **Configurações → Sistema → Atualizações → VERIFICAR → BAIXAR → REINICIAR E ATUALIZAR**. A versão 1.43.4 mantém o mecanismo corrigido da 1.43.3, a validação SHA-256, o backup e o vínculo do perfil. [Veja as notas e o passo a passo](releases/v1.43.4/RELEASE-NOTES.md). O APK permanece na versão 0.8.0.
+Para atualizar o launcher, use **Configurações → Sistema → Atualizações → VERIFICAR → BAIXAR → REINICIAR E ATUALIZAR**. No celular, use **Perfil → Atualizações**. A 0.9.0 é a primeira versão com esse recurso e precisa ser instalada uma última vez pelo método anterior. [Veja todos os detalhes](releases/v1.44.0/RELEASE-NOTES.md).
 
 Se o atualizador da 1.43.1/1.43.2 fechou sem voltar, consulte a [recuperação segura nas notas da 1.43.3](releases/v1.43.3/RELEASE-NOTES.md). O novo mecanismo só passa a ser utilizado após instalar a correção.
 

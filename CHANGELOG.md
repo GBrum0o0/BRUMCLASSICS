@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## 1.44.0 — Atualizações conectadas
+
+- Indicador discreto e aviso único por versão no launcher.
+- Atalho **Ver novidades** abre diretamente a central real de atualizações.
+- BRUMCLASSICS MOVEL 0.9.0 consulta as Releases oficiais do GitHub.
+- Fallback autenticado permite obter o APK pelo launcher pareado na rede local.
+- Tamanho, formato e SHA-256 são conferidos antes da instalação pelo Android.
+- Package ID, assinatura e dados offline do aplicativo permanecem preservados.
+- BRUMNEWS e linha do tempo atualizadas.
+
 ## 1.43.4 — Novas atmosferas
 
 - Temas Violeta Nebulosa, Ciano Polar e Rosa Synthwave em Configurações → Experiência → Tema.
