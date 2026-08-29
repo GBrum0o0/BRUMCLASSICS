@@ -33,7 +33,7 @@ O Windows não oferece uma API oficial segura para um aplicativo se fixar sozinh
 
 ## Arquivos da Release
 
-- `BRUMCLASSICS OFICIAL.exe` — executável permanente recomendado.
+- `BRUMCLASSICS-OFICIAL.exe` — download avulso estável; ao ser aberto, cria/atualiza localmente `BRUMCLASSICS OFICIAL.exe`.
 - `BRUMCLASSICS-OFICIAL-1.44.3-portable.exe` — cópia de compatibilidade para o atualizador antigo.
 - `BRUMCLASSICS-OFICIAL-1.44.3-COMPLETO.zip` — pacote limpo completo.
 - `BRUMCLASSICS-MOVEL-0.9.1-debug.apk` — aplicativo Android complementar, sem alteração nesta versão.
