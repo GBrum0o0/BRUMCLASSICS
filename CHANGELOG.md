@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## 1.45.0 — BRUMMOMENTS e sincronização offline
+
+- BRUMCLASSICS MOVEL 0.10.0 ganha a galeria pessoal **BRUMMOMENTS**.
+- Celular pareado pode solicitar uma captura do monitor do jogo enquanto uma sessão real está ativa.
+- Momentos aceitam localização, nota, categoria e favorito e permanecem disponíveis offline.
+- Galeria mantém os originais no armazenamento privado e usa prévias leves na interface.
+- Anotações e **Quero jogar** podem ser alterados fora da rede e ficam numa fila persistente.
+- Ao voltar à rede local, o aplicativo sincroniza as alterações por revisão e apresenta conflitos para escolha.
+- API local do Companion passa ao protocolo 5 sem expor caminhos, tokens ou credenciais.
+- BRUMWORLD, BRUMNEWS e linha do tempo atualizadas.
+
 ## 1.44.4 — História completada
 
 - Perfil do Jogo de JOGOS e CLASSICS recebe a ação **HISTÓRIA COMPLETADA**.

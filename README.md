@@ -35,6 +35,8 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - BRUMWORLD: revista interativa com guias visuais do launcher e do aplicativo.
 - Aplicativo Android com biblioteca offline, capas, estatísticas e BRUMCOMPANION.
 - BRUMCOMPANION identifica o jogo ativo e permite consultar ou editar Onde parei, Objetivos, Dicas e Comandos no celular.
+- BRUMMOMENTS registra capturas do jogo ativo com localização, notas, categorias e favoritos em uma galeria privada disponível offline.
+- Anotações e **Quero jogar** podem ser alterados fora da rede; a fila sincroniza ao reencontrar o launcher e conflitos exigem escolha explícita.
 - Temas de destaque preservam o layout, incluindo o novo **Vermelho Arcade**.
 
 ## Download
@@ -48,9 +50,9 @@ Abra a página de [Releases](https://github.com/GBrum0o0/BRUMCLASSICS/releases/l
 
 O GitHub hospeda os arquivos grandes na área de Releases; executáveis não são armazenados no histórico do repositório.
 
-## Novidade da versão 1.44.4
+## Novidade da versão 1.45.0
 
-No **Perfil do Jogo**, marque **História completada** quando terminar a campanha principal. O marco aparece na Central de Conquistas, em um filtro próprio, e na linha do tempo de Atividades. A marca pertence ao perfil de jogador ativo e não transforma a campanha concluída em 100% de conquistas.
+O **BRUMCLASSICS MOVEL 0.10.0** ganha o BRUMMOMENTS. Durante uma sessão ativa, o celular pareado solicita uma captura ao launcher, permite registrar localização, nota e categoria e guarda tudo para consulta offline. Anotações e **Quero jogar** também funcionam sem rede e sincronizam posteriormente sem sobrescrever conflitos silenciosamente.
 
 ## Instalação rápida
 

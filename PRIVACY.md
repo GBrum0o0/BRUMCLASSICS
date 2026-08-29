@@ -22,6 +22,8 @@ O aplicativo móvel sincroniza pela rede local após pareamento explícito. Ele 
 
 O BRUMCOMPANION recebe a identificação da sessão ativa e as anotações do jogo. Textos salvos no celular são enviados ao launcher pareado; sem conexão, permanecem em uma fila local até a reconexão. Conflitos de edição exigem uma escolha do usuário. Essa função não depende de uma conta BRUMCLASSICS nem publica anotações no GitHub.
 
+Uma captura BRUMMOMENTS só pode ser solicitada por um aparelho pareado enquanto o launcher acompanha uma sessão ativa. O endereço temporário da imagem expira, pertence ao aparelho solicitante e não revela o caminho do arquivo no Windows. A galeria, as anotações pendentes e as escolhas de Quero jogar ficam no armazenamento privado do aplicativo Android até serem excluídas ou sincronizadas pelo usuário.
+
 ## Serviços externos
 
 Ao vincular uma loja ou serviço, aplicam-se também os termos e políticas do respectivo provedor. O BRUMCLASSICS não promete disponibilidade permanente de APIs não públicas.
