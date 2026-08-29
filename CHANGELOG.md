@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## 1.44.1 — BRUMNEWS compacta e Perfil móvel direto
+
+- A linha do tempo passa a mostrar somente as seis versões mais recentes.
+- Todas as notas anteriores continuam disponíveis no arquivo expansível Desde o primeiro build.
+- BRUMCLASSICS MOVEL 0.9.1 remove a seção Saúde das conexões do Perfil.
+- Pareamento, sincronização, cache offline e atualização pelo GitHub ou rede local permanecem ativos.
+- Perfis, contas, bibliotecas, coleções, saves e configurações são preservados.
+
 ## 1.44.0 — Atualizações conectadas
 
 - Indicador discreto e aviso único por versão no launcher.

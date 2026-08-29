@@ -74,11 +74,11 @@ Leia a política completa em [PRIVACY.md](PRIVACY.md).
 
 O BRUMCLASSICS está em desenvolvimento ativo. Integrações de lojas dependem dos clientes e serviços oficiais e podem exigir ajustes quando os provedores alteram seus fluxos.
 
-### Versão 1.44.0 — Atualizações conectadas
+### Versão 1.44.1 — BRUMNEWS compacta e Perfil móvel direto
 
-O launcher sinaliza uma nova versão discretamente nas **Configurações** e mostra o aviso apenas uma vez. O BRUMCLASSICS MOVEL 0.9.0 pode localizar, baixar e verificar seus próximos APKs pelo GitHub, usando o launcher pareado como fallback na rede local.
+Na BRUMNEWS, a linha do tempo agora destaca somente as seis versões mais recentes; o arquivo expansível continua preservando todas as notas oficiais. O BRUMCLASSICS MOVEL 0.9.1 remove a seção Saúde das conexões para deixar o Perfil mais direto, sem alterar a sincronização ou os dados offline.
 
-Para atualizar o launcher, use **Configurações → Sistema → Atualizações → VERIFICAR → BAIXAR → REINICIAR E ATUALIZAR**. No celular, use **Perfil → Atualizações**. A 0.9.0 é a primeira versão com esse recurso e precisa ser instalada uma última vez pelo método anterior. [Veja todos os detalhes](releases/v1.44.0/RELEASE-NOTES.md).
+Para atualizar o launcher, use **Configurações → Sistema → Atualizações → VERIFICAR → BAIXAR → REINICIAR E ATUALIZAR**. No celular, use **Perfil → Atualizações**. [Veja todos os detalhes](releases/v1.44.1/RELEASE-NOTES.md).
 
 Se o atualizador da 1.43.1/1.43.2 fechou sem voltar, consulte a [recuperação segura nas notas da 1.43.3](releases/v1.43.3/RELEASE-NOTES.md). O novo mecanismo só passa a ser utilizado após instalar a correção.
 
