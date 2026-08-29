@@ -29,6 +29,7 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - Integração com Steam, Epic Games, GOG, EA App e Ubisoft Connect, conforme a disponibilidade de cada serviço.
 - Busca, filtros, coleções, favoritos e prioridade de loja.
 - Conquistas modernas e RetroAchievements.
+- Registro pessoal de **História completada** para jogos modernos e CLASSICS, separado do percentual de conquistas.
 - CLASSICS com RetroArch, save states e Quick Resume.
 - Living Room Mode com controle e mídia física 3D.
 - BRUMWORLD: revista interativa com guias visuais do launcher e do aplicativo.
@@ -46,6 +47,10 @@ Abra a página de [Releases](https://github.com/GBrum0o0/BRUMCLASSICS/releases/l
 4. **SHA256SUMS.txt** — hashes para verificar os arquivos baixados.
 
 O GitHub hospeda os arquivos grandes na área de Releases; executáveis não são armazenados no histórico do repositório.
+
+## Novidade da versão 1.44.4
+
+No **Perfil do Jogo**, marque **História completada** quando terminar a campanha principal. O marco aparece na Central de Conquistas, em um filtro próprio, e na linha do tempo de Atividades. A marca pertence ao perfil de jogador ativo e não transforma a campanha concluída em 100% de conquistas.
 
 ## Instalação rápida
 

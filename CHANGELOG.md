@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## 1.44.4 — História completada
+
+- Perfil do Jogo de JOGOS e CLASSICS recebe a ação **HISTÓRIA COMPLETADA**.
+- A marca é individual por perfil de jogador e permanece preservada durante refreshes e sincronizações.
+- Central de Conquistas ganhou contador e filtro próprios para campanhas concluídas.
+- Jogos sem conquistas sincronizadas também podem registrar a história concluída.
+- Conclusão da campanha permanece separada de 100% das conquistas.
+- Atividades registra conclusão e remoção da marca com data e jogo.
+- Estado seguro é sincronizado com o BRUMCLASSICS MOVEL.
+- BRUMWORLD, BRUMNEWS e linha do tempo atualizadas.
+
 ## 1.44.3 — Executável permanente e verificação na abertura
 
 - Executável principal passa a usar o nome fixo `BRUMCLASSICS OFICIAL.exe`.
