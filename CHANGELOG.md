@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## 1.44.3 — Executável permanente e verificação na abertura
+
+- Executável principal passa a usar o nome fixo `BRUMCLASSICS OFICIAL.exe`.
+- Primeira abertura migra com segurança o executável versionado para o caminho permanente e mantém o perfil instalado.
+- Configurações oferece **ABRIR LOCAL** para localizar e fixar o arquivo correto na barra de tarefas uma única vez.
+- Verificação silenciosa de atualização ocorre em toda abertura quando habilitada.
+- Atualizações futuras fazem backup, substituem e reiniciam o executável permanente.
+- Asset versionado de transição mantém compatibilidade com o atualizador anterior.
+- BRUMWORLD, BRUMNEWS e linha do tempo atualizadas.
+
 ## 1.44.2 — Guias completos na BRUMWORLD
 
 - BRUMWORLD ampliada de 11 para 14 páginas com sumário atualizado.

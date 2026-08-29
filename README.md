@@ -50,7 +50,7 @@ O GitHub hospeda os arquivos grandes na área de Releases; executáveis não sã
 ## Instalação rápida
 
 1. Baixe e extraia o pacote completo da Release mais recente.
-2. Execute `BRUMCLASSICS-OFICIAL-<versão>-portable.exe`.
+2. Execute `BRUMCLASSICS OFICIAL.exe`.
 3. Abra **Configurações → Conexões** e vincule somente suas próprias contas.
 4. Para CLASSICS, coloque somente suas próprias ROMs na pasta `RETROGAMES`.
 5. Para o celular, instale o APK e faça o pareamento em **Configurações → MOVEL** na mesma rede local.
@@ -74,11 +74,11 @@ Leia a política completa em [PRIVACY.md](PRIVACY.md).
 
 O BRUMCLASSICS está em desenvolvimento ativo. Integrações de lojas dependem dos clientes e serviços oficiais e podem exigir ajustes quando os provedores alteram seus fluxos.
 
-### Versão 1.44.2 — Guias completos na BRUMWORLD
+### Versão 1.44.3 — Um executável permanente
 
-A revista interativa agora reúne guias completos do BRUMCLASSICS MOVEL e BRUMCOMPANION, além dos processos seguros de atualização do celular e do launcher. Instalação, pareamento, sincronização, uso offline, conflitos de anotações, validação do APK e recuperação do executável anterior são explicados com instruções e diagramas visuais.
+O launcher agora mantém o nome **`BRUMCLASSICS OFICIAL.exe`** em todas as versões. Depois da primeira abertura, use **Configurações → Sistema → Atualizações → ABRIR LOCAL** e fixe esse arquivo uma única vez na barra de tarefas. O launcher também consulta silenciosamente novas versões em toda abertura, sem baixar ou instalar nada sem sua confirmação.
 
-Para atualizar o launcher, use **Configurações → Sistema → Atualizações → VERIFICAR → BAIXAR → REINICIAR E ATUALIZAR**. No celular, use **Perfil → Atualizações**. [Veja todos os detalhes](releases/v1.44.2/RELEASE-NOTES.md).
+Quem ainda está na 1.44.2 pode atualizar normalmente pelo launcher: a Release inclui um arquivo de transição reconhecido pelo mecanismo antigo. Contas, biblioteca, coleções, saves e configurações permanecem no perfil atual. [Veja todos os detalhes](releases/v1.44.3/RELEASE-NOTES.md).
 
 Se o atualizador da 1.43.1/1.43.2 fechou sem voltar, consulte a [recuperação segura nas notas da 1.43.3](releases/v1.43.3/RELEASE-NOTES.md). O novo mecanismo só passa a ser utilizado após instalar a correção.
 
