@@ -46,16 +46,16 @@ Abra a página de [Releases](https://github.com/GBrum0o0/BRUMCLASSICS/releases/l
 
 1. **Launcher Windows** — executável portátil do BRUMCLASSICS OFICIAL.
 2. **Pacote completo** — launcher, RetroArch limpo, pasta RETROGAMES vazia e APK.
-3. **APK Android** — versão móvel de teste.
+3. **APK Android** — aplicativo móvel assinado para atualização preservando os dados offline.
 4. **SHA256SUMS.txt** — hashes para verificar os arquivos baixados.
 
 O GitHub hospeda os arquivos grandes na área de Releases; executáveis não são armazenados no histórico do repositório.
 
-## Novidade da versão 1.45.5
+## Novidade da versão 1.46.1
 
-A versão 1.45.5 corrige a tela preta introduzida na 1.45.4. A causa era uma colisão de nome entre dois scripts da interface, agora coberta por um teste integrado específico.
+A versão 1.46.1 restaura o menu contextual da biblioteca: o botão direito abre as opções do jogo sem modificar a seleção. Quando vários jogos já estão selecionados, as ações em lote aparecem somente ao acionar um integrante daquele grupo.
 
-O sorteio sem repetição, a organização da aba Atividades e o atalho permanente continuam ativos. O BRUMCLASSICS MOVEL permanece na versão 0.10.1.
+Ela também inclui o BRUMCLASSICS MOVEL 0.11.0, cuja tela Início destaca o último jogo, Favoritos, Quero jogar e Minha jornada. A ponte local agora usa HTTPS com certificado fixado; após atualizar o APK, faça um novo pareamento único pelo QR Code. O cache offline do celular permanece preservado.
 
 ## Instalação rápida
 

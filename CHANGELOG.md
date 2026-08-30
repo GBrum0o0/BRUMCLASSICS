@@ -1,5 +1,26 @@
 # Histórico de versões
 
+## 1.46.1 — Menu contextual restaurado
+
+- O botão direito volta a abrir as opções do jogo sem selecioná-lo.
+- Clique normal ignora eventos de botões secundários do mouse.
+- Seleções múltiplas permanecem intactas ao consultar opções individuais.
+- Ações em lote aparecem somente quando o jogo acionado pertence ao grupo selecionado.
+- Botão Menu e Shift + F10 continuam funcionando pelo teclado.
+- Testes de regressão cobrem os gestos individuais e em lote.
+- BRUMNEWS e linha do tempo atualizadas.
+
+## 1.46.0 — Móvel, segurança e jornada
+
+- BRUMCLASSICS MOVEL 0.11.0 reorganiza a Início com último jogo, Favoritos, Quero jogar e Minha jornada.
+- Favoritos e Quero jogar sincronizam com o perfil ativo e permanecem disponíveis offline.
+- Ponte local passa a usar HTTPS com certificado fixado pelo QR Code.
+- APK utiliza uma identidade de assinatura estável, fora do pacote público.
+- Sincronização Steam libera a biblioteca antes de atualizar conquistas em segundo plano.
+- Falha de leitura das contas protegidas não é mais exibida como desconexão falsa.
+- Logs de sincronização possuem limite e rotação automática.
+- BRUMNEWS e linha do tempo atualizadas.
+
 ## 1.45.5 — Correção da tela preta
 
 - Corrige a tela preta que podia prender o launcher após a atualização 1.45.4.
