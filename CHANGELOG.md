@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## 1.45.1 — Companion somente com anotações
+
+- BRUMCOMPANION exibe somente jogos com Onde parei, Objetivos, Dicas ou Comandos preenchidos.
+- Jogos ativos sem anotações permanecem ocultos e não revelam seu nome no painel de espera.
+- A primeira anotação pode ser criada no Perfil do Jogo do launcher ou do celular.
+- Rascunhos offline contam imediatamente como conteúdo.
+- Ao apagar todos os campos, o cartão é removido depois de salvar.
+- Anotações recentes segue a mesma regra e não mostra cartões vazios.
+- BRUMMOMENTS, Quero jogar, galeria offline e resolução de conflitos permanecem disponíveis.
+- BRUMWORLD, BRUMNEWS e linha do tempo atualizadas.
+
 ## 1.45.0 — BRUMMOMENTS e sincronização offline
 
 - BRUMCLASSICS MOVEL 0.10.0 ganha a galeria pessoal **BRUMMOMENTS**.
