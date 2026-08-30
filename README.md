@@ -51,11 +51,11 @@ Abra a página de [Releases](https://github.com/GBrum0o0/BRUMCLASSICS/releases/l
 
 O GitHub hospeda os arquivos grandes na área de Releases; executáveis não são armazenados no histórico do repositório.
 
-## Novidade da versão 1.45.4
+## Novidade da versão 1.45.5
 
-O sorteio de **O que jogar agora?** percorre até 24 candidatos sem repetir antes de completar o ciclo. Cópias do mesmo título em lojas diferentes ocupam uma única vaga, respeitando a Loja Prioritária.
+A versão 1.45.5 corrige a tela preta introduzida na 1.45.4. A causa era uma colisão de nome entre dois scripts da interface, agora coberta por um teste integrado específico.
 
-A organização da aba Atividades da versão 1.45.3 e o atalho permanente continuam ativos. O BRUMCLASSICS MOVEL permanece na versão 0.10.1.
+O sorteio sem repetição, a organização da aba Atividades e o atalho permanente continuam ativos. O BRUMCLASSICS MOVEL permanece na versão 0.10.1.
 
 ## Instalação rápida
 

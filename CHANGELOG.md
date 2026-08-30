@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## 1.45.5 — Correção da tela preta
+
+- Corrige a tela preta que podia prender o launcher após a atualização 1.45.4.
+- Elimina uma colisão de nome global entre o modelo do sorteador e o renderer.
+- Preserva o ciclo sem repetição de “O que jogar agora?”.
+- Adiciona validação conjunta dos scripts globais carregados pela interface.
+- Contas, biblioteca, coleções, saves, capas e configurações não são recriados nem removidos.
+- BRUMNEWS e linha do tempo atualizadas.
+
 ## 1.45.4 — Sorteio sem repetição
 
 - “O que jogar agora?” deixa de alternar entre os mesmos poucos títulos.
