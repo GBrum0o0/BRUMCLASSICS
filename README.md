@@ -51,9 +51,11 @@ Abra a página de [Releases](https://github.com/GBrum0o0/BRUMCLASSICS/releases/l
 
 O GitHub hospeda os arquivos grandes na área de Releases; executáveis não são armazenados no histórico do repositório.
 
-## Novidade da versão 1.45.1
+## Novidade da versão 1.45.2
 
-O **BRUMCLASSICS MOVEL 0.10.1** deixa o Companion mais focado: somente jogos com conteúdo em Onde parei, Objetivos, Dicas ou Comandos aparecem durante uma sessão. Rascunhos offline contam imediatamente; ao limpar os quatro campos, o cartão volta a ficar oculto.
+O launcher cria e repara um atalho permanente no menu Iniciar, apontando para o arquivo externo `BRUMCLASSICS OFICIAL.exe`. Isso corrige o erro de executável não encontrado causado quando o Windows fixava na barra de tarefas a cópia temporária interna do aplicativo portátil.
+
+Quem já possui um ícone quebrado deve desafixá-lo uma única vez, pesquisar **BRUMCLASSICS OFICIAL** no menu Iniciar e fixar esse resultado. O BRUMCLASSICS MOVEL permanece na versão 0.10.1.
 
 ## Instalação rápida
 

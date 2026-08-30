@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## 1.45.2 — Atalho permanente na barra de tarefas
+
+- Corrige o erro de executável não encontrado após atualizar e reabrir por um ícone fixado.
+- O launcher cria um atalho estável no menu Iniciar apontando para o executável externo permanente.
+- Atalho e janela compartilham o mesmo identificador do aplicativo.
+- O atalho é validado e reparado automaticamente em cada inicialização.
+- Contas, biblioteca, coleções, saves e configurações permanecem no mesmo perfil.
+- BRUMWORLD, BRUMNEWS e linha do tempo atualizadas.
+
 ## 1.45.1 — Companion somente com anotações
 
 - BRUMCOMPANION exibe somente jogos com Onde parei, Objetivos, Dicas ou Comandos preenchidos.
