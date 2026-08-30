@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## 1.47.0 — Correções da auditoria
+
+- Vínculo Ubisoft local preservado ao reabrir; recuperação segura de confirmações anteriores.
+- Steam separa software e DLC sem usar catálogo como prova de propriedade.
+- Botão direito corrigido na causa: removida referência à ação Fila inexistente.
+- Sessões sem fim conhecido marcadas como interrompidas, com backup e sem horas inventadas.
+- Cache de conquistas persistido e monitoramento adaptativo encerrado junto da sessão.
+- BRUMWORLD, linha do tempo e guias do MOVEL 0.11.0 atualizados.
+
+Veja [detalhes e limites](releases/v1.47.0/RELEASE-NOTES.md).
+
 ## 1.46.1 — Menu contextual restaurado
 
 - O botão direito volta a abrir as opções do jogo sem selecioná-lo.

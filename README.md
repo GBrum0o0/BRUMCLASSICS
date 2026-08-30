@@ -51,9 +51,11 @@ Abra a página de [Releases](https://github.com/GBrum0o0/BRUMCLASSICS/releases/l
 
 O GitHub hospeda os arquivos grandes na área de Releases; executáveis não são armazenados no histórico do repositório.
 
-## Novidade da versão 1.46.1
+## Novidades da versão 1.47.0
 
-A versão 1.46.1 restaura o menu contextual da biblioteca: o botão direito abre as opções do jogo sem modificar a seleção. Quando vários jogos já estão selecionados, as ações em lote aparecem somente ao acionar um integrante daquele grupo.
+A versão 1.47.0 corrige a perda do vínculo local Ubisoft no carregamento rápido, identifica software Steam pelo catálogo oficial, remove a referência à antiga Fila que impedia abrir o menu do botão direito, encerra sessões órfãs sem inventar horas e preserva o cache de sincronização das conquistas. Coleções, contas e arquivos pessoais não são recriados.
+
+Confira as [notas da atualização](releases/v1.47.0/RELEASE-NOTES.md) e o [guia atualizado do celular](docs/MOVEL.md). Ubisoft continua usando o fallback local confirmado; não é uma nova autenticação online.
 
 Ela também inclui o BRUMCLASSICS MOVEL 0.11.0, cuja tela Início destaca o último jogo, Favoritos, Quero jogar e Minha jornada. A ponte local agora usa HTTPS com certificado fixado; após atualizar o APK, faça um novo pareamento único pelo QR Code. O cache offline do celular permanece preservado.
 

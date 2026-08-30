@@ -1,18 +1,18 @@
 # BRUMCOMPANION — suas anotações durante o jogo
 
-Requisitos recomendados: BRUMCLASSICS OFICIAL 1.44.2 e BRUMCLASSICS MOVEL 0.9.1.
+Requisitos recomendados: BRUMCLASSICS OFICIAL 1.47.0 e BRUMCLASSICS MOVEL 0.11.0. Consulte também o [guia móvel completo](MOVEL.md).
 
 ## Preparação
 
 1. Atualize o launcher em **Configurações → Sistema → Atualizações**.
-2. Instale o APK 0.9.1 sobre a versão móvel existente, sem apagar os dados do aplicativo. Quem já possui a 0.9.0 pode usar **Perfil → Atualizações**.
+2. Instale o APK 0.11.0 sobre a versão móvel existente, sem apagar os dados do aplicativo. Use **Perfil → Atualizações**; ao migrar de HTTP, refaça o pareamento pelo QR completo HTTPS.
 3. Conecte computador e celular à mesma rede local.
 4. Se ainda não estiver pareado, abra **Configurações → MOVEL** no launcher e **Perfil** no aplicativo para concluir o pareamento.
 5. Abra a aba **COMPANION** no celular.
 
 ## Durante a sessão
 
-Inicie um jogo moderno ou CLASSICS pelo launcher. Quando a sessão real for detectada, a aba mostra o jogo e os campos **Onde parei**, **Objetivos**, **Dicas** e **Comandos**. Edite os textos e toque em **SALVAR NO BRUMCOMPANION**. Cada campo aceita até 6.000 caracteres.
+Inicie um jogo moderno ou CLASSICS pelo launcher. Quando a sessão real for detectada, a aba mostra o jogo se ele já possuir alguma anotação. Os campos são **Onde parei**, **Objetivos**, **Dicas** e **Comandos**. Crie a primeira nota no Perfil do Jogo do desktop. Edite os textos e toque em **SALVAR NO BRUMCOMPANION**. Cada campo aceita até 6.000 caracteres.
 
 Com a conexão ativa, o texto é sincronizado com o Perfil do Jogo no computador. O Companion acompanha a sessão registrada pelo launcher; não promete identificar jogos abertos por fora dele.
 
