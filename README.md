@@ -51,11 +51,11 @@ Abra a página de [Releases](https://github.com/GBrum0o0/BRUMCLASSICS/releases/l
 
 O GitHub hospeda os arquivos grandes na área de Releases; executáveis não são armazenados no histórico do repositório.
 
-## Novidade da versão 1.45.3
+## Novidade da versão 1.45.4
 
-A aba Atividades fica mais direta: a lista recente mostra somente os 10 registros mais novos. Central de Sessões, Metas Pessoais, Fila Jogar Depois e Coleções Inteligentes deixam a interface sem apagar os dados anteriores. Gráfico, mapa anual, Saúde do Sistema, recomendação e Cofre de Saves permanecem disponíveis.
+O sorteio de **O que jogar agora?** percorre até 24 candidatos sem repetir antes de completar o ciclo. Cópias do mesmo título em lojas diferentes ocupam uma única vaga, respeitando a Loja Prioritária.
 
-O atalho permanente da versão 1.45.2 continua ativo. O BRUMCLASSICS MOVEL permanece na versão 0.10.1.
+A organização da aba Atividades da versão 1.45.3 e o atalho permanente continuam ativos. O BRUMCLASSICS MOVEL permanece na versão 0.10.1.
 
 ## Instalação rápida
 

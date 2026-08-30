@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## 1.45.4 — Sorteio sem repetição
+
+- “O que jogar agora?” deixa de alternar entre os mesmos poucos títulos.
+- O ciclo considera até 24 candidatos compatíveis.
+- Cada candidato aparece uma vez antes de o ciclo recomeçar.
+- O último jogo não se repete imediatamente na troca de ciclo.
+- Cópias de lojas diferentes ocupam uma única vaga conforme a Loja Prioritária.
+- Mudanças de tempo ou tipo reiniciam o ciclo com os novos critérios.
+- BRUMWORLD, BRUMNEWS e linha do tempo atualizadas.
+
 ## 1.45.3 — Atividades mais diretas
 
 - Atividades recentes exibe no máximo os 10 registros mais novos.
