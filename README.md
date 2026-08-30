@@ -51,11 +51,11 @@ Abra a página de [Releases](https://github.com/GBrum0o0/BRUMCLASSICS/releases/l
 
 O GitHub hospeda os arquivos grandes na área de Releases; executáveis não são armazenados no histórico do repositório.
 
-## Novidade da versão 1.45.2
+## Novidade da versão 1.45.3
 
-O launcher cria e repara um atalho permanente no menu Iniciar, apontando para o arquivo externo `BRUMCLASSICS OFICIAL.exe`. Isso corrige o erro de executável não encontrado causado quando o Windows fixava na barra de tarefas a cópia temporária interna do aplicativo portátil.
+A aba Atividades fica mais direta: a lista recente mostra somente os 10 registros mais novos. Central de Sessões, Metas Pessoais, Fila Jogar Depois e Coleções Inteligentes deixam a interface sem apagar os dados anteriores. Gráfico, mapa anual, Saúde do Sistema, recomendação e Cofre de Saves permanecem disponíveis.
 
-Quem já possui um ícone quebrado deve desafixá-lo uma única vez, pesquisar **BRUMCLASSICS OFICIAL** no menu Iniciar e fixar esse resultado. O BRUMCLASSICS MOVEL permanece na versão 0.10.1.
+O atalho permanente da versão 1.45.2 continua ativo. O BRUMCLASSICS MOVEL permanece na versão 0.10.1.
 
 ## Instalação rápida
 

@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## 1.45.3 — Atividades mais diretas
+
+- Atividades recentes exibe no máximo os 10 registros mais novos.
+- O limite vale também para filtros por jogo e por dia.
+- Central de Sessões, Metas Pessoais e Coleções Inteligentes foram retiradas da interface.
+- Fila Jogar Depois, seus estados e sua ação no menu dos jogos foram retirados.
+- O Living Room Mode deixa de mostrar o indicador de fila.
+- Dados anteriores permanecem preservados localmente.
+- BRUMWORLD, BRUMNEWS e linha do tempo atualizadas.
+
 ## 1.45.2 — Atalho permanente na barra de tarefas
 
 - Corrige o erro de executável não encontrado após atualizar e reabrir por um ícone fixado.
