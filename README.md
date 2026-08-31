@@ -34,6 +34,7 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - Living Room Mode com controle e mídia física 3D.
 - BRUMWORLD: revista interativa com guias visuais do launcher e do aplicativo.
 - Aplicativo Android com biblioteca offline, capas, estatísticas e BRUMCOMPANION.
+- B-CARD lista jogos instalados no celular e permite iniciar no computador com um gesto autenticado para cima.
 - BRUMCOMPANION identifica o jogo ativo e permite consultar ou editar Onde parei, Objetivos, Dicas e Comandos no celular.
 - O jogo ativo só aparece no BRUMCOMPANION quando possui alguma anotação; sessões sem conteúdo não criam cartões vazios.
 - BRUMMOMENTS registra capturas do jogo ativo com localização, notas, categorias e favoritos em uma galeria privada disponível offline.
@@ -51,13 +52,13 @@ Abra a página de [Releases](https://github.com/GBrum0o0/BRUMCLASSICS/releases/l
 
 O GitHub hospeda os arquivos grandes na área de Releases; executáveis não são armazenados no histórico do repositório.
 
-## Novidades da versão 1.47.0
+## Novidades da versão 1.49.0
 
-A versão 1.47.0 corrige a perda do vínculo local Ubisoft no carregamento rápido, identifica software Steam pelo catálogo oficial, remove a referência à antiga Fila que impedia abrir o menu do botão direito, encerra sessões órfãs sem inventar horas e preserva o cache de sincronização das conquistas. Coleções, contas e arquivos pessoais não são recriados.
+A versão 1.49.0 cria um primeiro acesso simples com conexão Steam e acesso paralelo à BRUMWORLD. CLASSICS passam a usar o hash oficial da ROM para encontrar o conjunto correto no RetroAchievements, com retentativas e diagnósticos distintos. Botões X fecham somente o diálogo superior e o Android passa a navegar para trás antes de sair. A publicação inclui também o B-CARD desenvolvido após a 1.47.0.
 
-Confira as [notas da atualização](releases/v1.47.0/RELEASE-NOTES.md) e o [guia atualizado do celular](docs/MOVEL.md). Ubisoft continua usando o fallback local confirmado; não é uma nova autenticação online.
+Confira as [notas da atualização](releases/v1.49.0/RELEASE-NOTES.md) e o [guia atualizado do celular](docs/MOVEL.md). Contas, biblioteca, ROMs, saves e personalizações não são recriados.
 
-Ela também inclui o BRUMCLASSICS MOVEL 0.11.0, cuja tela Início destaca o último jogo, Favoritos, Quero jogar e Minha jornada. A ponte local agora usa HTTPS com certificado fixado; após atualizar o APK, faça um novo pareamento único pelo QR Code. O cache offline do celular permanece preservado.
+Ela também inclui o BRUMCLASSICS MOVEL 0.13.0. O botão ou gesto Voltar fecha detalhes, B-CARD, pesquisa e filtros na ordem correta; na raiz, dois toques encerram o aplicativo. O cache offline e o pareamento permanecem preservados ao instalar o APK sobre a versão anterior.
 
 ## Instalação rápida
 

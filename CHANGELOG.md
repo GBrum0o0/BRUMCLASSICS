@@ -1,5 +1,20 @@
 # Histórico de versões
 
+## 1.49.0 — Primeiro acesso e CLASSICS confiáveis
+
+- Primeiro acesso por perfil apresenta a conexão Steam e a BRUMWORLD sem obrigar vinculação.
+- Links de SteamID64 e Web API Key usam somente páginas oficiais permitidas.
+- ROMs CLASSICS são identificadas prioritariamente pelos hashes oficiais do RetroAchievements.
+- Sistemas com formatos próprios recebem normalização de hash; ISO deixa de significar PSP automaticamente.
+- Falhas temporárias usam retentativa e preservam o último progresso válido.
+- Botões X e Escape fecham apenas o diálogo superior.
+- BRUMCLASSICS MOVEL 0.13.0 corrige Voltar, gesto lateral e saída por toque duplo.
+- Inclui o B-CARD: gesto autenticado para iniciar no computador um jogo instalado listado no celular.
+- 416 testes automatizados aprovados; APK assinado e auditado.
+- BRUMWORLD, BRUMNEWS e linha do tempo atualizadas.
+
+Veja [detalhes e limites](releases/v1.49.0/RELEASE-NOTES.md).
+
 ## 1.47.0 — Correções da auditoria
 
 - Vínculo Ubisoft local preservado ao reabrir; recuperação segura de confirmações anteriores.

@@ -1,11 +1,11 @@
 # BRUMCOMPANION — suas anotações durante o jogo
 
-Requisitos recomendados: BRUMCLASSICS OFICIAL 1.47.0 e BRUMCLASSICS MOVEL 0.11.0. Consulte também o [guia móvel completo](MOVEL.md).
+Requisitos recomendados: BRUMCLASSICS OFICIAL 1.49.0 e BRUMCLASSICS MOVEL 0.13.0. Consulte também o [guia móvel completo](MOVEL.md).
 
 ## Preparação
 
 1. Atualize o launcher em **Configurações → Sistema → Atualizações**.
-2. Instale o APK 0.11.0 sobre a versão móvel existente, sem apagar os dados do aplicativo. Use **Perfil → Atualizações**; ao migrar de HTTP, refaça o pareamento pelo QR completo HTTPS.
+2. Instale o APK 0.13.0 sobre a versão móvel existente, sem apagar os dados do aplicativo. Use **Perfil → Atualizações**; ao migrar de HTTP, refaça o pareamento pelo QR completo HTTPS.
 3. Conecte computador e celular à mesma rede local.
 4. Se ainda não estiver pareado, abra **Configurações → MOVEL** no launcher e **Perfil** no aplicativo para concluir o pareamento.
 5. Abra a aba **COMPANION** no celular.
