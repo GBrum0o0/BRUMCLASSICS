@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## 1.49.2 — Guia por cópia instalada
+
+- Um novo download ou extração apresenta Steam + BRUMWORLD uma vez, mesmo com perfil e contas antigos.
+- A visualização fica associada ao arquivo externo da instalação, não ao perfil global nem à extração temporária do Electron.
+- Reabrir a mesma cópia não repete o guia, mesmo após fechar o app sem selecionar uma ação.
+- A cópia fixa e as atualizações internas preservam a visualização; baixar manualmente de novo não reutiliza um recibo antigo.
+- Contas, coleções, favoritos e saves permanecem intactos. O botão CONTINUAR COM MINHAS CONEXÕES deixa isso explícito.
+- BRUMWORLD, BRUMNEWS e linha do tempo atualizadas. Android permanece na versão 0.13.1.
+
+Veja [as notas e como testar](releases/v1.49.2/RELEASE-NOTES.md).
+
 ## 1.49.1 — Proteções da validação final
 
 - Catálogo RetroAchievements indisponível preserva o progresso em cache.
