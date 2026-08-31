@@ -6,5 +6,6 @@
 - Testes móveis HomeLibraryTest, PerformanceLiveStateTest e BCardLibraryTest aprovados.
 - B-CARD: categoria explícita prevalece, fallback para cache antigo, instalados por seção, lista vazia e preservação de notas/favoritos/capas.
 - Nenhum teste remove jogos reais ou modifica contas/saves do usuário.
+- Electron offscreen: botão direito em JOGOS/CLASSICS, seleção em lote, Escape, botões do Perfil, cancelar remoção, remover e erro simulado de gravação aprovados com dados fictícios. Animações são finalizadas explicitamente no teste, sem validar sua duração.
 
 Os testes Android de modelo e compilação não substituem um teste visual em telefone físico. Nenhum jogo real foi removido para validação.
