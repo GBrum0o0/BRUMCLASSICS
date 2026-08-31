@@ -1,10 +1,10 @@
-# BRUMCLASSICS MOVEL 0.13.1
+# BRUMCLASSICS MOVEL 0.14.0
 
-Guia compatível com BRUMCLASSICS OFICIAL 1.49.1. Android 8.0 ou superior.
+Guia compatível com BRUMCLASSICS OFICIAL 1.50.0. Android 8.0 ou superior.
 
 ## Instalar e atualizar
 
-Instale o APK 0.13.1 da release oficial sobre o aplicativo existente, sem limpar seus dados. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente. Se a rede externa estiver indisponível, o launcher pareado pode oferecer o mesmo APK localmente.
+Instale o APK 0.14.0 da release oficial sobre o aplicativo existente, sem limpar seus dados. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente. Se a rede externa estiver indisponível, o launcher pareado pode oferecer o mesmo APK localmente.
 
 ## Parear com segurança
 
@@ -28,6 +28,8 @@ Na tela Início, abra **B-CARD** para ver somente jogos cuja instalação foi co
 ## BRUMCOMPANION
 
 Inicie o jogo pelo launcher. O jogo ativo aparece no Companion somente quando tem pelo menos uma anotação (Onde parei, Objetivos, Dicas ou Comandos). Crie a primeira no Perfil do Jogo. O Companion acompanha a sessão detectada, permite editar notas e solicitar capturas para BRUMMOMENTS. Capturar exige computador conectado e jogo ativo; consultar a galeria já sincronizada funciona offline.
+
+O painel de desempenho aparece durante a sessão e mostra CPU, GPU, RAM, VRAM, processo e duração. Toque em **VER DETALHES** para a leitura completa. Métricas sem provedor real aparecem como **INDISP.**. No computador, **Configurações → MOVEL** permite desligar o monitor e o alerta térmico.
 
 ## Conquistas e sessões
 

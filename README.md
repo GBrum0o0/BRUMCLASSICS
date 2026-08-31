@@ -37,6 +37,7 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - B-CARD lista jogos instalados no celular e permite iniciar no computador com um gesto autenticado para cima.
 - BRUMCOMPANION identifica o jogo ativo e permite consultar ou editar Onde parei, Objetivos, Dicas e Comandos no celular.
 - O jogo ativo só aparece no BRUMCOMPANION quando possui alguma anotação; sessões sem conteúdo não criam cartões vazios.
+- Durante a sessão, o BRUMCOMPANION 0.14.0 acompanha CPU, GPU, RAM, VRAM, consumo do processo e duração em tempo real. A coleta isolada pode ser desligada integralmente e não salva histórico por padrão.
 - BRUMMOMENTS registra capturas do jogo ativo com localização, notas, categorias e favoritos em uma galeria privada disponível offline.
 - Anotações e **Quero jogar** podem ser alterados fora da rede; a fila sincroniza ao reencontrar o launcher e conflitos exigem escolha explícita.
 - Temas de destaque preservam o layout, incluindo o novo **Vermelho Arcade**.
@@ -52,13 +53,13 @@ Abra a página de [Releases](https://github.com/GBrum0o0/BRUMCLASSICS/releases/l
 
 O GitHub hospeda os arquivos grandes na área de Releases; executáveis não são armazenados no histórico do repositório.
 
-## Novidades da versão 1.49.2
+## Novidades da versão 1.50.0
 
-A versão 1.49.2 faz Steam + BRUMWORLD aparecer uma vez por nova cópia baixada ou extraída, mesmo quando já existem contas e biblioteca no computador. Reabrir a mesma cópia não repete o guia. Atualizações pelo launcher preservam a visualização. Suas conexões continuam intactas: basta escolher **CONTINUAR COM MINHAS CONEXÕES**.
+A versão 1.50.0 transforma o BRUMCOMPANION em um monitor de desempenho da sessão. O MOVEL recebe CPU, GPU NVIDIA, RAM, VRAM, uso do processo e duração, com visões simples e detalhada. Métricas sem fonte real, como FPS sem PresentMon ou temperatura da CPU sem provedor de sensores, aparecem como indisponíveis — nunca simuladas.
 
-Confira as [notas da atualização](releases/v1.49.2/RELEASE-NOTES.md) e o [guia atualizado do celular](docs/MOVEL.md). Contas, biblioteca, ROMs, saves e personalizações não são recriados. Para rever a apresentação: **Configurações → Conexões → ABRIR GUIA DE PRIMEIRO ACESSO**.
+Confira as [notas da atualização](releases/v1.50.0/RELEASE-NOTES.md), o [guia do BRUMCOMPANION](docs/BRUMCOMPANION.md) e o [guia atualizado do celular](docs/MOVEL.md). A coleta roda em worker isolado apenas durante jogos e pode ser desativada em **Configurações → MOVEL**.
 
-Ela também inclui o BRUMCLASSICS MOVEL 0.13.1. O botão ou gesto Voltar fecha detalhes, B-CARD, pesquisa e filtros na ordem correta; na raiz, dois toques encerram o aplicativo. O cache offline e o pareamento permanecem preservados ao instalar o APK sobre a versão anterior.
+Ela inclui o BRUMCLASSICS MOVEL 0.14.0. O APK preserva cache offline, capas, anotações, BRUMMOMENTS e pareamento ao ser instalado sobre a versão anterior.
 
 ## Instalação rápida
 

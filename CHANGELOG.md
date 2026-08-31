@@ -1,5 +1,17 @@
 # Histórico de versões
 
+## 1.50.0 — BRUMCOMPANION desempenho ao vivo
+
+- Monitor em tempo real de CPU, GPU NVIDIA, RAM, VRAM, processo e duração da sessão.
+- Worker isolado com amostragem de três segundos, iniciado somente durante jogos.
+- MOVEL 0.14.0 oferece visões simples e detalhada sem interromper a edição de anotações.
+- Configurações permitem desligar totalmente o monitor e o alerta térmico opcional de 85 °C.
+- PID e detalhes internos do provedor não são enviados ao celular; histórico fica desativado por padrão.
+- FPS e temperatura da CPU sem provedor compatível aparecem como indisponíveis, nunca simulados.
+- BRUMNEWS, linha do tempo e BRUMWORLD atualizadas.
+
+Veja [detalhes, limites e validação](releases/v1.50.0/RELEASE-NOTES.md).
+
 ## 1.49.2 — Guia por cópia instalada
 
 - Um novo download ou extração apresenta Steam + BRUMWORLD uma vez, mesmo com perfil e contas antigos.
