@@ -1,6 +1,6 @@
 # Validação da release 1.47.0
 
-- 404 testes automatizados: todos passaram.
+- 408 testes automatizados: todos passaram, incluindo persistência do cache de conquistas, cancelamento de consulta ao encerrar a sessão e contagem preservada na reconciliação seguinte.
 - Sintaxe dos módulos JavaScript validada.
 - Os 98 arquivos de src foram comparados por SHA-256 com o app.asar compilado: iguais.
 - Menu contextual testado no renderer compilado usando eventos nativos de mouse no Electron: jogo moderno, seleção em lote e CLASSICS; Escape fecha e a seleção permanece intacta. Verificação inclui opacidade e captura renderizada, não apenas presença no DOM.
