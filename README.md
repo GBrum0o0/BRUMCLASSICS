@@ -52,13 +52,13 @@ Abra a página de [Releases](https://github.com/GBrum0o0/BRUMCLASSICS/releases/l
 
 O GitHub hospeda os arquivos grandes na área de Releases; executáveis não são armazenados no histórico do repositório.
 
-## Novidades da versão 1.49.0
+## Novidades da versão 1.49.1
 
-A versão 1.49.0 cria um primeiro acesso simples com conexão Steam e acesso paralelo à BRUMWORLD. CLASSICS passam a usar o hash oficial da ROM para encontrar o conjunto correto no RetroAchievements, com retentativas e diagnósticos distintos. Botões X fecham somente o diálogo superior e o Android passa a navegar para trás antes de sair. A publicação inclui também o B-CARD desenvolvido após a 1.47.0.
+A versão 1.49.1 cria um primeiro acesso simples com conexão Steam e acesso paralelo à BRUMWORLD. CLASSICS passam a usar o hash oficial da ROM para encontrar o conjunto correto no RetroAchievements, com retentativas e diagnósticos distintos. Botões X fecham somente o diálogo superior e o Android passa a navegar para trás antes de sair. A publicação inclui também o B-CARD desenvolvido após a 1.47.0.
 
-Confira as [notas da atualização](releases/v1.49.0/RELEASE-NOTES.md) e o [guia atualizado do celular](docs/MOVEL.md). Contas, biblioteca, ROMs, saves e personalizações não são recriados.
+Confira as [notas da atualização](releases/v1.49.1/RELEASE-NOTES.md) e o [guia atualizado do celular](docs/MOVEL.md). Contas, biblioteca, ROMs, saves e personalizações não são recriados.
 
-Ela também inclui o BRUMCLASSICS MOVEL 0.13.0. O botão ou gesto Voltar fecha detalhes, B-CARD, pesquisa e filtros na ordem correta; na raiz, dois toques encerram o aplicativo. O cache offline e o pareamento permanecem preservados ao instalar o APK sobre a versão anterior.
+Ela também inclui o BRUMCLASSICS MOVEL 0.13.1. O botão ou gesto Voltar fecha detalhes, B-CARD, pesquisa e filtros na ordem correta; na raiz, dois toques encerram o aplicativo. O cache offline e o pareamento permanecem preservados ao instalar o APK sobre a versão anterior.
 
 ## Instalação rápida
 

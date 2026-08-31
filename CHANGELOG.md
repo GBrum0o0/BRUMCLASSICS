@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## 1.49.1 — Proteções da validação final
+
+- Catálogo RetroAchievements indisponível preserva o progresso em cache.
+- Hash incompatível não é substituído por título semelhante.
+- Pilha real de diálogos e restauração de foco; 18 diálogos verificados no Electron.
+- APK MOVEL 0.13.1 usa versionCode 20 e Predictive Back no manifesto real de build.
+- Build confere manifesto, Gradle e metadados do APK para prevenir divergências.
+- Inclui todas as novidades 1.49.0: primeiro acesso Steam + BRUMWORLD, Voltar e B-CARD.
+
+Veja [notas e orientações](releases/v1.49.1/RELEASE-NOTES.md).
+
 ## 1.49.0 — Primeiro acesso e CLASSICS confiáveis
 
 - Primeiro acesso por perfil apresenta a conexão Steam e a BRUMWORLD sem obrigar vinculação.

@@ -1,10 +1,10 @@
-# BRUMCLASSICS MOVEL 0.13.0
+# BRUMCLASSICS MOVEL 0.13.1
 
-Guia compatível com BRUMCLASSICS OFICIAL 1.49.0. Android 8.0 ou superior.
+Guia compatível com BRUMCLASSICS OFICIAL 1.49.1. Android 8.0 ou superior.
 
 ## Instalar e atualizar
 
-Instale o APK 0.13.0 da release oficial sobre o aplicativo existente, sem limpar seus dados. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente. Se a rede externa estiver indisponível, o launcher pareado pode oferecer o mesmo APK localmente.
+Instale o APK 0.13.1 da release oficial sobre o aplicativo existente, sem limpar seus dados. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente. Se a rede externa estiver indisponível, o launcher pareado pode oferecer o mesmo APK localmente.
 
 ## Parear com segurança
 
@@ -31,7 +31,7 @@ Inicie o jogo pelo launcher. O jogo ativo aparece no Companion somente quando te
 
 ## Conquistas e sessões
 
-O móvel recebe os dados do launcher; não autentica suas lojas novamente. Conquistas dependem do suporte da plataforma, privacidade e disponibilidade da API. Atualização em segundo plano não significa desbloqueio instantâneo. No launcher 1.49.0, CLASSICS usam o hash da ROM para localizar o conjunto oficial e explicam quando o arquivo não é reconhecido.
+O móvel recebe os dados do launcher; não autentica suas lojas novamente. Conquistas dependem do suporte da plataforma, privacidade e disponibilidade da API. Atualização em segundo plano não significa desbloqueio instantâneo. No launcher 1.49.1, CLASSICS usam o hash da ROM para localizar o conjunto oficial e explicam quando o arquivo não é reconhecido.
 
 ## Botão e gesto Voltar
 
