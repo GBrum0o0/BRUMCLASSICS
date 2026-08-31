@@ -1,11 +1,11 @@
 # BRUMCOMPANION — anotações e desempenho durante o jogo
 
-Requisitos recomendados: BRUMCLASSICS OFICIAL 1.50.1 e BRUMCLASSICS MOVEL 0.14.1. Consulte também o [guia móvel completo](MOVEL.md).
+Requisitos recomendados: BRUMCLASSICS OFICIAL 1.51.0 e BRUMCLASSICS MOVEL 0.15.0. Consulte também o [guia móvel completo](MOVEL.md).
 
 ## Preparação
 
 1. Atualize o launcher em **Configurações → Sistema → Atualizações**.
-2. Instale o APK 0.14.1 sobre a versão móvel existente, sem apagar os dados do aplicativo. Use **Perfil → Atualizações**; ao migrar de HTTP, refaça o pareamento pelo QR completo HTTPS.
+2. Instale o APK 0.15.0 sobre a versão móvel existente, sem apagar os dados do aplicativo. Use **Perfil → Atualizações**; ao migrar de HTTP, refaça o pareamento pelo QR completo HTTPS.
 3. Conecte computador e celular à mesma rede local.
 4. Se ainda não estiver pareado, abra **Configurações → MOVEL** no launcher e **Perfil** no aplicativo para concluir o pareamento.
 5. Abra a aba **COMPANION** no celular.
@@ -32,8 +32,8 @@ Se ambos os dispositivos alterarem o mesmo campo, o aplicativo preserva o rascun
 
 ## O jogo não aparece?
 
-- Confira se o executável aberto é realmente o 1.50.1, não apenas um arquivo novo na pasta enquanto o anterior continua rodando.
-- Confira se o APK instalado é o 0.14.1. As próximas versões aparecerão em **Perfil → Atualizações**.
+- Confira se o executável aberto é realmente o 1.51.0, não apenas um arquivo novo na pasta enquanto o anterior continua rodando.
+- Confira se o APK instalado é o 0.15.0. As próximas versões aparecerão em **Perfil → Atualizações**.
 - Veja se o celular está conectado ao launcher correto na mesma rede.
 - Abra o jogo pelo launcher e aguarde a detecção do processo.
 - Se necessário, reabra o aplicativo para renovar a conexão. Só refaça o pareamento se ele tiver sido revogado ou perdido.

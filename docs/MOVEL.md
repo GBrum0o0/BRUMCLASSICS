@@ -1,10 +1,10 @@
-# BRUMCLASSICS MOVEL 0.14.1
+# BRUMCLASSICS MOVEL 0.15.0
 
-Guia compatível com BRUMCLASSICS OFICIAL 1.50.1. Android 8.0 ou superior.
+Guia compatível com BRUMCLASSICS OFICIAL 1.51.0. Android 8.0 ou superior.
 
 ## Instalar e atualizar
 
-Instale o APK 0.14.1 da release oficial sobre o aplicativo existente, sem limpar seus dados. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente. Se a rede externa estiver indisponível, o launcher pareado pode oferecer o mesmo APK localmente.
+Instale o APK 0.15.0 da release oficial sobre o aplicativo existente, sem limpar seus dados. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente. Se a rede externa estiver indisponível, o launcher pareado pode oferecer o mesmo APK localmente.
 
 ## Parear com segurança
 
@@ -22,6 +22,8 @@ A tela Início destaca o último jogo, Favoritos, Quero jogar e Minha jornada. D
 Anotações e Quero jogar editados offline entram em uma fila. Ao retornar à rede com o launcher aberto, as alterações são enviadas. Se os dois aparelhos alterarem o mesmo campo, escolha qual versão preservar; não é necessário limpar o banco.
 
 ## B-CARD
+
+Escolha a aba **JOGOS** ou **CLASSICS**. A contagem e a grade de cada aba incluem somente os instalados daquela categoria. A classificação é a mesma do launcher, inclusive após uma correção manual de seção; trocar abas não altera os jogos ou seus saves.
 
 Na tela Início, abra **B-CARD** para ver somente jogos cuja instalação foi confirmada pelo launcher. Toque em um jogo, arraste o cartão para cima e solte para enviar a solicitação autenticada ao computador. O launcher valida novamente a identidade e o estado do jogo antes de abrir. Em CLASSICS, escolha Novo jogo, autosave ou save manual. O gesto exige que o computador pareado esteja ligado e na mesma rede; nenhuma execução fica pendente para depois.
 

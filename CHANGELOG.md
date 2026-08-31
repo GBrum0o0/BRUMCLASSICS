@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## 1.51.0 — Remoção segura e B-CARD por categoria
+
+- Remover da biblioteca no Perfil, edição e botão direito, sem apagar arquivos ou saves.
+- Cadastro arquivado e proteção contra reimportação automática por varredura.
+- EDITAR JOGO corrige a seção sem remover.
+- MOVEL 0.15.0 separa B-CARD em JOGOS e CLASSICS.
+
+Veja [notas e instruções](releases/v1.51.0/RELEASE-NOTES.md).
+
 ## 1.50.1 — Ciclo de vida do monitor
 
 - MOVEL 0.14.1 exibe a primeira leitura sem sair do Companion e oculta dados offline ou expirados.
