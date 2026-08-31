@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## 1.50.1 — Ciclo de vida do monitor
+
+- MOVEL 0.14.1 exibe a primeira leitura sem sair do Companion e oculta dados offline ou expirados.
+- Troca de jogo invalida coletas antigas; troca de PID atualiza o monitor.
+- CPU do processo normalizada pelo total de processadores lógicos.
+- Limite esclarecido: FPS e temperatura da CPU ainda não têm integração, independentemente de ferramentas instaladas.
+
+Veja [notas e limites](releases/v1.50.1/RELEASE-NOTES.md).
+
 ## 1.50.0 — BRUMCOMPANION desempenho ao vivo
 
 - Monitor em tempo real de CPU, GPU NVIDIA, RAM, VRAM, processo e duração da sessão.

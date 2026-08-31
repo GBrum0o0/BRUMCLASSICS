@@ -1,10 +1,10 @@
-# BRUMCLASSICS MOVEL 0.14.0
+# BRUMCLASSICS MOVEL 0.14.1
 
-Guia compatível com BRUMCLASSICS OFICIAL 1.50.0. Android 8.0 ou superior.
+Guia compatível com BRUMCLASSICS OFICIAL 1.50.1. Android 8.0 ou superior.
 
 ## Instalar e atualizar
 
-Instale o APK 0.14.0 da release oficial sobre o aplicativo existente, sem limpar seus dados. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente. Se a rede externa estiver indisponível, o launcher pareado pode oferecer o mesmo APK localmente.
+Instale o APK 0.14.1 da release oficial sobre o aplicativo existente, sem limpar seus dados. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente. Se a rede externa estiver indisponível, o launcher pareado pode oferecer o mesmo APK localmente.
 
 ## Parear com segurança
 
