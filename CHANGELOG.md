@@ -1,5 +1,17 @@
 # Histórico de versões
 
+## 1.53.0 — Jogo não oficial com metadados seguros
+
+- Cadastro explícito de jogos locais fora das lojas, com nome e executável obrigatório.
+- SteamID opcional usado somente para nome oficial, capa e imagens secundárias.
+- A referência Steam não comprova propriedade, não vincula conta e não habilita instalação pela loja.
+- Horas locais, sessões, Living Room, anotações, B-CARD e BRUMCOMPANION continuam ligados ao executável real.
+- A biblioteca e o aplicativo móvel identificam a origem não oficial sem expor caminhos locais.
+- BRUMWORLD, BRUMNEWS e linha do tempo atualizadas.
+- 454 testes automatizados e 104 arquivos empacotados conferidos.
+
+Veja [notas e validação](releases/v1.53.0/RELEASE-NOTES.md).
+
 ## 1.52.0 — FPS, temperatura da CPU e AMD/Intel
 
 - FPS real via PresentMon portátil oficial, ativado somente após confirmação.

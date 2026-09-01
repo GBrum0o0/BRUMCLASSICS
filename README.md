@@ -28,6 +28,7 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - Biblioteca unificada de jogos modernos e clássicos.
 - Integração com Steam, Epic Games, GOG, EA App e Ubisoft Connect, conforme a disponibilidade de cada serviço.
 - Busca, filtros, coleções, favoritos e prioridade de loja.
+- Jogos não oficiais podem ser cadastrados com executável local e SteamID opcional apenas para recuperar nome e mídias, sem criar uma falsa licença de loja.
 - Remover da biblioteca sem desinstalar o jogo; correção de seção pelo Perfil → Editar jogo.
 - Conquistas modernas e RetroAchievements.
 - Registro pessoal de **História completada** para jogos modernos e CLASSICS, separado do percentual de conquistas.
@@ -54,11 +55,11 @@ Abra a página de [Releases](https://github.com/GBrum0o0/BRUMCLASSICS/releases/l
 
 O GitHub hospeda os arquivos grandes na área de Releases; executáveis não são armazenados no histórico do repositório.
 
-## Novidades da versão 1.51.0
+## Novidades da versão 1.53.0
 
-A versão 1.51.0 transforma o BRUMCOMPANION em um monitor de desempenho da sessão. O MOVEL recebe CPU, GPU NVIDIA, RAM, VRAM, uso do processo e duração, com visões simples e detalhada. Métricas sem fonte real, como FPS ou temperatura da CPU, ainda sem integração, aparecem como indisponíveis — nunca simuladas.
+A versão 1.53.0 cria o conceito de **Jogo não oficial** para executáveis locais fora das lojas. Em **JOGOS → ADICIONAR JOGO**, marque a opção, informe o nome, selecione o `.exe` e, opcionalmente, use um SteamID de referência para recuperar o título oficial, a capa e imagens secundárias.
 
-Confira as [notas da atualização](releases/v1.51.0/RELEASE-NOTES.md), o [guia do BRUMCOMPANION](docs/BRUMCOMPANION.md) e o [guia atualizado do celular](docs/MOVEL.md). A coleta roda em worker isolado apenas durante jogos e pode ser desativada em **Configurações → MOVEL**.
+Confira as [notas e a validação](releases/v1.53.0/RELEASE-NOTES.md). O SteamID permanece separado da identidade da loja: ele não prova propriedade, não vincula a conta e não habilita instalação Steam. O executável real continua alimentando horas, sessões e BRUMCOMPANION.
 
 Ela inclui o BRUMCLASSICS MOVEL 0.15.0. O APK preserva cache offline, capas, anotações, BRUMMOMENTS e pareamento ao ser instalado sobre a versão anterior.
 
@@ -74,7 +75,7 @@ Ela inclui o BRUMCLASSICS MOVEL 0.15.0. O APK preserva cache offline, capas, ano
 
 ![Sumário da BRUMWORLD](docs/images/brumworld-sumario.png)
 
-Na aba BRUMNEWS, clique na capa da BRUMWORLD. Use `A` e `D` ou as setas laterais para folhear. O sumário abre diretamente os guias de lojas, biblioteca, CLASSICS, Living Room, conquistas, saves, diagnóstico e aplicativo móvel.
+Na aba BRUMNEWS, clique na capa da BRUMWORLD. Use `A` e `D` ou as setas laterais para folhear. O guia de biblioteca também ensina a cadastrar um jogo não oficial sem confundi-lo com uma licença Steam.
 
 ## Privacidade
 

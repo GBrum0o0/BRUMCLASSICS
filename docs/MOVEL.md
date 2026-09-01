@@ -1,5 +1,7 @@
 # BRUMCLASSICS MOVEL 0.15.0
 
+Jogos cadastrados no launcher como **não oficiais** são sincronizados como itens locais instalados. O aplicativo recebe somente a classificação e o SteamID de referência quando houver; o caminho do executável nunca sai do computador. B-CARD, anotações e BRUMCOMPANION continuam usando a identidade segura enviada pelo launcher.
+
 Guia compatível com BRUMCLASSICS OFICIAL 1.51.0. Android 8.0 ou superior.
 
 ## Instalar e atualizar
