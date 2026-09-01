@@ -38,7 +38,7 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - B-CARD lista jogos instalados no celular e permite iniciar no computador com um gesto autenticado para cima.
 - BRUMCOMPANION identifica o jogo ativo e permite consultar ou editar Onde parei, Objetivos, Dicas e Comandos no celular.
 - O jogo ativo só aparece no BRUMCOMPANION quando possui alguma anotação; sessões sem conteúdo não criam cartões vazios.
-- Durante a sessão, o BRUMCOMPANION 0.15.0 acompanha CPU, GPU, RAM, VRAM, consumo do processo e duração em tempo real. A coleta isolada pode ser desligada integralmente e não salva histórico por padrão.
+- Durante a sessão, o BRUMCOMPANION acompanha CPU, GPU AMD/Intel/NVIDIA, RAM, VRAM, consumo do processo, duração, temperatura da CPU quando há sensor confiável e FPS real via PresentMon opcional. A coleta isolada pode ser desligada e não salva histórico por padrão.
 - BRUMMOMENTS registra capturas do jogo ativo com localização, notas, categorias e favoritos em uma galeria privada disponível offline.
 - Anotações e **Quero jogar** podem ser alterados fora da rede; a fila sincroniza ao reencontrar o launcher e conflitos exigem escolha explícita.
 - Temas de destaque preservam o layout, incluindo o novo **Vermelho Arcade**.

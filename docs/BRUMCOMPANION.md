@@ -1,6 +1,6 @@
 # BRUMCOMPANION — anotações e desempenho durante o jogo
 
-Requisitos recomendados: BRUMCLASSICS OFICIAL 1.51.0 e BRUMCLASSICS MOVEL 0.15.0. Consulte também o [guia móvel completo](MOVEL.md).
+Requisitos recomendados: BRUMCLASSICS OFICIAL 1.52.0 e BRUMCLASSICS MOVEL 0.15.0. Consulte também o [guia móvel completo](MOVEL.md).
 
 ## Preparação
 
@@ -18,9 +18,11 @@ Com a conexão ativa, o texto é sincronizado com o Perfil do Jogo no computador
 
 ## Desempenho ao vivo
 
-Durante a sessão, o painel mostra CPU, GPU, RAM, VRAM, consumo do processo e duração. Use **VER DETALHES** para alternar entre a leitura rápida e a completa. GPUs NVIDIA usam `nvidia-smi` quando disponível.
+Durante a sessão, o painel mostra CPU, GPU, RAM, VRAM, consumo do processo, duração e, quando configurado, FPS e temperatura da CPU. Use **VER DETALHES** para alternar entre a leitura rápida e a completa. GPUs NVIDIA usam `nvidia-smi` quando disponível; AMD e Intel usam os contadores nativos de GPU do Windows.
 
-FPS, frame time e temperatura da CPU ainda não têm provedor integrado nesta versão. Instalar PresentMon sozinho não ativa esses campos. O aplicativo mostra **INDISP.**, sem simular dados. Em GPUs não NVIDIA, as métricas específicas podem permanecer indisponíveis nesta versão.
+Para ativar FPS, abra **Configurações → MOVEL → ATIVAR FPS**. O launcher pede confirmação, baixa o PresentMon portátil somente do projeto oficial GameTechDev/PresentMon e valida o SHA-256 publicado pelo GitHub. Não instala driver ou serviço e não injeta DLL no jogo.
+
+A temperatura da CPU aparece quando o firmware identifica explicitamente o sensor ou quando LibreHardwareMonitor/OpenHardwareMonitor já está ativo e publica um sensor de CPU. O BRUMCLASSICS não instala esses programas nem seus drivers. Sensores ausentes ou ambíguos aparecem como **INDISP.**, sem transformar temperatura da placa-mãe em temperatura da CPU.
 
 A coleta roda a cada três segundos em worker isolado e somente enquanto existe uma sessão. Em **Configurações → MOVEL**, desligue integralmente o monitor ou apenas o alerta térmico. Nenhum histórico é salvo por padrão, PID não é transmitido e nenhuma DLL é injetada no jogo.
 
@@ -32,7 +34,7 @@ Se ambos os dispositivos alterarem o mesmo campo, o aplicativo preserva o rascun
 
 ## O jogo não aparece?
 
-- Confira se o executável aberto é realmente o 1.51.0, não apenas um arquivo novo na pasta enquanto o anterior continua rodando.
+- Confira se o executável aberto é realmente o 1.52.0, não apenas um arquivo novo na pasta enquanto o anterior continua rodando.
 - Confira se o APK instalado é o 0.15.0. As próximas versões aparecerão em **Perfil → Atualizações**.
 - Veja se o celular está conectado ao launcher correto na mesma rede.
 - Abra o jogo pelo launcher e aguarde a detecção do processo.

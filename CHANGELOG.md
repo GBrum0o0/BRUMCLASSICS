@@ -1,5 +1,17 @@
 # Histórico de versões
 
+## 1.52.0 — FPS, temperatura da CPU e AMD/Intel
+
+- FPS real via PresentMon portátil oficial, ativado somente após confirmação.
+- Download validado pela origem oficial e pelo SHA-256 publicado no GitHub.
+- Temperatura da CPU por sensor identificado do LibreHardwareMonitor, OpenHardwareMonitor ou ACPI confiável.
+- Uso de GPU por processo e VRAM para AMD e Intel pelos contadores nativos do Windows.
+- NVIDIA mantém `nvidia-smi` e recebe fallback para os contadores do Windows.
+- Métricas ausentes continuam como indisponíveis; nenhum valor é estimado.
+- BRUMWORLD e linha do tempo atualizadas.
+
+Veja [notas e limites](releases/v1.52.0/RELEASE-NOTES.md).
+
 ## 1.51.0 — Remoção segura e B-CARD por categoria
 
 - Remover da biblioteca no Perfil, edição e botão direito, sem apagar arquivos ou saves.
