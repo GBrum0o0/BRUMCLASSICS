@@ -1,5 +1,18 @@
 # Histórico de versões
 
+## 1.53.1 — Nome oficial e capa sem SteamID
+
+- BUSCAR DADOS procura o jogo pelo nome quando o SteamID de referência fica vazio.
+- Correspondências ambíguas ou fracas são recusadas, evitando associação silenciosa ao jogo errado.
+- Título oficial e AppID aparecem na tela antes de salvar.
+- Nome oficial, capa vertical e imagens secundárias são preenchidos a partir do resultado confirmado.
+- Jogos não oficiais já cadastrados sem mídia entram no reparo automático do refresh.
+- Executável, propriedade, horas, sessões, anotações e BRUMCOMPANION permanecem preservados.
+- BRUMWORLD, BRUMNEWS e linha do tempo atualizadas.
+- 457 testes automatizados e 104 arquivos empacotados conferidos.
+
+Veja [notas e validação](releases/v1.53.1/RELEASE-NOTES.md).
+
 ## 1.53.0 — Jogo não oficial com metadados seguros
 
 - Cadastro explícito de jogos locais fora das lojas, com nome e executável obrigatório.

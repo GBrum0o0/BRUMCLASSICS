@@ -28,7 +28,7 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - Biblioteca unificada de jogos modernos e clássicos.
 - Integração com Steam, Epic Games, GOG, EA App e Ubisoft Connect, conforme a disponibilidade de cada serviço.
 - Busca, filtros, coleções, favoritos e prioridade de loja.
-- Jogos não oficiais podem ser cadastrados com executável local e SteamID opcional apenas para recuperar nome e mídias, sem criar uma falsa licença de loja.
+- Jogos não oficiais podem ser cadastrados com executável local e SteamID opcional. **BUSCAR DADOS** usa o ID exato ou uma correspondência segura pelo nome para mostrar título oficial e recuperar capa e imagens, sem criar uma falsa licença de loja.
 - Remover da biblioteca sem desinstalar o jogo; correção de seção pelo Perfil → Editar jogo.
 - Conquistas modernas e RetroAchievements.
 - Registro pessoal de **História completada** para jogos modernos e CLASSICS, separado do percentual de conquistas.
