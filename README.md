@@ -27,6 +27,7 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 
 - Biblioteca unificada de jogos modernos e clássicos.
 - Integração com Steam, Epic Games, GOG, EA App e Ubisoft Connect, conforme a disponibilidade de cada serviço.
+- Família Steam opcional: jogos compartilhados atualmente acessíveis entram identificados separadamente, sem serem tratados como compras da conta.
 - Busca, filtros, coleções, favoritos e prioridade de loja.
 - Jogos não oficiais podem ser cadastrados com executável local e SteamID opcional. **BUSCAR DADOS** usa o ID exato ou uma correspondência segura pelo nome para mostrar título oficial e recuperar capa e imagens, sem criar uma falsa licença de loja.
 - Remover da biblioteca sem desinstalar o jogo; correção de seção pelo Perfil → Editar jogo.
@@ -55,11 +56,11 @@ Abra a página de [Releases](https://github.com/GBrum0o0/BRUMCLASSICS/releases/l
 
 O GitHub hospeda os arquivos grandes na área de Releases; executáveis não são armazenados no histórico do repositório.
 
-## Novidades da versão 1.53.0
+## Novidades da versão 1.54.0
 
-A versão 1.53.0 cria o conceito de **Jogo não oficial** para executáveis locais fora das lojas. Em **JOGOS → ADICIONAR JOGO**, marque a opção, informe o nome, selecione o `.exe` e, opcionalmente, use um SteamID de referência para recuperar o título oficial, a capa e imagens secundárias.
+A versão 1.54.0 adiciona a biblioteca da **Família Steam**. Depois de conectar a Steam normalmente, abra **Configurações → Conexões**, clique em **ATIVAR FAMÍLIA**, obtenha o token temporário na página oficial aberta pelo launcher e sincronize.
 
-Confira as [notas e a validação](releases/v1.53.0/RELEASE-NOTES.md). O SteamID permanece separado da identidade da loja: ele não prova propriedade, não vincula a conta e não habilita instalação Steam. O executável real continua alimentando horas, sessões e BRUMCOMPANION.
+Confira as [notas e a validação](releases/v1.54.0/RELEASE-NOTES.md). O launcher identifica esses títulos como `family_shared`, mantém jogos próprios com prioridade por AppID e preserva o último catálogo familiar caso o token temporário expire.
 
 Ela inclui o BRUMCLASSICS MOVEL 0.15.0. O APK preserva cache offline, capas, anotações, BRUMMOMENTS e pareamento ao ser instalado sobre a versão anterior.
 

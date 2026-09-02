@@ -1,5 +1,19 @@
 # Histórico de versões
 
+## 1.54.0 — Família Steam
+
+- Ativação opcional da biblioteca familiar dentro de Configurações → Conexões.
+- Consulta da sessão oficial da Steam para importar somente jogos compartilhados atualmente acessíveis.
+- Classificação `family_shared`, separada de compras, licenças gratuitas e instalações locais.
+- Deduplicação por AppID: a licença própria sempre vence quando o mesmo jogo também aparece na família.
+- Filtro de aplicativos excluídos, indisponíveis, gratuitos da outra conta e itens que não sejam jogos.
+- Token temporário protegido pela criptografia do Windows e omitido da interface pública e dos logs.
+- Último catálogo familiar preservado quando o token expira ou a resposta é parcial.
+- BRUMWORLD, BRUMNEWS e linha do tempo atualizadas.
+- 464 testes automatizados aprovados.
+
+Veja [notas, instruções e validação](releases/v1.54.0/RELEASE-NOTES.md).
+
 ## 1.53.1 — Nome oficial e capa sem SteamID
 
 - BUSCAR DADOS procura o jogo pelo nome quando o SteamID de referência fica vazio.
