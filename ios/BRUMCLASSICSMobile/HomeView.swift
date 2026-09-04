@@ -20,7 +20,7 @@ struct HomeView: View {
                 }
                 if let lastPlayed { FeaturedGameCard(game: lastPlayed) }
                 NavigationLink { BCardLibraryView() } label: { SettingsRow(icon: "rectangle.portrait.on.rectangle.portrait", title: "B-CARD", detail: "Seus jogos instalados · Jogos e CLASSICS") }
-                NavigationLink { ClassicsEverywhereView() } label: { SettingsRow(icon: "gamecontroller", title: "CLASSICS in every everywhere", detail: "Adicionar ROMs e jogar no iPhone com RetroArch") }.accessibilityIdentifier("classics-everywhere-link")
+                NavigationLink { ClassicsEverywhereView() } label: { SettingsRow(icon: "gamecontroller", title: "CLASSICS in every everywhere", detail: "Sua biblioteca do RetroArch · toque na capa para jogar") }.accessibilityIdentifier("classics-everywhere-link")
                 GameStrip(title: "FAVORITOS", games: favorites, empty: "Marque jogos como favoritos no launcher ou no perfil do jogo.")
                 GameStrip(title: "QUERO JOGAR", games: wantToPlay, empty: "Sua lista Quero jogar aparecerá aqui.")
                 JourneyCard(games: store.snapshot.games)

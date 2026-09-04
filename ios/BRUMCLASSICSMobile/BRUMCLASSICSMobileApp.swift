@@ -14,7 +14,12 @@ struct BRUMCLASSICSMobileApp: App {
                 .task { await pocket.restore(); await pocket.sync(launcher: store) }
                 .preferredColorScheme(.dark)
                 .tint(BrumTheme.primary)
-                .onOpenURL { url in Task { await store.pair(from: url) } }
+                .onOpenURL { url in
+                    Task {
+                        if url.scheme?.lowercased() == "brumclassics", url.host?.lowercased() == "retroarch" { await pocket.receiveRetroArchLibrary(url, launcher: store) }
+                        else { await store.pair(from: url) }
+                    }
+                }
                 .onChange(of: store.connection) { connection in
                     if connection == .online { Task { await pocket.sync(launcher: store) } }
                 }

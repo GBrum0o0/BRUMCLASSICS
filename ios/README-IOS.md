@@ -1,6 +1,6 @@
 # BRUMCLASSICS MÓVEL para iOS
 
-Versão 0.5.0: [horas offline e sincronização com o PC](HORAS-OFFLINE.md). Inclui medição pelos logs reais do RetroArch, fila persistente e envio sem duplicação ao launcher 1.55.3+. A autorização da pasta de logs e o vínculo inicial são feitos no iPhone. Também mantém o [guia CLASSICS in every everywhere e RetroArch](BRUMWORLD-IOS-0.4.0.md): ROMs locais, atalho externo para o emulador e conquistas oficiais em cache.
+Versão 0.6.0: [biblioteca e abertura direta pelo RetroArch compatível](RETROARCH-COMPATIVEL.md), além de [horas offline e sincronização com o PC](HORAS-OFFLINE.md). O aplicativo mostra as capas sincronizadas do PC separadas dos arquivos realmente jogáveis. Após o RetroArch confirmar sua biblioteca, tocar na capa abre o título exato.
 
 Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o mesmo protocolo local seguro (versão 8) do aplicativo Android e não altera o launcher nem o perfil do usuário.
 
@@ -18,6 +18,8 @@ Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o mesmo protocolo
 - BRUMCOMPANION como segunda tela: jogo ativo, anotações editáveis, métricas e BRUMMOMENTS; sem controle remoto.
 - B-CARD separado entre Jogos e CLASSICS, com a preferência Novo jogo / Auto Save / Save Manual nas configurações do app.
 - Horas de CLASSICS no iPhone persistidas offline por logs agregados do RetroArch, sem cronômetro fictício de segundo plano.
+- Consulta autenticada entre aplicativos pela URL `retroarch://library`, com retorno ao BRUMCLASSICS e cache da biblioteca real do emulador.
+- Abertura direta por identidade exata `titleId`; nomes ambíguos ou arquivos duplicados nunca iniciam outro jogo por aproximação.
 - BRUMMOMENTS com captura da sessão ativa, galeria offline, localização, anotação, categoria e favoritos.
 - Atualização pessoal: verificação automática de versão no Perfil e acesso ao build do GitHub Actions.
 
@@ -71,4 +73,4 @@ Não publique o `.ipa` em Releases se quiser mantê-lo pessoal. Artefatos de Act
 
 ## Privacidade
 
-O aplicativo não recebe senhas de lojas, caminhos locais do PC ou executáveis. ROMs próprias são importadas explicitamente pelo usuário e permanecem no armazenamento do iPhone. A permissão de leitura da pasta de logs do RetroArch é escolhida pelo app Arquivos; somente os contadores dos jogos vinculados são enviados ao PC pareado. O token do launcher e a Web API Key RetroAchievements ficam no Keychain. O usuário e a chave são enviados apenas ao serviço RetroAchievements para consultar o progresso. Biblioteca, capas, progresso e fila offline usam proteção de arquivos do iOS. O app não oferece comandos de desligamento ou suspensão do PC.
+O aplicativo não recebe senhas de lojas, caminhos locais do PC ou executáveis. A biblioteca do RetroArch devolve somente título, identidade, sistema e núcleo; ROMs não são copiadas de volta para o BRUMCLASSICS. A permissão de leitura da pasta de logs é escolhida pelo app Arquivos; somente os contadores dos jogos vinculados são enviados ao PC pareado. O token do launcher e a Web API Key RetroAchievements ficam no Keychain. O usuário e a chave são enviados apenas ao RetroAchievements para consultar o progresso. Biblioteca, capas, progresso e fila offline usam proteção de arquivos do iOS. O app não oferece comandos de desligamento ou suspensão do PC.

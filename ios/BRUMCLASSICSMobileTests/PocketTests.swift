@@ -35,4 +35,29 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: copied), bytes)
         XCTAssertEqual(try Data(contentsOf: source), bytes)
     }
+    func testRetroArchLibraryCallbackUsesExactSafeIdentity() throws {
+        let rows: [[String: Any]] = [
+            ["titleId": "Pokemon.gba", "titleName": "Pokémon FireRed", "filename": "Pokemon.gba", "gameId": "gba:1", "system": "Nintendo - Game Boy Advance"],
+            ["titleId": "../escape.gba", "titleName": "Unsafe", "filename": "../escape.gba", "gameId": "gba:2"],
+            ["titleId": "wrong.nes", "titleName": "Mismatch", "filename": "other.nes", "gameId": "nes:3"]
+        ]
+        let data = try JSONSerialization.data(withJSONObject: rows)
+        var encoded = data.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+        var components = URLComponents(); components.scheme = "brumclassics"; components.host = "retroarch"; components.queryItems = [.init(name: "games", value: encoded)]
+        let decoded = try RetroArchLibraryRules.decode(components.url!)
+        XCTAssertEqual(decoded.map(\.titleId), ["Pokemon.gba"])
+        XCTAssertEqual(RetroArchLibraryRules.launchURL(titleId: decoded[0].titleId)?.absoluteString, "retroarch://game/Pokemon.gba")
+        encoded = "invalid***"; components.queryItems = [.init(name: "games", value: encoded)]
+        XCTAssertThrowsError(try RetroArchLibraryRules.decode(components.url!))
+    }
+    func testRetroArchDuplicateFilenamesAreNotOfferedAsWrongGame() throws {
+        let rows = [
+            ["titleId": "game.zip", "titleName": "One", "filename": "game.zip", "gameId": "a"],
+            ["titleId": "game.zip", "titleName": "Two", "filename": "game.zip", "gameId": "b"]
+        ]
+        let data = try JSONSerialization.data(withJSONObject: rows)
+        let encoded = data.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+        let url = URL(string: "brumclassics://retroarch?games=\(encoded)")!
+        XCTAssertTrue(try RetroArchLibraryRules.decode(url).isEmpty)
+    }
 }

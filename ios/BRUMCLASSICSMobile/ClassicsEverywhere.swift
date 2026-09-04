@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 import UIKit
 
 struct PocketClassic: Codable, Identifiable, Equatable {
@@ -112,7 +111,10 @@ actor PocketRAClient {
     @Published private(set) var runtimeRecords: [PocketRuntimeRecord] = []
     @Published private(set) var runtimeConfigured = false
     @Published private(set) var runtimeStatus = ""
+    @Published private(set) var retroArchGames: [RetroArchLibraryGame] = []
+    @Published private(set) var retroArchLibraryStatus = ""
     private let runtime = PocketRuntimeFiles()
+    private let retroArchFiles = RetroArchLibraryFiles()
     private var timeBusy = false
     private let files = PocketFiles()
     private let api = PocketRAClient()
@@ -133,8 +135,59 @@ actor PocketRAClient {
     }
     func restore() async {
         guard !loaded else { return }
-        do { games = try await files.load(); loaded = true; await reloadRuntime() }
+        do { games = try await files.load(); loaded = true; retroArchGames = (try? await retroArchFiles.load()) ?? []; await reloadRuntime() }
         catch { status = "Não foi possível ler o catálogo local. Seus arquivos foram preservados." }
+    }
+    func requestRetroArchLibrary() {
+        retroArchLibraryStatus = "Consultando a biblioteca do RetroArch…"
+        UIApplication.shared.open(RetroArchLibraryRules.queryURL()) { opened in
+            if !opened { Task { @MainActor in self.retroArchLibraryStatus = "Instale a edição compatível do RetroArch fornecida com o BRUMCLASSICS." } }
+        }
+    }
+    func receiveRetroArchLibrary(_ url: URL, launcher: AppStore) async {
+        do {
+            let decoded = try RetroArchLibraryRules.decode(url)
+            try await retroArchFiles.save(decoded)
+            retroArchGames = decoded
+            // Build the BRUM metadata/link record from RetroArch's real library.
+            // Never infer ownership or delete an old record when a playlist changes.
+            var reconciled = games
+            for retro in decoded {
+                let existingIndex = reconciled.firstIndex { $0.filename.caseInsensitiveCompare(retro.filename) == .orderedSame }
+                let normalized = RetroArchLibraryRules.normalizedTitle(retro.titleName)
+                let matchingPC = launcher.snapshot.games.filter { $0.isClassic && RetroArchLibraryRules.normalizedTitle($0.title) == normalized }
+                if let index = existingIndex {
+                    reconciled[index].importedIntoRetroArch = true
+                    if reconciled[index].launcherGameID.isEmpty, matchingPC.count == 1 { reconciled[index].launcherGameID = matchingPC[0].id }
+                } else {
+                    reconciled.append(PocketClassic(id: UUID(), title: retro.titleName, filename: retro.filename,
+                        launcherGameID: matchingPC.count == 1 ? matchingPC[0].id : "", importedIntoRetroArch: true))
+                }
+            }
+            if reconciled != games { try await files.save(reconciled); games = reconciled }
+            retroArchLibraryStatus = decoded.isEmpty ? "O RetroArch respondeu, mas sua biblioteca está vazia." : "\(decoded.count) jogo(s) disponível(is) para abrir diretamente."
+        } catch { message = error.localizedDescription }
+    }
+    func retroArchGame(for launcherGame: Game) -> RetroArchLibraryGame? {
+        if let link = games.first(where: { $0.launcherGameID == launcherGame.id }),
+           let exact = retroArchGames.first(where: { $0.filename.caseInsensitiveCompare(link.filename) == .orderedSame }) { return exact }
+        let normalized = RetroArchLibraryRules.normalizedTitle(launcherGame.title)
+        let matches = retroArchGames.filter { RetroArchLibraryRules.normalizedTitle($0.titleName) == normalized }
+        return matches.count == 1 ? matches[0] : nil
+    }
+    func launcherGame(for retro: RetroArchLibraryGame, launcher: AppStore) -> Game? {
+        if let link = games.first(where: { $0.filename.caseInsensitiveCompare(retro.filename) == .orderedSame }),
+           let exact = launcher.snapshot.games.first(where: { $0.id == link.launcherGameID }) { return exact }
+        let normalized = RetroArchLibraryRules.normalizedTitle(retro.titleName)
+        let matches = launcher.snapshot.games.filter { $0.isClassic && RetroArchLibraryRules.normalizedTitle($0.title) == normalized }
+        return matches.count == 1 ? matches[0] : nil
+    }
+    func pocketGame(for retro: RetroArchLibraryGame) -> PocketClassic? {
+        games.first { $0.filename.caseInsensitiveCompare(retro.filename) == .orderedSame }
+    }
+    func launchRetroArch(_ game: RetroArchLibraryGame, launcher: AppStore) async {
+        guard let pocketGame = pocketGame(for: game) else { message = "Atualize a biblioteca do RetroArch novamente antes de jogar."; return }
+        await launch(pocketGame, launcher: launcher)
     }
     private func reloadRuntime() async {
         do { runtimeRecords = try await runtime.load(); runtimeConfigured = try await runtime.configured() }
@@ -229,22 +282,60 @@ actor PocketRAClient {
 struct ClassicsEverywhereView: View {
     @EnvironmentObject private var pocket: PocketClassicsStore
     @EnvironmentObject private var launcher: AppStore
-    @State private var importing = false
-    private var contentTypes: [UTType] { PocketRules.extensions.compactMap { UTType(filenameExtension: $0) } + [.data] }
+    private let columns = [GridItem(.adaptive(minimum: 145), spacing: 16)]
+    private var unavailable: [Game] { launcher.snapshot.games.filter { $0.isClassic && pocket.retroArchGame(for: $0) == nil }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending } }
     var body: some View {
         ScrollView { LazyVStack(alignment: .leading, spacing: 20) {
             PageHeader(kicker: "CLASSICS", title: "CLASSICS in every everywhere", subtitle: "Seus clássicos no iPhone · com RetroArch")
             NavigationLink { PocketSetupView() } label: { SettingsRow(icon: "gearshape", title: "CONFIGURAR RETROARCH", detail: "Instalação, tela, áudio e RetroAchievements") }
-            Button(pocket.busy ? "PROCESSANDO…" : "ADICIONAR JOGOS DO IPHONE") { importing = true }.buttonStyle(PrimaryButtonStyle()).disabled(pocket.busy)
-            Text("Importe somente arquivos que você tem direito de usar. ROMs, BIOS e núcleos não são baixados pelo BRUMCLASSICS.").font(.caption).foregroundStyle(BrumTheme.muted)
-            if pocket.games.isEmpty { Text("Sua biblioteca local está vazia. Adicione uma ROM pelo app Arquivos.").foregroundStyle(BrumTheme.muted) }
-            ForEach(pocket.games) { game in NavigationLink { PocketGameView(id: game.id) } label: { SettingsRow(icon: "gamecontroller", title: game.title, detail: game.progress.map { "\($0.unlocked)/\($0.achievements.count) conquistas · no iPhone" } ?? "ROM no iPhone · configurar e jogar") } }
+            Button("ATUALIZAR BIBLIOTECA DO RETROARCH") { pocket.requestRetroArchLibrary() }.buttonStyle(PrimaryButtonStyle())
+            Text("O BRUMCLASSICS mostra a biblioteca real do RetroArch. O arquivo do jogo precisa existir uma única vez no iPhone; capas e nomes sincronizados do PC não substituem a ROM. Não mantemos uma segunda cópia somente para exibir o catálogo.").font(.caption).foregroundStyle(BrumTheme.muted)
+            if pocket.retroArchGames.isEmpty { Text("Nenhum jogo jogável confirmado. Atualize usando o RetroArch compatível; se a biblioteca estiver vazia, disponibilize sua ROM nele uma única vez.").foregroundStyle(BrumTheme.muted) }
+            else { LazyVGrid(columns: columns, spacing: 22) { ForEach(pocket.retroArchGames) { game in RetroArchGameTile(game: game, launcherGame: pocket.launcherGame(for: game, launcher: launcher), pocketID: pocket.pocketGame(for: game)?.id) { Task { await pocket.launchRetroArch(game, launcher: launcher) } } } } }
+            if !unavailable.isEmpty {
+                BrumSectionLabel(text: "NA BIBLIOTECA DO PC · AINDA NÃO JOGÁVEIS NO IPHONE")
+                Text("Essas capas são metadados sincronizados. O botão Jogar só aparece depois que o RetroArch confirma o arquivo correspondente no iPhone.").font(.caption).foregroundStyle(BrumTheme.muted)
+                LazyVGrid(columns: columns, spacing: 22) { ForEach(unavailable) { UnavailableClassicTile(game: $0) } }
+            }
             if !pocket.status.isEmpty { Text(pocket.status).font(.caption).foregroundStyle(BrumTheme.muted) }
+            if !pocket.retroArchLibraryStatus.isEmpty { Text(pocket.retroArchLibraryStatus).font(.caption).foregroundStyle(BrumTheme.muted) }
         }.padding(20) }.background(BrumTheme.background.ignoresSafeArea()).navigationTitle("CLASSICS")
-        .fileImporter(isPresented: $importing, allowedContentTypes: contentTypes, allowsMultipleSelection: true) { result in
-            switch result { case .success(let urls): Task { await pocket.importFiles(urls) }; case .failure(let error): pocket.message = error.localizedDescription }
-        }
         .refreshable { await pocket.sync(launcher: launcher, force: true) }
+        .onAppear { if pocket.retroArchGames.isEmpty { pocket.requestRetroArchLibrary() } }
+    }
+}
+
+struct UnavailableClassicTile: View {
+    let game: Game
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            GameCoverView(game: game).aspectRatio(0.72, contentMode: .fit)
+            Text(game.title).font(.system(size: 15, weight: .bold)).foregroundStyle(BrumTheme.text).lineLimit(2)
+            Text("ROM NÃO CONFIRMADA NO IPHONE").font(.system(size: 10, weight: .bold)).foregroundStyle(BrumTheme.muted)
+        }.accessibilityElement(children: .combine)
+    }
+}
+
+struct RetroArchGameTile: View {
+    let game: RetroArchLibraryGame
+    let launcherGame: Game?
+    let pocketID: UUID?
+    let play: () -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button(action: play) {
+                VStack(alignment: .leading, spacing: 8) {
+                if let launcherGame { GameCoverView(game: launcherGame).aspectRatio(0.72, contentMode: .fit) }
+                else { RoundedRectangle(cornerRadius: 12).fill(BrumTheme.surface).aspectRatio(0.72, contentMode: .fit).overlay(Image(systemName: "gamecontroller.fill").font(.largeTitle).foregroundStyle(BrumTheme.primary)) }
+                Text(game.titleName).font(.system(size: 15, weight: .bold)).foregroundStyle(BrumTheme.text).lineLimit(2).multilineTextAlignment(.leading)
+                }
+            }.buttonStyle(.plain).accessibilityLabel("Jogar \(game.titleName)")
+            HStack {
+                Text("JOGAR · \((game.system ?? game.coreName ?? "CLASSICS").uppercased())").font(.system(size: 10, weight: .bold)).foregroundStyle(BrumTheme.primary)
+                Spacer()
+                if let pocketID { NavigationLink { PocketGameView(id: pocketID) } label: { Image(systemName: "info.circle").foregroundStyle(BrumTheme.muted) }.accessibilityLabel("Detalhes de \(game.titleName)") }
+            }
+        }
     }
 }
 
@@ -252,7 +343,6 @@ struct PocketGameView: View {
     @EnvironmentObject private var pocket: PocketClassicsStore
     @EnvironmentObject private var launcher: AppStore
     let id: UUID
-    @State private var share: PocketShare?
     @State private var raID = ""
     @State private var linkedID = ""
     private var game: PocketClassic? { pocket.games.first { $0.id == id } }
@@ -260,13 +350,13 @@ struct PocketGameView: View {
         ScrollView { VStack(alignment: .leading, spacing: 18) {
             if let game {
                 Text(game.title).font(.largeTitle.bold())
-                Text("1. Envie o arquivo e escolha RetroArch. Se ele não aparecer, use Salvar em Arquivos → No Meu iPhone → RetroArch → downloads. Dentro do emulador, carregue o conteúdo e selecione um núcleo compatível pelo menos uma vez.").font(.subheadline).foregroundStyle(BrumTheme.muted)
-                Button("ENVIAR ARQUIVO AO RETROARCH") { Task { do { share = PocketShare(url: try await pocket.file(game)) } catch { pocket.message = error.localizedDescription } } }.buttonStyle(PrimaryButtonStyle())
-                Toggle("Já importei e executei este jogo no RetroArch", isOn: Binding(get: { game.importedIntoRetroArch }, set: { value in var next = game; next.importedIntoRetroArch = value; Task { await pocket.update(next) } }))
-                Button("JOGAR NO RETROARCH") {
-                    Task { await pocket.launch(game, launcher: launcher) }
-                }.buttonStyle(PrimaryButtonStyle()).disabled(!game.importedIntoRetroArch)
-                Text("O iOS confirma a abertura do emulador, não se a ROM iniciou. ZIPs podem precisar ser extraídos no RetroArch; use o nome do arquivo final para o atalho.").font(.caption).foregroundStyle(BrumTheme.muted)
+                if let playable = pocket.retroArchGames.first(where: { $0.filename.caseInsensitiveCompare(game.filename) == .orderedSame }) {
+                    Button("JOGAR") { Task { await pocket.launchRetroArch(playable, launcher: launcher) } }.buttonStyle(PrimaryButtonStyle())
+                    Text("O jogo foi confirmado pela biblioteca real do RetroArch. Um toque abre diretamente este título.").font(.caption).foregroundStyle(BrumTheme.muted)
+                } else {
+                    Button("ATUALIZAR BIBLIOTECA DO RETROARCH") { pocket.requestRetroArchLibrary() }.buttonStyle(PrimaryButtonStyle())
+                    Text("Há metadados deste jogo no BRUMCLASSICS, mas o RetroArch não confirmou o arquivo jogável no iPhone. Uma capa não contém o jogo. Disponibilize legalmente a ROM no RetroArch uma vez e atualize a biblioteca.").font(.caption).foregroundStyle(BrumTheme.muted)
+                }
                 BrumSectionLabel(text: "HORAS OFFLINE")
                 Text(pocket.runtimeSummary(id)).font(.subheadline)
                 Text("Depois de jogar, use Close Content no RetroArch e volte aqui. Só contabilizamos o tempo registrado pelo emulador, não o tempo que ele ficou aberto em outro aplicativo.").font(.caption).foregroundStyle(BrumTheme.muted)
@@ -294,7 +384,6 @@ struct PocketGameView: View {
             }
         }.padding(20) }.background(BrumTheme.background.ignoresSafeArea()).navigationTitle("Jogar no iPhone")
         .onAppear { raID = game?.retroAchievementID ?? ""; linkedID = game?.launcherGameID ?? "" }
-        .sheet(item: $share) { DocumentExportView(url: $0.url) }
     }
 }
 
@@ -329,9 +418,10 @@ struct PocketSetupView: View {
     var body: some View {
         Form {
             Section("1 · Instale o emulador") {
-                Link("RetroArch na App Store", destination: URL(string: "https://apps.apple.com/app/retroarch/id6499539433")!)
-                Button("Abrir RetroArch") { UIApplication.shared.open(URL(string: "retroarch://start")!) { opened in if !opened { Task { @MainActor in feedback = "RetroArch não encontrado. Instale pela App Store." } } } }
-                Text("O jogo roda no RetroArch, não dentro do BRUMCLASSICS. Os dados de outros aplicativos são protegidos pelo iOS.")
+                Link("Baixar RetroArch compatível · Libretro", destination: URL(string: "https://buildbot.libretro.com/nightly/apple/ios-arm64/RetroArch.ipa")!)
+                Button("Abrir RetroArch") { UIApplication.shared.open(URL(string: "retroarch://start")!) { opened in if !opened { Task { @MainActor in feedback = "RetroArch não encontrado. Instale o IPA compatível indicado acima." } } } }
+                Text("Use a edição compatível indicada acima. A versão estável 1.22.2 da App Store abre o emulador, mas ainda não oferece ao BRUMCLASSICS consulta da biblioteca e abertura de um jogo específico.")
+                Text("O jogo roda no RetroArch, não dentro do BRUMCLASSICS. A ROM precisa existir uma vez no iPhone; somente nomes e capas sincronizados não são arquivos jogáveis.")
             }
             Section("2 · Tela, volume e controles") {
                 Text("No RetroArch: Settings → Video → Scaling → Aspect Ratio: Core provided. Isso preserva a proporção original. Ajuste Integer Scale se preferir pixels inteiros.")
@@ -347,7 +437,7 @@ struct PocketSetupView: View {
                 Text("É necessário estar online no RetroArch para registrar conquistas. O modo Hardcore restringe save states. ROMs incompatíveis ou núcleos sem suporte não geram conquistas.")
             }
             Section("4 · Sincronização") {
-                Text("Ao voltar ao BRUMCLASSICS, os jogos vinculados são consultados na API oficial e ficam disponíveis offline na seção Conquistas. Para atualizar o PC, vincule o mesmo jogo e use a mesma conta; o launcher deve estar atualizado, aberto e na rede local. Não copiamos ROMs nem saves para o PC.")
+                Text("Em CLASSICS in every everywhere, toque Atualizar biblioteca: o RetroArch devolve sua lista real e o BRUMCLASSICS mostra as capas correspondentes do PC. Depois, tocar na capa abre o título exato. Para atualizar o PC, vincule o mesmo jogo e use a mesma conta; o launcher deve estar atualizado, aberto e na rede local. Não copiamos ROMs nem saves para o PC.")
             }
             Section("5 · Horas offline do RetroArch") {
                 Text("No RetroArch: Settings → Playlists → Save runtime log (aggregate): ON. Em Settings → Directory → Runtime Logs, confira a pasta usada. Feche o conteúdo após jogar para gravar o log.")
