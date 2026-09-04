@@ -1,11 +1,12 @@
 {
-  "version": "0.2.1",
-  "build": 4,
+  "version": "0.3.0",
+  "build": 5,
   "minimumIos": "16.0",
   "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/actions/workflows/build-ios-personal.yml",
   "notes": [
-    "Corrige executável ausente no manifesto e nomes internos incompatíveis com Sideloadly.",
-    "Atualização pessoal integrada ao Perfil.",
+    "Sincronização aceita horas fracionadas e distingue erros de conexão offline.",
+    "BRUMCOMPANION alinhado ao Android: jogo ativo, anotações, métricas e BRUMMOMENTS, sem controle remoto.",
+    "Navegação Início, Biblioteca, Estatísticas, Companion e Perfil; B-CARD no Início.",
     "Bundle ID fixo para preservar biblioteca offline, capas e preferências."
   ]
 }

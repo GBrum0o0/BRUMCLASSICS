@@ -43,6 +43,7 @@ struct Game: Codable, Identifiable, Hashable {
         var revision: Int
         var updatedAt: String
         static let empty = Notes(whereStopped: "", objectives: "", tips: "", commands: "", revision: 0, updatedAt: "")
+        var hasContent: Bool { [whereStopped, objectives, tips, commands].contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }
     }
 
     let id: String
@@ -54,17 +55,17 @@ struct Game: Codable, Identifiable, Hashable {
     let genre: String
     let collectionId: String
     let sizeBytes: Int64
-    let playtimeMinutes: Int?
+    let playtimeMinutes: Double?
     let playtimeAvailable: Bool
     let achievementsCollected: Int?
     let achievementsTotal: Int?
     let achievementsAvailable: Bool
     let achievements: [Achievement]
     let storyCompleted: Bool
-    let favorite: Bool
-    let wantToPlay: Bool
+    var favorite: Bool
+    var wantToPlay: Bool
     let libraryStateRevision: Int
-    let notes: Notes
+    var notes: Notes
     let installed: Bool
     let integrityStatus: String
     let lastPlayedAt: String
@@ -72,7 +73,7 @@ struct Game: Codable, Identifiable, Hashable {
 
     var isClassic: Bool { category == "classic" }
     var achievementProgress: Int { guard let total = achievementsTotal, total > 0 else { return 0 }; return min(100, Int((Double(achievementsCollected ?? 0) / Double(total)) * 100)) }
-    var playtimeLabel: String { guard playtimeAvailable, let value = playtimeMinutes else { return "INDISPONÍVEL" }; return value >= 60 ? "\(value / 60) h \(value % 60) min" : "\(value) min" }
+    var playtimeLabel: String { guard playtimeAvailable, let raw = playtimeMinutes, raw.isFinite, raw >= 0, raw < Double(Int.max) else { return "INDISPONÍVEL" }; let value = Int(raw); return value >= 60 ? "\(value / 60) h \(value % 60) min" : "\(value) min" }
     var statusLabel: String { if storyCompleted { return "HISTÓRIA COMPLETADA" }; if wantToPlay { return "QUERO JOGAR" }; if (playtimeMinutes ?? 0) > 0 { return "JOGANDO" }; return installed ? "INSTALADO" : "NÃO INSTALADO" }
 }
 
@@ -83,6 +84,7 @@ struct PerformanceState: Codable, Equatable {
     struct GPU: Codable, Equatable { let available: Bool; let name: String; let usagePercent: Double?; let temperatureC: Double?; let memoryUsedBytes: Double?; let memoryTotalBytes: Double? }
     struct Memory: Codable, Equatable { let available: Bool; let usedBytes: Double?; let totalBytes: Double? }
     struct FPS: Codable, Equatable { let available: Bool; let value: Double? }
+    struct ProcessMetrics: Codable, Equatable { let available: Bool; let cpuPercent: Double?; let ramBytes: Double? }
     let active: Bool
     let gameId: String
     let sampledAt: String
@@ -91,6 +93,17 @@ struct PerformanceState: Codable, Equatable {
     let gpu: GPU
     let memory: Memory
     let fps: FPS
+    var process: ProcessMetrics?
+
+    func isFresh(gameID: String?, connected: Bool, now: Date = Date()) -> Bool {
+        guard connected, active, !gameId.isEmpty, gameId == gameID else { return false }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let sampled = formatter.date(from: sampledAt) ?? ISO8601DateFormatter().date(from: sampledAt)
+        guard let sampled else { return false }
+        let age = now.timeIntervalSince(sampled)
+        return age >= -30 && age < 20
+    }
 }
 
 struct BrumMoment: Codable, Identifiable, Equatable {

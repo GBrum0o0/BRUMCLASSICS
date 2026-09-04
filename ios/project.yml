@@ -6,8 +6,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    CURRENT_PROJECT_VERSION: 4
-    MARKETING_VERSION: 0.2.1
+    CURRENT_PROJECT_VERSION: 5
+    MARKETING_VERSION: 0.3.0
 targets:
   BRUMCLASSICSMobile:
     type: application
@@ -25,10 +25,18 @@ targets:
     scheme:
       testTargets:
         - BRUMCLASSICSMobileTests
+        - BRUMCLASSICSMobileUITests
   BRUMCLASSICSMobileTests:
     type: bundle.unit-test
     platform: iOS
     sources:
       - path: BRUMCLASSICSMobileTests
+    dependencies:
+      - target: BRUMCLASSICSMobile
+  BRUMCLASSICSMobileUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: BRUMCLASSICSMobileUITests
     dependencies:
       - target: BRUMCLASSICSMobile

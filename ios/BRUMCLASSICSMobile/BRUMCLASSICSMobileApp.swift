@@ -15,10 +15,10 @@ struct BRUMCLASSICSMobileApp: App {
                 .onChange(of: scenePhase) { phase in
                     if phase == .active {
                         Task {
-                            await store.refresh()
+                            await store.resume()
                             await store.checkForPersonalUpdate()
                         }
-                    }
+                    } else if phase == .background { store.suspend() }
                 }
         }
     }
@@ -32,8 +32,8 @@ struct RootView: View {
         TabView(selection: $selection) {
             NavigationStack { HomeView(selection: $selection) }.tabItem { Label("Início", systemImage: "house.fill") }.tag(0)
             NavigationStack { LibraryView() }.tabItem { Label("Biblioteca", systemImage: "rectangle.grid.2x2.fill") }.tag(1)
-            NavigationStack { AchievementsView() }.tabItem { Label("Conquistas", systemImage: "trophy.fill") }.tag(2)
-            NavigationStack { StatsView() }.tabItem { Label("Estatísticas", systemImage: "chart.bar.fill") }.tag(3)
+            NavigationStack { StatsView() }.tabItem { Label("Estatísticas", systemImage: "chart.bar.fill") }.tag(2)
+            NavigationStack { CompanionView() }.tabItem { Label("Companion", systemImage: "note.text") }.tag(3)
             NavigationStack { ProfileView() }.tabItem { Label("Perfil", systemImage: "person.crop.circle.fill") }.tag(4)
         }
         .background(BrumTheme.background.ignoresSafeArea())

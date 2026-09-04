@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## BRUMCLASSICS MÓVEL iOS 0.3.0 — Companion e sincronização
+
+- Corrigida a rejeição de bibliotecas contendo minutos fracionados.
+- Companion alinhado ao Android: notas, jogo ativo, desempenho e momentos; sem controle remoto.
+- Navegação com Companion como aba principal, B-CARD no Início e conquistas preservadas.
+- Diagnósticos de sincronização, reconexão e preservação de notas offline.
+- Testes de modelos, cache, métricas e navegação no simulador iPhone.
+
+Veja [as notas completas](ios/RELEASE-NOTES-IOS-0.3.0.txt).
+
 ## BRUMCLASSICS MÓVEL iOS 0.2.1 — Correção do IPA
 
 - Corrigida a referência ao executável no Info.plist.

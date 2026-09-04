@@ -11,6 +11,8 @@ struct ProfileView: View {
                 BrumCard {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack { BrumSectionLabel(text: "CONEXÃO LOCAL SEGURA"); Spacer(); ConnectionDot(state: store.connection) }
+                        if case .error(let detail) = store.connection { Text(detail).font(.caption).foregroundStyle(.orange).textSelection(.enabled) }
+                        if let warning = store.realtimeWarning { Text(warning).font(.caption).foregroundStyle(BrumTheme.muted) }
                         if let config = store.configuration {
                             Text("\(config.host):\(config.port)").font(.headline).foregroundStyle(BrumTheme.text)
                             Text("A biblioteca completa permanece disponível offline. Quando este computador reaparecer na rede local, somente as mudanças serão sincronizadas.").font(.subheadline).foregroundStyle(BrumTheme.muted)
@@ -25,7 +27,8 @@ struct ProfileView: View {
                         }
                     }
                 }
-                NavigationLink { CompanionControlView() } label: { SettingsRow(icon: "gamecontroller.fill", title: "BRUMCOMPANION", detail: "Controle e métricas em tempo real") }
+                NavigationLink { CompanionView() } label: { SettingsRow(icon: "note.text", title: "BRUMCOMPANION", detail: "Jogo ativo, anotações e desempenho") }
+                NavigationLink { AchievementsView() } label: { SettingsRow(icon: "trophy.fill", title: "CONQUISTAS", detail: "Progresso dos jogos e CLASSICS") }
                 NavigationLink { BCardLibraryView() } label: { SettingsRow(icon: "rectangle.portrait.on.rectangle.portrait", title: "B-CARD", detail: "Envie um jogo instalado ao computador") }
                 NavigationLink { MomentsView() } label: { SettingsRow(icon: "photo.on.rectangle.angled", title: "BRUMMOMENTS", detail: "Galeria pessoal de capturas e locais") }
                 PersonalUpdateCard()
@@ -100,36 +103,4 @@ private struct PersonalUpdateCard: View {
 struct SettingsRow: View {
     let icon: String; let title: String; let detail: String
     var body: some View { BrumCard { HStack(spacing: 14) { Image(systemName: icon).font(.title2).foregroundStyle(BrumTheme.primary).frame(width: 34); VStack(alignment: .leading, spacing: 3) { Text(title).font(.headline).foregroundStyle(BrumTheme.text); Text(detail).font(.caption).foregroundStyle(BrumTheme.muted) }; Spacer(); Image(systemName: "chevron.right").foregroundStyle(BrumTheme.muted) } } }
-}
-
-struct CompanionControlView: View {
-    @EnvironmentObject private var store: AppStore
-    @State private var search = ""
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 18) {
-                if let game = store.activeGame { CompanionCard(game: game) }
-                BrumCard {
-                    VStack(spacing: 18) {
-                        HStack { control("chevron.left", "navigate", ["direction": "left"]); control("chevron.up", "navigate", ["direction": "up"]); control("chevron.right", "navigate", ["direction": "right"]) }
-                        HStack { control("arrow.uturn.backward", "back"); control("checkmark", "activate"); control("line.3.horizontal", "tab") }
-                    }
-                }
-                BrumCard {
-                    VStack(alignment: .leading, spacing: 12) {
-                        BrumSectionLabel(text: "PESQUISA NO LIVING ROOM")
-                        HStack { TextField("Nome do jogo", text: $search).padding(12).background(BrumTheme.elevated).clipShape(RoundedRectangle(cornerRadius: 9)); Button("ENVIAR") { Task { await store.send("search", payload: ["text": search]) } }.font(.caption.bold()).foregroundStyle(BrumTheme.primary) }
-                        BrumSectionLabel(text: "VOLUME")
-                        HStack { control("speaker.minus.fill", "set_volume", ["action": "down"]); control("speaker.slash.fill", "set_volume", ["action": "mute"]); control("speaker.plus.fill", "set_volume", ["action": "up"]) }
-                    }
-                }
-                HStack { remoteButton("SAVE", "quick_save"); remoteButton("LOAD", "quick_load"); remoteButton("SAIR", "quit_game") }
-                Button("CAPTURAR BRUMMOMENT") { Task { await store.captureMoment() } }.buttonStyle(PrimaryButtonStyle()).disabled(store.activeGame == nil)
-                HStack { remoteButton("SUSPENDER", "sleep_pc"); remoteButton("DESLIGAR", "shutdown_pc") }
-                Text("Suspender e desligar sempre exigem confirmação no computador.").font(.caption).foregroundStyle(BrumTheme.muted)
-            }.padding(20)
-        }.navigationTitle("BRUMCOMPANION").background(BrumTheme.background.ignoresSafeArea())
-    }
-    private func control(_ icon: String, _ command: String, _ payload: [String: Any] = [:]) -> some View { Button { Task { await store.send(command, payload: payload) } } label: { Image(systemName: icon).font(.title2).frame(maxWidth: .infinity).padding(.vertical, 17).background(BrumTheme.elevated).clipShape(RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain).foregroundStyle(BrumTheme.text) }
-    private func remoteButton(_ label: String, _ command: String) -> some View { Button(label) { Task { await store.send(command) } }.font(.caption.bold()).foregroundStyle(BrumTheme.text).frame(maxWidth: .infinity).padding(.vertical, 13).background(BrumTheme.surface).clipShape(RoundedRectangle(cornerRadius: 9)) }
 }

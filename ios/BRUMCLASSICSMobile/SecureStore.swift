@@ -151,4 +151,5 @@ struct PendingMutation: Codable, Identifiable, Equatable {
     let favorite: Bool?
     let wantToPlay: Bool?
     let queuedAt: Date
+    var baseNotes: Game.Notes?
 }

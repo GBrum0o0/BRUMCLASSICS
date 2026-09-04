@@ -11,6 +11,9 @@ final class AppStore: ObservableObject {
     @Published private(set) var configuration: PairingConfiguration?
     @Published private(set) var pendingCount = 0
     @Published private(set) var moments: [BrumMoment] = []
+    @Published private(set) var realtimeWarning: String?
+    @Published private(set) var pendingGameIDs: Set<String> = []
+    @Published private(set) var noteConflicts: Set<String> = []
     @Published private(set) var personalUpdate: PersonalUpdateState = .idle
     @Published var selectedGame: Game?
     @Published var message: String?
@@ -21,7 +24,10 @@ final class AppStore: ObservableObject {
     private let images = NSCache<NSString, UIImage>()
     private var eventTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
-    private var lastEventRefresh = Date.distantPast
+    private var artworkTask: Task<Void, Never>?
+    private var artworkSignature = ""
+    private var flushing = false
+    private var appActive = true
     private static let configurationKey = "brum_pairing_configuration"
     private static let tokenAccount = "launcher-token"
 
@@ -32,12 +38,13 @@ final class AppStore: ObservableObject {
 
     var isPaired: Bool { configuration != nil && SecureStore.read(Self.tokenAccount) != nil }
     var activeGame: Game? { guard snapshot.companion?.active == true else { return nil }; return snapshot.games.first { $0.id == snapshot.companion?.gameId } }
+    var companionGame: Game? { guard let game = activeGame, game.notes.hasContent else { return nil }; return game }
 
     func restore() async {
         if let cached = await offline.loadSnapshot() { snapshot = cached }
         moments = await offline.loadMoments()
         if let data = UserDefaults.standard.data(forKey: Self.configurationKey), let decoded = try? JSONDecoder().decode(PairingConfiguration.self, from: data) { configuration = decoded }
-        pendingCount = await offline.loadOutbox().count
+        await overlayPending()
         await bridge.configure(configuration, token: SecureStore.read(Self.tokenAccount))
         if isPaired {
             await refresh()
@@ -76,6 +83,8 @@ final class AppStore: ObservableObject {
         guard let payload = PairingPayload(url: url) else { message = BridgeError.invalidPairing.localizedDescription; return }
         connection = .connecting
         do {
+            eventTask?.cancel(); eventTask = nil
+            await bridge.closeEvents()
             let (configuration, token) = try await bridge.pair(payload)
             try SecureStore.write(token, account: Self.tokenAccount)
             self.configuration = configuration
@@ -83,33 +92,35 @@ final class AppStore: ObservableObject {
             connection = .online
             await refresh()
             startRealtime()
-            message = "iPhone conectado ao BRUMCLASSICS."
+            message = connection == .online ? "iPhone conectado e biblioteca sincronizada." : "iPhone pareado. Consulte o diagnóstico em Perfil para concluir a sincronização."
         } catch { connection = .error(error.localizedDescription); message = error.localizedDescription }
     }
 
     func disconnect() async {
         try? await bridge.unpair()
-        eventTask?.cancel(); await bridge.closeEvents()
+        eventTask?.cancel(); eventTask = nil; artworkTask?.cancel(); artworkTask = nil; artworkSignature = ""
+        await bridge.closeEvents()
         SecureStore.remove(Self.tokenAccount)
         UserDefaults.standard.removeObject(forKey: Self.configurationKey)
         configuration = nil; connection = .offline
+        realtimeWarning = nil
         await bridge.configure(nil, token: nil)
         message = "O pareamento foi removido. A biblioteca offline permanece neste iPhone."
     }
 
     func refresh() async {
         guard isPaired else { connection = .offline; return }
-        if refreshTask != nil { return }
+        if let refreshTask { await refreshTask.value; return }
         refreshTask = Task { [weak self] in
             guard let self else { return }
-            self.connection = .connecting
+            if self.connection != .online { self.connection = .connecting }
             do {
+                await self.flushOutbox()
                 let fresh = try await self.bridge.snapshot()
                 guard !fresh.games.isEmpty || self.snapshot.games.isEmpty else { throw BridgeError.invalidResponse("A resposta vazia foi ignorada para preservar sua biblioteca offline.") }
                 self.snapshot = fresh
-                try await self.offline.saveSnapshot(fresh)
-                await self.offline.pruneArtwork(keeping: fresh.games)
-                await self.flushOutbox()
+                await self.overlayPending()
+                try await self.offline.saveSnapshot(self.snapshot)
                 self.connection = .online
                 self.prefetchAllArtwork()
             } catch {
@@ -118,6 +129,19 @@ final class AppStore: ObservableObject {
             self.refreshTask = nil
         }
         await refreshTask?.value
+    }
+
+    func resume() async {
+        appActive = true
+        await refresh()
+        if isPaired { startRealtime() }
+    }
+
+    func suspend() {
+        appActive = false
+        eventTask?.cancel(); eventTask = nil
+        artworkTask?.cancel(); artworkTask = nil; artworkSignature = ""
+        if connection == .online { connection = .offline }
     }
 
     func image(for game: Game) async -> UIImage? {
@@ -132,11 +156,6 @@ final class AppStore: ObservableObject {
             images.setObject(image, forKey: key)
             return image
         } catch { return nil }
-    }
-
-    func send(_ command: String, payload: [String: Any] = [:]) async {
-        do { try await bridge.remote(command: command, payload: payload); connection = .online }
-        catch { connection = .error(error.localizedDescription); message = error.localizedDescription }
     }
 
     func launchBCard(_ game: Game, mode: String = "new") async {
@@ -160,66 +179,113 @@ final class AppStore: ObservableObject {
     func removeMoment(_ moment: BrumMoment) async { try? await offline.removeMoment(moment); moments = await offline.loadMoments() }
     func momentImage(_ moment: BrumMoment) async -> UIImage? { guard let data = await offline.momentImage(moment) else { return nil }; return UIImage(data: data) }
 
-    func saveNotes(game: Game, notes: Game.Notes) async {
-        let mutation = PendingMutation(id: UUID(), kind: .notes, gameID: game.id, revision: game.notes.revision, force: false, notes: notes, favorite: nil, wantToPlay: nil, queuedAt: Date())
-        await queue(mutation)
+    func saveNotes(game: Game, notes: Game.Notes, force: Bool = false) async -> Bool {
+        let existing = await offline.loadOutbox().first { $0.kind == .notes && $0.gameID == game.id }
+        let mutation = PendingMutation(id: UUID(), kind: .notes, gameID: game.id, revision: existing?.revision ?? game.notes.revision, force: force, notes: notes, favorite: nil, wantToPlay: nil, queuedAt: Date(), baseNotes: existing?.baseNotes ?? game.notes)
+        return await queue(mutation)
     }
 
     func setLibraryState(game: Game, favorite: Bool, wantToPlay: Bool) async {
         let mutation = PendingMutation(id: UUID(), kind: .libraryState, gameID: game.id, revision: game.libraryStateRevision, force: false, notes: nil, favorite: favorite, wantToPlay: wantToPlay, queuedAt: Date())
-        await queue(mutation)
+        _ = await queue(mutation)
     }
 
-    private func queue(_ mutation: PendingMutation) async {
+    private func queue(_ mutation: PendingMutation) async -> Bool {
         var outbox = await offline.loadOutbox()
         outbox.removeAll { $0.kind == mutation.kind && $0.gameID == mutation.gameID }
         outbox.append(mutation)
-        try? await offline.saveOutbox(outbox)
-        pendingCount = outbox.count
+        do { try await offline.saveOutbox(outbox) }
+        catch { message = "Não foi possível salvar no iPhone. Suas alterações continuam no editor."; return false }
+        await overlayPending()
         if isPaired { await flushOutbox(); await refresh() }
         else { message = "Alteração salva no iPhone. Ela será enviada quando o launcher reaparecer na rede local." }
+        return true
     }
 
     private func flushOutbox() async {
-        var outbox = await offline.loadOutbox()
-        var remaining: [PendingMutation] = []
+        guard isPaired, !flushing else { return }
+        flushing = true
+        defer { flushing = false }
+        let outbox = await offline.loadOutbox()
         for mutation in outbox {
-            do { try await bridge.save(mutation) }
-            catch { remaining.append(mutation) }
+            do {
+                try await bridge.save(mutation)
+                var latest = await offline.loadOutbox()
+                latest.removeAll { $0.id == mutation.id }
+                try await offline.saveOutbox(latest)
+                noteConflicts.remove(mutation.gameID)
+            } catch BridgeError.conflict { noteConflicts.insert(mutation.gameID) }
+            catch { break }
         }
-        outbox = remaining
-        try? await offline.saveOutbox(outbox)
-        pendingCount = outbox.count
+        await overlayPending()
+    }
+
+    private func overlayPending() async {
+        let pending = await offline.loadOutbox()
+        pendingCount = pending.count
+        pendingGameIDs = Set(pending.map(\.gameID))
+        for mutation in pending {
+            guard let index = snapshot.games.firstIndex(where: { $0.id == mutation.gameID }) else { continue }
+            if let notes = mutation.notes { snapshot.games[index].notes = notes }
+            if let favorite = mutation.favorite { snapshot.games[index].favorite = favorite }
+            if let wantToPlay = mutation.wantToPlay { snapshot.games[index].wantToPlay = wantToPlay }
+        }
+    }
+
+    func useLauncherNotes(gameID: String) async -> Bool {
+        do {
+            let fresh = try await bridge.snapshot()
+            var pending = await offline.loadOutbox()
+            pending.removeAll { $0.gameID == gameID && $0.kind == .notes }
+            try await offline.saveOutbox(pending)
+            snapshot = fresh; noteConflicts.remove(gameID)
+            await overlayPending()
+            try await offline.saveSnapshot(snapshot)
+            connection = .online
+            return true
+        } catch { message = "Não foi possível obter as anotações do launcher. O rascunho foi mantido."; return false }
     }
 
     private func prefetchAllArtwork() {
         // Jogos recentes chegam primeiro, mas a tarefa continua até persistir toda a biblioteca no iPhone.
         let candidates = snapshot.games.sorted { ($0.lastPlayedAt, $0.title) > ($1.lastPlayedAt, $1.title) }
-        Task.detached(priority: .utility) { [weak self] in
+        let signature = candidates.map { "\($0.id)|\($0.artworkPath)" }.joined(separator: "\n")
+        guard signature != artworkSignature, appActive else { return }
+        artworkTask?.cancel(); artworkSignature = signature
+        artworkTask = Task(priority: .utility) { [weak self] in
             for game in candidates { guard !Task.isCancelled, let self else { return }; _ = await self.image(for: game) }
         }
     }
 
     private func startRealtime() {
-        eventTask?.cancel()
+        guard eventTask == nil, appActive else { return }
         eventTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self, self.isPaired else { return }
                 do {
                     try await self.bridge.openEvents { [weak self] raw in
                         guard !raw.isEmpty, let self else { return }
-                        await self.eventArrived()
+                        await self.eventArrived(raw)
                     }
                 } catch {
-                    if !Task.isCancelled { self.connection = .offline; try? await Task.sleep(for: .seconds(4)) }
+                    if !Task.isCancelled {
+                        self.realtimeWarning = "Atualização ao vivo interrompida. Reconectando; a sincronização manual continua disponível."
+                        await self.refresh()
+                        try? await Task.sleep(for: .seconds(4))
+                    }
                 }
             }
         }
     }
 
-    private func eventArrived() async {
-        guard Date().timeIntervalSince(lastEventRefresh) > 0.7 else { return }
-        lastEventRefresh = Date()
+    private func eventArrived(_ raw: String) async {
+        guard let data = raw.data(using: .utf8), let event = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+        realtimeWarning = nil
+        if event["type"] as? String == "performance_changed" {
+            if let payload = event["performance"], let data = try? JSONSerialization.data(withJSONObject: payload), let value = try? JSONDecoder().decode(PerformanceState.self, from: data) { snapshot.performance = value }
+            return
+        }
+        guard ["ready", "library_changed", "companion_changed", "achievement_unlocked", "install_changed", "notes_changed", "library_state_changed", "collections_changed", "activity_changed", "profile_changed"].contains(event["type"] as? String ?? "") else { return }
         await refresh()
     }
 }

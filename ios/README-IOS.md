@@ -13,7 +13,7 @@ Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o mesmo protocolo
 - Credencial do launcher protegida no Keychain e TLS fixado pelo certificado do QR.
 - Fila offline para anotações, favoritos e “Quero jogar”.
 - Atualização em tempo real por WebSocket quando o computador está disponível.
-- BRUMCOMPANION com navegação, pesquisa, volume, save/load e métricas.
+- BRUMCOMPANION como segunda tela: jogo ativo, anotações editáveis, métricas e BRUMMOMENTS; sem controle remoto.
 - B-CARD separado entre Jogos e CLASSICS, com Novo jogo, Auto Save e Save Manual.
 - BRUMMOMENTS com captura da sessão ativa, galeria offline, localização, anotação, categoria e favoritos.
 - Atualização pessoal: verificação automática de versão no Perfil e acesso ao build do GitHub Actions.
@@ -32,6 +32,14 @@ No Windows, `node validate-ios-project.js` confere a estrutura, os endpoints, os
 O Windows não possui Xcode nem o SDK do iOS, portanto não compila o aplicativo sozinho. O workflow `github-actions/build-ios-personal.yml` usa um executor macOS do GitHub para produzir um `.ipa` sem assinatura. Copie esse arquivo para `.github/workflows/build-ios-personal.yml` na raiz do repositório e mantenha o projeto iOS na pasta `ios` do repositório.
 
 ## Uso pessoal e atualizações
+
+### iOS 0.3.0 — alinhamento ao Android
+
+As abas são Início, Biblioteca, Estatísticas, Companion e Perfil. O B-CARD fica no Início; Conquistas pode ser aberto em Estatísticas e Perfil. No Companion, um jogo ativo com anotações mostra Onde parei, Objetivos, Dicas e Comandos para consulta e edição. Jogos sem notas ficam ocultos, mas as métricas válidas da sessão continuam disponíveis. O controle remoto foi retirado.
+
+As notas são guardadas no iPhone antes do envio. Fora da rede, consulte o cache e edite no Perfil do Jogo; alterações pendentes são reenviadas ao reconectar. Se houver conflito, abra o Companion para escolher qual versão manter. O estado ERRO DE SINCRONIZAÇÃO agora traz o motivo no Perfil, separado de OFFLINE e SINCRONIZANDO. Minutos fracionados não impedem mais a leitura da biblioteca.
+
+Use o IPA 0.3.0 sobre a instalação existente, sem desinstalar, com a mesma conta de assinatura e Bundle ID. O workflow testa dados e navegação em simulador iPhone antes de produzir o IPA arm64; a conexão de rede e assinatura no aparelho físico ainda precisam ser verificadas pelo usuário.
 
 ### Correção 0.2.1
 

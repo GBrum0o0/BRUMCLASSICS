@@ -1,0 +1,28 @@
+BRUMCLASSICS MOVEL iOS 0.3.0 - build 5 - 04/09/2026
+
+SINCRONIZACAO
+- Tempo jogado aceita minutos fracionados sem perder precisao no cache.
+- Estados conectado, sincronizando, offline e erro sao distintos.
+- Perfil apresenta falhas de leitura e avisos de reconexao ao vivo.
+- Certificado continua validado pelo fingerprint do QR em HTTPS e WebSocket.
+- Cancelamento de sockets ao ir para segundo plano e reconexao ao retornar.
+- Eventos de desempenho atualizam apenas metricas, sem baixar a biblioteca inteira.
+- Pre-carregamento de capas nao se multiplica a cada evento recebido.
+
+EXPERIENCIA ALINHADA AO ANDROID
+- Abas: Inicio, Biblioteca, Estatisticas, Companion e Perfil.
+- Companion mostra notas do jogo ativo, permite editar e salvar quatro campos,
+  consultar notas offline, capturar BRUMMOMENTS e abrir a galeria.
+- Jogo sem notas fica oculto no Companion; metricas continuam independentes.
+- Sem controle remoto, navegacao do PC, volume, save/load, suspender ou desligar.
+- B-CARD permanece separado, com entrada no Inicio e divisao Jogos/CLASSICS.
+- Conquistas permanecem acessiveis em Estatisticas e Perfil.
+- Biblioteca recebe filtros de plataforma, genero, status e progresso.
+- Notas pendentes ficam visiveis offline; conflitos nao sobrescrevem o launcher
+  sem escolha explicita do usuario. Edicao em andamento resiste ao refresh.
+- Metricas expiradas, desconectadas ou de outra sessao nao aparecem como atuais.
+
+INSTALACAO
+Instale o IPA sobre o app existente via Sideloadly/AltStore usando a mesma conta
+e o mesmo Bundle ID. Nao apague o app anterior. A PWA e o Android nao mudaram.
+A assinatura e a comunicacao com o iPhone fisico precisam de teste no aparelho.

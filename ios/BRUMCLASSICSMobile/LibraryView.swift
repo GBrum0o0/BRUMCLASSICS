@@ -5,13 +5,23 @@ struct LibraryView: View {
     @State private var query = ""
     @State private var scope = "Todos"
     @State private var installedOnly = false
+    @State private var platform = "Todas"
+    @State private var genre = "Todos"
+    @State private var status = "Todos"
+    @State private var progress = "Todos"
+    private var platforms: [String] { ["Todas"] + Set(store.snapshot.games.map(\.platform).filter { !$0.isEmpty }).sorted() }
+    private var genres: [String] { ["Todos"] + Set(store.snapshot.games.map(\.genre).filter { !$0.isEmpty }).sorted() }
     private let columns = [GridItem(.adaptive(minimum: 145), spacing: 16)]
 
     private var games: [Game] {
         store.snapshot.games.filter { game in
             (query.isEmpty || game.title.localizedCaseInsensitiveContains(query)) &&
             (scope == "Todos" || scope == "Jogos" && !game.isClassic || scope == "Classics" && game.isClassic || scope == "Favoritos" && game.favorite) &&
-            (!installedOnly || game.installed)
+            (!installedOnly || game.installed) &&
+            (platform == "Todas" || game.platform == platform) &&
+            (genre == "Todos" || game.genre == genre) &&
+            (status == "Todos" || status == "Quero jogar" && game.wantToPlay || status == "História completada" && game.storyCompleted || status == "Jogando" && (game.playtimeMinutes ?? 0) > 0 && !game.storyCompleted) &&
+            (progress == "Todos" || progress == "100%" && game.achievementProgress == 100 || progress == "Em progresso" && game.achievementProgress > 0 && game.achievementProgress < 100)
         }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
@@ -22,6 +32,14 @@ struct LibraryView: View {
                 TextField("Pesquisar por nome...", text: $query).textFieldStyle(.plain).padding(15).background(BrumTheme.surface).clipShape(RoundedRectangle(cornerRadius: 11)).overlay(RoundedRectangle(cornerRadius: 11).stroke(BrumTheme.line))
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack { ForEach(["Todos", "Jogos", "Classics", "Favoritos"], id: \.self) { item in FilterChip(title: item, selected: scope == item) { scope = item } }; FilterChip(title: "Instalados", selected: installedOnly) { installedOnly.toggle() } }
+                }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 14) {
+                        Picker("Plataforma", selection: $platform) { ForEach(platforms, id: \.self) { Text($0).tag($0) } }
+                        Picker("Gênero", selection: $genre) { ForEach(genres, id: \.self) { Text($0).tag($0) } }
+                        Picker("Status", selection: $status) { ForEach(["Todos", "Quero jogar", "Jogando", "História completada"], id: \.self) { Text($0).tag($0) } }
+                        Picker("Progresso", selection: $progress) { ForEach(["Todos", "Em progresso", "100%"], id: \.self) { Text($0).tag($0) } }
+                    }.pickerStyle(.menu).font(.caption.bold())
                 }
                 if games.isEmpty { VStack(spacing: 12) { Image(systemName: "magnifyingglass").font(.largeTitle).foregroundStyle(BrumTheme.muted); Text("Nenhum jogo encontrado").font(.headline).foregroundStyle(BrumTheme.text); Text("Altere os filtros ou sincronize novamente.").font(.subheadline).foregroundStyle(BrumTheme.muted) }.frame(maxWidth: .infinity).padding(.vertical, 70) }
                 else { LazyVGrid(columns: columns, spacing: 22) { ForEach(games) { GameTile(game: $0) } } }

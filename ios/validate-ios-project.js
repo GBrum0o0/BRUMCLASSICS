@@ -27,8 +27,11 @@ const source = swiftFiles.map((name) => fs.readFileSync(path.join(app, name), 'u
 const requiredEndpoints = ['/v1/pair', '/v1/snapshot', '/v1/ws', '/v1/remote', '/v1/companion/notes', '/v1/companion/library-state', '/v1/companion/capture', '/v1/moments/'];
 for (const endpoint of requiredEndpoints) if (!source.includes(endpoint)) throw new Error(`Endpoint não portado: ${endpoint}`);
 
-const requiredCommands = ['bcard_launch', 'navigate', 'search', 'activate', 'back', 'tab', 'set_volume', 'quick_save', 'quick_load', 'quit_game', 'sleep_pc', 'shutdown_pc'];
+const requiredCommands = ['bcard_launch'];
 for (const command of requiredCommands) if (!source.includes(`"${command}"`)) throw new Error(`Comando remoto não portado: ${command}`);
+for (const obsolete of ['CompanionControlView', 'PESQUISA NO LIVING ROOM', '"shutdown_pc"', '"sleep_pc"', '"quick_save"', '"quick_load"', '"set_volume"']) if (source.includes(obsolete)) throw new Error(`Controle remoto antigo ainda presente: ${obsolete}`);
+if (!source.includes('struct CompanionView') || !source.includes('struct CompanionNotesForm')) throw new Error('Companion de anotações ausente.');
+if (!source.includes('let playtimeMinutes: Double?')) throw new Error('Tempo fracionado não suportado.');
 
 if (!source.includes('SecureStore.write')) throw new Error('Token não está protegido pelo Keychain.');
 if (!source.includes('SHA256.hash(data: data)')) throw new Error('Certificate pinning ausente.');

@@ -15,8 +15,11 @@ struct HomeView: View {
                     Text(greeting).font(.system(size: 20, weight: .bold)).foregroundStyle(BrumTheme.primary)
                     Text("Sua biblioteca,\nem qualquer lugar.").font(.system(size: 40, weight: .black)).foregroundStyle(BrumTheme.text)
                 }
-                if let active = store.activeGame { CompanionCard(game: active) }
+                if let active = store.companionGame, store.connection == .online {
+                    Button { selection = 3 } label: { CompanionCard(game: active) }.buttonStyle(.plain)
+                }
                 if let lastPlayed { FeaturedGameCard(game: lastPlayed) }
+                NavigationLink { BCardLibraryView() } label: { SettingsRow(icon: "rectangle.portrait.on.rectangle.portrait", title: "B-CARD", detail: "Seus jogos instalados · Jogos e CLASSICS") }
                 GameStrip(title: "FAVORITOS", games: favorites, empty: "Marque jogos como favoritos no launcher ou no perfil do jogo.")
                 GameStrip(title: "QUERO JOGAR", games: wantToPlay, empty: "Sua lista Quero jogar aparecerá aqui.")
                 JourneyCard(games: store.snapshot.games)
@@ -36,7 +39,14 @@ struct ConnectionDot: View {
         HStack(spacing: 6) { Circle().fill(color).frame(width: 7, height: 7); Text(label).font(.caption2.bold()).tracking(1).foregroundStyle(BrumTheme.muted) }
     }
     private var color: Color { state == .online ? BrumTheme.primary : .orange }
-    private var label: String { state == .online ? "AO VIVO" : "OFFLINE" }
+    private var label: String {
+        switch state {
+        case .online: return "CONECTADO"
+        case .connecting: return "SINCRONIZANDO"
+        case .offline: return "OFFLINE"
+        case .error: return "ERRO DE SINCRONIZAÇÃO"
+        }
+    }
 }
 
 struct FeaturedGameCard: View {
@@ -48,7 +58,7 @@ struct FeaturedGameCard: View {
                 HStack(spacing: 18) {
                     GameCoverView(game: game, cornerRadius: 8).frame(width: 112, height: 158)
                     VStack(alignment: .leading, spacing: 9) {
-                        Text("CONTINUAR JOGANDO").font(.caption2.bold()).tracking(1.3).foregroundStyle(BrumTheme.primary)
+                        Text("ÚLTIMO JOGO JOGADO").font(.caption2.bold()).tracking(1.3).foregroundStyle(BrumTheme.primary)
                         Text(game.title).font(.title2.bold()).foregroundStyle(BrumTheme.text).lineLimit(3)
                         Text("\(game.platform) · \(game.playtimeLabel)").font(.caption).foregroundStyle(BrumTheme.muted)
                         ProgressView(value: Double(game.achievementProgress), total: 100).tint(BrumTheme.primary)
@@ -77,7 +87,7 @@ struct JourneyCard: View {
         BrumCard {
             VStack(alignment: .leading, spacing: 16) {
                 BrumSectionLabel(text: "MINHA JORNADA")
-                HStack { metric("JOGOS", "\(games.count)"); metric("HORAS", "\(games.compactMap(\.playtimeMinutes).reduce(0,+) / 60)"); metric("CAMPANHAS", "\(games.filter(\.storyCompleted).count)") }
+                HStack { metric("JOGOS", "\(games.count)"); metric("HORAS", String(format: "%.1f", games.compactMap(\.playtimeMinutes).reduce(0,+) / 60)); metric("CAMPANHAS", "\(games.filter(\.storyCompleted).count)") }
             }
         }
     }
@@ -87,16 +97,14 @@ struct JourneyCard: View {
 struct CompanionCard: View {
     @EnvironmentObject private var store: AppStore
     let game: Game
-    var performance: PerformanceState? { store.snapshot.performance }
     var body: some View {
         BrumCard {
             VStack(alignment: .leading, spacing: 13) {
                 HStack { BrumSectionLabel(text: "BRUMCOMPANION"); Spacer(); Text("SESSÃO ATIVA").font(.caption2.bold()).foregroundStyle(BrumTheme.primary) }
                 Text(game.title).font(.title3.bold()).foregroundStyle(BrumTheme.text)
-                HStack { metric("FPS", performance?.fps.value); metric("GPU", performance?.gpu.usagePercent, suffix: "%"); metric("CPU", performance?.cpu.usagePercent, suffix: "%"); metric("GPU °C", performance?.gpu.temperatureC, suffix: "°") }
-                if game.notes != .empty { Text(game.notes.whereStopped.isEmpty ? game.notes.objectives : game.notes.whereStopped).font(.subheadline).foregroundStyle(BrumTheme.muted).lineLimit(3) }
+                Text([game.notes.whereStopped, game.notes.objectives, game.notes.tips, game.notes.commands].first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? "").font(.subheadline).foregroundStyle(BrumTheme.muted).lineLimit(3)
+                Text("ABRIR MINHAS ANOTAÇÕES").font(.caption.bold()).foregroundStyle(BrumTheme.primary)
             }
         }
     }
-    private func metric(_ title: String, _ value: Double?, suffix: String = "") -> some View { VStack(alignment: .leading) { Text(value.map { String(format: "%.0f%@", $0, suffix) } ?? "—").font(.headline).foregroundStyle(BrumTheme.text); Text(title).font(.caption2.bold()).foregroundStyle(BrumTheme.muted) }.frame(maxWidth: .infinity, alignment: .leading) }
 }

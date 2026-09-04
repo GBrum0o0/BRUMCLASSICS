@@ -9,6 +9,7 @@ enum BridgeError: LocalizedError, Equatable {
     case unreachable
     case unauthorized
     case invalidCertificate
+    case conflict
     case server(String)
     case invalidResponse(String)
 
@@ -19,15 +20,24 @@ enum BridgeError: LocalizedError, Equatable {
         case .unreachable: return "Launcher não encontrado. Confirme o Wi-Fi e abra Configurações → MÓVEL no computador."
         case .unauthorized: return "A autorização deste iPhone foi revogada. Faça um novo pareamento."
         case .invalidCertificate: return "A identidade segura do launcher não corresponde ao QR Code."
+        case .conflict: return "As anotações mudaram no launcher. Escolha qual versão manter."
         case .server(let message), .invalidResponse(let message): return message
         }
     }
 }
 
-private final class PinnedSessionDelegate: NSObject, URLSessionDelegate {
+private final class PinnedSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate {
     var expectedFingerprint = ""
 
     func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        evaluate(challenge, completionHandler: completionHandler)
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        evaluate(challenge, completionHandler: completionHandler)
+    }
+
+    private func evaluate(_ challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
         guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
               let trust = challenge.protectionSpace.serverTrust,
               let certificate = SecTrustGetCertificateAtIndex(trust, 0) else {
@@ -101,7 +111,7 @@ actor BridgeClient {
         let path: String
         if mutation.kind == .notes {
             path = "/v1/companion/notes"
-            if let notes = mutation.notes { body["notes"] = notes.dictionary; body["base"] = notes.dictionary }
+            if let notes = mutation.notes { body["notes"] = notes.dictionary; body["base"] = (mutation.baseNotes ?? notes).dictionary }
         } else {
             path = "/v1/companion/library-state"
             body["favorite"] = mutation.favorite ?? false; body["wantToPlay"] = mutation.wantToPlay ?? false
@@ -114,14 +124,18 @@ actor BridgeClient {
         guard let request = try makeRequest(path: "/v1/ws", authenticated: true, webSocket: true) else { throw BridgeError.notPaired }
         let task = session.webSocketTask(with: request)
         socket = task
-        task.resume()
-        while !Task.isCancelled {
-            let message = try await task.receive()
-            switch message {
-            case .string(let value): await onEvent(value)
-            case .data(let value): await onEvent(String(data: value, encoding: .utf8) ?? "")
-            @unknown default: break
+        try await withTaskCancellationHandler {
+            task.resume()
+            while !Task.isCancelled {
+                let message = try await task.receive()
+                switch message {
+                case .string(let value): await onEvent(value)
+                case .data(let value): await onEvent(String(data: value, encoding: .utf8) ?? "")
+                @unknown default: break
+                }
             }
+        } onCancel: {
+            task.cancel(with: .goingAway, reason: nil)
         }
     }
 
@@ -130,7 +144,15 @@ actor BridgeClient {
     private func request<T: Decodable>(path: String, method: String = "GET", body: Data? = nil, authenticated: Bool = true, overrideHost: String? = nil, overridePort: Int? = nil) async throws -> T {
         let data = try await dataRequest(path: path, method: method, body: body, authenticated: authenticated, overrideHost: overrideHost, overridePort: overridePort)
         do { return try JSONDecoder().decode(T.self, from: data) }
-        catch { throw BridgeError.invalidResponse("O launcher respondeu em um formato incompatível.") }
+        catch let error as DecodingError {
+            let context: DecodingError.Context
+            switch error {
+            case .typeMismatch(_, let value), .valueNotFound(_, let value), .keyNotFound(_, let value), .dataCorrupted(let value): context = value
+            @unknown default: throw BridgeError.invalidResponse("Dados da biblioteca incompatíveis.")
+            }
+            let field = context.codingPath.map(\.stringValue).joined(separator: ".")
+            throw BridgeError.invalidResponse("Não foi possível ler os dados do launcher (\(field.isEmpty ? "biblioteca" : field)). Seu cache foi preservado.")
+        }
     }
 
     private func dataRequest(path: String, method: String = "GET", body: Data? = nil, authenticated: Bool = true, overrideHost: String? = nil, overridePort: Int? = nil, maximumBytes: Int = 24 * 1024 * 1024) async throws -> Data {
@@ -142,6 +164,7 @@ actor BridgeClient {
             guard data.count <= maximumBytes else { throw BridgeError.invalidResponse("A resposta excede o limite de segurança.") }
             guard let http = response as? HTTPURLResponse else { throw BridgeError.invalidResponse("Resposta de rede inválida.") }
             if http.statusCode == 401 { throw BridgeError.unauthorized }
+            if http.statusCode == 409 { throw BridgeError.conflict }
             guard (200...299).contains(http.statusCode) else {
                 let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
                 throw BridgeError.server((object?["message"] as? String) ?? pairingMessage(object?["error"] as? String) ?? "O launcher recusou a solicitação (\(http.statusCode)).")
@@ -160,7 +183,7 @@ actor BridgeClient {
         guard let url = URL(string: "\(scheme)://\(host):\(port)\(path)") else { throw BridgeError.invalidResponse("Endereço local inválido.") }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("BRUMCLASSICS-MOVEL/0.1.0 iOS", forHTTPHeaderField: "User-Agent")
+        request.setValue("BRUMCLASSICS-MOVEL/0.3.0 iOS", forHTTPHeaderField: "User-Agent")
         if authenticated { guard !token.isEmpty else { throw BridgeError.notPaired }; request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         return request
     }

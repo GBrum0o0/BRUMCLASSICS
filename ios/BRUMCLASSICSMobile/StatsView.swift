@@ -12,10 +12,11 @@ struct StatsView: View {
                 PageHeader(kicker: "MINHA JORNADA", title: "Estatísticas", subtitle: "Dados preservados no aparelho")
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                     StatCard(value: "\(games.count)", label: "JOGOS")
-                    StatCard(value: "\(games.compactMap(\.playtimeMinutes).reduce(0,+) / 60)", label: "HORAS")
+                    StatCard(value: String(format: "%.1f", games.compactMap(\.playtimeMinutes).reduce(0,+) / 60), label: "HORAS")
                     StatCard(value: "\(games.filter(\.storyCompleted).count)", label: "CAMPANHAS")
                     StatCard(value: "\(games.flatMap(\.achievements).filter(\.unlocked).count)", label: "CONQUISTAS")
                 }
+                NavigationLink { AchievementsView() } label: { SettingsRow(icon: "trophy.fill", title: "CONQUISTAS", detail: "Ver progresso e jogos próximos de 100%") }
                 BrumCard {
                     VStack(alignment: .leading, spacing: 14) {
                         BrumSectionLabel(text: "DISTRIBUIÇÃO POR PLATAFORMA")

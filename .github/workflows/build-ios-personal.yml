@@ -30,6 +30,23 @@ jobs:
         working-directory: ios
         run: xcodegen generate
 
+      - name: Testar modelos e navegacao no simulador iPhone
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          SIMULATOR_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for devices in d["devices"].values() for x in devices if "iPhone" in x["name"] and x.get("isAvailable")))')
+          xcodebuild -project BRUMCLASSICSMobile.xcodeproj -scheme BRUMCLASSICSMobile -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -derivedDataPath build/Simulator -resultBundlePath build/iOS-Tests.xcresult -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test
+
+      - name: Guardar resultados dos testes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: BRUMCLASSICS-IOS-TESTES-0.3.0
+          path: ios/build/iOS-Tests.xcresult
+          retention-days: 7
+          if-no-files-found: warn
+
       - name: Compilar aplicativo sem assinatura
         working-directory: ios
         run: >-
@@ -53,10 +70,10 @@ jobs:
       - name: Guardar build pessoal
         uses: actions/upload-artifact@v4
         with:
-          name: BRUMCLASSICS-MOVEL-IOS-PESSOAL-0.2.1
+          name: BRUMCLASSICS-MOVEL-IOS-PESSOAL-0.3.0
           path: |
-            ios/build/BRUMCLASSICS-MOVEL-IOS-0.2.1.ipa
-            ios/build/BRUMCLASSICS-MOVEL-IOS-0.2.1.ipa.sha256
+            ios/build/BRUMCLASSICS-MOVEL-IOS-0.3.0.ipa
+            ios/build/BRUMCLASSICS-MOVEL-IOS-0.3.0.ipa.sha256
             ios/build/IPA-VALIDATION.json
           retention-days: 30
           if-no-files-found: error

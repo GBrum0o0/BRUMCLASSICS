@@ -2,6 +2,53 @@ import XCTest
 @testable import BRUMCLASSICSMobile
 
 final class SnapshotTests: XCTestCase {
+    private func sampleGame(playtime: String) throws -> Game {
+        let json = """
+        {"id":"test:1","title":"Teste","description":"","category":"modern","platform":"pc","store":"local","genre":"","collectionId":"","sizeBytes":0,"playtimeMinutes":\(playtime),"playtimeAvailable":true,"achievementsCollected":null,"achievementsTotal":null,"achievementsAvailable":false,"achievements":[],"storyCompleted":false,"favorite":false,"wantToPlay":false,"libraryStateRevision":0,"notes":{"whereStopped":"","objectives":"","tips":"","commands":"","revision":0,"updatedAt":""},"installed":true,"integrityStatus":"verified","lastPlayedAt":"","artworkPath":""}
+        """
+        return try JSONDecoder().decode(Game.self, from: Data(json.utf8))
+    }
+
+    func testFractionalPlaytimePreservesPrecisionAndCacheRoundtrip() throws {
+        let game = try sampleGame(playtime: "35.13333333333333")
+        XCTAssertEqual(try XCTUnwrap(game.playtimeMinutes), 35.13333333333333, accuracy: 0.000000001)
+        XCTAssertEqual(game.playtimeLabel, "35 min")
+        let cached = try JSONDecoder().decode(Game.self, from: JSONEncoder().encode(game))
+        XCTAssertEqual(cached.playtimeMinutes, game.playtimeMinutes)
+    }
+
+    func testUnavailablePlaytimeDoesNotRejectLibrary() throws {
+        let game = try sampleGame(playtime: "null")
+        XCTAssertNil(game.playtimeMinutes)
+        XCTAssertEqual(game.playtimeLabel, "INDISPONÍVEL")
+    }
+
+    func testFractionalPlaytimeDoesNotDropOtherGames() throws {
+        var snapshot = LibrarySnapshot.empty
+        snapshot.games = [try sampleGame(playtime: "120"), try sampleGame(playtime: "35.13333333333333")]
+        let result = try JSONDecoder().decode(LibrarySnapshot.self, from: JSONEncoder().encode(snapshot))
+        XCTAssertEqual(result.games.count, 2)
+        XCTAssertEqual(result.games[0].playtimeLabel, "2 h 0 min")
+    }
+
+    func testCompanionChecksActualNoteContentNotRevision() {
+        var notes = Game.Notes.empty
+        notes.revision = 8; notes.updatedAt = "2026-09-04"; notes.tips = "  \n "
+        XCTAssertFalse(notes.hasContent)
+        notes.commands = "Pular: X"
+        XCTAssertTrue(notes.hasContent)
+    }
+
+    func testPerformanceRejectsOfflineStaleAndDifferentSession() throws {
+        let json = #"{"active":true,"gameId":"test:1","sampledAt":"2026-09-04T12:00:00.000Z","sessionSeconds":30,"cpu":{"available":true,"usagePercent":5},"gpu":{"available":false,"name":""},"memory":{"available":false},"fps":{"available":false}}"#
+        let value = try JSONDecoder().decode(PerformanceState.self, from: Data(json.utf8))
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-04T12:00:05Z"))
+        XCTAssertTrue(value.isFresh(gameID: "test:1", connected: true, now: now))
+        XCTAssertFalse(value.isFresh(gameID: "test:1", connected: false, now: now))
+        XCTAssertFalse(value.isFresh(gameID: "other", connected: true, now: now))
+        XCTAssertFalse(value.isFresh(gameID: "test:1", connected: true, now: now.addingTimeInterval(25)))
+    }
+
     func testPairingURLParsesSecureIdentity() throws {
         let url = try XCTUnwrap(URL(string: "brumclassics://pair?host=192.168.1.10&port=46991&code=123456&pin=AA:BB"))
         let value = try XCTUnwrap(PairingPayload(url: url))
