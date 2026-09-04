@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## BRUMCLASSICS MÓVEL iOS 0.2.1 — Correção do IPA
+
+- Corrigida a referência ao executável no Info.plist.
+- Nomes internos ASCII e permissões de execução preservadas no ZIP.
+- Validação do IPA compilado e sete testes de regressão de empacotamento.
+- Bundle ID e dados preservados; a PWA não foi alterada.
+
+Veja [as notas da correção](ios/RELEASE-NOTES-IOS-0.2.1.txt).
+
 ## BRUMCLASSICS MÓVEL iOS 0.2.0 — Sideload pessoal
 
 - Aplicativo iOS nativo em SwiftUI para iOS 16 ou superior.

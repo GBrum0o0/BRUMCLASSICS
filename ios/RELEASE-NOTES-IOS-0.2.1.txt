@@ -1,0 +1,14 @@
+BRUMCLASSICS MOVEL iOS 0.2.1 (build 4) - 04/09/2026
+
+Corrige o erro do Sideloadly "could not find executable":
+- CFBundleExecutable referencia o binario real compilado pelo Xcode.
+- Nome interno BRUMCLASSICSMobile sem acentos; nome visivel BRUMCLASSICS preservado.
+- Empacotamento preserva permissoes Unix do executavel.
+- Validacao do IPA confere manifesto, binario arm64, caminhos, versao e CRC.
+- Sete testes de regressao protegem o empacotamento.
+
+O Bundle ID permanece com.brumclassics.mobile.ios. Use o mesmo identificador
+e a mesma conta de assinatura para atualizar sem apagar o app anterior.
+O IPA nao e assinado: requer assinatura pessoal via Sideloadly ou AltStore.
+A instalacao em iPhone fisico precisa ser confirmada pelo usuario.
+PWA, launcher, contas e dados pessoais nao foram alterados por este pacote.

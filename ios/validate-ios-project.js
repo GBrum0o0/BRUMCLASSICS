@@ -5,6 +5,9 @@ const path = require('node:path');
 
 const root = __dirname;
 const app = path.join(root, 'BRUMCLASSICSMobile');
+const info = fs.readFileSync(path.join(app, 'Info.plist'), 'utf8');
+if (!/<key>CFBundleExecutable<\/key>\s*<string>\$\(EXECUTABLE_NAME\)<\/string>/.test(info)) throw new Error('CFBundleExecutable deve apontar para EXECUTABLE_NAME.');
+if (!fs.readFileSync(path.join(root, 'project.yml'), 'utf8').includes('PRODUCT_NAME: BRUMCLASSICSMobile')) throw new Error('Nome interno ASCII estável ausente.');
 const required = [
   'project.yml', 'BRUMCLASSICSMobile/Info.plist', 'BRUMCLASSICSMobile/PrivacyInfo.xcprivacy',
   'BRUMCLASSICSMobile/BRUMCLASSICSMobileApp.swift', 'BRUMCLASSICSMobile/AppStore.swift',

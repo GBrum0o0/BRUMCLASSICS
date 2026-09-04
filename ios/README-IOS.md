@@ -33,6 +33,14 @@ O Windows não possui Xcode nem o SDK do iOS, portanto não compila o aplicativo
 
 ## Uso pessoal e atualizações
 
+### Correção 0.2.1
+
+Use o IPA **0.2.1**, substituindo a seleção do arquivo 0.2.0 no Sideloadly. Esta versão corrige a ausência de `CFBundleExecutable` e utiliza caminhos internos ASCII para evitar incompatibilidades de nomes. O nome visível continua BRUMCLASSICS.
+
+O workflow executa sete testes de regressão e valida o IPA compilado (binário arm64, referência ao executável, permissões Unix, versão e CRC). O artefato inclui `IPA-VALIDATION.json` e SHA-256. Essas verificações não substituem o teste de assinatura e instalação num iPhone real.
+
+Para validar um download: `python3 validate_ipa.py caminho/do/arquivo.ipa --version 0.2.1`.
+
 1. Execute **Build iOS pessoal** na aba Actions do GitHub e baixe o artefato `BRUMCLASSICS-MOVEL-IOS-PESSOAL` no computador.
 2. No Windows, assine e instale o `.ipa` no seu iPhone com Sideloadly/AltStore e a sua própria conta Apple.
 3. Nas próximas versões, use sempre o Bundle ID `com.brumclassics.mobile.ios` e instale sobre o app anterior. Isso permite que o iOS preserve a biblioteca offline, capas e preferências.

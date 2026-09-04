@@ -17,6 +17,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validar projeto e testes do pacote
+        working-directory: ios
+        run: |
+          node validate-ios-project.js
+          python3 -m unittest -v test_validate_ipa.py
+
       - name: Instalar XcodeGen
         run: brew install xcodegen
 
@@ -42,20 +48,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          APP_PATH="build/DerivedData/Build/Products/Release-iphoneos/BRUMCLASSICS MÓVEL.app"
-          test -d "$APP_PATH"
-          rm -rf build/Payload
-          mkdir -p build/Payload
-          cp -R "$APP_PATH" build/Payload/
-          ditto -c -k --sequesterRsrc --keepParent build/Payload build/BRUMCLASSICS-MOVEL-IOS-0.2.0.ipa
-          shasum -a 256 build/BRUMCLASSICS-MOVEL-IOS-0.2.0.ipa > build/BRUMCLASSICS-MOVEL-IOS-0.2.0.ipa.sha256
+          python3 package_ipa.py "build/DerivedData/Build/Products/Release-iphoneos/BRUMCLASSICSMobile.app" build
 
       - name: Guardar build pessoal
         uses: actions/upload-artifact@v4
         with:
-          name: BRUMCLASSICS-MOVEL-IOS-PESSOAL-0.2.0
+          name: BRUMCLASSICS-MOVEL-IOS-PESSOAL-0.2.1
           path: |
-            ios/build/BRUMCLASSICS-MOVEL-IOS-0.2.0.ipa
-            ios/build/BRUMCLASSICS-MOVEL-IOS-0.2.0.ipa.sha256
+            ios/build/BRUMCLASSICS-MOVEL-IOS-0.2.1.ipa
+            ios/build/BRUMCLASSICS-MOVEL-IOS-0.2.1.ipa.sha256
+            ios/build/IPA-VALIDATION.json
           retention-days: 30
           if-no-files-found: error
