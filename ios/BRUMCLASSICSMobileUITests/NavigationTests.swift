@@ -1,6 +1,16 @@
 import XCTest
 
 final class NavigationTests: XCTestCase {
+    func testClassicsEverywhereOpensFromHomeAndReturns() {
+        let app = XCUIApplication(); app.launch()
+        let link = app.buttons["classics-everywhere-link"]
+        XCTAssertTrue(link.waitForExistence(timeout: 15))
+        if !link.isHittable { app.swipeUp() }
+        link.tap()
+        XCTAssertTrue(app.buttons["ADICIONAR JOGOS DO IPHONE"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(app.tabBars.buttons["Início"].exists)
+    }
     func testAndroidAlignedTabsAndCompanionWithoutRemoteControls() {
         let app = XCUIApplication()
         app.launch()

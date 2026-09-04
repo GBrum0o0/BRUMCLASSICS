@@ -43,6 +43,11 @@ final class AppStore: ObservableObject {
     var companionGame: Game? { guard let game = activeGame, game.notes.hasContent else { return nil }; return game }
     var canCaptureMoment: Bool { connection == .online && activeGame != nil && !capturingMoment }
 
+    func syncPocketAchievements(gameID: String, raGameID: Int, username: String) async -> String? {
+        do { try await bridge.syncPocketAchievements(gameID: gameID, raGameID: raGameID, username: username); await refresh(); return nil }
+        catch { return "Progresso salvo no iPhone. O PC ainda não confirmou: \(error.localizedDescription). Atualize o launcher e confira a mesma conta e o vínculo do jogo." }
+    }
+
     func restore() async {
         if let cached = await offline.loadSnapshot() { snapshot = cached }
         moments = await offline.loadMoments()

@@ -26,6 +26,7 @@ struct BCardView: View {
     @State private var offset: CGFloat = 0
     @State private var sending = false
     @State private var floating = false
+    @State private var sent = false
     @State private var sendError: String?
     var body: some View {
         GeometryReader { geometry in ZStack {
@@ -34,9 +35,11 @@ struct BCardView: View {
             GameCoverView(game: game, cornerRadius: 14, artworkOnly: true)
                 .frame(width: width, height: width / 0.72)
                 .shadow(color: BrumTheme.primary.opacity(0.12), radius: 35, y: 18)
-                .rotation3DEffect(.degrees(reduceMotion ? 0 : floating ? 3 : -3), axis: (x: 0.3, y: 1, z: 0))
-                .offset(y: offset + (reduceMotion ? 0 : floating ? -7 : 7))
+                .rotation3DEffect(.degrees(reduceMotion || sending ? 0 : floating ? 3 : -3), axis: (x: 0.3, y: 1, z: 0))
+                .offset(y: reduceMotion || sending ? 0 : floating ? -7 : 7)
                 .animation(reduceMotion ? nil : .easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: floating)
+                .offset(y: offset)
+                .opacity(sent ? 0 : 1)
                 .accessibilityLabel("Capa do jogo. Arraste para cima para enviar ao computador.")
                 .accessibilityIdentifier("bcard-floating-cover")
                 .accessibilityAction(named: "Enviar ao computador") { send(height: geometry.size.height) }
@@ -56,14 +59,18 @@ struct BCardView: View {
             }.padding(20)
         } }
         .onAppear { floating = true }
-        .alert("Não foi possível enviar", isPresented: Binding(get: { sendError != nil }, set: { if !$0 { sendError = nil } })) { Button("OK") { sendError = nil } } message: { Text(sendError ?? "") }
+        .alert("Não foi possível enviar", isPresented: Binding(get: { sendError != nil }, set: { if !$0 { sendError = nil; dismiss() } })) { Button("Voltar à biblioteca") { sendError = nil; dismiss() } } message: { Text(sendError ?? "") }
     }
     private func send(height: CGFloat) {
         guard !sending else { return }; sending = true
         withAnimation(reduceMotion ? nil : .easeIn(duration: 0.4)) { offset = -height }
         Task {
+            // The one-shot departure is separate from the repeating idle animation.
+            // Even a rejected request never brings the thrown card back to the center.
+            try? await Task.sleep(nanoseconds: reduceMotion ? 0 : 420_000_000)
+            sent = true
             let error = await store.launchBCard(game, mode: BCardLaunchMode.validated(savedMode, classic: game.isClassic))
-            if let error { sendError = error; sending = false; withAnimation(.spring()) { offset = 0 } }
+            if let error { sendError = error }
             else { dismiss() }
         }
     }

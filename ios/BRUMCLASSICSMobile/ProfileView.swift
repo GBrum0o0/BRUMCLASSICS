@@ -51,6 +51,9 @@ struct MobileSettingsView: View {
     @AppStorage("bcard_classic_launch_mode") private var mode = "new"
     var body: some View {
         Form {
+            Section("CLASSICS no iPhone") {
+                NavigationLink("RetroArch e RetroAchievements") { PocketSetupView() }
+            }
             Section("B-CARD · CLASSICS") {
                 Picker("Ao iniciar um clássico", selection: $mode) {
                     Text("Novo jogo").tag("new")

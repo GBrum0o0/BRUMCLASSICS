@@ -84,6 +84,11 @@ actor BridgeClient {
 
     func snapshot() async throws -> LibrarySnapshot { try await request(path: "/v1/snapshot") }
 
+    func syncPocketAchievements(gameID: String, raGameID: Int, username: String) async throws {
+        let body = try JSONSerialization.data(withJSONObject: ["gameId": gameID, "raGameId": raGameID, "username": username])
+        let _: [String: Bool] = try await request(path: "/v1/classics/achievements/sync", method: "POST", body: body)
+    }
+
     func artwork(for game: Game) async throws -> Data {
         guard !game.artworkPath.isEmpty else { throw BridgeError.invalidResponse("Capa indisponível.") }
         return try await dataRequest(path: game.artworkPath, maximumBytes: 20 * 1024 * 1024)
@@ -183,7 +188,7 @@ actor BridgeClient {
         guard let url = URL(string: "\(scheme)://\(host):\(port)\(path)") else { throw BridgeError.invalidResponse("Endereço local inválido.") }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("BRUMCLASSICS-MOVEL/0.3.1 iOS", forHTTPHeaderField: "User-Agent")
+        request.setValue("BRUMCLASSICS-MOVEL/0.4.0 iOS", forHTTPHeaderField: "User-Agent")
         if authenticated { guard !token.isEmpty else { throw BridgeError.notPaired }; request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         return request
     }

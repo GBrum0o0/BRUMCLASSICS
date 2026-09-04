@@ -3,12 +3,15 @@ import SwiftUI
 @main
 struct BRUMCLASSICSMobileApp: App {
     @StateObject private var store = AppStore()
+    @StateObject private var pocket = PocketClassicsStore()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(store)
+                .environmentObject(pocket)
+                .task { await pocket.restore(); await pocket.sync(launcher: store) }
                 .preferredColorScheme(.dark)
                 .tint(BrumTheme.primary)
                 .onOpenURL { url in Task { await store.pair(from: url) } }
@@ -16,6 +19,8 @@ struct BRUMCLASSICSMobileApp: App {
                     if phase == .active {
                         Task {
                             await store.resume()
+                            await pocket.restore()
+                            await pocket.sync(launcher: store)
                             await store.checkForPersonalUpdate()
                         }
                     } else if phase == .background { store.suspend() }
@@ -26,6 +31,7 @@ struct BRUMCLASSICSMobileApp: App {
 
 struct RootView: View {
     @EnvironmentObject private var store: AppStore
+    @EnvironmentObject private var pocket: PocketClassicsStore
     @State private var selection = 0
 
     var body: some View {
@@ -41,5 +47,6 @@ struct RootView: View {
         .toolbarBackground(.visible, for: .tabBar)
         .sheet(item: $store.selectedGame) { GameDetailView(game: $0) }
         .alert("BRUMCLASSICS", isPresented: Binding(get: { store.message != nil }, set: { if !$0 { store.message = nil } })) { Button("OK") { store.message = nil } } message: { Text(store.message ?? "") }
+        .alert("CLASSICS", isPresented: Binding(get: { pocket.message != nil }, set: { if !$0 { pocket.message = nil } })) { Button("OK") { pocket.message = nil } } message: { Text(pocket.message ?? "") }
     }
 }

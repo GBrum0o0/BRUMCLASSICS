@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## iOS 0.4.0 + launcher 1.55.2 — CLASSICS in every everywhere
+
+- B-CARD: saída única da capa; erros não trazem o cartão de volta ao centro.
+- Início: catálogo de ROMs próprias no iPhone, envio para RetroArch e atalho para jogos já importados nele.
+- Configuração guiada de RetroArch, proporção, áudio, controles e RetroAchievements, sem sobrescrever saves ou credenciais do emulador.
+- Progresso oficial do RetroAchievements salvo offline no iPhone e exibido em Conquistas.
+- Launcher: canal autenticado reconsulta a API para o mesmo jogo/conta; preserva coleção, horas, capas e saves. Não aceita conquistas declaradas pelo celular.
+- [BRUMWORLD: instalação e limites da integração](ios/BRUMWORLD-IOS-0.4.0.md).
+
+
 ## BRUMCLASSICS MÓVEL iOS 0.3.1 — B-CARD flutuante e Companion
 
 - Capa flutuante limpa com botão Voltar; modo de save movido às configurações do app.

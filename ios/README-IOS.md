@@ -1,5 +1,7 @@
 # BRUMCLASSICS MÓVEL para iOS
 
+Versão 0.4.0: [guia CLASSICS in every everywhere e RetroArch](BRUMWORLD-IOS-0.4.0.md). Inclui importação local, atalho externo para o emulador e conquistas oficiais em cache. A integração com o PC requer launcher 1.55.2, o mesmo jogo reconhecido e a mesma conta RetroAchievements.
+
 Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o mesmo protocolo local seguro (versão 8) do aplicativo Android e não altera o launcher nem o perfil do usuário.
 
 ## O que está implementado
