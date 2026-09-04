@@ -85,7 +85,7 @@ actor PocketFiles {
         try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
         // File copy runs on this actor, away from the UI; original ROM and emulator saves are untouched.
         try FileManager.default.copyItem(at: source, to: destination)
-        try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeFileProtectionUnlessOpen], ofItemAtPath: destination.path)
+        try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUnlessOpen], ofItemAtPath: destination.path)
         return game
     }
 }
@@ -132,7 +132,8 @@ actor PocketRAClient {
         catch { status = "Não foi possível ler o catálogo local. Seus arquivos foram preservados." }
     }
     func importFiles(_ urls: [URL]) async {
-        guard loaded, !busy else { return }; busy = true; defer { busy = false }
+        guard loaded else { message = "O catálogo não pôde ser aberto. Não vamos sobrescrever seus dados."; return }
+        guard !busy else { return }; busy = true; defer { busy = false }
         var errors: [String] = []
         for url in urls {
             do {
