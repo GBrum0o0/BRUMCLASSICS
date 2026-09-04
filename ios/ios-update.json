@@ -1,9 +1,11 @@
 {
-  "version": "0.6.0",
-  "build": 9,
+  "version": "0.6.1",
+  "build": 10,
   "minimumIos": "16.0",
   "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/actions/workflows/build-ios-personal.yml",
   "notes": [
+    "CLASSICS mostra somente ROMs realmente encontradas na pasta Downloads autorizada; jogos que existem apenas no PC deixam de aparecer nessa tela.",
+    "A pasta de ROMs pode ser alterada exclusivamente em Perfil → Configurações do app → CLASSICS e é verificada automaticamente nas próximas aberturas.",
     "CLASSICS agora consulta a biblioteca real do RetroArch compatível e abre o jogo exato ao tocar na capa.",
     "A lista distingue metadados do launcher de arquivos realmente jogáveis e não mantém uma segunda cópia apenas para mostrar o catálogo.",
     "Horas offline por logs reais do RetroArch, com fila persistente e sincronização sem duplicação para o PC 1.55.3+.",

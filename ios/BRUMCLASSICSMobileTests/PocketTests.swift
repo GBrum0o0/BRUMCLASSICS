@@ -60,4 +60,16 @@ final class PocketTests: XCTestCase {
         let url = URL(string: "brumclassics://retroarch?games=\(encoded)")!
         XCTAssertTrue(try RetroArchLibraryRules.decode(url).isEmpty)
     }
+    func testROMFolderShowsOnlyRealSupportedFilesAndOmitsAmbiguousDuplicates() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("nested"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try Data([1]).write(to: root.appendingPathComponent("Pokemon.gba"))
+        try Data([2]).write(to: root.appendingPathComponent("notes.txt"))
+        try Data([3]).write(to: root.appendingPathComponent("duplicate.nes"))
+        try Data([4]).write(to: root.appendingPathComponent("nested/duplicate.nes"))
+        let result = try ROMFolderScanner.scan(root)
+        XCTAssertEqual(result.games.map(\.filename), ["Pokemon.gba"])
+        XCTAssertEqual(result.duplicateFilenames, 2)
+    }
 }

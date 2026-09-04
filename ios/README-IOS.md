@@ -1,6 +1,6 @@
 # BRUMCLASSICS MÓVEL para iOS
 
-Versão 0.6.0: [biblioteca e abertura direta pelo RetroArch compatível](RETROARCH-COMPATIVEL.md), além de [horas offline e sincronização com o PC](HORAS-OFFLINE.md). O aplicativo mostra as capas sincronizadas do PC separadas dos arquivos realmente jogáveis. Após o RetroArch confirmar sua biblioteca, tocar na capa abre o título exato.
+Versão 0.6.1: [biblioteca e abertura direta pelo RetroArch compatível](RETROARCH-COMPATIVEL.md), além de [horas offline e sincronização com o PC](HORAS-OFFLINE.md). A tela CLASSICS mostra somente ROMs realmente encontradas na pasta Downloads que você autorizou. A pasta pode ser alterada em **Perfil → Configurações do app → CLASSICS**; jogos existentes apenas no PC não aparecem como se estivessem no iPhone.
 
 Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o mesmo protocolo local seguro (versão 8) do aplicativo Android e não altera o launcher nem o perfil do usuário.
 

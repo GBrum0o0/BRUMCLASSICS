@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## iOS 0.6.1 — biblioteca limitada às ROMs do aparelho
+
+- A seção CLASSICS exibe somente arquivos compatíveis realmente detectados na pasta Downloads autorizada.
+- Jogos sincronizados do PC sem ROM no iPhone deixam de aparecer nessa tela.
+- A pasta é autorizada uma vez e verificada automaticamente nas próximas aberturas.
+- A troca de pasta fica em **Perfil → Configurações do app → CLASSICS**.
+- Arquivos com o mesmo nome em duas subpastas são omitidos para impedir a abertura do jogo errado.
+
 ## iOS 0.6.0 + launcher 1.55.3 — biblioteca real do RetroArch
 
 - `CLASSICS in every everywhere` consulta a biblioteca devolvida pelo RetroArch compatível, em vez de manter outra cópia da ROM no BRUMCLASSICS.

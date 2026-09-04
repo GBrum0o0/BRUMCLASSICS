@@ -14,6 +14,7 @@ const required = [
   'BRUMCLASSICSMobile/BridgeClient.swift', 'BRUMCLASSICSMobile/Models.swift',
   'BRUMCLASSICSMobile/PersonalUpdateService.swift',
   'BRUMCLASSICSMobile/ProfileView.swift', 'BRUMCLASSICSMobile/BCardView.swift',
+  'BRUMCLASSICSMobile/ROMFolderLibrary.swift',
   'BRUMCLASSICSMobile/MomentsView.swift', 'BRUMCLASSICSMobileTests/SnapshotTests.swift',
   'ios-update.json', 'github-actions/build-ios-personal.yml'
 ];
@@ -34,6 +35,10 @@ for (const marker of ['PocketRuntimeFiles', '/v1/classics/playtime', 'acknowledg
 for (const marker of ['RetroArchLibraryRules.queryURL', 'RetroArchLibraryRules', 'receiveRetroArchLibrary', 'brumclassics', 'titleId']) {
   if (!source.includes(marker)) throw new Error(`Biblioteca RetroArch incompleta: ${marker}`);
 }
+for (const marker of ['ROMFolderScanner', 'ROMFolderAccess', 'choose-rom-folder', 'romFolderGames', 'refreshROMFolder']) {
+  if (!source.includes(marker)) throw new Error(`Pasta de ROMs incompleta: ${marker}`);
+}
+if (source.includes('NA BIBLIOTECA DO PC · AINDA NÃO JOGÁVEIS NO IPHONE')) throw new Error('CLASSICS não pode listar jogos sem ROM detectada no iPhone.');
 for (const command of requiredCommands) if (!source.includes(`"${command}"`)) throw new Error(`Comando remoto não portado: ${command}`);
 for (const obsolete of ['CompanionControlView', 'PESQUISA NO LIVING ROOM', '"shutdown_pc"', '"sleep_pc"', '"quick_save"', '"quick_load"', '"set_volume"']) if (source.includes(obsolete)) throw new Error(`Controle remoto antigo ainda presente: ${obsolete}`);
 if (!source.includes('struct CompanionView') || !source.includes('struct CompanionNotesForm')) throw new Error('Companion de anotações ausente.');

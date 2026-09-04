@@ -1,6 +1,6 @@
 # RetroArch compatível com o BRUMCLASSICS
 
-O BRUMCLASSICS MÓVEL 0.6.0 consulta a biblioteca real do RetroArch e abre um jogo pela identidade exata retornada pelo próprio emulador. Isso remove a antiga cópia da ROM dentro do catálogo do BRUMCLASSICS e a confirmação manual “já importei”.
+O BRUMCLASSICS MÓVEL 0.6.1 verifica as ROMs da pasta Downloads autorizada e usa a biblioteca real do RetroArch para abrir cada jogo pela identidade exata. A tela não mostra jogos existentes somente no PC nem mantém outra cópia da ROM dentro do catálogo do BRUMCLASSICS.
 
 ## Versão necessária
 
@@ -23,11 +23,11 @@ O binário local foi testado como ZIP/IPA e contém os marcadores de consulta da
 ## Uso
 
 1. Instale o RetroArch compatível no iPhone.
-2. O arquivo da ROM precisa existir uma única vez no armazenamento acessível ao RetroArch. O BRUMCLASSICS não baixa jogos e uma capa sincronizada não contém a ROM.
-3. No RetroArch, inclua legalmente sua ROM na playlist e confirme um núcleo compatível. Isso é a preparação inicial do arquivo no aparelho, não uma segunda biblioteca no BRUMCLASSICS.
-4. No BRUMCLASSICS, abra **CLASSICS in every everywhere**. Na primeira abertura ou em **Atualizar biblioteca do RetroArch**, o app alterna para o emulador; ele devolve a lista automaticamente.
-5. Jogos confirmados aparecem como jogáveis. Basta tocar na capa para abrir o título exato no RetroArch.
-6. Itens presentes somente na biblioteca sincronizada do PC aparecem abaixo como **ROM não confirmada no iPhone**. Eles não recebem um botão falso de execução.
+2. Em **Perfil → Configurações do app → CLASSICS**, toque **Selecionar Downloads** e autorize a pasta uma vez. O iOS não permite conceder essa permissão silenciosamente.
+3. O arquivo da ROM precisa existir uma única vez nessa pasta acessível. O BRUMCLASSICS não baixa jogos e uma capa sincronizada não contém a ROM.
+4. No RetroArch, inclua legalmente a mesma ROM na playlist e confirme um núcleo compatível. Isso permite que o atalho seguro por nome abra o arquivo exato, sem uma segunda cópia no BRUMCLASSICS.
+5. No BRUMCLASSICS, abra **CLASSICS in every everywhere**. A lista contém somente os arquivos detectados na pasta autorizada; toque na capa para jogar.
+6. Para trocar a origem no futuro, volte a **Perfil → Configurações do app → CLASSICS**. As próximas aberturas verificam automaticamente a pasta lembrada.
 
 ## Limites do iOS
 

@@ -48,10 +48,19 @@ struct ProfileView: View {
 }
 
 struct MobileSettingsView: View {
+    @EnvironmentObject private var pocket: PocketClassicsStore
     @AppStorage("bcard_classic_launch_mode") private var mode = "new"
+    @State private var choosingROMFolder = false
     var body: some View {
         Form {
             Section("CLASSICS no iPhone") {
+                LabeledContent("Pasta de ROMs", value: pocket.romFolderName)
+                Button(pocket.romFolderConfigured ? "ALTERAR PASTA DE ROMS" : "SELECIONAR DOWNLOADS") { choosingROMFolder = true }
+                    .accessibilityIdentifier("choose-rom-folder")
+                Button("VERIFICAR PASTA AGORA") { Task { await pocket.refreshROMFolder() } }
+                    .disabled(!pocket.romFolderConfigured)
+                Text("Na primeira vez, selecione a pasta Downloads no app Arquivos. Depois disso a leitura é automática. O iOS exige essa autorização inicial e o BRUMCLASSICS não copia nem apaga suas ROMs.").font(.caption).foregroundStyle(BrumTheme.muted)
+                if !pocket.romFolderStatus.isEmpty { Text(pocket.romFolderStatus).font(.caption).foregroundStyle(BrumTheme.muted) }
                 NavigationLink("RetroArch e RetroAchievements") { PocketSetupView() }
             }
             Section("B-CARD · CLASSICS") {
@@ -63,6 +72,12 @@ struct MobileSettingsView: View {
                 Text("Essa preferência vale para os CLASSICS enviados pelo B-CARD. Jogos de PC usam a inicialização normal. Se o save escolhido não existir, o launcher informará o problema; seus saves não são apagados.").font(.caption).foregroundStyle(BrumTheme.muted)
             }
         }.scrollContentBackground(.hidden).background(BrumTheme.background).navigationTitle("Configurações do app")
+        .fileImporter(isPresented: $choosingROMFolder, allowedContentTypes: [.folder]) { result in
+            switch result {
+            case .success(let folder): Task { await pocket.configureROMFolder(folder) }
+            case .failure(let error): pocket.message = error.localizedDescription
+            }
+        }
     }
 }
 

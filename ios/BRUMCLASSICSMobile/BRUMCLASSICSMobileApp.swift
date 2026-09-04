@@ -35,6 +35,7 @@ struct BRUMCLASSICSMobileApp: App {
                         Task {
                             await store.resume()
                             await pocket.restore()
+                            await pocket.refreshROMFolder()
                             await pocket.sync(launcher: store)
                             await store.checkForPersonalUpdate()
                         }

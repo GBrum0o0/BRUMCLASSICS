@@ -1,6 +1,6 @@
 # CLASSICS no iPhone: horas offline e conquistas
 
-iOS **0.6.0 (build 9)** + launcher **1.55.3 ou posterior**.
+iOS **0.6.1 (build 10)** + launcher **1.55.3 ou posterior**.
 
 ## Configuração inicial
 

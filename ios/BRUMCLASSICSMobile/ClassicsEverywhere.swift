@@ -42,7 +42,7 @@ enum PocketError: LocalizedError {
 }
 
 enum PocketRules {
-    static let extensions: Set<String> = ["gba", "gb", "gbc", "nes", "sfc", "smc", "n64", "z64", "v64", "nds", "sms", "gg", "md", "gen", "pce", "chd", "pbp", "iso", "zip"]
+    static let extensions: Set<String> = ["gba", "gb", "gbc", "nes", "sfc", "smc", "n64", "z64", "v64", "nds", "sms", "gg", "md", "gen", "pce", "chd", "pbp", "iso", "cso", "rvz", "cue", "m3u", "gdi", "wad", "zip"]
     static func safeFilename(_ value: String) -> Bool {
         !value.isEmpty && value != "." && value != ".." && !value.contains("/") && !value.contains("\\") && !value.contains("\0")
     }
@@ -113,8 +113,13 @@ actor PocketRAClient {
     @Published private(set) var runtimeStatus = ""
     @Published private(set) var retroArchGames: [RetroArchLibraryGame] = []
     @Published private(set) var retroArchLibraryStatus = ""
+    @Published private(set) var romFolderGames: [ROMFolderGame] = []
+    @Published private(set) var romFolderConfigured = false
+    @Published private(set) var romFolderName = "Downloads"
+    @Published private(set) var romFolderStatus = ""
     private let runtime = PocketRuntimeFiles()
     private let retroArchFiles = RetroArchLibraryFiles()
+    private let romFolder = ROMFolderAccess()
     private var timeBusy = false
     private let files = PocketFiles()
     private let api = PocketRAClient()
@@ -135,8 +140,47 @@ actor PocketRAClient {
     }
     func restore() async {
         guard !loaded else { return }
-        do { games = try await files.load(); loaded = true; retroArchGames = (try? await retroArchFiles.load()) ?? []; await reloadRuntime() }
+        do {
+            games = try await files.load()
+            loaded = true
+            retroArchGames = (try? await retroArchFiles.load()) ?? []
+            romFolderConfigured = await romFolder.configured
+            romFolderName = await romFolder.displayName
+            if romFolderConfigured { await refreshROMFolder() }
+            await reloadRuntime()
+        }
         catch { status = "Não foi possível ler o catálogo local. Seus arquivos foram preservados." }
+    }
+    func configureROMFolder(_ folder: URL) async {
+        do {
+            let scan = try await romFolder.configure(folder)
+            romFolderConfigured = true
+            romFolderName = await romFolder.displayName
+            try await applyROMFolderScan(scan)
+        } catch { message = error.localizedDescription }
+    }
+    func refreshROMFolder() async {
+        let hasBookmark = await romFolder.configured
+        guard romFolderConfigured || hasBookmark else {
+            romFolderConfigured = false
+            romFolderStatus = "Selecione Downloads uma vez em Perfil → Configurações do app → CLASSICS."
+            return
+        }
+        do {
+            romFolderConfigured = true
+            romFolderName = await romFolder.displayName
+            try await applyROMFolderScan(try await romFolder.scan())
+        } catch { romFolderStatus = "A pasta precisa ser autorizada novamente em Perfil → Configurações do app → CLASSICS. Seus dados foram preservados." }
+    }
+    private func applyROMFolderScan(_ scan: ROMFolderScan) async throws {
+        var reconciled = games
+        for rom in scan.games where !reconciled.contains(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }) {
+            reconciled.append(PocketClassic(id: UUID(), title: rom.title, filename: rom.filename))
+        }
+        if reconciled != games { try await files.save(reconciled); games = reconciled }
+        romFolderGames = scan.games
+        let duplicates = scan.duplicateFilenames > 0 ? " · \(scan.duplicateFilenames) arquivo(s) repetido(s) omitido(s)" : ""
+        romFolderStatus = "\(scan.games.count) jogo(s) encontrado(s) em \(romFolderName)\(duplicates)."
     }
     func requestRetroArchLibrary() {
         retroArchLibraryStatus = "Consultando a biblioteca do RetroArch…"
@@ -184,6 +228,24 @@ actor PocketRAClient {
     }
     func pocketGame(for retro: RetroArchLibraryGame) -> PocketClassic? {
         games.first { $0.filename.caseInsensitiveCompare(retro.filename) == .orderedSame }
+    }
+    func retroArchGame(for rom: ROMFolderGame) -> RetroArchLibraryGame? {
+        retroArchGames.first { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }
+    }
+    func launcherGame(for rom: ROMFolderGame, launcher: AppStore) -> Game? {
+        if let link = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame && !$0.launcherGameID.isEmpty }),
+           let exact = launcher.snapshot.games.first(where: { $0.id == link.launcherGameID }) { return exact }
+        if let retro = retroArchGame(for: rom), let exact = launcherGame(for: retro, launcher: launcher) { return exact }
+        let normalized = RetroArchLibraryRules.normalizedTitle(rom.title)
+        let matches = launcher.snapshot.games.filter { $0.isClassic && RetroArchLibraryRules.normalizedTitle($0.title) == normalized }
+        return matches.count == 1 ? matches[0] : nil
+    }
+    func launchROM(_ rom: ROMFolderGame, launcher: AppStore) async {
+        guard let record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }) else {
+            message = "Atualize a pasta de ROMs novamente antes de jogar."
+            return
+        }
+        await launch(record, launcher: launcher)
     }
     func launchRetroArch(_ game: RetroArchLibraryGame, launcher: AppStore) async {
         guard let pocketGame = pocketGame(for: game) else { message = "Atualize a biblioteca do RetroArch novamente antes de jogar."; return }
@@ -283,38 +345,59 @@ struct ClassicsEverywhereView: View {
     @EnvironmentObject private var pocket: PocketClassicsStore
     @EnvironmentObject private var launcher: AppStore
     private let columns = [GridItem(.adaptive(minimum: 145), spacing: 16)]
-    private var unavailable: [Game] { launcher.snapshot.games.filter { $0.isClassic && pocket.retroArchGame(for: $0) == nil }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending } }
     var body: some View {
         ScrollView { LazyVStack(alignment: .leading, spacing: 20) {
             PageHeader(kicker: "CLASSICS", title: "CLASSICS in every everywhere", subtitle: "Seus clássicos no iPhone · com RetroArch")
-            NavigationLink { PocketSetupView() } label: { SettingsRow(icon: "gearshape", title: "CONFIGURAR RETROARCH", detail: "Instalação, tela, áudio e RetroAchievements") }
-            Button("ATUALIZAR BIBLIOTECA DO RETROARCH") { pocket.requestRetroArchLibrary() }
+            HStack {
+                Button("VERIFICAR \(pocket.romFolderName.uppercased())") { Task { await pocket.refreshROMFolder() } }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .accessibilityIdentifier("rom-folder-refresh")
+                Button { pocket.requestRetroArchLibrary() } label: { Image(systemName: "arrow.triangle.2.circlepath").font(.headline) }
+                    .buttonStyle(.bordered).tint(BrumTheme.primary).accessibilityLabel("Sincronizar com RetroArch")
+            }
+            Text("A biblioteca mostra somente arquivos encontrados na pasta de ROMs autorizada. Para trocar a pasta, use Perfil → Configurações do app → CLASSICS.").font(.caption).foregroundStyle(BrumTheme.muted)
+            if !pocket.romFolderConfigured {
+                Text("Nenhuma pasta autorizada. Abra Perfil → Configurações do app → CLASSICS e selecione Downloads uma vez.").foregroundStyle(BrumTheme.muted)
+            } else if pocket.romFolderGames.isEmpty {
+                Text("Nenhuma ROM compatível foi encontrada em \(pocket.romFolderName).").foregroundStyle(BrumTheme.muted)
+            } else {
+                LazyVGrid(columns: columns, spacing: 22) {
+                    ForEach(pocket.romFolderGames) { rom in
+                        ROMFolderGameTile(rom: rom, launcherGame: pocket.launcherGame(for: rom, launcher: launcher), retroArchReady: pocket.retroArchGame(for: rom) != nil) {
+                            Task { await pocket.launchROM(rom, launcher: launcher) }
+                        }
+                    }
+                }
+            }
+            Button("ATUALIZAR VÍNCULO COM O RETROARCH") { pocket.requestRetroArchLibrary() }
                 .buttonStyle(PrimaryButtonStyle())
                 .accessibilityIdentifier("retroarch-library-refresh")
-            Text("O BRUMCLASSICS mostra a biblioteca real do RetroArch. O arquivo do jogo precisa existir uma única vez no iPhone; capas e nomes sincronizados do PC não substituem a ROM. Não mantemos uma segunda cópia somente para exibir o catálogo.").font(.caption).foregroundStyle(BrumTheme.muted)
-            if pocket.retroArchGames.isEmpty { Text("Nenhum jogo jogável confirmado. Atualize usando o RetroArch compatível; se a biblioteca estiver vazia, disponibilize sua ROM nele uma única vez.").foregroundStyle(BrumTheme.muted) }
-            else { LazyVGrid(columns: columns, spacing: 22) { ForEach(pocket.retroArchGames) { game in RetroArchGameTile(game: game, launcherGame: pocket.launcherGame(for: game, launcher: launcher), pocketID: pocket.pocketGame(for: game)?.id) { Task { await pocket.launchRetroArch(game, launcher: launcher) } } } } }
-            if !unavailable.isEmpty {
-                BrumSectionLabel(text: "NA BIBLIOTECA DO PC · AINDA NÃO JOGÁVEIS NO IPHONE")
-                Text("Essas capas são metadados sincronizados. O botão Jogar só aparece depois que o RetroArch confirma o arquivo correspondente no iPhone.").font(.caption).foregroundStyle(BrumTheme.muted)
-                LazyVGrid(columns: columns, spacing: 22) { ForEach(unavailable) { UnavailableClassicTile(game: $0) } }
-            }
             if !pocket.status.isEmpty { Text(pocket.status).font(.caption).foregroundStyle(BrumTheme.muted) }
+            if !pocket.romFolderStatus.isEmpty { Text(pocket.romFolderStatus).font(.caption).foregroundStyle(BrumTheme.muted) }
             if !pocket.retroArchLibraryStatus.isEmpty { Text(pocket.retroArchLibraryStatus).font(.caption).foregroundStyle(BrumTheme.muted) }
         }.padding(20) }.background(BrumTheme.background.ignoresSafeArea()).navigationTitle("CLASSICS")
         .refreshable { await pocket.sync(launcher: launcher, force: true) }
-        .onAppear { if pocket.retroArchGames.isEmpty { pocket.requestRetroArchLibrary() } }
+        .task { await pocket.refreshROMFolder() }
     }
 }
 
-struct UnavailableClassicTile: View {
-    let game: Game
+struct ROMFolderGameTile: View {
+    let rom: ROMFolderGame
+    let launcherGame: Game?
+    let retroArchReady: Bool
+    let play: () -> Void
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            GameCoverView(game: game).aspectRatio(0.72, contentMode: .fit)
-            Text(game.title).font(.system(size: 15, weight: .bold)).foregroundStyle(BrumTheme.text).lineLimit(2)
-            Text("ROM NÃO CONFIRMADA NO IPHONE").font(.system(size: 10, weight: .bold)).foregroundStyle(BrumTheme.muted)
-        }.accessibilityElement(children: .combine)
+            Button(action: play) {
+                VStack(alignment: .leading, spacing: 8) {
+                    if let launcherGame { GameCoverView(game: launcherGame).aspectRatio(0.72, contentMode: .fit) }
+                    else { RoundedRectangle(cornerRadius: 12).fill(BrumTheme.surface).aspectRatio(0.72, contentMode: .fit).overlay(Image(systemName: "gamecontroller.fill").font(.largeTitle).foregroundStyle(BrumTheme.primary)) }
+                    Text(launcherGame?.title ?? rom.title).font(.system(size: 15, weight: .bold)).foregroundStyle(BrumTheme.text).lineLimit(2).multilineTextAlignment(.leading)
+                }
+            }.buttonStyle(.plain).accessibilityLabel("Jogar \(launcherGame?.title ?? rom.title)")
+            Text(retroArchReady ? "JOGAR · RETROARCH" : "ROM DETECTADA · VINCULE O RETROARCH")
+                .font(.system(size: 10, weight: .bold)).foregroundStyle(retroArchReady ? BrumTheme.primary : BrumTheme.muted)
+        }
     }
 }
 
