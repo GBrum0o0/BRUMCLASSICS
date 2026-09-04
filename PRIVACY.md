@@ -28,4 +28,8 @@ Uma captura BRUMMOMENTS só pode ser solicitada por um aparelho pareado enquanto
 
 ## Serviços externos
 
+No iOS, CLASSICS in every everywhere copia somente as ROMs que o usuário seleciona no app Arquivos para o armazenamento privado do aplicativo. O envio ao RetroArch ocorre por ação explícita de compartilhamento. Não baixamos ROMs ou BIOS e não alteramos os saves ou as configurações privadas do emulador.
+
+Ao configurar RetroAchievements, usuário e Web API Key ficam no Keychain do iPhone. Para consultar o progresso, o app envia esses dados e o ID do jogo diretamente ao serviço oficial por HTTPS; nenhuma ROM é enviada. As respostas ficam em cache no aparelho. O canal com o launcher transmite apenas o ID do jogo e o nome da conta, para que o computador consulte a API com suas próprias credenciais. Não transmite a chave do iPhone nem aceita desbloqueios declarados por ele como prova.
+
 Ao vincular uma loja ou serviço, aplicam-se também os termos e políticas do respectivo provedor. O BRUMCLASSICS não promete disponibilidade permanente de APIs não públicas.
