@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $tracked = @(git ls-files)
 if ($LASTEXITCODE -ne 0) { throw 'Não foi possível listar os arquivos rastreados.' }
-$blockedExtensions = @('.exe', '.apk', '.zip', '.7z', '.rar', '.srm', '.sav', '.state')
+$blockedExtensions = @('.exe', '.apk', '.ipa', '.zip', '.7z', '.rar', '.srm', '.sav', '.state')
 $blockedNames = @('library.json', 'accounts.json', 'collections.json', 'favorites.json', 'mobile-bridge.json')
 $violations = @()
 

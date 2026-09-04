@@ -5,7 +5,7 @@
 <h1 align="center">BRUMCLASSICS</h1>
 
 <p align="center">
-  Biblioteca unificada para jogos modernos e clássicos no Windows, com aplicativo Android complementar.
+  Biblioteca unificada para jogos modernos e clássicos no Windows, com aplicativos móveis complementares.
 </p>
 
 <p align="center">
@@ -37,6 +37,7 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - Living Room Mode com controle e mídia física 3D.
 - BRUMWORLD: revista interativa com guias visuais do launcher e do aplicativo.
 - Aplicativo Android com biblioteca offline, capas, estatísticas e BRUMCOMPANION.
+- Aplicativo iOS pessoal em SwiftUI, com o mesmo cache offline, B-CARD e BRUMCOMPANION, preparado para sideload.
 - B-CARD lista jogos instalados no celular e permite iniciar no computador com um gesto autenticado para cima.
 - BRUMCOMPANION identifica o jogo ativo e permite consultar ou editar Onde parei, Objetivos, Dicas e Comandos no celular.
 - O jogo ativo só aparece no BRUMCOMPANION quando possui alguma anotação; sessões sem conteúdo não criam cartões vazios.
@@ -53,6 +54,8 @@ Abra a página de [Releases](https://github.com/GBrum0o0/BRUMCLASSICS/releases/l
 2. **Pacote completo** — launcher, RetroArch limpo, pasta RETROGAMES vazia e APK.
 3. **APK Android** — aplicativo móvel assinado para atualização preservando os dados offline.
 4. **SHA256SUMS.txt** — hashes para verificar os arquivos baixados.
+
+A versão pessoal para iPhone é compilada separadamente em **Actions → Build iOS pessoal**. O artefato contém um IPA sem assinatura para instalação com AltStore ou Sideloadly; consulte [as instruções do iOS](ios/README-IOS.md).
 
 O GitHub hospeda os arquivos grandes na área de Releases; executáveis não são armazenados no histórico do repositório.
 

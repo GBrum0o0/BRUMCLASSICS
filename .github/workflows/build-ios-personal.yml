@@ -1,0 +1,61 @@
+name: Build iOS pessoal
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "ios/**"
+      - ".github/workflows/build-ios-personal.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-unsigned-ipa:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar XcodeGen
+        run: brew install xcodegen
+
+      - name: Gerar projeto
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Compilar aplicativo sem assinatura
+        working-directory: ios
+        run: >-
+          xcodebuild
+          -project BRUMCLASSICSMobile.xcodeproj
+          -scheme BRUMCLASSICSMobile
+          -configuration Release
+          -sdk iphoneos
+          -derivedDataPath build/DerivedData
+          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_REQUIRED=NO
+          build
+
+      - name: Empacotar IPA pessoal
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_PATH="build/DerivedData/Build/Products/Release-iphoneos/BRUMCLASSICS MÓVEL.app"
+          test -d "$APP_PATH"
+          rm -rf build/Payload
+          mkdir -p build/Payload
+          cp -R "$APP_PATH" build/Payload/
+          ditto -c -k --sequesterRsrc --keepParent build/Payload build/BRUMCLASSICS-MOVEL-IOS-0.2.0.ipa
+          shasum -a 256 build/BRUMCLASSICS-MOVEL-IOS-0.2.0.ipa > build/BRUMCLASSICS-MOVEL-IOS-0.2.0.ipa.sha256
+
+      - name: Guardar build pessoal
+        uses: actions/upload-artifact@v4
+        with:
+          name: BRUMCLASSICS-MOVEL-IOS-PESSOAL-0.2.0
+          path: |
+            ios/build/BRUMCLASSICS-MOVEL-IOS-0.2.0.ipa
+            ios/build/BRUMCLASSICS-MOVEL-IOS-0.2.0.ipa.sha256
+          retention-days: 30
+          if-no-files-found: error

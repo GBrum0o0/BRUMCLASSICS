@@ -1,0 +1,11 @@
+{
+  "version": "0.2.0",
+  "build": 3,
+  "minimumIos": "16.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/actions/workflows/build-ios-personal.yml",
+  "notes": [
+    "Versão IPA sem assinatura preparada para AltStore e Sideloadly.",
+    "Atualização pessoal integrada ao Perfil.",
+    "Bundle ID fixo para preservar biblioteca offline, capas e preferências."
+  ]
+}

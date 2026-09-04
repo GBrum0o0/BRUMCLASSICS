@@ -1,0 +1,11 @@
+BRUMCLASSICS MÓVEL iOS 0.2.0 (build 3)
+Data: 04/09/2026
+
+- Projeto SwiftUI nativo para iOS 16 ou superior.
+- IPA sem assinatura gerado em executor macOS para sideload com AltStore ou Sideloadly.
+- Bundle ID mantido em com.brumclassics.mobile.ios para preservar os dados locais ao atualizar.
+- Biblioteca, capas, conquistas, estatísticas, anotações, B-CARD e BRUMCOMPANION.
+- Cache offline, token do launcher no Keychain e atualização em tempo real pela rede local.
+- Nenhuma conta, senha, token de loja, ROM, executável ou caminho pessoal incluído no pacote.
+
+Observação: a validade da assinatura instalada é determinada pelo método de sideload e pela conta Apple utilizada.

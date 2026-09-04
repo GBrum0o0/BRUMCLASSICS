@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## BRUMCLASSICS MÓVEL iOS 0.2.0 — Sideload pessoal
+
+- Aplicativo iOS nativo em SwiftUI para iOS 16 ou superior.
+- IPA sem assinatura produzido automaticamente em executor macOS.
+- Compatível com assinatura e instalação pessoal por AltStore ou Sideloadly.
+- Bundle ID fixo para preservar biblioteca offline, capas e preferências entre atualizações.
+- Artefato mantido fora do histórico Git e sem contas, tokens, ROMs ou caminhos pessoais.
+
+Veja [as instruções de compilação e instalação](ios/README-IOS.md).
+
 ## 1.54.0 — Família Steam
 
 - Ativação opcional da biblioteca familiar dentro de Configurações → Conexões.

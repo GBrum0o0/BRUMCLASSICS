@@ -2,6 +2,7 @@
 release-assets/
 *.exe
 *.apk
+*.ipa
 *.zip
 *.7z
 *.rar
@@ -26,4 +27,3 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
-
