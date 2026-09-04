@@ -28,6 +28,9 @@ const requiredEndpoints = ['/v1/pair', '/v1/snapshot', '/v1/ws', '/v1/remote', '
 for (const endpoint of requiredEndpoints) if (!source.includes(endpoint)) throw new Error(`Endpoint não portado: ${endpoint}`);
 
 const requiredCommands = ['bcard_launch'];
+for (const marker of ['PocketRuntimeFiles', '/v1/classics/playtime', 'acknowledgedSeconds', 'startAccessingSecurityScopedResource']) {
+  if (!source.includes(marker)) throw new Error(`Horas offline incompletas: ${marker}`);
+}
 for (const command of requiredCommands) if (!source.includes(`"${command}"`)) throw new Error(`Comando remoto não portado: ${command}`);
 for (const obsolete of ['CompanionControlView', 'PESQUISA NO LIVING ROOM', '"shutdown_pc"', '"sleep_pc"', '"quick_save"', '"quick_load"', '"set_volume"']) if (source.includes(obsolete)) throw new Error(`Controle remoto antigo ainda presente: ${obsolete}`);
 if (!source.includes('struct CompanionView') || !source.includes('struct CompanionNotesForm')) throw new Error('Companion de anotações ausente.');

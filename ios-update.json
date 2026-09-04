@@ -1,9 +1,11 @@
 {
-  "version": "0.4.0",
-  "build": 7,
+  "version": "0.5.0",
+  "build": 8,
   "minimumIos": "16.0",
   "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/actions/workflows/build-ios-personal.yml",
   "notes": [
+    "Horas offline por logs reais do RetroArch, com fila persistente e sincronização sem duplicação para o PC 1.55.3+.",
+    "Autorize a pasta de logs agregados em Configurações → CLASSICS. Conquistas continuam validadas pela conta oficial.",
     "CLASSICS in every everywhere: ROMs locais, integração externa com RetroArch e conquistas oficiais por conta.",
     "O B-CARD lançado não retorna ao centro, inclusive se o computador recusar o comando.",
     "B-CARD com capa flutuante, botão Voltar e preferência de save nas configurações do app.",

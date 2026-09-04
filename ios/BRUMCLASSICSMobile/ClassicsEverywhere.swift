@@ -109,6 +109,11 @@ actor PocketRAClient {
     @Published private(set) var busy = false
     @Published var message: String?
     @Published private(set) var status = ""
+    @Published private(set) var runtimeRecords: [PocketRuntimeRecord] = []
+    @Published private(set) var runtimeConfigured = false
+    @Published private(set) var runtimeStatus = ""
+    private let runtime = PocketRuntimeFiles()
+    private var timeBusy = false
     private let files = PocketFiles()
     private let api = PocketRAClient()
     private var loaded = false
@@ -128,8 +133,53 @@ actor PocketRAClient {
     }
     func restore() async {
         guard !loaded else { return }
-        do { games = try await files.load(); loaded = true }
+        do { games = try await files.load(); loaded = true; await reloadRuntime() }
         catch { status = "Não foi possível ler o catálogo local. Seus arquivos foram preservados." }
+    }
+    private func reloadRuntime() async {
+        do { runtimeRecords = try await runtime.load(); runtimeConfigured = try await runtime.configured() }
+        catch { runtimeStatus = "Não foi possível ler o registro de horas. Seus arquivos foram preservados." }
+    }
+    func configureRuntime(_ folder: URL) async {
+        do { try await runtime.configure(folder); await reloadRuntime(); runtimeStatus = "Pasta autorizada. Novos jogos iniciam a medição no próximo lançamento. Jogos já medidos precisam reestabelecer o ponto de partida." }
+        catch { message = error.localizedDescription }
+    }
+    func runtimeSummary(_ id: UUID) -> String {
+        guard let record = runtimeRecords.first(where: { $0.id == id }) else { return "Horas: habilite os logs e inicie o jogo pelo BRUMCLASSICS." }
+        let seconds = record.creditedSeconds
+        let pending = max(0, seconds - max(0, record.acknowledgedSeconds))
+        return "No iPhone: \(seconds / 3600)h \((seconds % 3600) / 60)min · " + (pending > 0 ? "\(pending / 60)min pendentes no PC" : record.acknowledgedSeconds < 0 ? "aguardando vínculo com o PC" : "sincronizado")
+    }
+    func rebaseline(_ id: UUID) async {
+        do { try await runtime.rebaseline(id); await reloadRuntime(); runtimeStatus = "Novo ponto de partida salvo. Horas já registradas e pendentes foram mantidas." }
+        catch { message = error.localizedDescription }
+    }
+    func syncHours(launcher: AppStore) async {
+        guard loaded, !timeBusy else { return }
+        timeBusy = true; defer { timeBusy = false }
+        var errors: [String] = []; var sent = false
+        do { errors = try await runtime.collect(); await reloadRuntime() }
+        catch { runtimeStatus = error.localizedDescription; return }
+        if launcher.connection == .online, let fingerprint = launcher.configuration?.fingerprint {
+            for record in runtimeRecords where record.acknowledgedSeconds < record.creditedSeconds {
+                guard let game = games.first(where: { $0.id == record.id }), !game.launcherGameID.isEmpty else { continue }
+                do {
+                    let bound = try await runtime.bind(record.id, gameID: game.launcherGameID, fingerprint: fingerprint)
+                    let receipt = try await launcher.syncPocketTime(bound)
+                    try await runtime.acknowledge(record.id, sentSeconds: bound.creditedSeconds, receipt: receipt)
+                    sent = true
+                } catch { errors.append("\(game.title): \(error.localizedDescription)") }
+            }
+        }
+        await reloadRuntime()
+        if sent { await launcher.refresh() }
+        runtimeStatus = errors.isEmpty ? "Horas lidas dos logs do RetroArch e salvas neste iPhone. Pendências serão enviadas com o app aberto na rede do PC." : errors.joined(separator: "\n")
+    }
+    func launch(_ game: PocketClassic, launcher: AppStore) async {
+        do { try await runtime.prepare(game, allGames: games); await syncHours(launcher: launcher) }
+        catch { runtimeStatus = "O jogo pode abrir, mas a medição não foi preparada: \(error.localizedDescription)" }
+        guard let url = PocketRules.launchURL(game.filename) else { return }
+        UIApplication.shared.open(url) { opened in if !opened { Task { @MainActor in self.message = "Instale o RetroArch 1.22.2 ou posterior. Importe e execute a ROM dentro dele primeiro." } } }
     }
     func importFiles(_ urls: [URL]) async {
         guard loaded else { message = "O catálogo não pôde ser aberto. Não vamos sobrescrever seus dados."; return }
@@ -152,6 +202,8 @@ actor PocketRAClient {
     }
     func file(_ game: PocketClassic) async throws -> URL { try await files.file(game) }
     func sync(launcher: AppStore, force: Bool = false) async {
+        // Runtime logs and the offline outbox do not require a RetroAchievements key.
+        await syncHours(launcher: launcher)
         guard loaded, !busy, let account = credentials, force || Date().timeIntervalSince(lastSync) >= 60 else { return }
         busy = true; lastSync = Date(); defer { busy = false }
         var errors: [String] = []; var refreshed = 0
@@ -212,10 +264,18 @@ struct PocketGameView: View {
                 Button("ENVIAR ARQUIVO AO RETROARCH") { Task { do { share = PocketShare(url: try await pocket.file(game)) } catch { pocket.message = error.localizedDescription } } }.buttonStyle(PrimaryButtonStyle())
                 Toggle("Já importei e executei este jogo no RetroArch", isOn: Binding(get: { game.importedIntoRetroArch }, set: { value in var next = game; next.importedIntoRetroArch = value; Task { await pocket.update(next) } }))
                 Button("JOGAR NO RETROARCH") {
-                    guard let url = PocketRules.launchURL(game.filename) else { return }
-                    UIApplication.shared.open(url) { opened in if !opened { Task { @MainActor in pocket.message = "Instale o RetroArch 1.22.2 ou posterior. Se o emulador abrir sem o jogo, importe a ROM e execute-a primeiro dentro dele." } } }
+                    Task { await pocket.launch(game, launcher: launcher) }
                 }.buttonStyle(PrimaryButtonStyle()).disabled(!game.importedIntoRetroArch)
                 Text("O iOS confirma a abertura do emulador, não se a ROM iniciou. ZIPs podem precisar ser extraídos no RetroArch; use o nome do arquivo final para o atalho.").font(.caption).foregroundStyle(BrumTheme.muted)
+                BrumSectionLabel(text: "HORAS OFFLINE")
+                Text(pocket.runtimeSummary(id)).font(.subheadline)
+                Text("Depois de jogar, use Close Content no RetroArch e volte aqui. Só contabilizamos o tempo registrado pelo emulador, não o tempo que ele ficou aberto em outro aplicativo.").font(.caption).foregroundStyle(BrumTheme.muted)
+                Button("ATUALIZAR HORAS E CONQUISTAS") { Task { await pocket.sync(launcher: launcher, force: true) } }.disabled(pocket.busy)
+                if pocket.runtimeRecords.first(where: { $0.id == id })?.counterReset == true {
+                    Button("REESTABELECER PONTO DE PARTIDA DO LOG") { Task { await pocket.rebaseline(id) } }
+                    Text("Mantém o histórico já medido e começa a contar os próximos acréscimos a partir do log atual.").font(.caption).foregroundStyle(BrumTheme.muted)
+                }
+                Text(pocket.runtimeStatus).font(.caption).foregroundStyle(BrumTheme.muted)
                 BrumSectionLabel(text: "CONQUISTAS E VÍNCULO")
                 TextField("ID do jogo no RetroAchievements", text: $raID).keyboardType(.numberPad).textFieldStyle(.roundedBorder)
                 Text("Use o número em retroachievements.org/game/… correspondente à ROM reconhecida pelo RetroArch. Uma capa ou um nome parecido não comprovam compatibilidade.").font(.caption).foregroundStyle(BrumTheme.muted)
@@ -265,6 +325,7 @@ struct PocketSetupView: View {
     @State private var username = ""
     @State private var key = ""
     @State private var feedback = ""
+    @State private var choosingRuntime = false
     var body: some View {
         Form {
             Section("1 · Instale o emulador") {
@@ -288,8 +349,19 @@ struct PocketSetupView: View {
             Section("4 · Sincronização") {
                 Text("Ao voltar ao BRUMCLASSICS, os jogos vinculados são consultados na API oficial e ficam disponíveis offline na seção Conquistas. Para atualizar o PC, vincule o mesmo jogo e use a mesma conta; o launcher deve estar atualizado, aberto e na rede local. Não copiamos ROMs nem saves para o PC.")
             }
+            Section("5 · Horas offline do RetroArch") {
+                Text("No RetroArch: Settings → Playlists → Save runtime log (aggregate): ON. Em Settings → Directory → Runtime Logs, confira a pasta usada. Feche o conteúdo após jogar para gravar o log.")
+                Text("Selecione essa pasta no app Arquivos abaixo. Use os logs agregados (.lrtl), não pastas de um núcleo. A permissão é somente para leitura; não alteramos o emulador, saves ou ROMs.")
+                Button(pocket.runtimeConfigured ? "REAUTORIZAR PASTA DE LOGS" : "AUTORIZAR PASTA DE LOGS") { choosingRuntime = true }
+                Text("Antes da primeira sessão offline, vincule cada jogo ao mesmo CLASSICS do PC e inicie-o uma vez pelo BRUMCLASSICS com o launcher conectado. Isso registra o ponto de partida sem duplicar horas da conta. Horas antigas do emulador não são importadas automaticamente.")
+                Text("Ao voltar à rede, mantenha este app aberto e o launcher ligado. O envio é automático e tolera novas tentativas. O iOS não permite garantir sincronização com o app encerrado. Sem internet, conquistas oficiais não são garantidas; tempo local e conquistas são independentes.")
+                Text(pocket.runtimeStatus).font(.caption)
+            }
             if !feedback.isEmpty { Section { Text(feedback) } }
         }.navigationTitle("CLASSICS · Configuração")
+        .fileImporter(isPresented: $choosingRuntime, allowedContentTypes: [.folder]) { result in
+            switch result { case .success(let folder): Task { await pocket.configureRuntime(folder) }; case .failure(let error): feedback = error.localizedDescription }
+        }
         .onAppear { username = pocket.credentials?.username ?? ""; key = pocket.credentials?.key ?? "" }
     }
 }

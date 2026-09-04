@@ -15,6 +15,16 @@ struct BRUMCLASSICSMobileApp: App {
                 .preferredColorScheme(.dark)
                 .tint(BrumTheme.primary)
                 .onOpenURL { url in Task { await store.pair(from: url) } }
+                .onChange(of: store.connection) { connection in
+                    if connection == .online { Task { await pocket.sync(launcher: store) } }
+                }
+                .task(id: scenePhase) {
+                    guard scenePhase == .active else { return }
+                    while !Task.isCancelled {
+                        do { try await Task.sleep(nanoseconds: 30_000_000_000) } catch { return }
+                        await pocket.syncHours(launcher: store)
+                    }
+                }
                 .onChange(of: scenePhase) { phase in
                     if phase == .active {
                         Task {

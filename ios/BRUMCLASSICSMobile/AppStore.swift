@@ -48,6 +48,11 @@ final class AppStore: ObservableObject {
         catch { return "Progresso salvo no iPhone. O PC ainda não confirmou: \(error.localizedDescription). Atualize o launcher e confira a mesma conta e o vínculo do jogo." }
     }
 
+    func syncPocketTime(_ record: PocketRuntimeRecord) async throws -> PocketTimeReceipt {
+        guard connection == .online, configuration?.fingerprint == record.serverFingerprint else { throw PocketError.message("Conecte-se ao PC original para enviar as horas pendentes.") }
+        return try await bridge.syncPocketTime(record)
+    }
+
     func restore() async {
         if let cached = await offline.loadSnapshot() { snapshot = cached }
         moments = await offline.loadMoments()

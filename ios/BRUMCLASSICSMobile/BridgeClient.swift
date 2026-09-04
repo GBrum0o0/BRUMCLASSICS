@@ -89,6 +89,11 @@ actor BridgeClient {
         let _: [String: Bool] = try await request(path: "/v1/classics/achievements/sync", method: "POST", body: body)
     }
 
+    func syncPocketTime(_ record: PocketRuntimeRecord) async throws -> PocketTimeReceipt {
+        let body = try JSONSerialization.data(withJSONObject: ["gameId": record.launcherGameID, "streamId": record.streamID, "totalSeconds": record.creditedSeconds])
+        return try await request(path: "/v1/classics/playtime", method: "POST", body: body)
+    }
+
     func artwork(for game: Game) async throws -> Data {
         guard !game.artworkPath.isEmpty else { throw BridgeError.invalidResponse("Capa indisponível.") }
         return try await dataRequest(path: game.artworkPath, maximumBytes: 20 * 1024 * 1024)
