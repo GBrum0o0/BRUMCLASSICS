@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## iOS 0.6.0 + launcher 1.55.3 — biblioteca real do RetroArch
+
+- `CLASSICS in every everywhere` consulta a biblioteca devolvida pelo RetroArch compatível, em vez de manter outra cópia da ROM no BRUMCLASSICS.
+- Jogos confirmados no emulador aparecem com as capas e os metadados já sincronizados do PC; tocar na mídia abre o arquivo exato.
+- Itens encontrados somente no launcher continuam visíveis, mas são identificados como ainda não jogáveis no iPhone.
+- Correspondência restrita à identidade confirmada ou a um único título normalizado; duplicatas ambíguas são omitidas para não iniciar o jogo errado.
+- Horas reais dos logs agregados permanecem disponíveis offline e sincronizam apenas os acréscimos com o PC.
+- RetroArch noturno oficial compatível documentado com versão, SHA-256, origem e limites do sandbox do iOS.
+
+Veja [configuração do RetroArch compatível](ios/RETROARCH-COMPATIVEL.md) e [instruções do aplicativo](ios/README-IOS.md).
+
 ## iOS 0.4.0 + launcher 1.55.2 — CLASSICS in every everywhere
 
 - B-CARD: saída única da capa; erros não trazem o cartão de volta ao centro.
