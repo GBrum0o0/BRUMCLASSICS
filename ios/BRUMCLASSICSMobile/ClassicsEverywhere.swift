@@ -241,6 +241,11 @@ actor PocketRAClient {
         return matches.count == 1 ? matches[0] : nil
     }
     func launchROM(_ rom: ROMFolderGame, launcher: AppStore) async {
+        guard retroArchGame(for: rom) != nil else {
+            retroArchLibraryStatus = "A ROM está em \(romFolderName), mas ainda não foi reconhecida na biblioteca do RetroArch. O vínculo será atualizado agora; depois, toque novamente para jogar."
+            requestRetroArchLibrary()
+            return
+        }
         guard let record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }) else {
             message = "Atualize a pasta de ROMs novamente antes de jogar."
             return
