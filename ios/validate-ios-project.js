@@ -32,6 +32,10 @@ for (const command of requiredCommands) if (!source.includes(`"${command}"`)) th
 for (const obsolete of ['CompanionControlView', 'PESQUISA NO LIVING ROOM', '"shutdown_pc"', '"sleep_pc"', '"quick_save"', '"quick_load"', '"set_volume"']) if (source.includes(obsolete)) throw new Error(`Controle remoto antigo ainda presente: ${obsolete}`);
 if (!source.includes('struct CompanionView') || !source.includes('struct CompanionNotesForm')) throw new Error('Companion de anotações ausente.');
 if (!source.includes('let playtimeMinutes: Double?')) throw new Error('Tempo fracionado não suportado.');
+const bcardView = fs.readFileSync(path.join(app, 'BCardView.swift'), 'utf8').split('struct BCardView: View')[1];
+if (!bcardView.includes('bcard-back') || !bcardView.includes('repeatForever') || !bcardView.includes('artworkOnly: true')) throw new Error('B-CARD flutuante e voltar ausentes.');
+if (bcardView.includes('Picker(') || bcardView.includes('BrumLogo(') || bcardView.includes('Text(game.title)')) throw new Error('B-CARD ainda possui campos que devem ficar fora da capa.');
+if (!source.includes('companion-capture') || !source.includes('MobileSettingsView')) throw new Error('Captura ou configurações móveis ausentes.');
 
 if (!source.includes('SecureStore.write')) throw new Error('Token não está protegido pelo Keychain.');
 if (!source.includes('SHA256.hash(data: data)')) throw new Error('Certificate pinning ausente.');

@@ -2,6 +2,24 @@ import XCTest
 @testable import BRUMCLASSICSMobile
 
 final class SnapshotTests: XCTestCase {
+    func testBCardLaunchPreferenceIsValidatedPerPlatform() {
+        XCTAssertEqual(BCardLaunchMode.validated("continue-auto", classic: true), "continue-auto")
+        XCTAssertEqual(BCardLaunchMode.validated("continue-manual", classic: true), "continue-manual")
+        XCTAssertEqual(BCardLaunchMode.validated("continue-manual", classic: false), "new")
+        XCTAssertEqual(BCardLaunchMode.validated("invalid", classic: true), "new")
+    }
+
+    func testReceivedPerformanceIgnoresClockSkewButExpires() throws {
+        let json = #"{"active":true,"gameId":"test:1","sampledAt":"2000-01-01T00:00:00Z","sessionSeconds":30,"cpu":{"available":true,"usagePercent":5},"gpu":{"available":false,"name":""},"memory":{"available":false},"fps":{"available":false,"reason":"PRESENTMON_NOT_INSTALLED"}}"#
+        let value = try JSONDecoder().decode(PerformanceState.self, from: Data(json.utf8))
+        XCTAssertTrue(value.isLive(gameID: "test:1", connected: true, receivedUptime: 100, nowUptime: 105))
+        XCTAssertFalse(value.isLive(gameID: "test:1", connected: true, receivedUptime: 100, nowUptime: 121))
+        XCTAssertFalse(value.isLive(gameID: "test:1", connected: true, receivedUptime: nil, nowUptime: 105))
+        XCTAssertFalse(value.isLive(gameID: "test:1", connected: false, receivedUptime: 100, nowUptime: 105))
+        XCTAssertFalse(value.isLive(gameID: "other", connected: true, receivedUptime: 100, nowUptime: 105))
+        XCTAssertTrue(PerformanceState.reasonLabel(value.fps.reason).contains("PresentMon"))
+    }
+
     private func sampleGame(playtime: String) throws -> Game {
         let json = """
         {"id":"test:1","title":"Teste","description":"","category":"modern","platform":"pc","store":"local","genre":"","collectionId":"","sizeBytes":0,"playtimeMinutes":\(playtime),"playtimeAvailable":true,"achievementsCollected":null,"achievementsTotal":null,"achievementsAvailable":false,"achievements":[],"storyCompleted":false,"favorite":false,"wantToPlay":false,"libraryStateRevision":0,"notes":{"whereStopped":"","objectives":"","tips":"","commands":"","revision":0,"updatedAt":""},"installed":true,"integrityStatus":"verified","lastPlayedAt":"","artworkPath":""}

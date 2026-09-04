@@ -5,6 +5,7 @@ struct GameCoverView: View {
     @EnvironmentObject private var store: AppStore
     let game: Game
     var cornerRadius: CGFloat = 12
+    var artworkOnly = false
     @State private var image: UIImage?
 
     var body: some View {
@@ -12,13 +13,13 @@ struct GameCoverView: View {
             LinearGradient(colors: [BrumTheme.elevated, BrumTheme.deepBackground], startPoint: .topLeading, endPoint: .bottomTrailing)
             if let image {
                 Image(uiImage: image).resizable().scaledToFill().transition(.opacity.animation(.easeOut(duration: 0.18)))
-            } else {
+            } else if !artworkOnly {
                 VStack(spacing: 10) {
                     BrumLogo(compact: true).opacity(0.55)
                     Text(game.platform.uppercased()).font(.caption2.bold()).tracking(1.5).foregroundStyle(BrumTheme.muted)
                 }
             }
-            VStack { HStack { Text(game.isClassic ? game.platform.uppercased() : game.store.uppercased()).font(.caption2.bold()).tracking(1.4).padding(8).foregroundStyle(.white); Spacer() }; Spacer() }
+            if !artworkOnly { VStack { HStack { Text(game.isClassic ? game.platform.uppercased() : game.store.uppercased()).font(.caption2.bold()).tracking(1.4).padding(8).foregroundStyle(.white); Spacer() }; Spacer() } }
         }
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
         .overlay(RoundedRectangle(cornerRadius: cornerRadius).stroke(BrumTheme.line))

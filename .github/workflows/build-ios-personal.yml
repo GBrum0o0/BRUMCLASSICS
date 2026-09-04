@@ -42,7 +42,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: BRUMCLASSICS-IOS-TESTES-0.3.0
+          name: BRUMCLASSICS-IOS-TESTES-0.3.1
           path: ios/build/iOS-Tests.xcresult
           retention-days: 7
           if-no-files-found: warn
@@ -70,10 +70,10 @@ jobs:
       - name: Guardar build pessoal
         uses: actions/upload-artifact@v4
         with:
-          name: BRUMCLASSICS-MOVEL-IOS-PESSOAL-0.3.0
+          name: BRUMCLASSICS-MOVEL-IOS-PESSOAL-0.3.1
           path: |
-            ios/build/BRUMCLASSICS-MOVEL-IOS-0.3.0.ipa
-            ios/build/BRUMCLASSICS-MOVEL-IOS-0.3.0.ipa.sha256
+            ios/build/BRUMCLASSICS-MOVEL-IOS-0.3.1.ipa
+            ios/build/BRUMCLASSICS-MOVEL-IOS-0.3.1.ipa.sha256
             ios/build/IPA-VALIDATION.json
           retention-days: 30
           if-no-files-found: error

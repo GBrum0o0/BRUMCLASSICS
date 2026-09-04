@@ -19,5 +19,13 @@ final class NavigationTests: XCTestCase {
         XCTAssertFalse(app.buttons["DESLIGAR"].exists)
         XCTAssertFalse(app.buttons["SUSPENDER"].exists)
         XCTAssertFalse(app.staticTexts["PESQUISA NO LIVING ROOM"].exists)
+        XCTAssertTrue(app.staticTexts["FPS"].exists)
+        if !app.buttons["companion-capture"].isHittable { app.swipeUp() }
+        XCTAssertTrue(app.buttons["companion-capture"].exists)
+        XCTAssertFalse(app.buttons["companion-capture"].isEnabled)
+        app.tabBars.buttons["Perfil"].tap()
+        app.buttons["mobile-settings-link"].tap()
+        XCTAssertTrue(app.staticTexts["Ao iniciar um clássico"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Continuar no auto save"].exists || app.staticTexts["Continuar no auto save"].exists)
     }
 }

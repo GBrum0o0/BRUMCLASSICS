@@ -80,10 +80,10 @@ struct Game: Codable, Identifiable, Hashable {
 struct CompanionState: Codable, Equatable { let active: Bool; let gameId: String; let startedAt: String; let state: String }
 
 struct PerformanceState: Codable, Equatable {
-    struct CPU: Codable, Equatable { let available: Bool; let usagePercent: Double?; let temperatureC: Double? }
-    struct GPU: Codable, Equatable { let available: Bool; let name: String; let usagePercent: Double?; let temperatureC: Double?; let memoryUsedBytes: Double?; let memoryTotalBytes: Double? }
+    struct CPU: Codable, Equatable { let available: Bool; let usagePercent: Double?; let temperatureC: Double?; var temperatureReason: String? }
+    struct GPU: Codable, Equatable { let available: Bool; let name: String; let usagePercent: Double?; let temperatureC: Double?; let memoryUsedBytes: Double?; let memoryTotalBytes: Double?; var reason: String? }
     struct Memory: Codable, Equatable { let available: Bool; let usedBytes: Double?; let totalBytes: Double? }
-    struct FPS: Codable, Equatable { let available: Bool; let value: Double? }
+    struct FPS: Codable, Equatable { let available: Bool; let value: Double?; var reason: String? }
     struct ProcessMetrics: Codable, Equatable { let available: Bool; let cpuPercent: Double?; let ramBytes: Double? }
     let active: Bool
     let gameId: String
@@ -95,6 +95,24 @@ struct PerformanceState: Codable, Equatable {
     let fps: FPS
     var process: ProcessMetrics?
 
+    func isLive(gameID: String?, connected: Bool, receivedUptime: TimeInterval?, nowUptime: TimeInterval) -> Bool {
+        guard connected, active, !gameId.isEmpty, gameId == gameID, let receivedUptime else { return false }
+        let age = nowUptime - receivedUptime
+        return age >= 0 && age < 20
+    }
+
+    static func reasonLabel(_ code: String?) -> String {
+        switch code {
+        case "PRESENTMON_NOT_INSTALLED": return "Ative FPS com PresentMon em Configurações → MÓVEL no computador."
+        case "PROCESS_NOT_IDENTIFIED", "PROCESS_NOT_FOUND": return "O processo do jogo ainda não foi identificado pelo launcher."
+        case "FPS_NO_PRESENTS", "FPS_CAPTURE_EMPTY": return "Aguardando quadros do jogo para medir o FPS."
+        case "FPS_CAPTURE_TIMEOUT", "FPS_CAPTURE_FAILED", "FPS_METRIC_UNAVAILABLE": return "O coletor de FPS não retornou uma medição válida."
+        case "CPU_TEMPERATURE_UNAVAILABLE": return "O computador não forneceu um sensor de temperatura da CPU."
+        case "GPU_COUNTERS_UNAVAILABLE", "NVIDIA_SMI_UNAVAILABLE", "GPU_NOT_FOUND", "GPU_PROVIDER_UNSUPPORTED": return "O computador não forneceu as métricas da GPU."
+        default: return "Esta medição ainda não foi fornecida pelo computador."
+        }
+    }
+
     func isFresh(gameID: String?, connected: Bool, now: Date = Date()) -> Bool {
         guard connected, active, !gameId.isEmpty, gameId == gameID else { return false }
         let formatter = ISO8601DateFormatter()
@@ -103,6 +121,12 @@ struct PerformanceState: Codable, Equatable {
         guard let sampled else { return false }
         let age = now.timeIntervalSince(sampled)
         return age >= -30 && age < 20
+    }
+}
+
+enum BCardLaunchMode {
+    static func validated(_ value: String, classic: Bool) -> String {
+        classic && ["new", "continue-auto", "continue-manual"].contains(value) ? value : "new"
     }
 }
 

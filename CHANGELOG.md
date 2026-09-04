@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## BRUMCLASSICS MÓVEL iOS 0.3.1 — B-CARD flutuante e Companion
+
+- Capa flutuante limpa com botão Voltar; modo de save movido às configurações do app.
+- Captura independente de anotações e painel de desempenho sempre visível.
+- Diagnósticos de FPS/sensores e validade das medições pelo recebimento local.
+- [Notas completas](ios/RELEASE-NOTES-IOS-0.3.1.txt).
+
 ## BRUMCLASSICS MÓVEL iOS 0.3.0 — Companion e sincronização
 
 - Corrigida a rejeição de bibliotecas contendo minutos fracionados.

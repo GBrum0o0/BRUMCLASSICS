@@ -8,6 +8,7 @@ struct ProfileView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 PageHeader(kicker: "CONTA E DISPOSITIVO", title: "Perfil", subtitle: store.configuration?.deviceName ?? "iPhone não pareado")
+                NavigationLink { MobileSettingsView() } label: { SettingsRow(icon: "gearshape", title: "CONFIGURAÇÕES DO APP", detail: "Como iniciar CLASSICS pelo B-CARD") }.accessibilityIdentifier("mobile-settings-link")
                 BrumCard {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack { BrumSectionLabel(text: "CONEXÃO LOCAL SEGURA"); Spacer(); ConnectionDot(state: store.connection) }
@@ -43,6 +44,22 @@ struct ProfileView: View {
                 Button { scanner = false } label: { Image(systemName: "xmark").font(.headline).padding(14).background(.black.opacity(0.6)).clipShape(Circle()) }.foregroundStyle(.white).padding()
             }.ignoresSafeArea()
         }
+    }
+}
+
+struct MobileSettingsView: View {
+    @AppStorage("bcard_classic_launch_mode") private var mode = "new"
+    var body: some View {
+        Form {
+            Section("B-CARD · CLASSICS") {
+                Picker("Ao iniciar um clássico", selection: $mode) {
+                    Text("Novo jogo").tag("new")
+                    Text("Continuar no auto save").tag("continue-auto")
+                    Text("Continuar no save manual").tag("continue-manual")
+                }.pickerStyle(.inline).accessibilityIdentifier("classic-launch-mode")
+                Text("Essa preferência vale para os CLASSICS enviados pelo B-CARD. Jogos de PC usam a inicialização normal. Se o save escolhido não existir, o launcher informará o problema; seus saves não são apagados.").font(.caption).foregroundStyle(BrumTheme.muted)
+            }
+        }.scrollContentBackground(.hidden).background(BrumTheme.background).navigationTitle("Configurações do app")
     }
 }
 

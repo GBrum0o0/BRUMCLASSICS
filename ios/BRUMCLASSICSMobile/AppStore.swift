@@ -14,6 +14,8 @@ final class AppStore: ObservableObject {
     @Published private(set) var realtimeWarning: String?
     @Published private(set) var pendingGameIDs: Set<String> = []
     @Published private(set) var noteConflicts: Set<String> = []
+    @Published private(set) var capturingMoment = false
+    @Published private(set) var performanceReceivedUptime: TimeInterval?
     @Published private(set) var personalUpdate: PersonalUpdateState = .idle
     @Published var selectedGame: Game?
     @Published var message: String?
@@ -39,6 +41,7 @@ final class AppStore: ObservableObject {
     var isPaired: Bool { configuration != nil && SecureStore.read(Self.tokenAccount) != nil }
     var activeGame: Game? { guard snapshot.companion?.active == true else { return nil }; return snapshot.games.first { $0.id == snapshot.companion?.gameId } }
     var companionGame: Game? { guard let game = activeGame, game.notes.hasContent else { return nil }; return game }
+    var canCaptureMoment: Bool { connection == .online && activeGame != nil && !capturingMoment }
 
     func restore() async {
         if let cached = await offline.loadSnapshot() { snapshot = cached }
@@ -118,7 +121,9 @@ final class AppStore: ObservableObject {
                 await self.flushOutbox()
                 let fresh = try await self.bridge.snapshot()
                 guard !fresh.games.isEmpty || self.snapshot.games.isEmpty else { throw BridgeError.invalidResponse("A resposta vazia foi ignorada para preservar sua biblioteca offline.") }
+                let previousPerformance = self.snapshot.performance
                 self.snapshot = fresh
+                if previousPerformance?.sampledAt != fresh.performance?.sampledAt { self.performanceReceivedUptime = fresh.performance?.active == true ? ProcessInfo.processInfo.systemUptime : nil }
                 await self.overlayPending()
                 try await self.offline.saveSnapshot(self.snapshot)
                 self.connection = .online
@@ -158,16 +163,21 @@ final class AppStore: ObservableObject {
         } catch { return nil }
     }
 
-    func launchBCard(_ game: Game, mode: String = "new") async {
-        guard game.installed else { message = "Este jogo não está confirmado como instalado."; return }
+    func launchBCard(_ game: Game, mode: String = "new") async -> String? {
+        guard connection == .online else { return "Conecte o iPhone ao launcher na mesma rede." }
+        guard game.installed else { return "Este jogo não está confirmado como instalado." }
         do {
             try await bridge.remote(command: "bcard_launch", payload: ["gameId": game.id, "mode": mode], requestID: UUID().uuidString)
-            message = "B-CARD enviado. Confirme a abertura no computador."
-        } catch { message = error.localizedDescription }
+            return nil
+        } catch { return error.localizedDescription }
     }
 
     func captureMoment() async {
+        guard connection == .online else { message = "Conecte-se ao launcher para tirar um print."; return }
+        guard !capturingMoment else { return }
         guard let game = activeGame else { message = "Inicie um jogo pelo launcher antes de capturar um BRUMMOMENT."; return }
+        capturingMoment = true
+        defer { capturingMoment = false }
         do {
             let (metadata, image) = try await bridge.captureMoment(gameID: game.id)
             _ = try await offline.saveMoment(data: image, gameID: metadata.gameId, gameTitle: metadata.gameTitle, capturedAt: metadata.capturedAt)
@@ -282,7 +292,10 @@ final class AppStore: ObservableObject {
         guard let data = raw.data(using: .utf8), let event = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
         realtimeWarning = nil
         if event["type"] as? String == "performance_changed" {
-            if let payload = event["performance"], let data = try? JSONSerialization.data(withJSONObject: payload), let value = try? JSONDecoder().decode(PerformanceState.self, from: data) { snapshot.performance = value }
+            if let payload = event["performance"], let data = try? JSONSerialization.data(withJSONObject: payload), let value = try? JSONDecoder().decode(PerformanceState.self, from: data) {
+                if value.sampledAt != snapshot.performance?.sampledAt { performanceReceivedUptime = value.active ? ProcessInfo.processInfo.systemUptime : nil }
+                snapshot.performance = value
+            }
             return
         }
         guard ["ready", "library_changed", "companion_changed", "achievement_unlocked", "install_changed", "notes_changed", "library_state_changed", "collections_changed", "activity_changed", "profile_changed"].contains(event["type"] as? String ?? "") else { return }

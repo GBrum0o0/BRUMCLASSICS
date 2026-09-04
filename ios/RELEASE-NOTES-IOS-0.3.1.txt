@@ -1,0 +1,21 @@
+BRUMCLASSICS MOVEL iOS 0.3.1 - build 6 - 04/09/2026
+
+B-CARD
+- Tela do cartao mostra apenas a arte, movimento suave, Voltar e dica do gesto.
+- Removidos marca, titulo externo, plataforma e seletor de save da tela do cartao.
+- Preferencia persistente em Perfil > Configuracoes do app > B-CARD CLASSICS:
+  Novo jogo, Continuar no auto save ou Continuar no save manual.
+- Reduce Motion respeitado; tamanho adaptado ao espaco disponivel.
+- Erro de envio retorna a capa a posicao inicial, sem simular sucesso.
+
+COMPANION
+- TIRAR PRINT sempre visivel, independente das anotacoes do jogo.
+- Captura habilitada com conexao e sessao ativa; envio duplicado bloqueado.
+- CPU, GPU e FPS nao desaparecem na ausencia de dados: estado e orientacao visiveis.
+- FPS sem PresentMon orienta ativacao no computador, sem instalar automaticamente.
+- Recebimento recente usa tempo monotono local, evitando esconder metricas por
+  diferenca entre relogios do PC e do iPhone. Cache offline nunca e tratado ao vivo.
+- Metricas antigas e de outras sessoes permanecem indisponiveis, sem valores ficticios.
+
+Instale sobre o app existente via Sideloadly/AltStore, mesma conta e Bundle ID.
+Nao desinstale para atualizar. Contas, pareamento, notas e saves nao sao removidos.

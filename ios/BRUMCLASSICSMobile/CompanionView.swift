@@ -12,6 +12,11 @@ struct CompanionView: View {
                 if case .error(let detail) = store.connection { Text(detail).font(.caption).foregroundStyle(.orange) }
                 if let warning = store.realtimeWarning { Text(warning).font(.caption).foregroundStyle(BrumTheme.muted) }
                 PerformancePanel()
+                Button(store.capturingMoment ? "CAPTURANDO…" : "TIRAR PRINT") { Task { await store.captureMoment() } }
+                    .buttonStyle(PrimaryButtonStyle()).disabled(!store.canCaptureMoment).accessibilityIdentifier("companion-capture")
+                if !store.canCaptureMoment && !store.capturingMoment {
+                    Text(store.connection != .online ? "Conecte o iPhone ao launcher para capturar a tela do jogo." : "Inicie um jogo pelo launcher para habilitar a captura. Não é necessário ter anotações.").font(.caption).foregroundStyle(BrumTheme.muted)
+                }
                 if let game = store.companionGame {
                     BrumCard {
                         HStack(spacing: 16) {
@@ -23,7 +28,6 @@ struct CompanionView: View {
                             }
                         }
                     }
-                    Button("CAPTURAR MOMENTO") { Task { await store.captureMoment() } }.buttonStyle(PrimaryButtonStyle()).disabled(store.connection != .online)
                     CompanionNotesForm(game: game).id(game.id)
                 } else {
                     BrumCard {
@@ -121,25 +125,31 @@ struct PerformancePanel: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 2)) { context in
-            if let value = store.snapshot.performance, value.isFresh(gameID: store.snapshot.companion?.gameId, connected: store.connection == .online, now: context.date) {
+            let value = store.snapshot.performance
+            let live = value?.isLive(gameID: store.snapshot.companion?.gameId, connected: store.connection == .online, receivedUptime: store.performanceReceivedUptime, nowUptime: ProcessInfo.processInfo.systemUptime) == true
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack { BrumSectionLabel(text: "DESEMPENHO AO VIVO"); Spacer(); Button(detailed ? "VISÃO SIMPLES" : "DETALHES") { detailed.toggle() }.font(.caption2.bold()).foregroundStyle(BrumTheme.primary) }
+                    HStack { BrumSectionLabel(text: "DESEMPENHO"); Spacer(); Button(detailed ? "VISÃO SIMPLES" : "DETALHES") { detailed.toggle() }.font(.caption2.bold()).foregroundStyle(BrumTheme.primary) }
+                    Text(live ? "AO VIVO" : store.connection != .online ? "OFFLINE · conecte ao launcher para receber as medições." : store.activeGame == nil ? "AGUARDANDO JOGO · inicie uma sessão pelo launcher." : "AGUARDANDO MEDIÇÕES · confira o monitor de desempenho em Configurações → MÓVEL no computador.").font(.caption).foregroundStyle(live ? BrumTheme.primary : BrumTheme.muted)
                     LazyVGrid(columns: columns, spacing: 12) {
-                        metric("CPU", value.cpu.available ? value.cpu.usagePercent : nil, suffix: "%")
-                        metric("TEMP. GPU", value.gpu.available ? value.gpu.temperatureC : nil, suffix: " °C")
-                        metric("USO GPU", value.gpu.available ? value.gpu.usagePercent : nil, suffix: "%")
-                        metric("FPS", value.fps.available ? value.fps.value : nil)
+                        metric("CPU", live && value?.cpu.available == true ? value?.cpu.usagePercent : nil, suffix: "%")
+                        metric("TEMP. GPU", live && value?.gpu.available == true ? value?.gpu.temperatureC : nil, suffix: " °C")
+                        metric("USO GPU", live && value?.gpu.available == true ? value?.gpu.usagePercent : nil, suffix: "%")
+                        metric("FPS", live && value?.fps.available == true ? value?.fps.value : nil)
                         if detailed {
-                            metric("RAM", value.memory.available ? value.memory.usedBytes.map { $0 / 1_073_741_824 } : nil, suffix: " GB")
-                            metric("VRAM", value.gpu.available ? value.gpu.memoryUsedBytes.map { $0 / 1_073_741_824 } : nil, suffix: " GB")
-                            metric("CPU DO JOGO", value.process?.available == true ? value.process?.cpuPercent : nil, suffix: "%")
-                            metric("RAM DO JOGO", value.process?.available == true ? value.process?.ramBytes.map { $0 / 1_073_741_824 } : nil, suffix: " GB")
-                            metric("TEMP. CPU", value.cpu.temperatureC, suffix: " °C")
+                            metric("RAM", live && value?.memory.available == true ? value?.memory.usedBytes.map { $0 / 1_073_741_824 } : nil, suffix: " GB")
+                            metric("VRAM", live && value?.gpu.available == true ? value?.gpu.memoryUsedBytes.map { $0 / 1_073_741_824 } : nil, suffix: " GB")
+                            metric("CPU DO JOGO", live && value?.process?.available == true ? value?.process?.cpuPercent : nil, suffix: "%")
+                            metric("RAM DO JOGO", live && value?.process?.available == true ? value?.process?.ramBytes.map { $0 / 1_073_741_824 } : nil, suffix: " GB")
+                            metric("TEMP. CPU", live ? value?.cpu.temperatureC : nil, suffix: " °C")
                         }
                     }
-                    if detailed { Text("GPU · \(value.gpu.name)\nSESSÃO · \(Int(max(0, value.sessionSeconds) / 60)) min").font(.caption).foregroundStyle(BrumTheme.muted) }
+                    if live, let value {
+                        if !value.fps.available { Text("FPS · " + PerformanceState.reasonLabel(value.fps.reason)).font(.caption).foregroundStyle(BrumTheme.muted) }
+                        if !value.gpu.available { Text("GPU · " + PerformanceState.reasonLabel(value.gpu.reason)).font(.caption).foregroundStyle(BrumTheme.muted) }
+                        if detailed { Text("GPU · \(value.gpu.name)\nSESSÃO · \(Int(max(0, value.sessionSeconds) / 60)) min").font(.caption).foregroundStyle(BrumTheme.muted) }
+                        if detailed && value.cpu.temperatureC == nil { Text(PerformanceState.reasonLabel(value.cpu.temperatureReason)).font(.caption).foregroundStyle(BrumTheme.muted) }
+                    }
                 }
-            }
         }
     }
 

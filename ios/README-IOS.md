@@ -33,6 +33,14 @@ O Windows não possui Xcode nem o SDK do iOS, portanto não compila o aplicativo
 
 ## Uso pessoal e atualizações
 
+### iOS 0.3.1 — B-CARD e captura
+
+O B-CARD mostra a capa flutuante sem título externo ou marca, com Voltar e gesto para cima. A preferência Novo jogo / Auto save / Save manual fica em **Perfil → Configurações do app → B-CARD · CLASSICS**. Vale somente para clássicos; jogos de PC mantêm a abertura normal.
+
+No Companion, **TIRAR PRINT** fica sempre visível e habilita quando há conexão e jogo ativo, mesmo sem notas. As métricas mostram o estado de espera ou o motivo de indisponibilidade. FPS exige o coletor PresentMon no computador, ativado pelo próprio usuário em Configurações → MÓVEL. Nenhum sensor ou valor é simulado.
+
+Use o IPA 0.3.1 sobre o app existente com a mesma conta de assinatura e Bundle ID.
+
 ### iOS 0.3.0 — alinhamento ao Android
 
 Veja o [guia BRUMWORLD do iPhone](BRUMWORLD-IOS-0.3.0.md).

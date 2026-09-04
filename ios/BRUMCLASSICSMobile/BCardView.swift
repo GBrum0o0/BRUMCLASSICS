@@ -21,35 +21,50 @@ struct BCardView: View {
     @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
     let game: Game
-    @State private var mode = "new"
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("bcard_classic_launch_mode") private var savedMode = "new"
     @State private var offset: CGFloat = 0
     @State private var sending = false
+    @State private var floating = false
+    @State private var sendError: String?
     var body: some View {
-        ZStack {
+        GeometryReader { geometry in ZStack {
             BrumTheme.deepBackground.ignoresSafeArea()
-            Circle().fill(BrumTheme.primary.opacity(0.08)).frame(width: 500).blur(radius: 45).offset(y: -100)
-            VStack(spacing: 22) {
-                HStack { BrumLogo(); Spacer(); Button { dismiss() } label: { Image(systemName: "xmark").font(.headline).padding(12).background(BrumTheme.surface).clipShape(Circle()) } }.padding(.horizontal, 20)
-                Spacer()
-                VStack(spacing: 15) {
-                    GameCoverView(game: game, cornerRadius: 18).frame(width: 225, height: 315)
-                    Text(game.title).font(.title2.bold()).foregroundStyle(BrumTheme.text).multilineTextAlignment(.center)
-                    Text(game.isClassic ? "B-CARD · CLASSICS" : "B-CARD · JOGOS").font(.caption.bold()).tracking(1.4).foregroundStyle(BrumTheme.primary)
+            let width = min(geometry.size.width * 0.70, geometry.size.height * 0.45, 300)
+            GameCoverView(game: game, cornerRadius: 14, artworkOnly: true)
+                .frame(width: width, height: width / 0.72)
+                .shadow(color: BrumTheme.primary.opacity(0.12), radius: 35, y: 18)
+                .rotation3DEffect(.degrees(reduceMotion ? 0 : floating ? 3 : -3), axis: (x: 0.3, y: 1, z: 0))
+                .offset(y: offset + (reduceMotion ? 0 : floating ? -7 : 7))
+                .animation(reduceMotion ? nil : .easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: floating)
+                .accessibilityLabel("Capa do jogo. Arraste para cima para enviar ao computador.")
+                .accessibilityIdentifier("bcard-floating-cover")
+                .accessibilityAction(named: "Enviar ao computador") { send(height: geometry.size.height) }
+                .gesture(DragGesture().onChanged { if !sending { offset = min(0, $0.translation.height) } }.onEnded { value in
+                    guard !sending else { return }
+                    if value.translation.height < -90 { send(height: geometry.size.height) }
+                    else { withAnimation(.spring()) { offset = 0 } }
+                })
+            VStack {
+                HStack {
+                    Button { dismiss() } label: { Label("Voltar", systemImage: "chevron.left").font(.subheadline.bold()).padding(14).background(BrumTheme.surface).clipShape(Capsule()) }
+                        .accessibilityIdentifier("bcard-back").foregroundStyle(BrumTheme.text)
+                    Spacer()
                 }
-                .padding(22).background(.ultraThinMaterial).clipShape(RoundedRectangle(cornerRadius: 24)).overlay(RoundedRectangle(cornerRadius: 24).stroke(BrumTheme.primary.opacity(0.35)))
-                .offset(y: offset)
-                .gesture(DragGesture().onChanged { offset = min(0, $0.translation.height) }.onEnded { value in if value.translation.height < -110 { send() } else { withAnimation(.spring) { offset = 0 } } })
-                if game.isClassic {
-                    Picker("Modo", selection: $mode) { Text("NOVO").tag("new"); Text("AUTO SAVE").tag("continue-auto"); Text("SAVE MANUAL").tag("continue-manual") }.pickerStyle(.segmented).padding(.horizontal, 24)
-                }
-                VStack(spacing: 7) { Image(systemName: "chevron.up").foregroundStyle(BrumTheme.primary); Text(sending ? "ENVIANDO AO COMPUTADOR…" : "ARRASTE O CARTÃO PARA CIMA").font(.caption.bold()).tracking(1.2).foregroundStyle(BrumTheme.muted) }
                 Spacer()
-            }.padding(.vertical, 16)
-        }
+                Text(sending ? "ENVIANDO…" : "DESLIZE PARA CIMA").font(.caption2.bold()).tracking(1.3).foregroundStyle(BrumTheme.muted)
+            }.padding(20)
+        } }
+        .onAppear { floating = true }
+        .alert("Não foi possível enviar", isPresented: Binding(get: { sendError != nil }, set: { if !$0 { sendError = nil } })) { Button("OK") { sendError = nil } } message: { Text(sendError ?? "") }
     }
-    private func send() {
+    private func send(height: CGFloat) {
         guard !sending else { return }; sending = true
-        withAnimation(.easeIn(duration: 0.35)) { offset = -UIScreen.main.bounds.height }
-        Task { await store.launchBCard(game, mode: mode); try? await Task.sleep(for: .milliseconds(500)); dismiss() }
+        withAnimation(reduceMotion ? nil : .easeIn(duration: 0.4)) { offset = -height }
+        Task {
+            let error = await store.launchBCard(game, mode: BCardLaunchMode.validated(savedMode, classic: game.isClassic))
+            if let error { sendError = error; sending = false; withAnimation(.spring()) { offset = 0 } }
+            else { dismiss() }
+        }
     }
 }
