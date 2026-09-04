@@ -7,7 +7,7 @@ final class NavigationTests: XCTestCase {
         XCTAssertTrue(link.waitForExistence(timeout: 15))
         if !link.isHittable { app.swipeUp() }
         link.tap()
-        XCTAssertTrue(app.buttons["ADICIONAR JOGOS DO IPHONE"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["retroarch-library-refresh"].waitForExistence(timeout: 5))
         app.navigationBars.buttons.firstMatch.tap()
         XCTAssertTrue(app.tabBars.buttons["Início"].exists)
     }

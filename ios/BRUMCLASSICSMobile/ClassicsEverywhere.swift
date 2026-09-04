@@ -288,7 +288,9 @@ struct ClassicsEverywhereView: View {
         ScrollView { LazyVStack(alignment: .leading, spacing: 20) {
             PageHeader(kicker: "CLASSICS", title: "CLASSICS in every everywhere", subtitle: "Seus clássicos no iPhone · com RetroArch")
             NavigationLink { PocketSetupView() } label: { SettingsRow(icon: "gearshape", title: "CONFIGURAR RETROARCH", detail: "Instalação, tela, áudio e RetroAchievements") }
-            Button("ATUALIZAR BIBLIOTECA DO RETROARCH") { pocket.requestRetroArchLibrary() }.buttonStyle(PrimaryButtonStyle())
+            Button("ATUALIZAR BIBLIOTECA DO RETROARCH") { pocket.requestRetroArchLibrary() }
+                .buttonStyle(PrimaryButtonStyle())
+                .accessibilityIdentifier("retroarch-library-refresh")
             Text("O BRUMCLASSICS mostra a biblioteca real do RetroArch. O arquivo do jogo precisa existir uma única vez no iPhone; capas e nomes sincronizados do PC não substituem a ROM. Não mantemos uma segunda cópia somente para exibir o catálogo.").font(.caption).foregroundStyle(BrumTheme.muted)
             if pocket.retroArchGames.isEmpty { Text("Nenhum jogo jogável confirmado. Atualize usando o RetroArch compatível; se a biblioteca estiver vazia, disponibilize sua ROM nele uma única vez.").foregroundStyle(BrumTheme.muted) }
             else { LazyVGrid(columns: columns, spacing: 22) { ForEach(pocket.retroArchGames) { game in RetroArchGameTile(game: game, launcherGame: pocket.launcherGame(for: game, launcher: launcher), pocketID: pocket.pocketGame(for: game)?.id) { Task { await pocket.launchRetroArch(game, launcher: launcher) } } } } }
