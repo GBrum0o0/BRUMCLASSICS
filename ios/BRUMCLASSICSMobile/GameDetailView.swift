@@ -46,19 +46,17 @@ struct NotesSummary: View {
 struct NotesEditor: View {
     @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
-    let game: Game
-    @State private var notes: Game.Notes
-    @State private var saving = false
-    init(game: Game) { self.game = game; _notes = State(initialValue: game.notes) }
+    let initialGame: Game
+    private var game: Game { store.snapshot.games.first { $0.id == initialGame.id } ?? initialGame }
+    init(game: Game) { initialGame = game }
     var body: some View {
         NavigationStack {
-            Form { noteField("Onde parei", text: $notes.whereStopped); noteField("Objetivos", text: $notes.objectives); noteField("Dicas", text: $notes.tips); noteField("Comandos", text: $notes.commands) }
-                .scrollContentBackground(.hidden).background(BrumTheme.background)
+            ScrollView { CompanionNotesForm(game: game).padding(20) }
+                .background(BrumTheme.background)
                 .navigationTitle("Anotações")
-                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }; ToolbarItem(placement: .confirmationAction) { Button(saving ? "Salvando…" : "Salvar") { saving = true; Task { if await store.saveNotes(game: game, notes: notes) { dismiss() }; saving = false } }.disabled(saving) } }
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Fechar") { dismiss() } } }
         }
     }
-    private func noteField(_ title: String, text: Binding<String>) -> some View { Section(title) { TextEditor(text: Binding(get: { text.wrappedValue }, set: { text.wrappedValue = String($0.prefix(6000)) })).frame(minHeight: 90) } }
 }
 
 struct AchievementList: View {

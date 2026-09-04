@@ -35,6 +35,8 @@ O Windows não possui Xcode nem o SDK do iOS, portanto não compila o aplicativo
 
 ### iOS 0.3.0 — alinhamento ao Android
 
+Veja o [guia BRUMWORLD do iPhone](BRUMWORLD-IOS-0.3.0.md).
+
 As abas são Início, Biblioteca, Estatísticas, Companion e Perfil. O B-CARD fica no Início; Conquistas pode ser aberto em Estatísticas e Perfil. No Companion, um jogo ativo com anotações mostra Onde parei, Objetivos, Dicas e Comandos para consulta e edição. Jogos sem notas ficam ocultos, mas as métricas válidas da sessão continuam disponíveis. O controle remoto foi retirado.
 
 As notas são guardadas no iPhone antes do envio. Fora da rede, consulte o cache e edite no Perfil do Jogo; alterações pendentes são reenviadas ao reconectar. Se houver conflito, abra o Companion para escolher qual versão manter. O estado ERRO DE SINCRONIZAÇÃO agora traz o motivo no Perfil, separado de OFFLINE e SINCRONIZANDO. Minutos fracionados não impedem mais a leitura da biblioteca.
