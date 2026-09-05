@@ -96,7 +96,7 @@ actor PocketRAClient {
         var url = URLComponents(string: "https://retroachievements.org/API/API_GetGameInfoAndUserProgress.php")!
         url.queryItems = [URLQueryItem(name: "y", value: key), URLQueryItem(name: "u", value: username), URLQueryItem(name: "g", value: String(gameID))]
         var request = URLRequest(url: url.url!, timeoutInterval: 20)
-        request.setValue("BRUMCLASSICS-iOS/0.4.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("BRUMCLASSICS-iOS/0.7.0", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200, data.count <= 12 * 1024 * 1024 else { throw PocketError.message("RetroAchievements indisponível ou credencial inválida. Tente mais tarde; o progresso salvo foi mantido.") }
         return try PocketProgress.decode(data, username: username, expectedID: gameID)
@@ -163,7 +163,7 @@ actor PocketRAClient {
         let hasBookmark = await romFolder.configured
         guard romFolderConfigured || hasBookmark else {
             romFolderConfigured = false
-            romFolderStatus = "Selecione Downloads uma vez em Perfil → Configurações do app → CLASSICS."
+            romFolderStatus = "Selecione a pasta de ROMs do RetroArch uma vez em Perfil → Configurações do app → CLASSICS."
             return
         }
         do {
@@ -174,8 +174,13 @@ actor PocketRAClient {
     }
     private func applyROMFolderScan(_ scan: ROMFolderScan) async throws {
         var reconciled = games
-        for rom in scan.games where !reconciled.contains(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }) {
-            reconciled.append(PocketClassic(id: UUID(), title: rom.title, filename: rom.filename))
+        for rom in scan.games {
+            if let index = reconciled.firstIndex(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }) {
+                // Migrate only the display name. IDs, RetroAchievements progress and PC links stay intact.
+                reconciled[index].title = rom.title
+            } else {
+                reconciled.append(PocketClassic(id: UUID(), title: rom.title, filename: rom.filename))
+            }
         }
         if reconciled != games { try await files.save(reconciled); games = reconciled }
         romFolderGames = scan.games
@@ -198,8 +203,8 @@ actor PocketRAClient {
             var reconciled = games
             for retro in decoded {
                 let existingIndex = reconciled.firstIndex { $0.filename.caseInsensitiveCompare(retro.filename) == .orderedSame }
-                let normalized = RetroArchLibraryRules.normalizedTitle(retro.titleName)
-                let matchingPC = launcher.snapshot.games.filter { $0.isClassic && RetroArchLibraryRules.normalizedTitle($0.title) == normalized }
+                let normalized = normalizedLibraryTitle(retro.titleName)
+                let matchingPC = launcher.snapshot.games.filter { $0.isClassic && normalizedLibraryTitle($0.title) == normalized }
                 if let index = existingIndex {
                     reconciled[index].importedIntoRetroArch = true
                     if reconciled[index].launcherGameID.isEmpty, matchingPC.count == 1 { reconciled[index].launcherGameID = matchingPC[0].id }
@@ -215,15 +220,15 @@ actor PocketRAClient {
     func retroArchGame(for launcherGame: Game) -> RetroArchLibraryGame? {
         if let link = games.first(where: { $0.launcherGameID == launcherGame.id }),
            let exact = retroArchGames.first(where: { $0.filename.caseInsensitiveCompare(link.filename) == .orderedSame }) { return exact }
-        let normalized = RetroArchLibraryRules.normalizedTitle(launcherGame.title)
-        let matches = retroArchGames.filter { RetroArchLibraryRules.normalizedTitle($0.titleName) == normalized }
+        let normalized = normalizedLibraryTitle(launcherGame.title)
+        let matches = retroArchGames.filter { normalizedLibraryTitle($0.titleName) == normalized }
         return matches.count == 1 ? matches[0] : nil
     }
     func launcherGame(for retro: RetroArchLibraryGame, launcher: AppStore) -> Game? {
         if let link = games.first(where: { $0.filename.caseInsensitiveCompare(retro.filename) == .orderedSame }),
            let exact = launcher.snapshot.games.first(where: { $0.id == link.launcherGameID }) { return exact }
-        let normalized = RetroArchLibraryRules.normalizedTitle(retro.titleName)
-        let matches = launcher.snapshot.games.filter { $0.isClassic && RetroArchLibraryRules.normalizedTitle($0.title) == normalized }
+        let normalized = normalizedLibraryTitle(retro.titleName)
+        let matches = launcher.snapshot.games.filter { $0.isClassic && normalizedLibraryTitle($0.title) == normalized }
         return matches.count == 1 ? matches[0] : nil
     }
     func pocketGame(for retro: RetroArchLibraryGame) -> PocketClassic? {
@@ -236,21 +241,41 @@ actor PocketRAClient {
         if let link = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame && !$0.launcherGameID.isEmpty }),
            let exact = launcher.snapshot.games.first(where: { $0.id == link.launcherGameID }) { return exact }
         if let retro = retroArchGame(for: rom), let exact = launcherGame(for: retro, launcher: launcher) { return exact }
-        let normalized = RetroArchLibraryRules.normalizedTitle(rom.title)
-        let matches = launcher.snapshot.games.filter { $0.isClassic && RetroArchLibraryRules.normalizedTitle($0.title) == normalized }
+        let normalized = normalizedLibraryTitle(rom.title)
+        let matches = launcher.snapshot.games.filter { $0.isClassic && normalizedLibraryTitle($0.title) == normalized }
         return matches.count == 1 ? matches[0] : nil
     }
+    private func normalizedLibraryTitle(_ value: String) -> String {
+        RetroArchLibraryRules.normalizedTitle(ROMTitleRules.clean(value))
+    }
     func launchROM(_ rom: ROMFolderGame, launcher: AppStore) async {
-        guard retroArchGame(for: rom) != nil else {
-            retroArchLibraryStatus = "A ROM está em \(romFolderName), mas ainda não foi reconhecida na biblioteca do RetroArch. O vínculo será atualizado agora; depois, toque novamente para jogar."
-            requestRetroArchLibrary()
-            return
-        }
-        guard let record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }) else {
+        guard var record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }) else {
             message = "Atualize a pasta de ROMs novamente antes de jogar."
             return
         }
-        await launch(record, launcher: launcher)
+        if record.launcherGameID.isEmpty, let matched = launcherGame(for: rom, launcher: launcher) {
+            record.launcherGameID = matched.id
+            record.title = matched.title
+            await update(record)
+        }
+        if RetroArchDirectLaunchRules.supports(filename: rom.filename) {
+            do {
+                let directURL = try await romFolder.directLaunchURL(for: rom)
+                // Optional runtime permissions must never prevent a valid ROM from opening.
+                do { try await runtime.prepare(record, allGames: games) }
+                catch { runtimeStatus = "O jogo pode abrir, mas a medição não foi preparada: \(error.localizedDescription)" }
+                UIApplication.shared.open(directURL) { opened in
+                    if !opened { Task { @MainActor in self.message = "O RetroArch compatível não aceitou a abertura direta. Confirme se a pasta escolhida pertence ao RetroArch." } }
+                }
+            } catch { message = error.localizedDescription }
+            return
+        }
+        if retroArchGame(for: rom) != nil {
+            await launch(record, launcher: launcher)
+        } else {
+            retroArchLibraryStatus = "Este formato não identifica sozinho o sistema. Organize a ROM em uma playlist do RetroArch e sincronize as playlists."
+            requestRetroArchLibrary()
+        }
     }
     func launchRetroArch(_ game: RetroArchLibraryGame, launcher: AppStore) async {
         guard let pocketGame = pocketGame(for: game) else { message = "Atualize a biblioteca do RetroArch novamente antes de jogar."; return }
@@ -352,17 +377,15 @@ struct ClassicsEverywhereView: View {
     private let columns = [GridItem(.adaptive(minimum: 145), spacing: 16)]
     var body: some View {
         ScrollView { LazyVStack(alignment: .leading, spacing: 20) {
-            PageHeader(kicker: "CLASSICS", title: "CLASSICS in every everywhere", subtitle: "Seus clássicos no iPhone · com RetroArch")
+            PageHeader(kicker: "CLASSICS", title: "CLASSICS Everywhere", subtitle: "Seus clássicos no iPhone · com RetroArch")
             HStack {
                 Button("VERIFICAR \(pocket.romFolderName.uppercased())") { Task { await pocket.refreshROMFolder() } }
                     .buttonStyle(PrimaryButtonStyle())
                     .accessibilityIdentifier("rom-folder-refresh")
-                Button { pocket.requestRetroArchLibrary() } label: { Image(systemName: "arrow.triangle.2.circlepath").font(.headline) }
-                    .buttonStyle(.bordered).tint(BrumTheme.primary).accessibilityLabel("Sincronizar com RetroArch")
             }
-            Text("A biblioteca mostra somente arquivos encontrados na pasta de ROMs autorizada. Para trocar a pasta, use Perfil → Configurações do app → CLASSICS.").font(.caption).foregroundStyle(BrumTheme.muted)
+            Text("A biblioteca mostra somente arquivos encontrados na pasta autorizada. Para a abertura direta funcionar, use uma pasta dentro de No Meu iPhone → RetroArch. Para trocar, abra Perfil → Configurações do app → CLASSICS.").font(.caption).foregroundStyle(BrumTheme.muted)
             if !pocket.romFolderConfigured {
-                Text("Nenhuma pasta autorizada. Abra Perfil → Configurações do app → CLASSICS e selecione Downloads uma vez.").foregroundStyle(BrumTheme.muted)
+                Text("Nenhuma pasta autorizada. Abra Perfil → Configurações do app → CLASSICS e selecione a pasta de ROMs do RetroArch uma vez.").foregroundStyle(BrumTheme.muted)
             } else if pocket.romFolderGames.isEmpty {
                 Text("Nenhuma ROM compatível foi encontrada em \(pocket.romFolderName).").foregroundStyle(BrumTheme.muted)
             } else {
@@ -374,9 +397,14 @@ struct ClassicsEverywhereView: View {
                     }
                 }
             }
-            Button("ATUALIZAR VÍNCULO COM O RETROARCH") { pocket.requestRetroArchLibrary() }
-                .buttonStyle(PrimaryButtonStyle())
-                .accessibilityIdentifier("retroarch-library-refresh")
+            if pocket.romFolderGames.contains(where: { !RetroArchDirectLaunchRules.supports(filename: $0.filename) }) {
+                BrumSectionLabel(text: "FORMATOS QUE PRECISAM DE PLAYLIST")
+                Text("ISO, CHD, ZIP, CUE e outros formatos podem representar sistemas diferentes. Para eles, organize o jogo no RetroArch e use a sincronização abaixo. O RetroArch abre e retorna ao BRUMCLASSICS automaticamente; isso é esperado e não inicia o jogo.")
+                    .font(.caption).foregroundStyle(BrumTheme.muted)
+                Button("SINCRONIZAR PLAYLISTS DO RETROARCH") { pocket.requestRetroArchLibrary() }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .accessibilityIdentifier("retroarch-library-refresh")
+            }
             if !pocket.status.isEmpty { Text(pocket.status).font(.caption).foregroundStyle(BrumTheme.muted) }
             if !pocket.romFolderStatus.isEmpty { Text(pocket.romFolderStatus).font(.caption).foregroundStyle(BrumTheme.muted) }
             if !pocket.retroArchLibraryStatus.isEmpty { Text(pocket.retroArchLibraryStatus).font(.caption).foregroundStyle(BrumTheme.muted) }
@@ -391,17 +419,33 @@ struct ROMFolderGameTile: View {
     let launcherGame: Game?
     let retroArchReady: Bool
     let play: () -> Void
+    @State private var artwork: ROMArtwork?
+    @State private var artworkImage: UIImage?
+    private var displayedTitle: String { launcherGame?.title ?? artwork?.title ?? rom.title }
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button(action: play) {
                 VStack(alignment: .leading, spacing: 8) {
-                    if let launcherGame { GameCoverView(game: launcherGame).aspectRatio(0.72, contentMode: .fit) }
-                    else { RoundedRectangle(cornerRadius: 12).fill(BrumTheme.surface).aspectRatio(0.72, contentMode: .fit).overlay(Image(systemName: "gamecontroller.fill").font(.largeTitle).foregroundStyle(BrumTheme.primary)) }
-                    Text(launcherGame?.title ?? rom.title).font(.system(size: 15, weight: .bold)).foregroundStyle(BrumTheme.text).lineLimit(2).multilineTextAlignment(.leading)
+                    if let launcherGame, !launcherGame.artworkPath.isEmpty {
+                        GameCoverView(game: launcherGame).aspectRatio(0.72, contentMode: .fit)
+                    } else {
+                        RoundedRectangle(cornerRadius: 12).fill(BrumTheme.surface).aspectRatio(0.72, contentMode: .fit)
+                            .overlay {
+                                if let artworkImage { Image(uiImage: artworkImage).resizable().scaledToFit() }
+                                else { Image(systemName: "gamecontroller.fill").font(.largeTitle).foregroundStyle(BrumTheme.primary) }
+                            }.clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    Text(displayedTitle).font(.system(size: 15, weight: .bold)).foregroundStyle(BrumTheme.text).lineLimit(2).multilineTextAlignment(.leading)
                 }
-            }.buttonStyle(.plain).accessibilityLabel("Jogar \(launcherGame?.title ?? rom.title)")
-            Text(retroArchReady ? "JOGAR · RETROARCH" : "ROM DETECTADA · VINCULE O RETROARCH")
-                .font(.system(size: 10, weight: .bold)).foregroundStyle(retroArchReady ? BrumTheme.primary : BrumTheme.muted)
+            }.buttonStyle(.plain).accessibilityLabel("Jogar \(displayedTitle)")
+            Text(RetroArchDirectLaunchRules.supports(filename: rom.filename) ? "JOGAR · ABERTURA DIRETA" : retroArchReady ? "JOGAR · RETROARCH" : "PRECISA DE PLAYLIST")
+                .font(.system(size: 10, weight: .bold)).foregroundStyle(BrumTheme.primary)
+        }.task(id: rom.id + (launcherGame?.artworkPath ?? "")) {
+            guard launcherGame?.artworkPath.isEmpty != false else { return }
+            let result = await ROMArtworkCache.shared.artwork(for: rom)
+            guard !Task.isCancelled else { return }
+            artwork = result
+            artworkImage = result.flatMap { UIImage(contentsOfFile: $0.imageURL.path) }
         }
     }
 }
@@ -527,7 +571,7 @@ struct PocketSetupView: View {
                 Text("É necessário estar online no RetroArch para registrar conquistas. O modo Hardcore restringe save states. ROMs incompatíveis ou núcleos sem suporte não geram conquistas.")
             }
             Section("4 · Sincronização") {
-                Text("Em CLASSICS in every everywhere, toque Atualizar biblioteca: o RetroArch devolve sua lista real e o BRUMCLASSICS mostra as capas correspondentes do PC. Depois, tocar na capa abre o título exato. Para atualizar o PC, vincule o mesmo jogo e use a mesma conta; o launcher deve estar atualizado, aberto e na rede local. Não copiamos ROMs nem saves para o PC.")
+                Text("Em CLASSICS Everywhere, as ROMs de plataformas identificáveis abrem diretamente com o núcleo compatível. Atualizar vínculo continua disponível para formatos ambíguos e jogos já organizados em playlists. Para atualizar o PC, vincule o mesmo jogo e use a mesma conta; o launcher deve estar atualizado, aberto e na rede local. Não copiamos ROMs nem saves para o PC.")
             }
             Section("5 · Horas offline do RetroArch") {
                 Text("No RetroArch: Settings → Playlists → Save runtime log (aggregate): ON. Em Settings → Directory → Runtime Logs, confira a pasta usada. Feche o conteúdo após jogar para gravar o log.")

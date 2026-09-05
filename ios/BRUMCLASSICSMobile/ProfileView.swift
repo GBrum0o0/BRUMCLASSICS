@@ -55,11 +55,11 @@ struct MobileSettingsView: View {
         Form {
             Section("CLASSICS no iPhone") {
                 LabeledContent("Pasta de ROMs", value: pocket.romFolderName)
-                Button(pocket.romFolderConfigured ? "ALTERAR PASTA DE ROMS" : "SELECIONAR DOWNLOADS") { choosingROMFolder = true }
+                Button(pocket.romFolderConfigured ? "ALTERAR PASTA DE ROMS" : "SELECIONAR PASTA DO RETROARCH") { choosingROMFolder = true }
                     .accessibilityIdentifier("choose-rom-folder")
                 Button("VERIFICAR PASTA AGORA") { Task { await pocket.refreshROMFolder() } }
                     .disabled(!pocket.romFolderConfigured)
-                Text("Na primeira vez, selecione a pasta Downloads no app Arquivos. Depois disso a leitura é automática. O iOS exige essa autorização inicial e o BRUMCLASSICS não copia nem apaga suas ROMs.").font(.caption).foregroundStyle(BrumTheme.muted)
+                Text("Para tocar e jogar sem importar novamente, selecione uma pasta que pertença ao RetroArch em No Meu iPhone → RetroArch. Outras pastas podem ser lidas pelo BRUMCLASSICS, mas o iOS pode impedir que o RetroArch acesse o mesmo caminho. O app não copia nem apaga suas ROMs.").font(.caption).foregroundStyle(BrumTheme.muted)
                 if !pocket.romFolderStatus.isEmpty { Text(pocket.romFolderStatus).font(.caption).foregroundStyle(BrumTheme.muted) }
                 NavigationLink("RetroArch e RetroAchievements") { PocketSetupView() }
             }

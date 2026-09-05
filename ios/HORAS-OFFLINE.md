@@ -1,6 +1,6 @@
 # CLASSICS no iPhone: horas offline e conquistas
 
-iOS **0.6.1 (build 10)** + launcher **1.55.3 ou posterior**.
+iOS **0.7.0 (build 11)** + launcher **1.55.3 ou posterior**.
 
 ## Configuração inicial
 
@@ -8,7 +8,7 @@ iOS **0.6.1 (build 10)** + launcher **1.55.3 ou posterior**.
 2. Instale o RetroArch separadamente. O BRUMCLASSICS não instala drivers, núcleos, ROMs ou BIOS, nem altera configurações/saves do emulador.
 3. No RetroArch, habilite **Settings → Playlists → Save runtime log (aggregate)**. Confira **Settings → Directory → Runtime Logs**. Use a pasta agregada, não a subpasta de um núcleo.
 4. No BRUMCLASSICS, abra **Perfil → Configurações do app → CLASSICS → Autorizar pasta de logs**. Selecione essa pasta pelo app Arquivos. Se sua instalação do RetroArch não expuser essa pasta ao seletor, a medição não poderá funcionar até escolher uma pasta acessível no emulador. Não há acesso oculto aos dados de outro app no iOS.
-5. Em **Início → CLASSICS in every everywhere**, importe uma ROM que você tem direito de usar. Envie-a ao RetroArch e execute-a nele primeiro. Mantenha o mesmo nome de arquivo: os logs usam o nome da ROM sem extensão. Para ZIPs extraídos, importe o arquivo final correspondente; nomes diferentes e ROMs com o mesmo nome-base não podem ser reconciliados por adivinhação.
+5. Em **Início → CLASSICS Everywhere**, abra uma ROM que você tem direito de usar. Mantenha o mesmo nome de arquivo: os logs usam o nome da ROM sem extensão. Para ZIPs extraídos, use o arquivo final correspondente; nomes diferentes e ROMs com o mesmo nome-base não podem ser reconciliados por adivinhação.
 6. Abra os detalhes desse jogo, escolha **Mesmo jogo no launcher** e salve o vínculo. Com o PC conectado, inicie uma vez pelo botão **Jogar no RetroArch**: isso prepara o contador e registra o ponto de partida no PC. O histórico anterior dos logs não é importado silenciosamente.
 
 ## Exemplo: jogar 3 horas fora de casa

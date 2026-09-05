@@ -38,6 +38,10 @@ for (const marker of ['RetroArchLibraryRules.queryURL', 'RetroArchLibraryRules',
 for (const marker of ['ROMFolderScanner', 'ROMFolderAccess', 'choose-rom-folder', 'romFolderGames', 'refreshROMFolder']) {
   if (!source.includes(marker)) throw new Error(`Pasta de ROMs incompleta: ${marker}`);
 }
+for (const marker of ['ROMTitleRules.clean', 'RetroArchDirectLaunchRules', 'components.host = "topshelf"']) {
+  if (!source.includes(marker)) throw new Error(`Abertura direta ou metadados de ROM incompletos: ${marker}`);
+}
+if (source.includes('CLASSICS in every everywhere')) throw new Error('Nome antigo e repetido de CLASSICS ainda está visível no aplicativo.');
 if (source.includes('NA BIBLIOTECA DO PC · AINDA NÃO JOGÁVEIS NO IPHONE')) throw new Error('CLASSICS não pode listar jogos sem ROM detectada no iPhone.');
 for (const command of requiredCommands) if (!source.includes(`"${command}"`)) throw new Error(`Comando remoto não portado: ${command}`);
 for (const obsolete of ['CompanionControlView', 'PESQUISA NO LIVING ROOM', '"shutdown_pc"', '"sleep_pc"', '"quick_save"', '"quick_load"', '"set_volume"']) if (source.includes(obsolete)) throw new Error(`Controle remoto antigo ainda presente: ${obsolete}`);

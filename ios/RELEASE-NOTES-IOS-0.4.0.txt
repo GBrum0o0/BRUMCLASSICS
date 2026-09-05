@@ -1,7 +1,7 @@
 BRUMCLASSICS MOVEL iOS 0.4.0 - build 7
 
 B-CARD: saída permanente da capa enviada; flutuação separada da animação de envio.
-CLASSICS in every everywhere no Início: importação de ROMs próprias, cópias privadas, envio ao RetroArch e atalho para o jogo já importado.
+Primeira edição do atual CLASSICS Everywhere no Início: importação de ROMs próprias, cópias privadas, envio ao RetroArch e atalho para o jogo já importado.
 Guia de configuração em Perfil: tela, som, controles e conta RetroAchievements.
 Consulta oficial por ID do jogo e conta, cache offline e lista de conquistas no celular.
 Canal de sincronização com launcher 1.55.2: mesma conta e identidade, consulta independente no servidor; não altera ROMs/saves/horas/coleções.

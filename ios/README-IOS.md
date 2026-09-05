@@ -1,6 +1,6 @@
 # BRUMCLASSICS MÓVEL para iOS
 
-Versão 0.6.1: [biblioteca e abertura direta pelo RetroArch compatível](RETROARCH-COMPATIVEL.md), além de [horas offline e sincronização com o PC](HORAS-OFFLINE.md). A tela CLASSICS mostra somente ROMs realmente encontradas na pasta Downloads que você autorizou. A pasta pode ser alterada em **Perfil → Configurações do app → CLASSICS**; jogos existentes apenas no PC não aparecem como se estivessem no iPhone.
+Versão 0.7.0: [biblioteca e abertura direta pelo RetroArch compatível](RETROARCH-COMPATIVEL.md), além de [horas offline e sincronização com o PC](HORAS-OFFLINE.md). A tela **CLASSICS Everywhere** mostra somente ROMs realmente encontradas na pasta autorizada. Ela limpa o nome bruto para associar o título oficial e a capa do PC. Plataformas reconhecíveis abrem pelo caminho real e pelo núcleo correspondente, sem depender de uma playlist anterior.
 
 Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o mesmo protocolo local seguro (versão 8) do aplicativo Android e não altera o launcher nem o perfil do usuário.
 
@@ -18,8 +18,9 @@ Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o mesmo protocolo
 - BRUMCOMPANION como segunda tela: jogo ativo, anotações editáveis, métricas e BRUMMOMENTS; sem controle remoto.
 - B-CARD separado entre Jogos e CLASSICS, com a preferência Novo jogo / Auto Save / Save Manual nas configurações do app.
 - Horas de CLASSICS no iPhone persistidas offline por logs agregados do RetroArch, sem cronômetro fictício de segundo plano.
-- Consulta autenticada entre aplicativos pela URL `retroarch://library`, com retorno ao BRUMCLASSICS e cache da biblioteca real do emulador.
-- Abertura direta por identidade exata `titleId`; nomes ambíguos ou arquivos duplicados nunca iniciam outro jogo por aproximação.
+- Consulta entre aplicativos pela URL `retroarch://library`, com retorno ao BRUMCLASSICS e cache da biblioteca real do emulador. O esquema de URL não autentica o remetente; essa resposta não comprova propriedade ou conquistas.
+- Abertura pelo caminho real da ROM e núcleo da plataforma. Formatos ambíguos usam identidade exata de playlist.
+- Capas locais prioritárias; fallback no catálogo público Libretro da mesma plataforma, com imagens e índices salvos para consulta offline. A busca da capa não estabelece vínculos de conquistas.
 - BRUMMOMENTS com captura da sessão ativa, galeria offline, localização, anotação, categoria e favoritos.
 - Atualização pessoal: verificação automática de versão no Perfil e acesso ao build do GitHub Actions.
 

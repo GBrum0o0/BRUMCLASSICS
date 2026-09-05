@@ -1,4 +1,4 @@
-# BRUMWORLD · CLASSICS in every everywhere
+# BRUMWORLD · CLASSICS Everywhere
 
 ## 1. Instalar
 
@@ -8,7 +8,7 @@ Instale o [RetroArch oficial pela App Store](https://apps.apple.com/app/retroarc
 
 ## 2. Adicionar e jogar no iPhone
 
-**Início → CLASSICS in every everywhere → Adicionar jogos do iPhone**.
+**Início → CLASSICS Everywhere**.
 
 Selecione sua ROM pelo app Arquivos. O BRUMCLASSICS guarda uma cópia privada e não altera o original. ROMs, BIOS e núcleos não são fornecidos. Formatos aceitos não garantem que todos os núcleos, aparelhos ou conjuntos de conquistas os suportem.
 

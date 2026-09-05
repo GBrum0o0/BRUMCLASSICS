@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## iOS 0.7.0 — CLASSICS Everywhere e abertura direta
+
+- Capas ausentes no PC são procuradas no catálogo Libretro da mesma plataforma e persistidas no celular. Essa correspondência visual não concede conquistas nem propriedade.
+- A falta de autorização para logs de horas não impede jogar.
+
+- O nome repetido “CLASSICS in every everywhere” foi substituído por **CLASSICS Everywhere**.
+- Nomes brutos como `1636 - Pokemon Fire Red (U)(Squirrels).gba` viram `Pokemon Fire Red` antes da associação com o título oficial e a capa do PC.
+- Plataformas reconhecíveis abrem o caminho real com o núcleo correspondente pelo protocolo oficial `retroarch://topshelf`.
+- A antiga abertura por nome de playlist permanece somente quando a identidade já foi confirmada pelo RetroArch.
+- Formatos ambíguos, como ISO, CHD, ZIP, CUE e M3U, continuam exigindo uma playlist para não escolher o sistema errado.
+
 ## iOS 0.6.1 — biblioteca limitada às ROMs do aparelho
 
 - A seção CLASSICS exibe somente arquivos compatíveis realmente detectados na pasta Downloads autorizada.
@@ -10,7 +21,7 @@
 
 ## iOS 0.6.0 + launcher 1.55.3 — biblioteca real do RetroArch
 
-- `CLASSICS in every everywhere` consulta a biblioteca devolvida pelo RetroArch compatível, em vez de manter outra cópia da ROM no BRUMCLASSICS.
+- A primeira edição do atual `CLASSICS Everywhere` consulta a biblioteca devolvida pelo RetroArch compatível, em vez de manter outra cópia da ROM no BRUMCLASSICS.
 - Jogos confirmados no emulador aparecem com as capas e os metadados já sincronizados do PC; tocar na mídia abre o arquivo exato.
 - Itens encontrados somente no launcher continuam visíveis, mas são identificados como ainda não jogáveis no iPhone.
 - Correspondência restrita à identidade confirmada ou a um único título normalizado; duplicatas ambíguas são omitidas para não iniciar o jogo errado.
@@ -19,7 +30,7 @@
 
 Veja [configuração do RetroArch compatível](ios/RETROARCH-COMPATIVEL.md) e [instruções do aplicativo](ios/README-IOS.md).
 
-## iOS 0.4.0 + launcher 1.55.2 — CLASSICS in every everywhere
+## iOS 0.4.0 + launcher 1.55.2 — primeira versão do CLASSICS Everywhere
 
 - B-CARD: saída única da capa; erros não trazem o cartão de volta ao centro.
 - Início: catálogo de ROMs próprias no iPhone, envio para RetroArch e atalho para jogos já importados nele.
