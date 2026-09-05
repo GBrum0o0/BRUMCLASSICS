@@ -2,6 +2,36 @@ import XCTest
 @testable import BRUMCLASSICSMobile
 
 final class PocketRuntimeTests: XCTestCase {
+    func testFallbackSessionRequiresRealBackgroundTransitionAndPersistsIt() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let game = PocketClassic(id: UUID(), title: "Test", filename: "test.gba")
+        let sessions = PocketPlaySessionFiles(root: root)
+        try await sessions.begin(game, now: Date(timeIntervalSince1970: 100))
+        let premature = try await sessions.finish(returnedAt: Date(timeIntervalSince1970: 110))
+        XCTAssertNil(premature)
+        try await sessions.markBackgrounded(now: Date(timeIntervalSince1970: 120))
+        let finished = try await sessions.finish(returnedAt: Date(timeIntervalSince1970: 245))
+        XCTAssertEqual(finished?.session.gameID, game.id)
+        XCTAssertEqual(finished?.seconds, 125)
+        let repeated = try await sessions.finish(returnedAt: Date(timeIntervalSince1970: 300))
+        XCTAssertNil(repeated)
+    }
+    func testFallbackCreditsTimeWhenRetroArchLogFolderIsNotAuthorized() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let game = PocketClassic(id: UUID(), title: "Test", filename: "test.gba")
+        let runtime = PocketRuntimeFiles(root: root)
+        try await runtime.prepare(game, allGames: [game])
+        let credited = try await runtime.creditEstimated(game.id, filename: game.filename, seconds: 125)
+        XCTAssertTrue(credited)
+        let errors = try await runtime.collect()
+        XCTAssertTrue(errors.isEmpty)
+        let records = try await runtime.load()
+        let record = try XCTUnwrap(records.first)
+        XCTAssertEqual(record.creditedSeconds, 125)
+        XCTAssertEqual(record.lastObservedSeconds, 0)
+    }
     func testParsesActualRetroArchRuntimeAndRejectsMalformedValues() throws {
         XCTAssertEqual(try PocketRuntimeRules.seconds(Data(#"{"runtime":"123:45:06","last_played":"2026-09-04 12:00:00"}"#.utf8)), 445506)
         for runtime in ["1:60:00", "-1:00:00", "1:00", "1:00:99", "9999999999999999999:00:00"] {

@@ -68,7 +68,7 @@ struct Game: Codable, Identifiable, Hashable {
     var notes: Notes
     let installed: Bool
     let integrityStatus: String
-    let lastPlayedAt: String
+    var lastPlayedAt: String
     let artworkPath: String
 
     var isClassic: Bool { category == "classic" }

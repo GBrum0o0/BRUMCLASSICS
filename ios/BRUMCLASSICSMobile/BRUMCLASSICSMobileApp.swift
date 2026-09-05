@@ -35,11 +35,15 @@ struct BRUMCLASSICSMobileApp: App {
                         Task {
                             await store.resume()
                             await pocket.restore()
+                            await pocket.finishPlaySession(launcher: store)
                             await pocket.refreshROMFolder()
                             await pocket.sync(launcher: store)
                             await store.checkForPersonalUpdate()
                         }
-                    } else if phase == .background { store.suspend() }
+                    } else if phase == .background {
+                        Task { await pocket.notePlaySessionBackgrounded() }
+                        store.suspend()
+                    }
                 }
         }
     }

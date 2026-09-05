@@ -1,6 +1,6 @@
 # BRUMWORLD · CLASSICS Everywhere
 
-> Atualização iOS 0.7.3: escolha RetroArch somente na primeira vez. O BRUMCLASSICS registra a entrega e, nos próximos toques, abre diretamente a cópia existente em `RetroArch/downloads` com o núcleo correspondente. Formatos ambíguos abrem o RetroArch para seleção, mas nunca são importados novamente. A ROM original permanece intacta.
+> Atualização iOS 0.7.4: escolha RetroArch somente na primeira vez. Nos próximos toques, o jogo abre diretamente, aparece imediatamente como o mais recente e a sessão é concluída quando você retorna ao BRUMCLASSICS. Logs autorizados fornecem o tempo preciso; sem eles, o app mantém um cronômetro persistente de contingência.
 
 ## 1. Instalar
 

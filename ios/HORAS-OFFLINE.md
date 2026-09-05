@@ -1,25 +1,25 @@
 # CLASSICS no iPhone: horas offline e conquistas
 
-iOS **0.7.3 (build 14)** + launcher **1.55.3 ou posterior**.
+iOS **0.7.4 (build 15)** + launcher **1.55.3 ou posterior**.
 
 ## Configuração inicial
 
 1. Instale o IPA por Sideloadly/AltStore sobre o app existente, com a mesma conta Apple. Não desinstale para atualizar: isso apagaria o armazenamento local do aplicativo.
 2. Instale o RetroArch separadamente. O BRUMCLASSICS não instala drivers, núcleos, ROMs ou BIOS, nem altera configurações/saves do emulador.
-3. No RetroArch, habilite **Settings → Playlists → Save runtime log (aggregate)**. Confira **Settings → Directory → Runtime Logs**. Use a pasta agregada, não a subpasta de um núcleo.
-4. No BRUMCLASSICS, abra **Perfil → Configurações do app → CLASSICS → Autorizar pasta de logs**. Selecione essa pasta pelo app Arquivos. Se sua instalação do RetroArch não expuser essa pasta ao seletor, a medição não poderá funcionar até escolher uma pasta acessível no emulador. Não há acesso oculto aos dados de outro app no iOS.
+3. Para a medição mais precisa, no RetroArch habilite **Settings → Playlists → Save runtime log (aggregate)**. Confira **Settings → Directory → Runtime Logs**. Use a pasta agregada, não a subpasta de um núcleo.
+4. No BRUMCLASSICS, abra **Perfil → Configurações do app → CLASSICS → Autorizar pasta de logs** e selecione essa pasta. Se ela não estiver autorizada, o app usa como contingência o período entre a saída para o RetroArch e o retorno ao BRUMCLASSICS. Esse intervalo é persistente, mas pode incluir tempo parado no emulador; por isso os logs continuam recomendados.
 5. Em **Início → CLASSICS Everywhere**, abra uma ROM que você tem direito de usar. Mantenha o mesmo nome de arquivo: os logs usam o nome da ROM sem extensão. Para ZIPs extraídos, use o arquivo final correspondente; nomes diferentes e ROMs com o mesmo nome-base não podem ser reconciliados por adivinhação.
 6. Abra os detalhes desse jogo, escolha **Mesmo jogo no launcher** e salve o vínculo. Com o PC conectado, inicie uma vez pelo botão **Jogar no RetroArch**: isso prepara o contador e registra o ponto de partida no PC. O histórico anterior dos logs não é importado silenciosamente.
 
 ## Exemplo: jogar 3 horas fora de casa
 
 - Jogue normalmente, mesmo sem rede local ou sem internet. O RetroArch mede o tempo de execução.
-- Ao terminar, use **Close Content** no RetroArch para gravar o arquivo `.lrtl`. Depois retorne ao BRUMCLASSICS.
+- Ao terminar, use **Close Content** no RetroArch para gravar o arquivo `.lrtl` e retorne ao BRUMCLASSICS. O retorno conclui a sessão automaticamente.
 - O aplicativo lê o aumento do contador e salva as horas no próprio iPhone. Um indicador mostra o tempo local e o que ainda está pendente no PC.
 - De volta à rede local, deixe o launcher e o app abertos. A fila é enviada ao reconectar e verificada periodicamente enquanto o app estiver ativo. Também existe **Atualizar horas e conquistas** na página do jogo.
 - O PC combina as horas com o registro existente. Reenviar o mesmo contador, inclusive depois de reiniciar ou perder uma resposta, não duplica o tempo.
 
-O iOS não garante execução contínua do BRUMCLASSICS enquanto o RetroArch está aberto ou o telefone está bloqueado. Por isso **não usamos um cronômetro baseado na troca de aplicativos**. Os dados dependem de o RetroArch efetivamente gravar os logs; encerramento abrupto antes dessa gravação pode perder o trecho ainda não registrado.
+O iOS não permite ao BRUMCLASSICS observar o processo interno do RetroArch. Com a pasta de logs autorizada, usamos o contador gravado pelo emulador. Sem essa autorização, usamos um cronômetro persistente baseado na troca real de aplicativos e deixamos isso identificado como contingência; ele nunca é somado por cima de uma fonte de log autorizada.
 
 ## Histórico, proteção e limites
 

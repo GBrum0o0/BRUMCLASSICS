@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## iOS 0.7.4 — sessões concluídas e jogo recente
+
+- O toque em **Jogar** registra imediatamente o título como o jogo mais recente no cache do iPhone, sem esperar o snapshot do PC.
+- O registro recente local é reaplicado depois de cada sincronização para não desaparecer enquanto o launcher processa as horas.
+- Ao sair para o RetroArch, uma sessão persistente acompanha a transição real para segundo plano e é concluída assim que o usuário retorna ao BRUMCLASSICS.
+- Sem uma pasta de logs autorizada, o intervalo externo é usado como contingência e entra na mesma fila idempotente de horas para o PC.
+- Com logs autorizados, o acumulado gravado pelo próprio RetroArch continua sendo a fonte precisa; o cronômetro de contingência não é somado por cima.
+- Reinício do app, retorno de rede e respostas perdidas preservam a sessão e os segundos pendentes sem recriar o banco.
+- Novos testes cobrem a transição para segundo plano, conclusão única e crédito sem pasta de logs.
+
 ## iOS 0.7.3 — importar uma vez e jogar diretamente
 
 - A conclusão da primeira entrega é gravada no catálogo local do BRUMCLASSICS por identidade exata do arquivo.

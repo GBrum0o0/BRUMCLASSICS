@@ -32,6 +32,7 @@ final class AppStore: ObservableObject {
     private var appActive = true
     private static let configurationKey = "brum_pairing_configuration"
     private static let tokenAccount = "launcher-token"
+    private static let localLaunchesKey = "brum_local_game_launches_v1"
 
     init() {
         images.countLimit = 80
@@ -54,7 +55,7 @@ final class AppStore: ObservableObject {
     }
 
     func restore() async {
-        if let cached = await offline.loadSnapshot() { snapshot = cached }
+        if let cached = await offline.loadSnapshot() { snapshot = cached; applyLocalLaunches() }
         moments = await offline.loadMoments()
         if let data = UserDefaults.standard.data(forKey: Self.configurationKey), let decoded = try? JSONDecoder().decode(PairingConfiguration.self, from: data) { configuration = decoded }
         await overlayPending()
@@ -133,6 +134,7 @@ final class AppStore: ObservableObject {
                 guard !fresh.games.isEmpty || self.snapshot.games.isEmpty else { throw BridgeError.invalidResponse("A resposta vazia foi ignorada para preservar sua biblioteca offline.") }
                 let previousPerformance = self.snapshot.performance
                 self.snapshot = fresh
+                self.applyLocalLaunches()
                 if previousPerformance?.sampledAt != fresh.performance?.sampledAt { self.performanceReceivedUptime = fresh.performance?.active == true ? ProcessInfo.processInfo.systemUptime : nil }
                 await self.overlayPending()
                 try await self.offline.saveSnapshot(self.snapshot)
@@ -180,6 +182,16 @@ final class AppStore: ObservableObject {
             try await bridge.remote(command: "bcard_launch", payload: ["gameId": game.id, "mode": mode], requestID: UUID().uuidString)
             return nil
         } catch { return error.localizedDescription }
+    }
+
+    func recordLocalLaunch(gameID: String, at date: Date = Date()) async {
+        guard let index = snapshot.games.firstIndex(where: { $0.id == gameID }) else { return }
+        let stamp = ISO8601DateFormatter().string(from: date)
+        var launches = localLaunches()
+        launches[gameID] = stamp
+        if let data = try? JSONEncoder().encode(launches) { UserDefaults.standard.set(data, forKey: Self.localLaunchesKey) }
+        snapshot.games[index].lastPlayedAt = stamp
+        try? await offline.saveSnapshot(snapshot)
     }
 
     func captureMoment() async {
@@ -252,13 +264,28 @@ final class AppStore: ObservableObject {
         }
     }
 
+    private func localLaunches() -> [String: String] {
+        guard let data = UserDefaults.standard.data(forKey: Self.localLaunchesKey),
+              let decoded = try? JSONDecoder().decode([String: String].self, from: data) else { return [:] }
+        return decoded
+    }
+
+    private func applyLocalLaunches() {
+        let launches = localLaunches()
+        for index in snapshot.games.indices {
+            guard let local = launches[snapshot.games[index].id] else { continue }
+            let remote = snapshot.games[index].lastPlayedAt
+            if remote.isEmpty || local > remote { snapshot.games[index].lastPlayedAt = local }
+        }
+    }
+
     func useLauncherNotes(gameID: String) async -> Bool {
         do {
             let fresh = try await bridge.snapshot()
             var pending = await offline.loadOutbox()
             pending.removeAll { $0.gameID == gameID && $0.kind == .notes }
             try await offline.saveOutbox(pending)
-            snapshot = fresh; noteConflicts.remove(gameID)
+            snapshot = fresh; applyLocalLaunches(); noteConflicts.remove(gameID)
             await overlayPending()
             try await offline.saveSnapshot(snapshot)
             connection = .online

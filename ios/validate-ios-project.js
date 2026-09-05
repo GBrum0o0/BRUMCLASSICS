@@ -32,6 +32,9 @@ const requiredCommands = ['bcard_launch'];
 for (const marker of ['PocketRuntimeFiles', '/v1/classics/playtime', 'acknowledgedSeconds', 'startAccessingSecurityScopedResource']) {
   if (!source.includes(marker)) throw new Error(`Horas offline incompletas: ${marker}`);
 }
+for (const marker of ['PocketPlaySessionFiles', 'notePlaySessionBackgrounded', 'finishPlaySession', 'creditEstimated', 'recordLocalLaunch']) {
+  if (!source.includes(marker)) throw new Error(`Conclusão automática de sessão incompleta: ${marker}`);
+}
 for (const marker of ['RetroArchLibraryRules.queryURL', 'RetroArchLibraryRules', 'receiveRetroArchLibrary', 'brumclassics', 'titleId']) {
   if (!source.includes(marker)) throw new Error(`Biblioteca RetroArch incompleta: ${marker}`);
 }
@@ -67,9 +70,11 @@ if (!source.includes('com.brumclassics.mobile.ios') && !fs.readFileSync(path.joi
 if (!source.includes('checkForPersonalUpdate')) throw new Error('Verificação de atualização pessoal ausente.');
 
 const updateManifest = JSON.parse(fs.readFileSync(path.join(root, 'ios-update.json'), 'utf8'));
+const publishedUpdateManifest = JSON.parse(fs.readFileSync(path.join(root, '..', 'ios-update.json'), 'utf8'));
 if (!fs.readFileSync(path.join(root, 'github-actions/build-ios-personal.yml'), 'utf8').includes('ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa')) throw new Error('Upload do IPA não pode ficar preso a uma versão antiga.');
 if (!/^\d+\.\d+\.\d+$/.test(updateManifest.version)) throw new Error('Versão inválida em ios-update.json.');
 if (!String(updateManifest.buildUrl || '').startsWith('https://github.com/GBrum0o0/BRUMCLASSICS/')) throw new Error('URL do build pessoal inválida.');
+if (publishedUpdateManifest.version !== updateManifest.version || publishedUpdateManifest.build !== updateManifest.build || publishedUpdateManifest.buildUrl !== updateManifest.buildUrl) throw new Error('Manifesto público de atualização diverge do pacote iOS.');
 
 const icon = fs.readFileSync(path.join(app, 'Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png'));
 if (icon.readUInt32BE(16) !== 1024 || icon.readUInt32BE(20) !== 1024) throw new Error('AppIcon precisa ter 1024 × 1024 pixels.');

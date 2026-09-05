@@ -96,7 +96,7 @@ actor PocketRAClient {
         var url = URLComponents(string: "https://retroachievements.org/API/API_GetGameInfoAndUserProgress.php")!
         url.queryItems = [URLQueryItem(name: "y", value: key), URLQueryItem(name: "u", value: username), URLQueryItem(name: "g", value: String(gameID))]
         var request = URLRequest(url: url.url!, timeoutInterval: 20)
-        request.setValue("BRUMCLASSICS-iOS/0.7.3", forHTTPHeaderField: "User-Agent")
+        request.setValue("BRUMCLASSICS-iOS/0.7.4", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200, data.count <= 12 * 1024 * 1024 else { throw PocketError.message("RetroAchievements indisponível ou credencial inválida. Tente mais tarde; o progresso salvo foi mantido.") }
         return try PocketProgress.decode(data, username: username, expectedID: gameID)
@@ -119,6 +119,7 @@ actor PocketRAClient {
     @Published private(set) var romFolderStatus = ""
     @Published var pendingROMShare: ROMShareTicket?
     private let runtime = PocketRuntimeFiles()
+    private let playSessions = PocketPlaySessionFiles()
     private let retroArchFiles = RetroArchLibraryFiles()
     private let romFolder = ROMFolderAccess()
     private var timeBusy = false
@@ -267,15 +268,19 @@ actor PocketRAClient {
         if retroArchGame(for: rom) != nil {
             await launch(record, launcher: launcher)
         } else if record.importedIntoRetroArch {
-            do { try await runtime.prepare(record, allGames: games); await syncHours(launcher: launcher) }
-            catch { runtimeStatus = "O jogo pode abrir, mas a medição não foi preparada: \(error.localizedDescription)" }
             if let url = RetroArchAppStoreLaunchRules.launchURL(filename: rom.filename) {
-                UIApplication.shared.open(url) { opened in
-                    if !opened { Task { @MainActor in self.message = "O RetroArch não aceitou a abertura direta. Reabra o emulador e tente novamente." } }
-                }
+                await beginPlaySession(record)
+                let opened = await UIApplication.shared.open(url)
+                if !opened {
+                    await playSessions.cancel()
+                    message = "O RetroArch não aceitou a abertura direta. Reabra o emulador e tente novamente."
+                } else if !record.launcherGameID.isEmpty { await launcher.recordLocalLaunch(gameID: record.launcherGameID) }
             } else {
                 message = "A ROM já foi importada. Como este formato pode pertencer a mais de um sistema, escolha o jogo na playlist do RetroArch; ele não será importado novamente."
-                await UIApplication.shared.open(URL(string: "retroarch://start")!)
+                await beginPlaySession(record)
+                let opened = await UIApplication.shared.open(URL(string: "retroarch://start")!)
+                if !opened { await playSessions.cancel() }
+                else if !record.launcherGameID.isEmpty { await launcher.recordLocalLaunch(gameID: record.launcherGameID) }
             }
         } else {
             do {
@@ -342,11 +347,40 @@ actor PocketRAClient {
         if sent { await launcher.refresh() }
         runtimeStatus = errors.isEmpty ? "Horas lidas dos logs do RetroArch e salvas neste iPhone. Pendências serão enviadas com o app aberto na rede do PC." : errors.joined(separator: "\n")
     }
+    private func beginPlaySession(_ game: PocketClassic) async {
+        do { try await runtime.prepare(game, allGames: games) }
+        catch { runtimeStatus = "A sessão será aberta, mas o contador preciso não pôde ser preparado: \(error.localizedDescription)" }
+        do { try await playSessions.begin(game) }
+        catch { runtimeStatus = "O jogo será aberto, mas a sessão local não pôde ser registrada: \(error.localizedDescription)" }
+    }
+    func notePlaySessionBackgrounded() async {
+        do { try await playSessions.markBackgrounded() }
+        catch { runtimeStatus = "A sessão abriu, mas o instante de início não pôde ser salvo: \(error.localizedDescription)" }
+    }
+    func finishPlaySession(launcher: AppStore) async {
+        do {
+            guard let finished = try await playSessions.finish() else { return }
+            let exactLogsConfigured = try await runtime.configured()
+            if !exactLogsConfigured {
+                _ = try await runtime.creditEstimated(finished.session.gameID, filename: finished.session.filename, seconds: finished.seconds)
+            }
+            await reloadRuntime()
+            await syncHours(launcher: launcher)
+            if !exactLogsConfigured {
+                runtimeStatus = "Sessão automática registrada: \(finished.seconds / 60)min \(finished.seconds % 60)s. Autorize os logs do RetroArch para usar o tempo exato do emulador."
+            }
+        } catch {
+            runtimeStatus = "Não foi possível concluir a sessão automática: \(error.localizedDescription)"
+        }
+    }
     func launch(_ game: PocketClassic, launcher: AppStore) async {
-        do { try await runtime.prepare(game, allGames: games); await syncHours(launcher: launcher) }
-        catch { runtimeStatus = "O jogo pode abrir, mas a medição não foi preparada: \(error.localizedDescription)" }
+        await beginPlaySession(game)
         guard let url = PocketRules.launchURL(game.filename) else { return }
-        UIApplication.shared.open(url) { opened in if !opened { Task { @MainActor in self.message = "Instale o RetroArch 1.22.2 ou posterior. Importe e execute a ROM dentro dele primeiro." } } }
+        let opened = await UIApplication.shared.open(url)
+        if !opened {
+            await playSessions.cancel()
+            message = "Instale o RetroArch 1.22.2 ou posterior. Importe e execute a ROM dentro dele primeiro."
+        } else if !game.launcherGameID.isEmpty { await launcher.recordLocalLaunch(gameID: game.launcherGameID) }
     }
     func importFiles(_ urls: [URL]) async {
         guard loaded else { message = "O catálogo não pôde ser aberto. Não vamos sobrescrever seus dados."; return }
@@ -527,7 +561,7 @@ struct PocketGameView: View {
                 }
                 BrumSectionLabel(text: "HORAS OFFLINE")
                 Text(pocket.runtimeSummary(id)).font(.subheadline)
-                Text("Depois de jogar, use Close Content no RetroArch e volte aqui. Só contabilizamos o tempo registrado pelo emulador, não o tempo que ele ficou aberto em outro aplicativo.").font(.caption).foregroundStyle(BrumTheme.muted)
+                Text("Depois de jogar, use Close Content no RetroArch e volte aqui. Com a pasta de logs autorizada, usamos o tempo preciso do emulador. Sem ela, registramos como contingência o intervalo em que o RetroArch ficou em primeiro plano.").font(.caption).foregroundStyle(BrumTheme.muted)
                 Button("ATUALIZAR HORAS E CONQUISTAS") { Task { await pocket.sync(launcher: launcher, force: true) } }.disabled(pocket.busy)
                 if pocket.runtimeRecords.first(where: { $0.id == id })?.counterReset == true {
                     Button("REESTABELECER PONTO DE PARTIDA DO LOG") { Task { await pocket.rebaseline(id) } }
@@ -612,8 +646,8 @@ struct PocketSetupView: View {
                 Text("Em CLASSICS Everywhere, as ROMs de plataformas identificáveis abrem diretamente com o núcleo compatível. Atualizar vínculo continua disponível para formatos ambíguos e jogos já organizados em playlists. Para atualizar o PC, vincule o mesmo jogo e use a mesma conta; o launcher deve estar atualizado, aberto e na rede local. Não copiamos ROMs nem saves para o PC.")
             }
             Section("5 · Horas offline do RetroArch") {
-                Text("No RetroArch: Settings → Playlists → Save runtime log (aggregate): ON. Em Settings → Directory → Runtime Logs, confira a pasta usada. Feche o conteúdo após jogar para gravar o log.")
-                Text("Selecione essa pasta no app Arquivos abaixo. Use os logs agregados (.lrtl), não pastas de um núcleo. A permissão é somente para leitura; não alteramos o emulador, saves ou ROMs.")
+                Text("Recomendado para tempo preciso: no RetroArch, use Settings → Playlists → Save runtime log (aggregate): ON. Em Settings → Directory → Runtime Logs, confira a pasta usada e feche o conteúdo após jogar.")
+                Text("Selecione essa pasta no app Arquivos abaixo. Use os logs agregados (.lrtl), não pastas de um núcleo. Sem essa autorização, o BRUMCLASSICS registra automaticamente o período entre abrir o RetroArch e voltar ao app; esse tempo é uma contingência e pode incluir pausas no emulador.")
                 Button(pocket.runtimeConfigured ? "REAUTORIZAR PASTA DE LOGS" : "AUTORIZAR PASTA DE LOGS") { choosingRuntime = true }
                 Text("Antes da primeira sessão offline, vincule cada jogo ao mesmo CLASSICS do PC e inicie-o uma vez pelo BRUMCLASSICS com o launcher conectado. Isso registra o ponto de partida sem duplicar horas da conta. Horas antigas do emulador não são importadas automaticamente.")
                 Text("Ao voltar à rede, mantenha este app aberto e o launcher ligado. O envio é automático e tolera novas tentativas. O iOS não permite garantir sincronização com o app encerrado. Sem internet, conquistas oficiais não são garantidas; tempo local e conquistas são independentes.")

@@ -2,6 +2,62 @@ import Foundation
 
 struct PocketTimeReceipt: Decodable { let ok: Bool; let acceptedSeconds: Int }
 
+struct PocketPlaySession: Codable, Equatable {
+    let gameID: UUID
+    let filename: String
+    let launchedAt: Date
+    var backgroundedAt: Date?
+}
+
+enum PocketSessionRules {
+    static let maximumDuration = 24 * 60 * 60
+
+    static func elapsed(_ session: PocketPlaySession, returnedAt: Date) -> Int? {
+        guard let backgroundedAt = session.backgroundedAt else { return nil }
+        let seconds = Int(returnedAt.timeIntervalSince(backgroundedAt).rounded(.down))
+        guard seconds > 0, seconds <= maximumDuration else { return nil }
+        return seconds
+    }
+}
+
+actor PocketPlaySessionFiles {
+    private let file: URL
+
+    init(root: URL? = nil) {
+        let directory = root ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("ClassicsEverywhere", isDirectory: true)
+        file = directory.appendingPathComponent("active-play-session.json")
+    }
+
+    func begin(_ game: PocketClassic, now: Date = Date()) throws {
+        let session = PocketPlaySession(gameID: game.id, filename: game.filename, launchedAt: now, backgroundedAt: nil)
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(session).write(to: file, options: [.atomic, .completeFileProtectionUnlessOpen])
+    }
+
+    func markBackgrounded(now: Date = Date()) throws {
+        guard FileManager.default.fileExists(atPath: file.path) else { return }
+        var session = try JSONDecoder().decode(PocketPlaySession.self, from: Data(contentsOf: file))
+        if session.backgroundedAt == nil {
+            session.backgroundedAt = now
+            try JSONEncoder().encode(session).write(to: file, options: [.atomic, .completeFileProtectionUnlessOpen])
+        }
+    }
+
+    func finish(returnedAt: Date = Date()) throws -> (session: PocketPlaySession, seconds: Int)? {
+        guard FileManager.default.fileExists(atPath: file.path) else { return nil }
+        let session = try JSONDecoder().decode(PocketPlaySession.self, from: Data(contentsOf: file))
+        guard let seconds = PocketSessionRules.elapsed(session, returnedAt: returnedAt) else {
+            if session.backgroundedAt != nil { try? FileManager.default.removeItem(at: file) }
+            return nil
+        }
+        try FileManager.default.removeItem(at: file)
+        return (session, seconds)
+    }
+
+    func cancel() { try? FileManager.default.removeItem(at: file) }
+}
+
 struct PocketRuntimeRecord: Codable, Equatable, Identifiable {
     var id: UUID
     var streamID = UUID().uuidString
@@ -114,13 +170,32 @@ actor PocketRuntimeFiles {
         let log = try PocketRuntimeRules.logName(game.filename).lowercased()
         guard try allGames.filter({ try PocketRuntimeRules.logName($0.filename).lowercased() == log }).count == 1 else { throw PocketError.message("Duas ROMs usam o mesmo nome de log. Renomeie os arquivos no catálogo e no RetroArch para distinguir as horas.") }
         guard !state.records.contains(where: { $0.id == game.id }) else { return }
-        let baseline = try observed(game.filename) ?? 0
+        let baseline = state.bookmark == nil ? 0 : try observed(game.filename) ?? 0
         var next = state
         next.records.append(PocketRuntimeRecord(id: game.id, filename: game.filename, lastObservedSeconds: baseline))
         try commit(next)
     }
+    func creditEstimated(_ id: UUID, filename: String, seconds: Int) throws -> Bool {
+        _ = try load()
+        guard state.bookmark == nil, seconds > 0, seconds <= PocketSessionRules.maximumDuration else { return false }
+        var next = state
+        if let index = next.records.firstIndex(where: { $0.id == id }) {
+            guard next.records[index].filename.caseInsensitiveCompare(filename) == .orderedSame else {
+                throw PocketError.message("A sessão pertence a outro arquivo. O histórico anterior foi preservado.")
+            }
+            next.records[index].creditedSeconds += seconds
+        } else {
+            next.records.append(PocketRuntimeRecord(id: id, filename: filename, lastObservedSeconds: 0, creditedSeconds: seconds))
+        }
+        try commit(next)
+        return true
+    }
     func collect() throws -> [String] {
-        _ = try load(); var next = state; var errors: [String] = []
+        _ = try load()
+        // Without an authorized log folder, elapsed time is recorded by the
+        // persistent play-session fallback instead of becoming a permanent error.
+        guard state.bookmark != nil else { return [] }
+        var next = state; var errors: [String] = []
         for index in next.records.indices {
             do {
                 guard let seconds = try observed(next.records[index].filename) else { continue }
