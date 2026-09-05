@@ -273,8 +273,7 @@ actor PocketRAClient {
         if retroArchGame(for: rom) != nil {
             await launch(record, launcher: launcher)
         } else {
-            retroArchLibraryStatus = "Este formato não identifica sozinho o sistema. Organize a ROM em uma playlist do RetroArch e sincronize as playlists."
-            requestRetroArchLibrary()
+            message = "O formato .\((rom.filename as NSString).pathExtension) pode pertencer a mais de um console. Confirme o sistema e o núcleo numa playlist do RetroArch e use Sincronizar playlists nesta tela. Nenhum jogo foi iniciado."
         }
     }
     func launchRetroArch(_ game: RetroArchLibraryGame, launcher: AppStore) async {
