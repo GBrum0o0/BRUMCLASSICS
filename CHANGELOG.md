@@ -9,6 +9,7 @@
 - A interface distingue o uso normal do RetroArch da App Store da consulta e abertura direta disponíveis somente na edição compatível.
 - O vínculo técnico antigo do RetroArch é invalidado uma vez, impedindo que um cache anterior sobreviva à reinstalação do emulador e repita a URL sem permissão; ROMs, capas, horas e conquistas não são apagadas.
 - Adicionado teste automatizado que comprova que a cópia é legível e que o arquivo de origem é preservado.
+- O IPA sem assinatura passa a ser anexado a uma versão pessoal estável no GitHub, evitando a expiração do artefato do Actions e permitindo que o aviso de atualização abra o download correto.
 
 ## iOS 0.7.1 — entrega autorizada ao RetroArch
 

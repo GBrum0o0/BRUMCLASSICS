@@ -2,7 +2,7 @@
   "version": "0.7.2",
   "build": 13,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/actions/workflows/build-ios-personal.yml",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.7.2",
   "notes": [
     "Corrige definitivamente o aviso de falta de permissão ao enviar ROMs de Downloads, iCloud Drive ou outros provedores.",
     "Antes de abrir o compartilhamento, o BRUMCLASSICS cria uma cópia temporária legível dentro do próprio aplicativo.",

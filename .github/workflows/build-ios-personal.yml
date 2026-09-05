@@ -8,7 +8,7 @@ on:
       - ".github/workflows/build-ios-personal.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-unsigned-ipa:
@@ -77,3 +77,16 @@ jobs:
             ios/build/IPA-VALIDATION.json
           retention-days: 30
           if-no-files-found: error
+
+      - name: Publicar versão pessoal para instalação
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(python3 -c 'import json; print(json.load(open("ios/ios-update.json", encoding="utf-8"))["version"])')
+          TAG="ios-v${VERSION}"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "BRUMCLASSICS MÓVEL iOS ${VERSION}" --notes-file ios/RETROARCH-COMPATIVEL.md --prerelease
+          fi
+          gh release upload "$TAG" ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa.sha256 ios/build/IPA-VALIDATION.json --clobber
