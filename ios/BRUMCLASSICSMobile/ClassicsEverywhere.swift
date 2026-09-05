@@ -275,7 +275,7 @@ actor PocketRAClient {
                 }
             } else {
                 message = "A ROM já foi importada. Como este formato pode pertencer a mais de um sistema, escolha o jogo na playlist do RetroArch; ele não será importado novamente."
-                UIApplication.shared.open(URL(string: "retroarch://start")!)
+                await UIApplication.shared.open(URL(string: "retroarch://start")!)
             }
         } else {
             do {
