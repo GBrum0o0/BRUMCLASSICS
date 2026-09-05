@@ -1,6 +1,6 @@
 # RetroArch compatível com o BRUMCLASSICS
 
-O BRUMCLASSICS MÓVEL 0.7.1 verifica as ROMs da pasta autorizada. No primeiro uso de cada arquivo, **CLASSICS Everywhere** abre a folha de compartilhamento para o iOS entregar a ROM ao RetroArch com permissão. Depois que a biblioteca é confirmada, os próximos toques usam a identidade exata da playlist.
+O BRUMCLASSICS MÓVEL 0.7.2 verifica as ROMs da pasta autorizada. No primeiro uso de cada arquivo, **CLASSICS Everywhere** cria uma cópia temporária legível dentro do próprio aplicativo e abre a folha de compartilhamento para entregá-la ao RetroArch. A ROM original é preservada. Depois que a biblioteca é confirmada na edição compatível, os próximos toques usam a identidade exata da playlist.
 
 ## Versão necessária
 
@@ -22,7 +22,7 @@ O binário local foi testado como ZIP/IPA e contém os marcadores de consulta da
 
 ## Uso
 
-1. Instale o RetroArch compatível no iPhone.
+1. Instale o RetroArch no iPhone. A versão da App Store recebe a ROM normalmente; use a edição compatível abaixo se quiser consulta da biblioteca e abertura direta pelo cartão.
 2. Em **Perfil → Configurações do app → CLASSICS**, toque **Selecionar pasta de ROMs** e autorize Downloads, iCloud Drive ou outra pasta disponível no app Arquivos.
 3. No BRUMCLASSICS, abra **CLASSICS Everywhere** e toque no jogo. Se ele ainda não estiver na biblioteca do RetroArch, escolha **RetroArch** na folha de compartilhamento.
 4. Aguarde o RetroArch receber e importar o arquivo. Se necessário, associe o núcleo correto dentro do emulador.
@@ -32,7 +32,7 @@ O binário local foi testado como ZIP/IPA e contém os marcadores de consulta da
 
 ## Limites do iOS
 
-Dois aplicativos não compartilham automaticamente permissões de pasta. Enviar somente o caminho da ROM fazia o RetroArch exibir “this file couldn't be opened because you don't have permission to view”. A folha de compartilhamento transfere o acesso ao arquivo pela rota prevista pelo iOS. O RetroArch cria sua própria cópia no sandbox; a origem escolhida pelo usuário permanece intacta.
+Dois aplicativos não compartilham automaticamente permissões de pasta. Enviar somente o caminho da ROM fazia o RetroArch exibir “this file couldn't be opened because you don't have permission to view”. Manter apenas a autorização da pasta aberta também pode falhar com provedores de documentos. Por isso, a 0.7.2 cria primeiro uma cópia temporária dentro do sandbox do BRUMCLASSICS e compartilha essa cópia legível. O RetroArch cria a própria cópia; a origem escolhida pelo usuário permanece intacta.
 
 Para uso fora de casa, a ROM e a cópia importada precisam estar no telefone. Formatos como ISO, CHD, ZIP, CUE, M3U, GDI, RVZ e WAD podem exigir seleção manual do núcleo, BIOS ou organização da playlist dentro do RetroArch.
 

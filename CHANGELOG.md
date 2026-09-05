@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## iOS 0.7.2 — cópia local autorizada para o RetroArch
+
+- Corrige o caso ainda reproduzido no RetroArch reinstalado pela App Store: a URL protegida da pasta não é mais entregue diretamente a outro aplicativo.
+- O BRUMCLASSICS lê a ROM enquanto possui autorização e cria uma cópia temporária, privada e excluída do backup.
+- A folha de compartilhamento entrega essa cópia comum ao RetroArch; a ROM original permanece no lugar e não é alterada.
+- Arquivos temporários antigos são removidos automaticamente.
+- A interface distingue o uso normal do RetroArch da App Store da consulta e abertura direta disponíveis somente na edição compatível.
+- O vínculo técnico antigo do RetroArch é invalidado uma vez, impedindo que um cache anterior sobreviva à reinstalação do emulador e repita a URL sem permissão; ROMs, capas, horas e conquistas não são apagadas.
+- Adicionado teste automatizado que comprova que a cópia é legível e que o arquivo de origem é preservado.
+
 ## iOS 0.7.1 — entrega autorizada ao RetroArch
 
 - Corrige “this file couldn't be opened because you don't have permission to view” ao tocar numa ROM externa.

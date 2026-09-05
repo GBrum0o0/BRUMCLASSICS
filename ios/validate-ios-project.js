@@ -35,10 +35,11 @@ for (const marker of ['PocketRuntimeFiles', '/v1/classics/playtime', 'acknowledg
 for (const marker of ['RetroArchLibraryRules.queryURL', 'RetroArchLibraryRules', 'receiveRetroArchLibrary', 'brumclassics', 'titleId']) {
   if (!source.includes(marker)) throw new Error(`Biblioteca RetroArch incompleta: ${marker}`);
 }
+if (!source.includes('retroarch-library-v2.json')) throw new Error('Cache antigo de abertura direta ainda pode sobreviver à reinstalação do RetroArch.');
 for (const marker of ['ROMFolderScanner', 'ROMFolderAccess', 'choose-rom-folder', 'romFolderGames', 'refreshROMFolder']) {
   if (!source.includes(marker)) throw new Error(`Pasta de ROMs incompleta: ${marker}`);
 }
-for (const marker of ['ROMTitleRules.clean', 'beginShare(for game:', 'pendingROMShare', 'completionWithItemsHandler']) {
+for (const marker of ['ROMTitleRules.clean', 'beginShare(for game:', 'ROMExportStager.stage', 'RetroArchExports', 'pendingROMShare', 'completionWithItemsHandler']) {
   if (!source.includes(marker)) throw new Error(`Importação autorizada ou metadados de ROM incompletos: ${marker}`);
 }
 if (source.includes('components.host = "topshelf"')) throw new Error('Caminho externo não pode ser enviado ao RetroArch sem transferir a permissão do iOS.');

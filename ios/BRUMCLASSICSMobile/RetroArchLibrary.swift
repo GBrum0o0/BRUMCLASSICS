@@ -61,7 +61,10 @@ actor RetroArchLibraryFiles {
     private let file: URL
     init(root: URL? = nil) {
         let directory = root ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("ClassicsEverywhere", isDirectory: true)
-        file = directory.appendingPathComponent("retroarch-library.json")
+        // v2 intentionally invalidates links recorded before ROMs were staged in
+        // our sandbox. Those stale links survive a RetroArch reinstall and can
+        // make the App Store build receive the old inaccessible path again.
+        file = directory.appendingPathComponent("retroarch-library-v2.json")
     }
     func load() throws -> [RetroArchLibraryGame] {
         guard FileManager.default.fileExists(atPath: file.path) else { return [] }

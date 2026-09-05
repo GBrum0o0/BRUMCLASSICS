@@ -1,6 +1,6 @@
 # BRUMWORLD · CLASSICS Everywhere
 
-> Atualização iOS 0.7.1: ao tocar numa ROM ainda ausente no RetroArch, escolha o emulador na folha de compartilhamento do iOS. Aguarde a importação, volte ao BRUMCLASSICS e toque **Confirmar importação**. O cartão mudará para **Jogar · RetroArch**. Esse fluxo substitui o envio direto do caminho, que não transferia a permissão entre aplicativos.
+> Atualização iOS 0.7.2: ao tocar numa ROM ainda ausente no RetroArch, o BRUMCLASSICS prepara uma cópia temporária legível e abre a folha de compartilhamento. Escolha RetroArch e selecione o núcleo se solicitado. A versão da App Store recebe o jogo; **Confirmar no compatível** e **Jogar · RetroArch** exigem a edição compatível. A ROM original permanece intacta.
 
 ## 1. Instalar
 

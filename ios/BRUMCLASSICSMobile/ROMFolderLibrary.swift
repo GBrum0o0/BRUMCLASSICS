@@ -76,10 +76,33 @@ enum ROMFolderScanner {
     }
 }
 
+enum ROMExportStager {
+    static func stage(source: URL, filename: String, root: URL, id: UUID) throws -> URL {
+        let directory = root.appendingPathComponent(id.uuidString, isDirectory: true)
+        let destination = directory.appendingPathComponent(filename, isDirectory: false)
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: source, to: destination)
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = true
+            try? destination.setResourceValues(values)
+            return destination
+        } catch {
+            try? FileManager.default.removeItem(at: directory)
+            throw error
+        }
+    }
+}
+
 actor ROMFolderAccess {
     private let bookmarkKey = "brumclassics-ios-rom-folder-bookmark-v1"
     private let nameKey = "brumclassics-ios-rom-folder-name-v1"
     private var activeShares: [UUID: (root: URL, accessing: Bool)] = [:]
+
+    private var exportRoot: URL {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("RetroArchExports", isDirectory: true)
+    }
 
     var configured: Bool { UserDefaults.standard.data(forKey: bookmarkKey) != nil }
     var displayName: String { UserDefaults.standard.string(forKey: nameKey) ?? "Downloads" }
@@ -133,7 +156,22 @@ actor ROMFolderAccess {
             if accessing { root.stopAccessingSecurityScopedResource() }
             throw PocketError.message("A ROM não está mais disponível na pasta escolhida.")
         }
-        let ticket = ROMShareTicket(id: UUID(), url: file, title: game.title)
+        // A security-scoped permission belongs only to BRUMCLASSICS. Passing the
+        // provider URL directly makes another app receive a path it cannot read.
+        // Stage a private copy first so UIActivityViewController can vend a normal
+        // document URL to RetroArch, including the App Store build.
+        let shareID = UUID()
+        let exportDirectory = exportRoot.appendingPathComponent(shareID.uuidString, isDirectory: true)
+        let exportedFile: URL
+        do {
+            try removeExpiredExports()
+            exportedFile = try ROMExportStager.stage(source: file, filename: game.filename, root: exportRoot, id: shareID)
+        } catch {
+            try? FileManager.default.removeItem(at: exportDirectory)
+            if accessing { root.stopAccessingSecurityScopedResource() }
+            throw PocketError.message("Não foi possível preparar uma cópia autorizada da ROM. Se ela estiver no iCloud, baixe o arquivo no iPhone e tente novamente.")
+        }
+        let ticket = ROMShareTicket(id: shareID, url: exportedFile, title: game.title)
         activeShares[ticket.id] = (root, accessing)
         return ticket
     }
@@ -141,5 +179,21 @@ actor ROMFolderAccess {
     func finishShare(_ id: UUID) {
         guard let share = activeShares.removeValue(forKey: id) else { return }
         if share.accessing { share.root.stopAccessingSecurityScopedResource() }
+    }
+
+    private func removeExpiredExports(now: Date = Date()) throws {
+        let manager = FileManager.default
+        try manager.createDirectory(at: exportRoot, withIntermediateDirectories: true)
+        let children = try manager.contentsOfDirectory(
+            at: exportRoot,
+            includingPropertiesForKeys: [.contentModificationDateKey],
+            options: [.skipsHiddenFiles]
+        )
+        let expiration = now.addingTimeInterval(-24 * 60 * 60)
+        for child in children {
+            let date = try? child.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+            guard let date else { try? manager.removeItem(at: child); continue }
+            if date < expiration { try? manager.removeItem(at: child) }
+        }
     }
 }

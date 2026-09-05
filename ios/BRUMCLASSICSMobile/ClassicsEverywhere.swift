@@ -96,7 +96,7 @@ actor PocketRAClient {
         var url = URLComponents(string: "https://retroachievements.org/API/API_GetGameInfoAndUserProgress.php")!
         url.queryItems = [URLQueryItem(name: "y", value: key), URLQueryItem(name: "u", value: username), URLQueryItem(name: "g", value: String(gameID))]
         var request = URLRequest(url: url.url!, timeoutInterval: 20)
-        request.setValue("BRUMCLASSICS-iOS/0.7.1", forHTTPHeaderField: "User-Agent")
+        request.setValue("BRUMCLASSICS-iOS/0.7.2", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200, data.count <= 12 * 1024 * 1024 else { throw PocketError.message("RetroAchievements indisponível ou credencial inválida. Tente mais tarde; o progresso salvo foi mantido.") }
         return try PocketProgress.decode(data, username: username, expectedID: gameID)
@@ -272,7 +272,7 @@ actor PocketRAClient {
         await romFolder.finishShare(ticket.id)
         if pendingROMShare?.id == ticket.id { pendingROMShare = nil }
         if let error { message = "Não foi possível entregar a ROM ao RetroArch: \(error.localizedDescription)" }
-        else if completed { romFolderStatus = "Arquivo entregue. Depois que o RetroArch concluir a importação, volte ao BRUMCLASSICS e toque CONFIRMAR IMPORTAÇÃO." }
+        else if completed { romFolderStatus = "Cópia autorizada entregue. No RetroArch, escolha o núcleo se ele solicitar. Depois volte ao BRUMCLASSICS. A abertura direta exige o RetroArch compatível; a versão da App Store pode ser aberta normalmente pelo botão ABRIR RETROARCH." }
         else { romFolderStatus = "Importação cancelada. A ROM original foi preservada." }
     }
     func launchRetroArch(_ game: RetroArchLibraryGame, launcher: AppStore) async {
@@ -397,11 +397,18 @@ struct ClassicsEverywhereView: View {
             }
             if pocket.romFolderGames.contains(where: { pocket.retroArchGame(for: $0) == nil }) {
                 BrumSectionLabel(text: "PRIMEIRA IMPORTAÇÃO")
-                Text("Depois de compartilhar a ROM com o RetroArch e concluir a importação nele, toque abaixo. O RetroArch abre por um instante, devolve a biblioteca e retorna ao BRUMCLASSICS. Isso acontece apenas para confirmar o vínculo.")
+                Text("O BRUMCLASSICS envia uma cópia temporária autorizada, sem mover sua ROM original. No RetroArch da App Store, escolha o núcleo e jogue normalmente. O vínculo e a abertura direta pelo cartão exigem a versão compatível indicada nas configurações.")
                     .font(.caption).foregroundStyle(BrumTheme.muted)
-                Button("CONFIRMAR IMPORTAÇÃO") { pocket.requestRetroArchLibrary() }
-                    .buttonStyle(PrimaryButtonStyle())
-                    .accessibilityIdentifier("retroarch-library-refresh")
+                HStack {
+                    Button("ABRIR RETROARCH") {
+                        UIApplication.shared.open(URL(string: "retroarch://start")!) { opened in
+                            if !opened { Task { @MainActor in pocket.message = "RetroArch não encontrado no iPhone." } }
+                        }
+                    }.buttonStyle(PrimaryButtonStyle())
+                    Button("CONFIRMAR NO COMPATÍVEL") { pocket.requestRetroArchLibrary() }
+                        .buttonStyle(PrimaryButtonStyle())
+                        .accessibilityIdentifier("retroarch-library-refresh")
+                }
             }
             if !pocket.status.isEmpty { Text(pocket.status).font(.caption).foregroundStyle(BrumTheme.muted) }
             if !pocket.romFolderStatus.isEmpty { Text(pocket.romFolderStatus).font(.caption).foregroundStyle(BrumTheme.muted) }

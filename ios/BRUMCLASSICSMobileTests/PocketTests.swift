@@ -60,6 +60,16 @@ final class PocketTests: XCTestCase {
         let url = URL(string: "brumclassics://retroarch?games=\(encoded)")!
         XCTAssertTrue(try RetroArchLibraryRules.decode(url).isEmpty)
     }
+    func testOldRetroArchLinkCacheIsNotReusedAfterPermissionMigration() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let stale = [RetroArchLibraryGame(titleId: "Pokemon.gba", titleName: "Pokemon", filename: "Pokemon.gba", gameId: "gba:1", developer: nil, version: nil, system: nil, coreName: nil)]
+        try JSONEncoder().encode(stale).write(to: root.appendingPathComponent("retroarch-library.json"))
+        let files = RetroArchLibraryFiles(root: root)
+        let loaded = try await files.load()
+        XCTAssertTrue(loaded.isEmpty)
+    }
     func testROMFolderShowsOnlyRealSupportedFilesAndOmitsAmbiguousDuplicates() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: root.appendingPathComponent("nested"), withIntermediateDirectories: true)
@@ -71,6 +81,21 @@ final class PocketTests: XCTestCase {
         let result = try ROMFolderScanner.scan(root)
         XCTAssertEqual(result.games.map(\.filename), ["Pokemon.gba"])
         XCTAssertEqual(result.duplicateFilenames, 2)
+    }
+    func testRetroArchShareStagesReadablePrivateCopyAndPreservesOriginal() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let sourceRoot = root.appendingPathComponent("source", isDirectory: true)
+        let exportRoot = root.appendingPathComponent("exports", isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceRoot, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = sourceRoot.appendingPathComponent("Pokemon Fire Red.gba")
+        let bytes = Data("synthetic test ROM; not a game".utf8)
+        try bytes.write(to: source)
+        let staged = try ROMExportStager.stage(source: source, filename: source.lastPathComponent, root: exportRoot, id: UUID())
+        XCTAssertTrue(staged.path.hasPrefix(exportRoot.path + "/"))
+        XCTAssertNotEqual(staged.standardizedFileURL, source.standardizedFileURL)
+        XCTAssertEqual(try Data(contentsOf: staged), bytes)
+        XCTAssertEqual(try Data(contentsOf: source), bytes)
     }
     func testSceneROMNameBecomesAReadableLibraryTitle() {
         XCTAssertEqual(ROMTitleRules.clean("1636 - Pokemon Fire Red (U)(Squirrels).gba"), "Pokemon Fire Red")

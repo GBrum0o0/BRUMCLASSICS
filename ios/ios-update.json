@@ -1,11 +1,14 @@
 {
-  "version": "0.7.1",
-  "build": 12,
+  "version": "0.7.2",
+  "build": 13,
   "minimumIos": "16.0",
   "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/actions/workflows/build-ios-personal.yml",
   "notes": [
-    "Corrige o aviso de falta de permissão ao tocar numa ROM localizada fora do RetroArch.",
-    "No primeiro uso, o iOS entrega o arquivo ao RetroArch pela folha de compartilhamento; depois da confirmação, os próximos toques abrem o jogo diretamente.",
+    "Corrige definitivamente o aviso de falta de permissão ao enviar ROMs de Downloads, iCloud Drive ou outros provedores.",
+    "Antes de abrir o compartilhamento, o BRUMCLASSICS cria uma cópia temporária legível dentro do próprio aplicativo.",
+    "A cópia é entregue pela folha oficial do iOS e a ROM original continua intacta na pasta escolhida.",
+    "O RetroArch da App Store pode receber e executar a ROM; consulta da biblioteca e abertura direta continuam exclusivas da edição compatível.",
+    "O vínculo técnico antigo é descartado uma vez para não sobreviver à reinstalação do RetroArch e repetir o caminho sem permissão.",
     "A pasta original pode continuar em Downloads, iCloud Drive ou outro local autorizado pelo usuário.",
     "CLASSICS Everywhere substitui o nome repetido anterior.",
     "Nomes de arquivos de ROM são limpos antes de procurar o título oficial e a capa sincronizada do PC.",
