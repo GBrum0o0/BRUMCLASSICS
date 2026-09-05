@@ -2,6 +2,13 @@ import XCTest
 @testable import BRUMCLASSICSMobile
 
 final class PocketRuntimeTests: XCTestCase {
+    func testReceiptWithoutGameIDRemainsCompatibleWithOlderLauncher() throws {
+        let receipt = try JSONDecoder().decode(PocketTimeReceipt.self, from: Data(#"{"ok":true,"acceptedSeconds":90}"#.utf8))
+        XCTAssertTrue(receipt.ok)
+        XCTAssertEqual(receipt.acceptedSeconds, 90)
+        XCTAssertNil(receipt.gameId)
+    }
+
     func testFallbackSessionRequiresRealBackgroundTransitionAndPersistsIt() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -78,7 +85,7 @@ final class PocketRuntimeTests: XCTestCase {
         let baseline = try await store.load()
         XCTAssertEqual(baseline.first?.lastObservedSeconds, 0)
         let bound = try await store.bind(game.id, gameID: "classic:1", fingerprint: "pc-test")
-        try await store.acknowledge(game.id, sentSeconds: 0, receipt: PocketTimeReceipt(ok: true, acceptedSeconds: 0))
+        try await store.acknowledge(game.id, sentSeconds: 0, receipt: PocketTimeReceipt(ok: true, acceptedSeconds: 0, gameId: "classic:1"))
         try Data(#"{"runtime":"3:00:00"}"#.utf8).write(to: logs.appendingPathComponent("test.lrtl"))
         let errors = try await store.collect(); XCTAssertTrue(errors.isEmpty)
         let restarted = PocketRuntimeFiles(root: root.appendingPathComponent("ledger"))
@@ -87,7 +94,7 @@ final class PocketRuntimeTests: XCTestCase {
         XCTAssertEqual(records.first?.creditedSeconds, 10800)
         XCTAssertEqual(records.first?.acknowledgedSeconds, 0)
         _ = try await restarted.collect()
-        try await restarted.acknowledge(game.id, sentSeconds: 10800, receipt: PocketTimeReceipt(ok: true, acceptedSeconds: 10800))
+        try await restarted.acknowledge(game.id, sentSeconds: 10800, receipt: PocketTimeReceipt(ok: true, acceptedSeconds: 10800, gameId: "classic:1"))
         let confirmed = try await restarted.load()
         XCTAssertEqual(confirmed.first?.creditedSeconds, 10800)
         XCTAssertEqual(confirmed.first?.acknowledgedSeconds, 10800)

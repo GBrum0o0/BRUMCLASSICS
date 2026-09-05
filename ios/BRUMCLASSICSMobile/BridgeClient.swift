@@ -89,8 +89,11 @@ actor BridgeClient {
         let _: [String: Bool] = try await request(path: "/v1/classics/achievements/sync", method: "POST", body: body)
     }
 
-    func syncPocketTime(_ record: PocketRuntimeRecord) async throws -> PocketTimeReceipt {
-        let body = try JSONSerialization.data(withJSONObject: ["gameId": record.launcherGameID, "streamId": record.streamID, "totalSeconds": record.creditedSeconds])
+    func syncPocketTime(_ record: PocketRuntimeRecord, game: PocketClassic) async throws -> PocketTimeReceipt {
+        var payload: [String: Any] = ["gameId": record.launcherGameID, "streamId": record.streamID,
+            "filename": record.filename, "title": game.title, "totalSeconds": record.creditedSeconds]
+        if let playedAt = game.lastPlayedAt { payload["playedAt"] = ISO8601DateFormatter().string(from: playedAt) }
+        let body = try JSONSerialization.data(withJSONObject: payload)
         return try await request(path: "/v1/classics/playtime", method: "POST", body: body)
     }
 

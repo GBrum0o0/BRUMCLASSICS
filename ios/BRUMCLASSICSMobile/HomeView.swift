@@ -29,7 +29,9 @@ struct HomeView: View {
                     Button { selection = 3 } label: { CompanionCard(game: active) }.buttonStyle(.plain)
                 }
                 if showPocketAsLatest, let lastPocketGame {
-                    NavigationLink { PocketGameView(id: lastPocketGame.id) } label: { PocketFeaturedGameCard(game: lastPocketGame) }.buttonStyle(.plain)
+                    NavigationLink { PocketGameView(id: lastPocketGame.id) } label: {
+                        PocketFeaturedGameCard(game: lastPocketGame, launcherGame: store.snapshot.games.first { $0.id == lastPocketGame.launcherGameID })
+                    }.buttonStyle(.plain)
                 } else if let lastPlayed { FeaturedGameCard(game: lastPlayed) }
                 NavigationLink { BCardLibraryView() } label: { SettingsRow(icon: "rectangle.portrait.on.rectangle.portrait", title: "B-CARD", detail: "Seus jogos instalados · Jogos e CLASSICS") }
                 NavigationLink { ClassicsEverywhereView() } label: { SettingsRow(icon: "gamecontroller", title: "CLASSICS Everywhere", detail: "Suas ROMs locais · toque para jogar") }.accessibilityIdentifier("classics-everywhere-link")
@@ -48,13 +50,21 @@ struct HomeView: View {
 
 struct PocketFeaturedGameCard: View {
     let game: PocketClassic
+    let launcherGame: Game?
+    @State private var artworkImage: UIImage?
     var body: some View {
         BrumCard {
             HStack(spacing: 18) {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(BrumTheme.surface)
-                    .overlay(Image(systemName: "gamecontroller.fill").font(.system(size: 38)).foregroundStyle(BrumTheme.primary))
-                    .frame(width: 112, height: 158)
+                Group {
+                    if let launcherGame, !launcherGame.artworkPath.isEmpty {
+                        GameCoverView(game: launcherGame, cornerRadius: 8)
+                    } else {
+                        RoundedRectangle(cornerRadius: 8).fill(BrumTheme.surface).overlay {
+                            if let artworkImage { Image(uiImage: artworkImage).resizable().scaledToFill() }
+                            else { ProgressView().tint(BrumTheme.primary) }
+                        }.clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }.frame(width: 112, height: 158)
                 VStack(alignment: .leading, spacing: 9) {
                     Text("ÚLTIMO JOGO JOGADO").font(.caption2.bold()).tracking(1.3).foregroundStyle(BrumTheme.primary)
                     Text(game.title).font(.title2.bold()).foregroundStyle(BrumTheme.text).lineLimit(3)
@@ -63,6 +73,13 @@ struct PocketFeaturedGameCard: View {
                 }
                 Spacer(minLength: 0)
             }
+        }
+        .task(id: game.filename + (launcherGame?.artworkPath ?? "")) {
+            guard launcherGame?.artworkPath.isEmpty != false else { return }
+            let rom = ROMFolderGame(relativePath: game.filename, filename: game.filename, title: game.title, fileSize: 1)
+            let artwork = await ROMArtworkCache.shared.artwork(for: rom)
+            guard !Task.isCancelled else { return }
+            artworkImage = artwork.flatMap { UIImage(contentsOfFile: $0.imageURL.path) }
         }
     }
 }

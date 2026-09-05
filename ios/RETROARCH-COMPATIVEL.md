@@ -1,6 +1,6 @@
 # RetroArch compatível com o BRUMCLASSICS
 
-O BRUMCLASSICS MÓVEL 0.7.5 verifica as ROMs da pasta autorizada. No primeiro uso de cada arquivo, **CLASSICS Everywhere** cria uma cópia temporária legível e abre a folha de compartilhamento. Ao concluir a entrega, grava o vínculo local. Nos próximos toques, formatos reconhecidos abrem diretamente a ROM já copiada em `RetroArch/downloads`, sem importar novamente. O jogo é marcado como recente ao abrir, mesmo sem vínculo com o PC, e a sessão termina automaticamente quando você retorna ao BRUMCLASSICS. A ROM original é preservada.
+O BRUMCLASSICS MÓVEL 0.7.6 verifica as ROMs da pasta autorizada. No primeiro uso de cada arquivo, **CLASSICS Everywhere** cria uma cópia temporária legível e abre a folha de compartilhamento. Ao concluir a entrega, grava o vínculo local. Nos próximos toques, formatos reconhecidos abrem diretamente a ROM já copiada em `RetroArch/downloads`, sem importar novamente. O jogo é marcado como recente ao abrir; ao retornar, a sessão é encerrada e pode ser vinculada ao CLASSICS correspondente no launcher 1.55.4. A capa recente vem do PC ou do cache local. A ROM original é preservada.
 
 ## Versão necessária
 

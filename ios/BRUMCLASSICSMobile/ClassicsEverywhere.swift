@@ -97,7 +97,7 @@ actor PocketRAClient {
         var url = URLComponents(string: "https://retroachievements.org/API/API_GetGameInfoAndUserProgress.php")!
         url.queryItems = [URLQueryItem(name: "y", value: key), URLQueryItem(name: "u", value: username), URLQueryItem(name: "g", value: String(gameID))]
         var request = URLRequest(url: url.url!, timeoutInterval: 20)
-        request.setValue("BRUMCLASSICS-iOS/0.7.5", forHTTPHeaderField: "User-Agent")
+        request.setValue("BRUMCLASSICS-iOS/0.7.6", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200, data.count <= 12 * 1024 * 1024 else { throw PocketError.message("RetroAchievements indisponível ou credencial inválida. Tente mais tarde; o progresso salvo foi mantido.") }
         return try PocketProgress.decode(data, username: username, expectedID: gameID)
@@ -341,11 +341,19 @@ actor PocketRAClient {
         catch { runtimeStatus = error.localizedDescription; return }
         if launcher.connection == .online, let fingerprint = launcher.configuration?.fingerprint {
             for record in runtimeRecords where record.acknowledgedSeconds < record.creditedSeconds {
-                guard let game = games.first(where: { $0.id == record.id }), !game.launcherGameID.isEmpty else { continue }
+                guard var game = games.first(where: { $0.id == record.id }) else { continue }
                 do {
-                    let bound = try await runtime.bind(record.id, gameID: game.launcherGameID, fingerprint: fingerprint)
-                    let receipt = try await launcher.syncPocketTime(bound)
+                    let outgoing = game.launcherGameID.isEmpty ? record : try await runtime.bind(record.id, gameID: game.launcherGameID, fingerprint: fingerprint)
+                    let receipt = try await launcher.syncPocketTime(outgoing, game: game)
+                    let resolvedGameID = game.launcherGameID.isEmpty ? String(receipt.gameId ?? "") : game.launcherGameID
+                    guard !resolvedGameID.isEmpty else { throw PocketError.message("O PC recebeu as horas, mas não confirmou qual CLASSICS corresponde à ROM.") }
+                    let bound = try await runtime.bind(record.id, gameID: resolvedGameID, fingerprint: fingerprint)
                     try await runtime.acknowledge(record.id, sentSeconds: bound.creditedSeconds, receipt: receipt)
+                    if game.launcherGameID.isEmpty {
+                        game.launcherGameID = resolvedGameID
+                        await update(game)
+                        if let date = game.lastPlayedAt { await launcher.recordLocalLaunch(gameID: resolvedGameID, at: date) }
+                    }
                     sent = true
                 } catch { errors.append("\(game.title): \(error.localizedDescription)") }
             }

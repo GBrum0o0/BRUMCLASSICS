@@ -1,6 +1,6 @@
 import Foundation
 
-struct PocketTimeReceipt: Decodable { let ok: Bool; let acceptedSeconds: Int }
+struct PocketTimeReceipt: Decodable { let ok: Bool; let acceptedSeconds: Int; let gameId: String? }
 
 struct PocketPlaySession: Codable, Equatable {
     let gameID: UUID

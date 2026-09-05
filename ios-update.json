@@ -1,9 +1,12 @@
 {
-  "version": "0.7.5",
-  "build": 16,
+  "version": "0.7.6",
+  "build": 17,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.7.5",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.7.6",
   "notes": [
+    "A capa do último CLASSICS agora reutiliza a capa sincronizada do PC ou a arte local já armazenada no iPhone.",
+    "Horas sem vínculo manual passam a enviar nome e arquivo da ROM; o launcher 1.55.4 resolve somente uma correspondência CLASSICS inequívoca e devolve a identidade confirmada.",
+    "Depois da confirmação do PC, o vínculo é salvo no iPhone e horas, jogo recente e capa permanecem associados nas próximas sessões.",
     "Ao iniciar um CLASSICS, inclusive sem vínculo com o PC, o jogo é marcado imediatamente como o mais recente no iPhone.",
     "Ao retornar do RetroArch, a sessão é concluída automaticamente e enviada ao launcher quando ele estiver conectado.",
     "Sem uma pasta de logs autorizada, um cronômetro persistente de contingência registra o período em que o RetroArch ficou em primeiro plano.",

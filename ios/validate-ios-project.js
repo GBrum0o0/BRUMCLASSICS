@@ -35,6 +35,9 @@ for (const marker of ['PocketRuntimeFiles', '/v1/classics/playtime', 'acknowledg
 for (const marker of ['PocketPlaySessionFiles', 'notePlaySessionBackgrounded', 'finishPlaySession', 'creditEstimated', 'recordLocalLaunch']) {
   if (!source.includes(marker)) throw new Error(`Conclusão automática de sessão incompleta: ${marker}`);
 }
+for (const marker of ['"filename": record.filename', '"title": game.title', 'receipt.gameId', 'PocketFeaturedGameCard(game:', 'ROMArtworkCache.shared.artwork']) {
+  if (!source.includes(marker)) throw new Error(`Vínculo, horas ou capa recente incompletos: ${marker}`);
+}
 for (const marker of ['RetroArchLibraryRules.queryURL', 'RetroArchLibraryRules', 'receiveRetroArchLibrary', 'brumclassics', 'titleId']) {
   if (!source.includes(marker)) throw new Error(`Biblioteca RetroArch incompleta: ${marker}`);
 }

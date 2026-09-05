@@ -1,6 +1,8 @@
 # CLASSICS no iPhone: horas offline e conquistas
 
-iOS **0.7.5 (build 16)** + launcher **1.55.3 ou posterior**.
+iOS **0.7.6 (build 17)** + launcher **1.55.4 ou posterior**.
+
+Quando a ROM ainda não estiver vinculada, o iPhone envia o nome e o arquivo. O launcher só aceita uma correspondência CLASSICS exata e única, devolve o ID confirmado e salva a data da sessão no perfil ativo. Nenhuma aproximação ambígua recebe horas.
 
 ## Configuração inicial
 

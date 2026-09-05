@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## iOS 0.7.6 + launcher 1.55.4 — horas e capa recentes vinculadas ao PC
+
+- O cartão **Último jogo jogado** agora usa a capa sincronizada do launcher; sem vínculo, usa a arte oficial armazenada no cache local da ROM.
+- Uma ROM ainda sem `launcherGameID` envia nome e nome de arquivo ao PC. O launcher só confirma o vínculo quando encontra uma única correspondência em CLASSICS.
+- A identidade confirmada pelo PC fica salva no iPhone, permitindo que as próximas horas, a capa e o registro recente permaneçam associados ao mesmo jogo.
+- O launcher salva a data da sessão móvel no perfil ativo e atualiza imediatamente biblioteca, atividades e dispositivos conectados.
+- Reenvios usam um contador cumulativo e não duplicam horas já confirmadas.
+
 ## iOS 0.7.5 — sessões concluídas e jogo recente
 
 - O toque em **Jogar** registra imediatamente o título como o jogo mais recente no cache do iPhone, inclusive sem vínculo com o PC.
