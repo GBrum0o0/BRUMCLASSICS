@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## iOS 0.7.3 — importar uma vez e jogar diretamente
+
+- A conclusão da primeira entrega é gravada no catálogo local do BRUMCLASSICS por identidade exata do arquivo.
+- Toques posteriores deixam de abrir a folha de compartilhamento e usam a ROM já copiada pelo RetroArch em `~/Documents/RetroArch/downloads`.
+- GBA, GB/GBC, NES, SNES, Nintendo 64, Nintendo DS, Master System, Game Gear, Mega Drive e PC Engine recebem automaticamente o núcleo correspondente pela abertura `retroarch://topshelf`.
+- Formatos ambíguos já importados não são reenviados; o RetroArch abre para o usuário selecionar a playlist/núcleo existente.
+- A tela passa a considerar tanto a confirmação da edição compatível quanto o registro local da primeira importação.
+- Testes garantem que o caminho usado pertence ao sandbox do RetroArch, que o núcleo é determinístico e que caminhos inseguros são rejeitados.
+
 ## iOS 0.7.2 — cópia local autorizada para o RetroArch
 
 - Corrige o caso ainda reproduzido no RetroArch reinstalado pela App Store: a URL protegida da pasta não é mais entregue diretamente a outro aplicativo.

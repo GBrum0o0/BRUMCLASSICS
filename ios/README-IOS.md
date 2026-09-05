@@ -1,6 +1,6 @@
 # BRUMCLASSICS MÓVEL para iOS
 
-Versão 0.7.2: [importação autorizada e abertura pelo RetroArch compatível](RETROARCH-COMPATIVEL.md), além de [horas offline e sincronização com o PC](HORAS-OFFLINE.md). A tela **CLASSICS Everywhere** mostra somente ROMs realmente encontradas na pasta autorizada. Ela limpa o nome bruto para associar o título oficial e a capa. No primeiro uso, copia temporariamente o arquivo para o sandbox do BRUMCLASSICS e entrega essa cópia legível pela folha de compartilhamento do iOS. Isso funciona com o RetroArch da App Store; depois da confirmação da biblioteca na edição compatível, o jogo abre pela identidade exata. O IPA sem assinatura também é anexado à versão `ios-v0.7.2`, com link estável usado pelo aviso de atualização.
+Versão 0.7.3: [importação única e abertura direta pelo RetroArch](RETROARCH-COMPATIVEL.md), além de [horas offline e sincronização com o PC](HORAS-OFFLINE.md). A tela **CLASSICS Everywhere** mostra somente ROMs encontradas na pasta autorizada. No primeiro uso, copia temporariamente o arquivo para o sandbox do BRUMCLASSICS e entrega essa cópia legível. Ao concluir o compartilhamento, registra a importação. Nos próximos toques, formatos reconhecidos abrem diretamente a cópia existente em `RetroArch/downloads`, sem nova importação. O IPA sem assinatura é anexado à versão `ios-v0.7.3`.
 
 Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o mesmo protocolo local seguro (versão 8) do aplicativo Android e não altera o launcher nem o perfil do usuário.
 

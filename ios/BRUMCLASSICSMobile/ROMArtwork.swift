@@ -83,7 +83,7 @@ actor ROMArtworkCache {
         let task = Task<Index, Error> {
             let url = URL(string: "https://api.github.com/repos/libretro-thumbnails/\(repository)/git/trees/master?recursive=1")!
             var request = URLRequest(url: url)
-            request.setValue("BRUMCLASSICS-iOS/0.7.2", forHTTPHeaderField: "User-Agent")
+            request.setValue("BRUMCLASSICS-iOS/0.7.3", forHTTPHeaderField: "User-Agent")
             let (data, response) = try await session.data(for: request)
             guard (response as? HTTPURLResponse)?.statusCode == 200, data.count < 12_000_000 else { throw URLError(.badServerResponse) }
             let tree = try JSONDecoder().decode(Tree.self, from: data)

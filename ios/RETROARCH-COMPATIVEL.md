@@ -1,6 +1,6 @@
 # RetroArch compatível com o BRUMCLASSICS
 
-O BRUMCLASSICS MÓVEL 0.7.2 verifica as ROMs da pasta autorizada. No primeiro uso de cada arquivo, **CLASSICS Everywhere** cria uma cópia temporária legível dentro do próprio aplicativo e abre a folha de compartilhamento para entregá-la ao RetroArch. A ROM original é preservada. Depois que a biblioteca é confirmada na edição compatível, os próximos toques usam a identidade exata da playlist.
+O BRUMCLASSICS MÓVEL 0.7.3 verifica as ROMs da pasta autorizada. No primeiro uso de cada arquivo, **CLASSICS Everywhere** cria uma cópia temporária legível e abre a folha de compartilhamento. Ao concluir a entrega, grava o vínculo local. Nos próximos toques, formatos reconhecidos abrem diretamente a ROM já copiada em `RetroArch/downloads`, sem importar novamente. A ROM original é preservada.
 
 ## Versão necessária
 
@@ -24,10 +24,10 @@ O binário local foi testado como ZIP/IPA e contém os marcadores de consulta da
 
 1. Instale o RetroArch no iPhone. A versão da App Store recebe a ROM normalmente; use a edição compatível abaixo se quiser consulta da biblioteca e abertura direta pelo cartão.
 2. Em **Perfil → Configurações do app → CLASSICS**, toque **Selecionar pasta de ROMs** e autorize Downloads, iCloud Drive ou outra pasta disponível no app Arquivos.
-3. No BRUMCLASSICS, abra **CLASSICS Everywhere** e toque no jogo. Se ele ainda não estiver na biblioteca do RetroArch, escolha **RetroArch** na folha de compartilhamento.
+3. No BRUMCLASSICS, abra **CLASSICS Everywhere** e toque no jogo. Na primeira vez, escolha **RetroArch** na folha de compartilhamento.
 4. Aguarde o RetroArch receber e importar o arquivo. Se necessário, associe o núcleo correto dentro do emulador.
-5. Volte ao BRUMCLASSICS e toque **Confirmar importação**. O RetroArch abre por um instante, devolve a biblioteca e retorna ao aplicativo.
-6. Quando o cartão indicar **Jogar · RetroArch**, os próximos toques abrem o jogo diretamente.
+5. Volte ao BRUMCLASSICS. O cartão passa a indicar **Jogar · RetroArch** automaticamente.
+6. Os próximos toques abrem a cópia existente no RetroArch diretamente, sem nova importação. A confirmação de biblioteca continua opcional e exclusiva da edição compatível.
 7. Para trocar a pasta de origem, volte a **Perfil → Configurações do app → CLASSICS**.
 
 ## Limites do iOS

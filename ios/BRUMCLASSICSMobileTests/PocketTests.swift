@@ -97,6 +97,16 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: staged), bytes)
         XCTAssertEqual(try Data(contentsOf: source), bytes)
     }
+    func testAppStoreDirectLaunchUsesRetroArchInternalCopyAndKnownCore() throws {
+        let url = try XCTUnwrap(RetroArchAppStoreLaunchRules.launchURL(filename: "Pokemon Fire Red.gba"))
+        let query = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
+        XCTAssertEqual(url.scheme, "retroarch")
+        XCTAssertEqual(url.host, "topshelf")
+        XCTAssertEqual(query.first(where: { $0.name == "path" })?.value, "~/Documents/RetroArch/downloads/Pokemon Fire Red.gba")
+        XCTAssertEqual(query.first(where: { $0.name == "core_path" })?.value, ":/Frameworks/mgba.libretro.framework/mgba.libretro")
+        XCTAssertNil(RetroArchAppStoreLaunchRules.launchURL(filename: "../escape.gba"))
+        XCTAssertNil(RetroArchAppStoreLaunchRules.launchURL(filename: "ambiguous.iso"))
+    }
     func testSceneROMNameBecomesAReadableLibraryTitle() {
         XCTAssertEqual(ROMTitleRules.clean("1636 - Pokemon Fire Red (U)(Squirrels).gba"), "Pokemon Fire Red")
         XCTAssertEqual(ROMTitleRules.clean("Pokemon_FireRed_Version.gba"), "Pokemon Fire Red")

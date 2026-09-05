@@ -1,6 +1,6 @@
 # BRUMWORLD · CLASSICS Everywhere
 
-> Atualização iOS 0.7.2: ao tocar numa ROM ainda ausente no RetroArch, o BRUMCLASSICS prepara uma cópia temporária legível e abre a folha de compartilhamento. Escolha RetroArch e selecione o núcleo se solicitado. A versão da App Store recebe o jogo; **Confirmar no compatível** e **Jogar · RetroArch** exigem a edição compatível. A ROM original permanece intacta.
+> Atualização iOS 0.7.3: escolha RetroArch somente na primeira vez. O BRUMCLASSICS registra a entrega e, nos próximos toques, abre diretamente a cópia existente em `RetroArch/downloads` com o núcleo correspondente. Formatos ambíguos abrem o RetroArch para seleção, mas nunca são importados novamente. A ROM original permanece intacta.
 
 ## 1. Instalar
 

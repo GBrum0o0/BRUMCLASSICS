@@ -18,6 +18,7 @@ struct ROMShareTicket: Identifiable, Equatable {
     let id: UUID
     let url: URL
     let title: String
+    let filename: String
 }
 
 enum ROMTitleRules {
@@ -32,6 +33,32 @@ enum ROMTitleRules {
             .replacingOccurrences(of: #"\s+version\s*$"#, with: "", options: [.regularExpression, .caseInsensitive])
             .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
             .trimmingCharacters(in: CharacterSet(charactersIn: "-_. "))
+    }
+}
+
+enum RetroArchAppStoreLaunchRules {
+    private static let cores: [String: String] = [
+        "gba": "mgba.libretro", "gb": "gambatte.libretro", "gbc": "gambatte.libretro",
+        "nes": "mesen.libretro", "sfc": "snes9x.libretro", "smc": "snes9x.libretro",
+        "n64": "mupen64plus.next.libretro", "z64": "mupen64plus.next.libretro", "v64": "mupen64plus.next.libretro",
+        "nds": "melondsds.libretro", "sms": "genesis.plus.gx.libretro", "gg": "genesis.plus.gx.libretro",
+        "md": "genesis.plus.gx.libretro", "gen": "genesis.plus.gx.libretro", "pce": "mednafen.pce.fast.libretro"
+    ]
+
+    static func supports(filename: String) -> Bool {
+        PocketRules.safeFilename(filename) && cores[(filename as NSString).pathExtension.lowercased()] != nil
+    }
+
+    static func launchURL(filename: String) -> URL? {
+        guard PocketRules.safeFilename(filename), let core = cores[(filename as NSString).pathExtension.lowercased()] else { return nil }
+        var components = URLComponents()
+        components.scheme = "retroarch"
+        components.host = "topshelf"
+        components.queryItems = [
+            URLQueryItem(name: "path", value: "~/Documents/RetroArch/downloads/\(filename)"),
+            URLQueryItem(name: "core_path", value: ":/Frameworks/\(core).framework/\(core)")
+        ]
+        return components.url
     }
 }
 
@@ -171,7 +198,7 @@ actor ROMFolderAccess {
             if accessing { root.stopAccessingSecurityScopedResource() }
             throw PocketError.message("Não foi possível preparar uma cópia autorizada da ROM. Se ela estiver no iCloud, baixe o arquivo no iPhone e tente novamente.")
         }
-        let ticket = ROMShareTicket(id: shareID, url: exportedFile, title: game.title)
+        let ticket = ROMShareTicket(id: shareID, url: exportedFile, title: game.title, filename: game.filename)
         activeShares[ticket.id] = (root, accessing)
         return ticket
     }

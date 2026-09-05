@@ -96,7 +96,7 @@ actor PocketRAClient {
         var url = URLComponents(string: "https://retroachievements.org/API/API_GetGameInfoAndUserProgress.php")!
         url.queryItems = [URLQueryItem(name: "y", value: key), URLQueryItem(name: "u", value: username), URLQueryItem(name: "g", value: String(gameID))]
         var request = URLRequest(url: url.url!, timeoutInterval: 20)
-        request.setValue("BRUMCLASSICS-iOS/0.7.2", forHTTPHeaderField: "User-Agent")
+        request.setValue("BRUMCLASSICS-iOS/0.7.3", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200, data.count <= 12 * 1024 * 1024 else { throw PocketError.message("RetroAchievements indisponível ou credencial inválida. Tente mais tarde; o progresso salvo foi mantido.") }
         return try PocketProgress.decode(data, username: username, expectedID: gameID)
@@ -238,6 +238,11 @@ actor PocketRAClient {
     func retroArchGame(for rom: ROMFolderGame) -> RetroArchLibraryGame? {
         retroArchGames.first { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }
     }
+    func isImportedIntoRetroArch(_ rom: ROMFolderGame) -> Bool {
+        retroArchGame(for: rom) != nil || games.contains {
+            $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame && $0.importedIntoRetroArch
+        }
+    }
     func launcherGame(for rom: ROMFolderGame, launcher: AppStore) -> Game? {
         if let link = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame && !$0.launcherGameID.isEmpty }),
            let exact = launcher.snapshot.games.first(where: { $0.id == link.launcherGameID }) { return exact }
@@ -261,6 +266,17 @@ actor PocketRAClient {
         }
         if retroArchGame(for: rom) != nil {
             await launch(record, launcher: launcher)
+        } else if record.importedIntoRetroArch {
+            do { try await runtime.prepare(record, allGames: games); await syncHours(launcher: launcher) }
+            catch { runtimeStatus = "O jogo pode abrir, mas a medição não foi preparada: \(error.localizedDescription)" }
+            if let url = RetroArchAppStoreLaunchRules.launchURL(filename: rom.filename) {
+                UIApplication.shared.open(url) { opened in
+                    if !opened { Task { @MainActor in self.message = "O RetroArch não aceitou a abertura direta. Reabra o emulador e tente novamente." } }
+                }
+            } else {
+                message = "A ROM já foi importada. Como este formato pode pertencer a mais de um sistema, escolha o jogo na playlist do RetroArch; ele não será importado novamente."
+                UIApplication.shared.open(URL(string: "retroarch://start")!)
+            }
         } else {
             do {
                 pendingROMShare = try await romFolder.beginShare(for: rom)
@@ -272,7 +288,15 @@ actor PocketRAClient {
         await romFolder.finishShare(ticket.id)
         if pendingROMShare?.id == ticket.id { pendingROMShare = nil }
         if let error { message = "Não foi possível entregar a ROM ao RetroArch: \(error.localizedDescription)" }
-        else if completed { romFolderStatus = "Cópia autorizada entregue. No RetroArch, escolha o núcleo se ele solicitar. Depois volte ao BRUMCLASSICS. A abertura direta exige o RetroArch compatível; a versão da App Store pode ser aberta normalmente pelo botão ABRIR RETROARCH." }
+        else if completed {
+            if var record = games.first(where: { $0.filename.caseInsensitiveCompare(ticket.filename) == .orderedSame }) {
+                record.importedIntoRetroArch = true
+                await update(record)
+            }
+            romFolderStatus = RetroArchAppStoreLaunchRules.supports(filename: ticket.filename)
+                ? "Importação registrada. Nos próximos toques, \(ticket.title) abrirá diretamente no RetroArch sem pedir outro envio."
+                : "Importação registrada. Este formato precisa de uma playlist/núcleo confirmado para abertura direta."
+        }
         else { romFolderStatus = "Importação cancelada. A ROM original foi preservada." }
     }
     func launchRetroArch(_ game: RetroArchLibraryGame, launcher: AppStore) async {
@@ -389,15 +413,15 @@ struct ClassicsEverywhereView: View {
             } else {
                 LazyVGrid(columns: columns, spacing: 22) {
                     ForEach(pocket.romFolderGames) { rom in
-                        ROMFolderGameTile(rom: rom, launcherGame: pocket.launcherGame(for: rom, launcher: launcher), retroArchReady: pocket.retroArchGame(for: rom) != nil) {
+                        ROMFolderGameTile(rom: rom, launcherGame: pocket.launcherGame(for: rom, launcher: launcher), retroArchReady: pocket.isImportedIntoRetroArch(rom)) {
                             Task { await pocket.launchROM(rom, launcher: launcher) }
                         }
                     }
                 }
             }
-            if pocket.romFolderGames.contains(where: { pocket.retroArchGame(for: $0) == nil }) {
+            if pocket.romFolderGames.contains(where: { !pocket.isImportedIntoRetroArch($0) }) {
                 BrumSectionLabel(text: "PRIMEIRA IMPORTAÇÃO")
-                Text("O BRUMCLASSICS envia uma cópia temporária autorizada, sem mover sua ROM original. No RetroArch da App Store, escolha o núcleo e jogue normalmente. O vínculo e a abertura direta pelo cartão exigem a versão compatível indicada nas configurações.")
+                Text("O BRUMCLASSICS envia uma cópia temporária autorizada somente uma vez. Depois que o RetroArch receber o arquivo, o vínculo fica salvo e formatos reconhecidos abrem diretamente pelo cartão. Sua ROM original não é movida.")
                     .font(.caption).foregroundStyle(BrumTheme.muted)
                 HStack {
                     Button("ABRIR RETROARCH") {
