@@ -79,7 +79,7 @@ enum ROMFolderScanner {
 enum ROMExportStager {
     static func stage(source: URL, filename: String, root: URL, id: UUID) throws -> URL {
         let directory = root.appendingPathComponent(id.uuidString, isDirectory: true)
-        let destination = directory.appendingPathComponent(filename, isDirectory: false)
+        var destination = directory.appendingPathComponent(filename, isDirectory: false)
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             try FileManager.default.copyItem(at: source, to: destination)
