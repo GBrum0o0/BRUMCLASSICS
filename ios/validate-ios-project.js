@@ -38,9 +38,10 @@ for (const marker of ['RetroArchLibraryRules.queryURL', 'RetroArchLibraryRules',
 for (const marker of ['ROMFolderScanner', 'ROMFolderAccess', 'choose-rom-folder', 'romFolderGames', 'refreshROMFolder']) {
   if (!source.includes(marker)) throw new Error(`Pasta de ROMs incompleta: ${marker}`);
 }
-for (const marker of ['ROMTitleRules.clean', 'RetroArchDirectLaunchRules', 'components.host = "topshelf"']) {
-  if (!source.includes(marker)) throw new Error(`Abertura direta ou metadados de ROM incompletos: ${marker}`);
+for (const marker of ['ROMTitleRules.clean', 'beginShare(for game:', 'pendingROMShare', 'completionWithItemsHandler']) {
+  if (!source.includes(marker)) throw new Error(`Importação autorizada ou metadados de ROM incompletos: ${marker}`);
 }
+if (source.includes('components.host = "topshelf"')) throw new Error('Caminho externo não pode ser enviado ao RetroArch sem transferir a permissão do iOS.');
 if (source.includes('CLASSICS in every everywhere')) throw new Error('Nome antigo e repetido de CLASSICS ainda está visível no aplicativo.');
 if (source.includes('NA BIBLIOTECA DO PC · AINDA NÃO JOGÁVEIS NO IPHONE')) throw new Error('CLASSICS não pode listar jogos sem ROM detectada no iPhone.');
 for (const command of requiredCommands) if (!source.includes(`"${command}"`)) throw new Error(`Comando remoto não portado: ${command}`);

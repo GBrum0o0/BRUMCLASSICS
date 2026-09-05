@@ -28,7 +28,7 @@ Uma captura BRUMMOMENTS só pode ser solicitada por um aparelho pareado enquanto
 
 ## Serviços externos
 
-No iOS, CLASSICS Everywhere lê somente a pasta que o usuário autoriza no app Arquivos. O aplicativo não copia, envia ou apaga ROMs e não baixa jogos ou BIOS. A abertura ocorre por ação explícita do usuário no RetroArch, sem alterar saves ou configurações privadas do emulador.
+No iOS, CLASSICS Everywhere lê somente a pasta que o usuário autoriza no app Arquivos. No primeiro uso de um jogo, uma ação explícita abre a folha de compartilhamento do sistema; ao escolher RetroArch, o iOS concede acesso temporário ao arquivo e o emulador pode criar sua própria cópia. O BRUMCLASSICS não move nem apaga a ROM original e não baixa jogos ou BIOS.
 
 Para capas ausentes, o iOS consulta os índices públicos de libretro-thumbnails na API do GitHub e baixa a imagem correspondente de raw.githubusercontent.com. A comparação do nome é feita no aparelho: ROMs e caminhos privados não são enviados. Índices, títulos e imagens ficam em cache persistente para uso offline.
 

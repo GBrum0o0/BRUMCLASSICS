@@ -76,17 +76,6 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(ROMTitleRules.clean("1636 - Pokemon Fire Red (U)(Squirrels).gba"), "Pokemon Fire Red")
         XCTAssertEqual(ROMTitleRules.clean("Pokemon_FireRed_Version.gba"), "Pokemon Fire Red")
     }
-    func testDirectRetroArchLaunchChoosesBundledCoreWithoutLeakingIntoPath() throws {
-        let file = URL(fileURLWithPath: "/private/mobile/Downloads/Pokémon #1.gba")
-        let url = try XCTUnwrap(RetroArchDirectLaunchRules.launchURL(content: file))
-        let items = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
-        XCTAssertEqual(url.scheme, "retroarch"); XCTAssertEqual(url.host, "topshelf")
-        XCTAssertEqual(items.first(where: { $0.name == "path" })?.value, file.path)
-        XCTAssertEqual(items.first(where: { $0.name == "core_path" })?.value, ":/Frameworks/mgba.libretro.framework/mgba.libretro")
-        XCTAssertNil(RetroArchDirectLaunchRules.launchURL(content: URL(fileURLWithPath: "/tmp/game.iso")))
-        XCTAssertTrue(RetroArchDirectLaunchRules.supports(filename: "Pokemon.gba"))
-        XCTAssertFalse(RetroArchDirectLaunchRules.supports(filename: "Game.iso"))
-    }
     func testROMArtworkMatchesSceneNameWithinPlatformAndKeepsOtherGamesOut() {
         let paths = ["Named_Boxarts/Pokemon - FireRed Version (USA, Europe).png", "Named_Boxarts/Pokemon - LeafGreen Version (USA).png", "Named_Snaps/Pokemon - FireRed Version (USA, Europe).png"]
         XCTAssertEqual(ROMArtworkRules.match(filename: "1636 - Pokemon Fire Red (U)(Squirrels).gba", paths: paths), paths[0])

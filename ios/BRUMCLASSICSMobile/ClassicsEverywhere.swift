@@ -96,7 +96,7 @@ actor PocketRAClient {
         var url = URLComponents(string: "https://retroachievements.org/API/API_GetGameInfoAndUserProgress.php")!
         url.queryItems = [URLQueryItem(name: "y", value: key), URLQueryItem(name: "u", value: username), URLQueryItem(name: "g", value: String(gameID))]
         var request = URLRequest(url: url.url!, timeoutInterval: 20)
-        request.setValue("BRUMCLASSICS-iOS/0.7.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("BRUMCLASSICS-iOS/0.7.1", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200, data.count <= 12 * 1024 * 1024 else { throw PocketError.message("RetroAchievements indisponível ou credencial inválida. Tente mais tarde; o progresso salvo foi mantido.") }
         return try PocketProgress.decode(data, username: username, expectedID: gameID)
@@ -117,6 +117,7 @@ actor PocketRAClient {
     @Published private(set) var romFolderConfigured = false
     @Published private(set) var romFolderName = "Downloads"
     @Published private(set) var romFolderStatus = ""
+    @Published var pendingROMShare: ROMShareTicket?
     private let runtime = PocketRuntimeFiles()
     private let retroArchFiles = RetroArchLibraryFiles()
     private let romFolder = ROMFolderAccess()
@@ -163,7 +164,7 @@ actor PocketRAClient {
         let hasBookmark = await romFolder.configured
         guard romFolderConfigured || hasBookmark else {
             romFolderConfigured = false
-            romFolderStatus = "Selecione a pasta de ROMs do RetroArch uma vez em Perfil → Configurações do app → CLASSICS."
+            romFolderStatus = "Selecione uma pasta de ROMs em Perfil → Configurações do app → CLASSICS."
             return
         }
         do {
@@ -258,23 +259,21 @@ actor PocketRAClient {
             record.title = matched.title
             await update(record)
         }
-        if RetroArchDirectLaunchRules.supports(filename: rom.filename) {
-            do {
-                let directURL = try await romFolder.directLaunchURL(for: rom)
-                // Optional runtime permissions must never prevent a valid ROM from opening.
-                do { try await runtime.prepare(record, allGames: games) }
-                catch { runtimeStatus = "O jogo pode abrir, mas a medição não foi preparada: \(error.localizedDescription)" }
-                UIApplication.shared.open(directURL) { opened in
-                    if !opened { Task { @MainActor in self.message = "O RetroArch compatível não aceitou a abertura direta. Confirme se a pasta escolhida pertence ao RetroArch." } }
-                }
-            } catch { message = error.localizedDescription }
-            return
-        }
         if retroArchGame(for: rom) != nil {
             await launch(record, launcher: launcher)
         } else {
-            message = "O formato .\((rom.filename as NSString).pathExtension) pode pertencer a mais de um console. Confirme o sistema e o núcleo numa playlist do RetroArch e use Sincronizar playlists nesta tela. Nenhum jogo foi iniciado."
+            do {
+                pendingROMShare = try await romFolder.beginShare(for: rom)
+                romFolderStatus = "Primeiro uso de \(record.title): escolha RetroArch na folha de compartilhamento. Depois, volte e confirme a importação."
+            } catch { message = error.localizedDescription }
         }
+    }
+    func finishROMShare(_ ticket: ROMShareTicket, completed: Bool, error: Error?) async {
+        await romFolder.finishShare(ticket.id)
+        if pendingROMShare?.id == ticket.id { pendingROMShare = nil }
+        if let error { message = "Não foi possível entregar a ROM ao RetroArch: \(error.localizedDescription)" }
+        else if completed { romFolderStatus = "Arquivo entregue. Depois que o RetroArch concluir a importação, volte ao BRUMCLASSICS e toque CONFIRMAR IMPORTAÇÃO." }
+        else { romFolderStatus = "Importação cancelada. A ROM original foi preservada." }
     }
     func launchRetroArch(_ game: RetroArchLibraryGame, launcher: AppStore) async {
         guard let pocketGame = pocketGame(for: game) else { message = "Atualize a biblioteca do RetroArch novamente antes de jogar."; return }
@@ -382,9 +381,9 @@ struct ClassicsEverywhereView: View {
                     .buttonStyle(PrimaryButtonStyle())
                     .accessibilityIdentifier("rom-folder-refresh")
             }
-            Text("A biblioteca mostra somente arquivos encontrados na pasta autorizada. Para a abertura direta funcionar, use uma pasta dentro de No Meu iPhone → RetroArch. Para trocar, abra Perfil → Configurações do app → CLASSICS.").font(.caption).foregroundStyle(BrumTheme.muted)
+            Text("A biblioteca mostra somente arquivos da pasta autorizada. No primeiro uso, o iOS pede que você entregue a ROM ao RetroArch; depois disso, o jogo abre diretamente pela biblioteca dele. Para trocar a pasta, use Perfil → Configurações do app → CLASSICS.").font(.caption).foregroundStyle(BrumTheme.muted)
             if !pocket.romFolderConfigured {
-                Text("Nenhuma pasta autorizada. Abra Perfil → Configurações do app → CLASSICS e selecione a pasta de ROMs do RetroArch uma vez.").foregroundStyle(BrumTheme.muted)
+                Text("Nenhuma pasta autorizada. Abra Perfil → Configurações do app → CLASSICS e selecione uma pasta de ROMs uma vez.").foregroundStyle(BrumTheme.muted)
             } else if pocket.romFolderGames.isEmpty {
                 Text("Nenhuma ROM compatível foi encontrada em \(pocket.romFolderName).").foregroundStyle(BrumTheme.muted)
             } else {
@@ -396,11 +395,11 @@ struct ClassicsEverywhereView: View {
                     }
                 }
             }
-            if pocket.romFolderGames.contains(where: { !RetroArchDirectLaunchRules.supports(filename: $0.filename) }) {
-                BrumSectionLabel(text: "FORMATOS QUE PRECISAM DE PLAYLIST")
-                Text("ISO, CHD, ZIP, CUE e outros formatos podem representar sistemas diferentes. Para eles, organize o jogo no RetroArch e use a sincronização abaixo. O RetroArch abre e retorna ao BRUMCLASSICS automaticamente; isso é esperado e não inicia o jogo.")
+            if pocket.romFolderGames.contains(where: { pocket.retroArchGame(for: $0) == nil }) {
+                BrumSectionLabel(text: "PRIMEIRA IMPORTAÇÃO")
+                Text("Depois de compartilhar a ROM com o RetroArch e concluir a importação nele, toque abaixo. O RetroArch abre por um instante, devolve a biblioteca e retorna ao BRUMCLASSICS. Isso acontece apenas para confirmar o vínculo.")
                     .font(.caption).foregroundStyle(BrumTheme.muted)
-                Button("SINCRONIZAR PLAYLISTS DO RETROARCH") { pocket.requestRetroArchLibrary() }
+                Button("CONFIRMAR IMPORTAÇÃO") { pocket.requestRetroArchLibrary() }
                     .buttonStyle(PrimaryButtonStyle())
                     .accessibilityIdentifier("retroarch-library-refresh")
             }
@@ -410,6 +409,11 @@ struct ClassicsEverywhereView: View {
         }.padding(20) }.background(BrumTheme.background.ignoresSafeArea()).navigationTitle("CLASSICS")
         .refreshable { await pocket.sync(launcher: launcher, force: true) }
         .task { await pocket.refreshROMFolder() }
+        .sheet(item: $pocket.pendingROMShare) { ticket in
+            DocumentExportView(url: ticket.url) { completed, error in
+                Task { await pocket.finishROMShare(ticket, completed: completed, error: error) }
+            }
+        }
     }
 }
 
@@ -437,7 +441,7 @@ struct ROMFolderGameTile: View {
                     Text(displayedTitle).font(.system(size: 15, weight: .bold)).foregroundStyle(BrumTheme.text).lineLimit(2).multilineTextAlignment(.leading)
                 }
             }.buttonStyle(.plain).accessibilityLabel("Jogar \(displayedTitle)")
-            Text(RetroArchDirectLaunchRules.supports(filename: rom.filename) ? "JOGAR · ABERTURA DIRETA" : retroArchReady ? "JOGAR · RETROARCH" : "PRECISA DE PLAYLIST")
+            Text(retroArchReady ? "JOGAR · RETROARCH" : "PRIMEIRO USO · IMPORTAR")
                 .font(.system(size: 10, weight: .bold)).foregroundStyle(BrumTheme.primary)
         }.task(id: rom.id + (launcherGame?.artworkPath ?? "")) {
             guard launcherGame?.artworkPath.isEmpty != false else { return }
@@ -520,10 +524,14 @@ struct PocketGameView: View {
     }
 }
 
-struct PocketShare: Identifiable { let id = UUID(); let url: URL }
 struct DocumentExportView: UIViewControllerRepresentable {
     let url: URL
-    func makeUIViewController(context: Context) -> UIActivityViewController { UIActivityViewController(activityItems: [url], applicationActivities: nil) }
+    let completion: (Bool, Error?) -> Void
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        controller.completionWithItemsHandler = { _, completed, _, error in completion(completed, error) }
+        return controller
+    }
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
 

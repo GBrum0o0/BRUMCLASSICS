@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## iOS 0.7.1 — entrega autorizada ao RetroArch
+
+- Corrige “this file couldn't be opened because you don't have permission to view” ao tocar numa ROM externa.
+- O primeiro toque abre a folha de compartilhamento do iOS, mantendo a permissão até a atividade terminar.
+- Depois de escolher o RetroArch, o usuário confirma a importação uma vez; a biblioteca devolvida passa a ser a identidade usada nos próximos lançamentos.
+- A pasta de origem continua configurável e a ROM original não é movida nem apagada.
+- Nomes limpos, capas em cache, vínculos, horas e conquistas são preservados.
+
 ## iOS 0.7.0 — CLASSICS Everywhere e abertura direta
 
 - Capas ausentes no PC são procuradas no catálogo Libretro da mesma plataforma e persistidas no celular. Essa correspondência visual não concede conquistas nem propriedade.

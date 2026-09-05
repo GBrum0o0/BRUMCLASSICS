@@ -1,5 +1,7 @@
 # BRUMWORLD · CLASSICS Everywhere
 
+> Atualização iOS 0.7.1: ao tocar numa ROM ainda ausente no RetroArch, escolha o emulador na folha de compartilhamento do iOS. Aguarde a importação, volte ao BRUMCLASSICS e toque **Confirmar importação**. O cartão mudará para **Jogar · RetroArch**. Esse fluxo substitui o envio direto do caminho, que não transferia a permissão entre aplicativos.
+
 ## 1. Instalar
 
 Atualize o BRUMCLASSICS MÓVEL para iOS 0.4.0 pelo Sideloadly sobre o app existente, usando a mesma conta. Não desinstale. No computador, use o launcher 1.55.2 para a nova sincronização.

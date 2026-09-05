@@ -14,6 +14,12 @@ struct ROMFolderScan: Equatable {
     let duplicateFilenames: Int
 }
 
+struct ROMShareTicket: Identifiable, Equatable {
+    let id: UUID
+    let url: URL
+    let title: String
+}
+
 enum ROMTitleRules {
     static func clean(_ value: String) -> String {
         value
@@ -26,32 +32,6 @@ enum ROMTitleRules {
             .replacingOccurrences(of: #"\s+version\s*$"#, with: "", options: [.regularExpression, .caseInsensitive])
             .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
             .trimmingCharacters(in: CharacterSet(charactersIn: "-_. "))
-    }
-}
-
-enum RetroArchDirectLaunchRules {
-    private static let cores: [String: String] = [
-        "gba": "mgba.libretro", "gb": "gambatte.libretro", "gbc": "gambatte.libretro",
-        "nes": "mesen.libretro", "sfc": "snes9x.libretro", "smc": "snes9x.libretro",
-        "n64": "mupen64plus.next.libretro", "z64": "mupen64plus.next.libretro", "v64": "mupen64plus.next.libretro",
-        "nds": "melondsds.libretro", "sms": "genesis.plus.gx.libretro", "gg": "genesis.plus.gx.libretro",
-        "md": "genesis.plus.gx.libretro", "gen": "genesis.plus.gx.libretro", "pce": "mednafen.pce.fast.libretro"
-    ]
-
-    static func supports(filename: String) -> Bool {
-        cores[(filename as NSString).pathExtension.lowercased()] != nil
-    }
-
-    static func launchURL(content: URL) -> URL? {
-        guard content.isFileURL, let core = cores[content.pathExtension.lowercased()] else { return nil }
-        var components = URLComponents()
-        components.scheme = "retroarch"
-        components.host = "topshelf"
-        components.queryItems = [
-            URLQueryItem(name: "path", value: content.path),
-            URLQueryItem(name: "core_path", value: ":/Frameworks/\(core).framework/\(core)")
-        ]
-        return components.url
     }
 }
 
@@ -99,6 +79,7 @@ enum ROMFolderScanner {
 actor ROMFolderAccess {
     private let bookmarkKey = "brumclassics-ios-rom-folder-bookmark-v1"
     private let nameKey = "brumclassics-ios-rom-folder-name-v1"
+    private var activeShares: [UUID: (root: URL, accessing: Bool)] = [:]
 
     var configured: Bool { UserDefaults.standard.data(forKey: bookmarkKey) != nil }
     var displayName: String { UserDefaults.standard.string(forKey: nameKey) ?? "Downloads" }
@@ -115,7 +96,7 @@ actor ROMFolderAccess {
 
     func scan() throws -> ROMFolderScan {
         guard let bookmark = UserDefaults.standard.data(forKey: bookmarkKey) else {
-            throw PocketError.message("Selecione a pasta de ROMs do RetroArch em Perfil → Configurações do app → CLASSICS.")
+            throw PocketError.message("Selecione uma pasta de ROMs em Perfil → Configurações do app → CLASSICS.")
         }
         var stale = false
         let folder = try URL(resolvingBookmarkData: bookmark, options: [], relativeTo: nil, bookmarkDataIsStale: &stale)
@@ -129,26 +110,36 @@ actor ROMFolderAccess {
         return result
     }
 
-    func directLaunchURL(for game: ROMFolderGame) throws -> URL {
+    func beginShare(for game: ROMFolderGame) throws -> ROMShareTicket {
         guard let bookmark = UserDefaults.standard.data(forKey: bookmarkKey) else {
             throw PocketError.message("Selecione novamente a pasta de ROMs.")
         }
         var stale = false
         let root = try URL(resolvingBookmarkData: bookmark, options: [], relativeTo: nil, bookmarkDataIsStale: &stale).standardizedFileURL
         let accessing = root.startAccessingSecurityScopedResource()
-        defer { if accessing { root.stopAccessingSecurityScopedResource() } }
         let file = root.appendingPathComponent(game.relativePath).standardizedFileURL
         let prefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
         guard file.path.hasPrefix(prefix), file.lastPathComponent == game.filename else {
+            if accessing { root.stopAccessingSecurityScopedResource() }
             throw PocketError.message("O caminho da ROM não pertence mais à pasta autorizada.")
         }
-        let values = try file.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+        let values: URLResourceValues
+        do { values = try file.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]) }
+        catch {
+            if accessing { root.stopAccessingSecurityScopedResource() }
+            throw error
+        }
         guard values.isRegularFile == true, values.isSymbolicLink != true, (values.fileSize ?? 0) > 0 else {
+            if accessing { root.stopAccessingSecurityScopedResource() }
             throw PocketError.message("A ROM não está mais disponível na pasta escolhida.")
         }
-        guard let url = RetroArchDirectLaunchRules.launchURL(content: file) else {
-            throw PocketError.message("Este formato precisa estar vinculado a uma playlist do RetroArch para determinar o sistema e o núcleo corretos.")
-        }
-        return url
+        let ticket = ROMShareTicket(id: UUID(), url: file, title: game.title)
+        activeShares[ticket.id] = (root, accessing)
+        return ticket
+    }
+
+    func finishShare(_ id: UUID) {
+        guard let share = activeShares.removeValue(forKey: id) else { return }
+        if share.accessing { share.root.stopAccessingSecurityScopedResource() }
     }
 }
