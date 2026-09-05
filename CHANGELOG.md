@@ -1,8 +1,8 @@
 # Histórico de versões
 
-## iOS 0.7.4 — sessões concluídas e jogo recente
+## iOS 0.7.5 — sessões concluídas e jogo recente
 
-- O toque em **Jogar** registra imediatamente o título como o jogo mais recente no cache do iPhone, sem esperar o snapshot do PC.
+- O toque em **Jogar** registra imediatamente o título como o jogo mais recente no cache do iPhone, inclusive sem vínculo com o PC.
 - O registro recente local é reaplicado depois de cada sincronização para não desaparecer enquanto o launcher processa as horas.
 - Ao sair para o RetroArch, uma sessão persistente acompanha a transição real para segundo plano e é concluída assim que o usuário retorna ao BRUMCLASSICS.
 - Sem uma pasta de logs autorizada, o intervalo externo é usado como contingência e entra na mesma fila idempotente de horas para o PC.

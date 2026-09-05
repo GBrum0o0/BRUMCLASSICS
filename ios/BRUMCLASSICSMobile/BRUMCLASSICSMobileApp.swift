@@ -40,8 +40,11 @@ struct BRUMCLASSICSMobileApp: App {
                             await pocket.sync(launcher: store)
                             await store.checkForPersonalUpdate()
                         }
-                    } else if phase == .background {
+                    } else if phase == .inactive {
+                        // This transition occurs before iOS suspends the process,
+                        // so the persisted start time is not lost on app handoff.
                         Task { await pocket.notePlaySessionBackgrounded() }
+                    } else if phase == .background {
                         store.suspend()
                     }
                 }

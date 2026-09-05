@@ -1,10 +1,10 @@
 {
-  "version": "0.7.4",
-  "build": 15,
+  "version": "0.7.5",
+  "build": 16,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.7.4",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.7.5",
   "notes": [
-    "Ao iniciar um CLASSICS, o jogo é marcado imediatamente como o mais recente no iPhone.",
+    "Ao iniciar um CLASSICS, inclusive sem vínculo com o PC, o jogo é marcado imediatamente como o mais recente no iPhone.",
     "Ao retornar do RetroArch, a sessão é concluída automaticamente e enviada ao launcher quando ele estiver conectado.",
     "Sem uma pasta de logs autorizada, um cronômetro persistente de contingência registra o período em que o RetroArch ficou em primeiro plano.",
     "Com a pasta de logs autorizada, o contador acumulado do próprio RetroArch continua sendo a fonte precisa e evita estimativas.",

@@ -55,7 +55,7 @@ Abra a página de [Releases](https://github.com/GBrum0o0/BRUMCLASSICS/releases/l
 3. **APK Android** — aplicativo móvel assinado para atualização preservando os dados offline.
 4. **SHA256SUMS.txt** — hashes para verificar os arquivos baixados.
 
-A versão pessoal para iPhone é compilada separadamente em **Actions → Build iOS pessoal**. O artefato contém um IPA sem assinatura para instalação com AltStore ou Sideloadly. No iOS 0.7.4, `CLASSICS Everywhere` importa cada ROM uma vez, abre formatos reconhecidos diretamente, registra o último jogo no próprio iPhone e conclui a sessão ao retornar do RetroArch. Consulte [as instruções do iOS](ios/README-IOS.md) e o [guia do RetroArch compatível](ios/RETROARCH-COMPATIVEL.md).
+A versão pessoal para iPhone é compilada separadamente em **Actions → Build iOS pessoal**. O artefato contém um IPA sem assinatura para instalação com AltStore ou Sideloadly. No iOS 0.7.5, `CLASSICS Everywhere` importa cada ROM uma vez, abre formatos reconhecidos diretamente, registra o último jogo no próprio iPhone e conclui a sessão ao retornar do RetroArch. Consulte [as instruções do iOS](ios/README-IOS.md) e o [guia do RetroArch compatível](ios/RETROARCH-COMPATIVEL.md).
 
 O GitHub hospeda os arquivos grandes na área de Releases; executáveis não são armazenados no histórico do repositório.
 

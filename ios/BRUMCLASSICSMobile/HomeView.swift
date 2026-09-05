@@ -2,8 +2,18 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject private var store: AppStore
+    @EnvironmentObject private var pocket: PocketClassicsStore
     @Binding var selection: Int
     private var lastPlayed: Game? { store.snapshot.games.filter { !$0.lastPlayedAt.isEmpty || ($0.playtimeMinutes ?? 0) > 0 }.sorted { $0.lastPlayedAt > $1.lastPlayedAt }.first }
+    private var lastPocketGame: PocketClassic? { pocket.games.filter { $0.lastPlayedAt != nil }.sorted { ($0.lastPlayedAt ?? .distantPast) > ($1.lastPlayedAt ?? .distantPast) }.first }
+    private var showPocketAsLatest: Bool {
+        guard let pocketDate = lastPocketGame?.lastPlayedAt else { return false }
+        guard let stamp = lastPlayed?.lastPlayedAt, !stamp.isEmpty else { return true }
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let remoteDate = fractional.date(from: stamp) ?? ISO8601DateFormatter().date(from: stamp) ?? .distantPast
+        return pocketDate > remoteDate
+    }
     private var favorites: [Game] { Array(store.snapshot.games.filter(\.favorite).prefix(8)) }
     private var wantToPlay: [Game] { Array(store.snapshot.games.filter(\.wantToPlay).prefix(8)) }
 
@@ -18,7 +28,9 @@ struct HomeView: View {
                 if let active = store.companionGame, store.connection == .online {
                     Button { selection = 3 } label: { CompanionCard(game: active) }.buttonStyle(.plain)
                 }
-                if let lastPlayed { FeaturedGameCard(game: lastPlayed) }
+                if showPocketAsLatest, let lastPocketGame {
+                    NavigationLink { PocketGameView(id: lastPocketGame.id) } label: { PocketFeaturedGameCard(game: lastPocketGame) }.buttonStyle(.plain)
+                } else if let lastPlayed { FeaturedGameCard(game: lastPlayed) }
                 NavigationLink { BCardLibraryView() } label: { SettingsRow(icon: "rectangle.portrait.on.rectangle.portrait", title: "B-CARD", detail: "Seus jogos instalados · Jogos e CLASSICS") }
                 NavigationLink { ClassicsEverywhereView() } label: { SettingsRow(icon: "gamecontroller", title: "CLASSICS Everywhere", detail: "Suas ROMs locais · toque para jogar") }.accessibilityIdentifier("classics-everywhere-link")
                 GameStrip(title: "FAVORITOS", games: favorites, empty: "Marque jogos como favoritos no launcher ou no perfil do jogo.")
@@ -32,6 +44,27 @@ struct HomeView: View {
     }
 
     private var greeting: String { let hour = Calendar.current.component(.hour, from: Date()); return hour < 12 ? "Bom dia." : hour < 18 ? "Boa tarde." : "Boa noite." }
+}
+
+struct PocketFeaturedGameCard: View {
+    let game: PocketClassic
+    var body: some View {
+        BrumCard {
+            HStack(spacing: 18) {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(BrumTheme.surface)
+                    .overlay(Image(systemName: "gamecontroller.fill").font(.system(size: 38)).foregroundStyle(BrumTheme.primary))
+                    .frame(width: 112, height: 158)
+                VStack(alignment: .leading, spacing: 9) {
+                    Text("ÚLTIMO JOGO JOGADO").font(.caption2.bold()).tracking(1.3).foregroundStyle(BrumTheme.primary)
+                    Text(game.title).font(.title2.bold()).foregroundStyle(BrumTheme.text).lineLimit(3)
+                    Text("CLASSICS · JOGADO NO IPHONE").font(.caption).foregroundStyle(BrumTheme.muted)
+                    if let date = game.lastPlayedAt { Text(date.formatted(date: .abbreviated, time: .shortened)).font(.caption2).foregroundStyle(BrumTheme.muted) }
+                }
+                Spacer(minLength: 0)
+            }
+        }
+    }
 }
 
 struct ConnectionDot: View {

@@ -8,6 +8,7 @@ struct PocketClassic: Codable, Identifiable, Equatable {
     var retroAchievementID = ""
     var launcherGameID = ""
     var importedIntoRetroArch = false
+    var lastPlayedAt: Date?
     var progress: PocketProgress?
 }
 
@@ -96,7 +97,7 @@ actor PocketRAClient {
         var url = URLComponents(string: "https://retroachievements.org/API/API_GetGameInfoAndUserProgress.php")!
         url.queryItems = [URLQueryItem(name: "y", value: key), URLQueryItem(name: "u", value: username), URLQueryItem(name: "g", value: String(gameID))]
         var request = URLRequest(url: url.url!, timeoutInterval: 20)
-        request.setValue("BRUMCLASSICS-iOS/0.7.4", forHTTPHeaderField: "User-Agent")
+        request.setValue("BRUMCLASSICS-iOS/0.7.5", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200, data.count <= 12 * 1024 * 1024 else { throw PocketError.message("RetroAchievements indisponível ou credencial inválida. Tente mais tarde; o progresso salvo foi mantido.") }
         return try PocketProgress.decode(data, username: username, expectedID: gameID)
@@ -244,6 +245,12 @@ actor PocketRAClient {
             $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame && $0.importedIntoRetroArch
         }
     }
+    private func recordLaunch(_ game: PocketClassic, launcher: AppStore) async {
+        var launched = game
+        launched.lastPlayedAt = Date()
+        await update(launched)
+        if !launched.launcherGameID.isEmpty { await launcher.recordLocalLaunch(gameID: launched.launcherGameID, at: launched.lastPlayedAt ?? Date()) }
+    }
     func launcherGame(for rom: ROMFolderGame, launcher: AppStore) -> Game? {
         if let link = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame && !$0.launcherGameID.isEmpty }),
            let exact = launcher.snapshot.games.first(where: { $0.id == link.launcherGameID }) { return exact }
@@ -274,13 +281,13 @@ actor PocketRAClient {
                 if !opened {
                     await playSessions.cancel()
                     message = "O RetroArch não aceitou a abertura direta. Reabra o emulador e tente novamente."
-                } else if !record.launcherGameID.isEmpty { await launcher.recordLocalLaunch(gameID: record.launcherGameID) }
+                } else { await recordLaunch(record, launcher: launcher) }
             } else {
                 message = "A ROM já foi importada. Como este formato pode pertencer a mais de um sistema, escolha o jogo na playlist do RetroArch; ele não será importado novamente."
                 await beginPlaySession(record)
                 let opened = await UIApplication.shared.open(URL(string: "retroarch://start")!)
                 if !opened { await playSessions.cancel() }
-                else if !record.launcherGameID.isEmpty { await launcher.recordLocalLaunch(gameID: record.launcherGameID) }
+                else { await recordLaunch(record, launcher: launcher) }
             }
         } else {
             do {
@@ -380,7 +387,7 @@ actor PocketRAClient {
         if !opened {
             await playSessions.cancel()
             message = "Instale o RetroArch 1.22.2 ou posterior. Importe e execute a ROM dentro dele primeiro."
-        } else if !game.launcherGameID.isEmpty { await launcher.recordLocalLaunch(gameID: game.launcherGameID) }
+        } else { await recordLaunch(game, launcher: launcher) }
     }
     func importFiles(_ urls: [URL]) async {
         guard loaded else { message = "O catálogo não pôde ser aberto. Não vamos sobrescrever seus dados."; return }

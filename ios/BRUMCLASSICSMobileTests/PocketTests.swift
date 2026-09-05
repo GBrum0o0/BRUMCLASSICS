@@ -2,6 +2,12 @@ import XCTest
 @testable import BRUMCLASSICSMobile
 
 final class PocketTests: XCTestCase {
+    func testOlderPocketCatalogWithoutLastPlayedDateStillDecodes() throws {
+        let json = #"{"id":"00000000-0000-0000-0000-000000000001","title":"Game","filename":"game.gba","retroAchievementID":"","launcherGameID":"","importedIntoRetroArch":true}"#
+        let game = try JSONDecoder().decode(PocketClassic.self, from: Data(json.utf8))
+        XCTAssertNil(game.lastPlayedAt)
+        XCTAssertTrue(game.importedIntoRetroArch)
+    }
     func testROMIdentityAndURLNeverInterpretFilenameAsPathOrQuery() {
         XCTAssertNil(PocketRules.launchURL("../escape.gba"))
         XCTAssertNil(PocketRules.launchURL("folder\\escape.gba"))
