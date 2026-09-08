@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## Launcher 1.56.2 — biblioteca e sessões mais confiáveis
+
+- ISOs de CLASSICS passam a distinguir PS1 e PS2 lendo o `SYSTEM.CNF` real da mídia.
+- Servidores públicos de teste da Steam saem da biblioteca principal, inclusive via Família Steam.
+- Solicitações antigas sem qualquer evidência de instalação deixam de reaparecer após reiniciar.
+- Falhas na preparação de uma sessão restauram o launcher e não prendem a tela intermediária.
+- BRUMNEWS registra a versão e mantém somente seis destaques na linha do tempo compacta.
+
 ## iOS 0.7.6 + launcher 1.55.4 — horas e capa recentes vinculadas ao PC
 
 - O cartão **Último jogo jogado** agora usa a capa sincronizada do launcher; sem vínculo, usa a arte oficial armazenada no cache local da ROM.
