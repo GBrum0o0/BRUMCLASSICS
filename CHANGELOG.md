@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## Launcher 1.56.3 — identidade BRUMCLASSICS no Windows
+
+- O campo de descrição do executável passa a ser somente **BRUMCLASSICS**.
+- O nome fixo `BRUMCLASSICS OFICIAL.exe` permanece para não quebrar atalhos nem atualizações.
+- BRUMNEWS e sua linha do tempo compacta foram atualizadas.
+
 ## Launcher 1.56.2 — biblioteca e sessões mais confiáveis
 
 - ISOs de CLASSICS passam a distinguir PS1 e PS2 lendo o `SYSTEM.CNF` real da mídia.
