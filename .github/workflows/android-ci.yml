@@ -1,0 +1,50 @@
+name: Android CI
+
+on:
+  push:
+    paths:
+      - "android/**"
+      - ".github/workflows/android-ci.yml"
+  pull_request:
+    paths:
+      - "android/**"
+      - ".github/workflows/android-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK 36
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Compile Android application
+        working-directory: android
+        run: ./gradlew :app:assembleDebug --no-daemon
+      - name: Run contract tests
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/brum-tests"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/brum-tests" \
+            android/app/src/main/java/com/brumclassics/mobile/model/Game.java \
+            android/app/src/main/java/com/brumclassics/mobile/model/PerformanceLiveState.java \
+            android/app/src/main/java/com/brumclassics/mobile/data/HomeLibrary.java \
+            android/app/src/main/java/com/brumclassics/mobile/data/BCardLibrary.java \
+            android/app/src/main/java/com/brumclassics/mobile/classics/ClassicsRules.java \
+            android/app/src/test/java/com/brumclassics/mobile/data/HomeLibraryTest.java \
+            android/app/src/test/java/com/brumclassics/mobile/data/BCardLibraryTest.java \
+            android/app/src/test/java/com/brumclassics/mobile/model/PerformanceLiveStateTest.java \
+            android/app/src/test/java/com/brumclassics/mobile/classics/ClassicsRulesTest.java
+          for test in \
+            com.brumclassics.mobile.data.HomeLibraryTest \
+            com.brumclassics.mobile.data.BCardLibraryTest \
+            com.brumclassics.mobile.model.PerformanceLiveStateTest \
+            com.brumclassics.mobile.classics.ClassicsRulesTest; do
+            java -cp "$RUNNER_TEMP/brum-tests" "$test"
+          done

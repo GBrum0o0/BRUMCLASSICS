@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## Android 0.16.0 — CLASSICS Everywhere
+
+- Pasta de ROMs autorizada pelo seletor nativo e abertura de sistemas compatíveis no RetroArch.
+- Vínculo seguro com o CLASSICS do launcher e consulta oficial do RetroAchievements.
+- Credenciais do RetroAchievements protegidas pelo Android Keystore.
+- Conquistas, capas, jogo recente e horas ficam disponíveis offline.
+- Logs `.lrtl` são a fonte preferida de tempo; o cronômetro persistente funciona como contingência.
+- Sincronização cumulativa e idempotente evita duplicar horas ao reencontrar o computador.
+- O código-fonte Android e sua validação automatizada passam a fazer parte do repositório público.
+
 ## Launcher 1.56.3 — identidade BRUMCLASSICS no Windows
 
 - O campo de descrição do executável passa a ser somente **BRUMCLASSICS**.

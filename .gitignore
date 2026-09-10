@@ -28,4 +28,8 @@ desktop.ini
 .vscode/
 .idea/
 ios/build/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
 __pycache__/

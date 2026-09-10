@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brum_bg">#090A0C</color>
+    <color name="brum_surface">#111317</color>
+    <color name="brum_surface_raised">#171A1F</color>
+    <color name="brum_text">#F5F6F8</color>
+    <color name="brum_muted">#757B86</color>
+    <color name="brum_accent">#9DFF3B</color>
+</resources>

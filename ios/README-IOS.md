@@ -35,7 +35,7 @@ Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o mesmo protocolo
 
 No Windows, `node validate-ios-project.js` confere a estrutura, os endpoints, os comandos remotos, o protocolo, a proteção local, o pin TLS e o AppIcon antes de transferir o projeto ao Mac.
 
-O Windows não possui Xcode nem o SDK do iOS, portanto não compila o aplicativo sozinho. O workflow `github-actions/build-ios-personal.yml` usa um executor macOS do GitHub para produzir um `.ipa` sem assinatura. Copie esse arquivo para `.github/workflows/build-ios-personal.yml` na raiz do repositório e mantenha o projeto iOS na pasta `ios` do repositório.
+O Windows não possui Xcode nem o SDK do iOS, portanto não compila o aplicativo sozinho. O workflow `.github/workflows/build-ios-personal.yml` usa um executor macOS do GitHub para produzir um `.ipa` sem assinatura e já está configurado na raiz deste repositório.
 
 ## Uso pessoal e atualizações
 

@@ -1,0 +1,25 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "com.brumclassics.mobile"
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "com.brumclassics.mobile"
+        minSdk 26
+        targetSdk 36
+        versionCode 24
+        versionName "0.16.0"
+    }
+
+    buildTypes {
+        debug {
+            debuggable false
+        }
+        release {
+            minifyEnabled false
+        }
+    }
+}

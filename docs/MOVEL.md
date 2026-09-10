@@ -1,12 +1,12 @@
-# BRUMCLASSICS MOVEL 0.15.0
+# BRUMCLASSICS MÓVEL Android 0.16.0
 
 Jogos cadastrados no launcher como **não oficiais** são sincronizados como itens locais instalados. O aplicativo recebe somente a classificação e o SteamID de referência quando houver; o caminho do executável nunca sai do computador. B-CARD, anotações e BRUMCOMPANION continuam usando a identidade segura enviada pelo launcher.
 
-Guia compatível com BRUMCLASSICS OFICIAL 1.51.0. Android 8.0 ou superior.
+Esta versão também adiciona **CLASSICS Everywhere**: a biblioteca local de ROMs autorizada pelo usuário, abertura no RetroArch, capas, conquistas oficiais do RetroAchievements e horas disponíveis offline. Guia compatível com BRUMCLASSICS OFICIAL 1.55.4 ou superior. Android 8.0 ou superior.
 
 ## Instalar e atualizar
 
-Instale o APK 0.15.0 da release oficial sobre o aplicativo existente, sem limpar seus dados. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente. Se a rede externa estiver indisponível, o launcher pareado pode oferecer o mesmo APK localmente.
+Instale o APK 0.16.0 da release oficial sobre o aplicativo existente, sem limpar seus dados. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente. Se a rede externa estiver indisponível, o launcher pareado pode oferecer o mesmo APK localmente.
 
 ## Parear com segurança
 
@@ -38,6 +38,16 @@ O painel de desempenho aparece durante a sessão e mostra CPU, GPU, RAM, VRAM, p
 ## Conquistas e sessões
 
 O móvel recebe os dados do launcher; não autentica suas lojas novamente. Conquistas dependem do suporte da plataforma, privacidade e disponibilidade da API. Atualização em segundo plano não significa desbloqueio instantâneo. No launcher 1.49.1, CLASSICS usam o hash da ROM para localizar o conjunto oficial e explicam quando o arquivo não é reconhecido.
+
+## CLASSICS Everywhere
+
+1. Em **Perfil → Configurações do app → CLASSICS**, autorize a pasta que contém suas próprias ROMs.
+2. Instale o RetroArch e os núcleos dos sistemas que pretende usar. O BRUMCLASSICS não instala nem altera o emulador.
+3. Para conquistas, informe seu usuário e sua **Web API Key** do RetroAchievements. Esses dados ficam cifrados pelo Android Keystore e são usados apenas para consultar a API oficial.
+4. Vincule a ROM ao CLASSICS correspondente quando o aplicativo solicitar. Capas e semelhança de nome não comprovam identidade nem concedem conquistas.
+5. Se quiser contabilização precisa de horas, autorize a pasta de logs agregados `.lrtl` do RetroArch. Sem ela, o aplicativo usa o intervalo persistente fora do BRUMCLASSICS como contingência.
+
+O progresso consultado permanece disponível offline. Ao reencontrar o launcher na mesma rede, conquistas e acréscimos de tempo vinculados entram na sincronização autenticada. Reenvios usam um contador cumulativo para não duplicar horas.
 
 ## Botão e gesto Voltar
 
