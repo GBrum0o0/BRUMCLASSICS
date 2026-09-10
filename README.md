@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.56.3"><strong>Windows 1.56.3</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.56.4"><strong>Windows 1.56.4</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.16.0"><strong>Android 0.16.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.7.6"><strong>iOS 0.7.6</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -54,7 +54,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 1.56.3 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.56.3) |
+| Windows | 1.56.4 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.56.4) |
 | Android | 0.16.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.16.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.7.6 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.7.6) · [Guia](ios/README-IOS.md) |
 
@@ -64,7 +64,7 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 
 ## Versões atuais
 
-- **Launcher 1.56.3:** identidade do executável consolidada como BRUMCLASSICS e correções acumuladas de biblioteca e sessões.
+- **Launcher 1.56.4:** tela de preparação renovada com identidade BRUMCLASSICS, título refinado e anotações em sequência.
 - **Android 0.16.0:** CLASSICS Everywhere, RetroArch, RetroAchievements, capas e horas locais com sincronização segura ao PC.
 - **iOS 0.7.6:** abertura pelo RetroArch, sessões móveis, vínculo seguro com o CLASSICS do launcher e capa recente.
 
@@ -83,7 +83,7 @@ Veja o [histórico completo](CHANGELOG.md) e as [notas do Android 0.16.0](releas
 
 ## Instalação rápida
 
-1. Baixe e extraia o pacote da [release Windows 1.56.3](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.56.3).
+1. Baixe o executável portátil da [release Windows 1.56.4](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.56.4).
 2. Execute `BRUMCLASSICS OFICIAL.exe`.
 3. Abra **Configurações → Conexões** e vincule somente suas próprias contas.
 4. Para CLASSICS, coloque somente suas próprias ROMs na pasta `RETROGAMES`.

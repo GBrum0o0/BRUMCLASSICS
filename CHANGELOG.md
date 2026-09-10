@@ -10,6 +10,14 @@
 - Sincronização cumulativa e idempotente evita duplicar horas ao reencontrar o computador.
 - O código-fonte Android e sua validação automatizada passam a fazer parte do repositório público.
 
+## Launcher 1.56.4 — preparação com identidade BRUMCLASSICS
+
+- A tela intermediária ganha um fundo próprio inspirado na biblioteca digital do BRUMCLASSICS.
+- O título preserva a escrita original do jogo e recebe hierarquia tipográfica adaptável a nomes longos.
+- Onde parei, Objetivos, Dicas e Comandos aparecem em sequência ao longo dos dez segundos de preparação.
+- Plataforma, categoria, tempo jogado e última sessão contextualizam o retorno ao jogo.
+- O cartão final mantém a liberação por teclado, mouse ou controle e não altera os fluxos de falha e restauração.
+
 ## Launcher 1.56.3 — identidade BRUMCLASSICS no Windows
 
 - O campo de descrição do executável passa a ser somente **BRUMCLASSICS**.
