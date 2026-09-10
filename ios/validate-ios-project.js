@@ -16,7 +16,7 @@ const required = [
   'BRUMCLASSICSMobile/ProfileView.swift', 'BRUMCLASSICSMobile/BCardView.swift',
   'BRUMCLASSICSMobile/ROMFolderLibrary.swift',
   'BRUMCLASSICSMobile/MomentsView.swift', 'BRUMCLASSICSMobileTests/SnapshotTests.swift',
-  'ios-update.json', 'github-actions/build-ios-personal.yml'
+  'ios-update.json'
 ];
 
 for (const relative of required) {
@@ -74,7 +74,8 @@ if (!source.includes('checkForPersonalUpdate')) throw new Error('Verificação d
 
 const updateManifest = JSON.parse(fs.readFileSync(path.join(root, 'ios-update.json'), 'utf8'));
 const publishedUpdateManifest = JSON.parse(fs.readFileSync(path.join(root, '..', 'ios-update.json'), 'utf8'));
-if (!fs.readFileSync(path.join(root, 'github-actions/build-ios-personal.yml'), 'utf8').includes('ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa')) throw new Error('Upload do IPA não pode ficar preso a uma versão antiga.');
+const workflow = fs.readFileSync(path.join(root, '..', '.github', 'workflows', 'build-ios-personal.yml'), 'utf8');
+if (!workflow.includes('ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa')) throw new Error('Upload do IPA não pode ficar preso a uma versão antiga.');
 if (!/^\d+\.\d+\.\d+$/.test(updateManifest.version)) throw new Error('Versão inválida em ios-update.json.');
 if (!String(updateManifest.buildUrl || '').startsWith('https://github.com/GBrum0o0/BRUMCLASSICS/')) throw new Error('URL do build pessoal inválida.');
 if (publishedUpdateManifest.version !== updateManifest.version || publishedUpdateManifest.build !== updateManifest.build || publishedUpdateManifest.buildUrl !== updateManifest.buildUrl) throw new Error('Manifesto público de atualização diverge do pacote iOS.');

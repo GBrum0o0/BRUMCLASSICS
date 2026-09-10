@@ -3,6 +3,8 @@ name: Build iOS pessoal
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     paths:
       - "ios/**"
       - ".github/workflows/build-ios-personal.yml"
