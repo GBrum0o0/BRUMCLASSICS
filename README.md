@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.56.6"><strong>Windows 1.56.6</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.57.0"><strong>Windows 1.57.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.16.0"><strong>Android 0.16.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.7.6"><strong>iOS 0.7.6</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -38,6 +38,9 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - CLASSICS com RetroArch, save states e Quick Resume.
 - Living Room Mode com controle e mídia física 3D.
 - Perfis por dispositivo para controles genéricos, com layout PlayStation, Xbox ou Nintendo e aprendizado de botões.
+- Calibração de drift e ajustes de analógicos por controle.
+- Central de Sessões com evidências do processo e correção auditável.
+- Saúde da Biblioteca e backup portátil do perfil com verificação SHA-256.
 - BRUMWORLD: revista interativa com guias visuais do launcher e do aplicativo.
 - Aplicativo Android com biblioteca offline, capas, estatísticas e BRUMCOMPANION.
 - Aplicativo iOS pessoal em SwiftUI, com o mesmo cache offline, B-CARD e BRUMCOMPANION, preparado para sideload.
@@ -55,7 +58,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 1.56.6 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.56.6) |
+| Windows | 1.57.0 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.57.0) |
 | Android | 0.16.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.16.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.7.6 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.7.6) · [Guia](ios/README-IOS.md) |
 
@@ -65,7 +68,7 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 
 ## Versões atuais
 
-- **Launcher 1.56.6:** sessões acompanham corretamente jogos abertos por Steam, Ubisoft Connect e outros launchers durante trocas de processo.
+- **Launcher 1.57.0:** diagnósticos de sessões e RetroAchievements, calibração de controles, Saúde da Biblioteca e backup portátil.
 - **Android 0.16.0:** CLASSICS Everywhere, RetroArch, RetroAchievements, capas e horas locais com sincronização segura ao PC.
 - **iOS 0.7.6:** abertura pelo RetroArch, sessões móveis, vínculo seguro com o CLASSICS do launcher e capa recente.
 
@@ -84,7 +87,7 @@ Veja o [histórico completo](CHANGELOG.md) e as [notas do Android 0.16.0](releas
 
 ## Instalação rápida
 
-1. Baixe o executável portátil da [release Windows 1.56.6](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.56.6).
+1. Baixe o executável portátil da [release Windows 1.57.0](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.57.0).
 2. Execute `BRUMCLASSICS OFICIAL.exe`.
 3. Abra **Configurações → Conexões** e vincule somente suas próprias contas.
 4. Para CLASSICS, coloque somente suas próprias ROMs na pasta `RETROGAMES`.

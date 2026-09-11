@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## Launcher 1.57.0 — central de confiabilidade
+
+- Central de Sessões com processo, PID, reconexão, encerramento manual e correção auditável do histórico.
+- Diagnóstico completo do RetroAchievements, da conta até a resposta da API oficial.
+- Calibração de drift, centro, deadzone, sensibilidade e gatilhos por dispositivo.
+- Saúde da Biblioteca com reparo de instalações, capas e identificação de possíveis duplicatas.
+- Backup portátil protegido por SHA-256, sem credenciais e com cópia de recuperação antes da restauração.
+
 ## Launcher 1.56.6 — sessões acompanhadas até o fechamento real
 
 - Jogos iniciados pela Steam, Ubisoft Connect e outros launchers não são mais marcados como encerrados durante uma troca temporária de processo.
