@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## Launcher 1.56.6 — sessões acompanhadas até o fechamento real
+
+- Jogos iniciados pela Steam, Ubisoft Connect e outros launchers não são mais marcados como encerrados durante uma troca temporária de processo.
+- O monitor reconhece o executável esperado mesmo quando o Windows oculta seu caminho por ele estar executando com privilégios elevados.
+- Reinicializações e executáveis auxiliares seguros dentro da pasta do jogo podem continuar a mesma sessão; launchers, instaladores e crash reporters permanecem excluídos.
+- O PID do jogo passa a ser preservado corretamente e o encerramento exige 12 verificações consecutivas sem localizar o processo.
+- As estatísticas e a atividade só são concluídas quando o fechamento do jogo é confirmado.
+
 ## Launcher 1.56.5 — controles personalizados por dispositivo
 
 - Cada controle conectado ganha o botão **AJUSTAR** em Configurações → Controles.
