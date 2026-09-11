@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## Launcher 1.56.5 — controles personalizados por dispositivo
+
+- Cada controle conectado ganha o botão **AJUSTAR** em Configurações → Controles.
+- Controles genéricos podem ser apresentados como PlayStation, Xbox, Nintendo ou continuar na detecção automática.
+- O comando **ESCUTAR** aprende cada botão físico; o número também pode ser escolhido manualmente.
+- O perfil fica salvo por dispositivo e adapta tanto a navegação do launcher quanto os ícones da interface.
+- CLASSICS recebem os botões e hotkeys remapeados por um `appendconfig` temporário do RetroArch, sem modificar o `retroarch.cfg`.
+- A identidade real do hardware continua registrada. Nenhum driver virtual é instalado e jogos externos ainda podem exigir suporte próprio, Steam Input ou DS4Windows.
+
 ## Android 0.16.0 — CLASSICS Everywhere
 
 - Pasta de ROMs autorizada pelo seletor nativo e abertura de sistemas compatíveis no RetroArch.
