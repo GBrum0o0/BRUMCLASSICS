@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## Launcher 1.60.1 — conexões em foco
+
+- O catálogo de conexões ganha cartões mais compactos e hierarquia visual inspirada no conceito aprovado, preservando o preto e verde do BRUMCLASSICS.
+- Cada loja ou serviço passa a abrir uma tela dedicada com nome em destaque, estado da integração, biblioteca, inicialização e monitoramento.
+- A conexão exibe quatro etapas em duas colunas, com progresso, estado de cada verificação e garantias de privacidade visíveis.
+- O botão **Voltar** agora respeita a navegação: primeiro retorna da integração ao catálogo e depois volta às Configurações → Conexões.
+- A tecla Esc segue o mesmo caminho e não fecha mais a área de configurações indevidamente.
+- Um teste de interação cobre os dois retornos e confirma que o catálogo, a tela de detalhes e o progresso permanecem dentro da área visível.
+
 ## Launcher 1.60.0 — explorar conexões
 
 - Configurações → Conexões passa a apresentar um único botão **EXPLORAR CONEXÕES**, sem criar uma seção separada de extensões.
