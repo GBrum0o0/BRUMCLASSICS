@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## Launcher 1.60.0 — explorar conexões
+
+- Configurações → Conexões passa a apresentar um único botão **EXPLORAR CONEXÕES**, sem criar uma seção separada de extensões.
+- Steam, Epic Games, GOG Galaxy, EA app, Ubisoft Connect, RetroAchievements e RetroArch aparecem no mesmo catálogo visual.
+- Busca e filtros separam todas as integrações das conexões já configuradas.
+- Cada cartão informa recursos, tipo de acesso, estado atual, última sincronização e funcionamento do monitor.
+- A tela de detalhes explica permissões e diagnósticos antes de iniciar qualquer vínculo.
+- Validação, sincronização, desconexão e Família Steam recebem acompanhamento visual por etapas e mensagens de recuperação.
+- RetroAchievements e RetroArch mantêm cartões e formulários focados, mas continuam compartilhando a configuração retrô protegida já existente.
+- O monitor atualiza os estados enquanto o explorador está aberto, sem alterar bibliotecas, contas ou configurações anteriores.
+
 ## iOS 0.8.1 — pesquisa de jogos em Conquistas
 
 - A seção Conquistas permite pesquisar jogos do launcher e CLASSICS do próprio iPhone.

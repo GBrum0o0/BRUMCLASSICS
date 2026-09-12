@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.59.0"><strong>Windows 1.59.0</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.60.0"><strong>Windows 1.60.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.17.0"><strong>Android 0.17.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.8.1"><strong>iOS 0.8.1</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -29,6 +29,7 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 
 - Biblioteca unificada de jogos modernos e clássicos.
 - Integração com Steam, Epic Games, GOG, EA App e Ubisoft Connect, conforme a disponibilidade de cada serviço.
+- Explorador único de conexões para lojas, RetroAchievements e RetroArch, com busca, permissões, diagnóstico e monitoramento visível.
 - Família Steam opcional: jogos compartilhados atualmente acessíveis entram identificados separadamente, sem serem tratados como compras da conta.
 - Busca, filtros, coleções, favoritos e prioridade de loja.
 - Jogos não oficiais podem ser cadastrados com executável local e SteamID opcional. **BUSCAR DADOS** usa o ID exato ou uma correspondência segura pelo nome para mostrar título oficial e recuperar capa e imagens, sem criar uma falsa licença de loja.
@@ -59,16 +60,17 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 1.59.0 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.59.0) |
+| Windows | 1.60.0 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.60.0) |
 | Android | 0.17.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.17.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.8.1 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.8.1) · [Guia](ios/README-IOS.md) |
 
 Os hashes SHA-256 acompanham os arquivos publicados. O GitHub hospeda executáveis, APKs e IPAs somente em Releases; esses binários não entram no histórico do repositório.
 
-A versão pessoal para iPhone é compilada separadamente em **Actions → Build iOS pessoal**. O artefato contém um IPA sem assinatura para instalação com AltStore ou Sideloadly. No iOS 0.8.1, Conquistas permite pesquisar jogos e abrir o progresso completo; a Central BRUM acompanha os avisos do launcher 1.59.0. `CLASSICS Everywhere`, horas, capas e sessões continuam disponíveis. Consulte [as instruções do iOS](ios/README-IOS.md) e o [guia do RetroArch compatível](ios/RETROARCH-COMPATIVEL.md).
+A versão pessoal para iPhone é compilada separadamente em **Actions → Build iOS pessoal**. O artefato contém um IPA sem assinatura para instalação com AltStore ou Sideloadly. No iOS 0.8.1, Conquistas permite pesquisar jogos e abrir o progresso completo; a Central BRUM acompanha os avisos do launcher 1.59.0 ou posterior. `CLASSICS Everywhere`, horas, capas e sessões continuam disponíveis. Consulte [as instruções do iOS](ios/README-IOS.md) e o [guia do RetroArch compatível](ios/RETROARCH-COMPATIVEL.md).
 
 ## Versões atuais
 
+- **Launcher 1.60.0:** lojas, RetroAchievements e RetroArch reunidos em um explorador com conexão acompanhada e monitoramento refinado.
 - **Launcher 1.59.0:** sincronização autenticada da Central BRUM com iPhone e Android.
 - **Launcher 1.58.0:** Central de Notificações, backup completo e seletivo de perfil, saves e mídias, além de recuperação de encerramentos inesperados.
 - **Launcher 1.57.0:** diagnósticos de sessões e RetroAchievements, calibração de controles e Saúde da Biblioteca.
@@ -90,9 +92,9 @@ Veja o [histórico completo](CHANGELOG.md) e as [notas do Android 0.17.0](releas
 
 ## Instalação rápida
 
-1. Baixe o executável portátil da [release Windows 1.59.0](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.59.0).
+1. Baixe o executável portátil da [release Windows 1.60.0](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.60.0).
 2. Execute `BRUMCLASSICS OFICIAL.exe`.
-3. Abra **Configurações → Conexões** e vincule somente suas próprias contas.
+3. Abra **Configurações → Conexões → Explorar conexões** e vincule somente suas próprias contas.
 4. Para CLASSICS, coloque somente suas próprias ROMs na pasta `RETROGAMES`.
 5. Para o celular, instale o APK e faça o pareamento em **Configurações → MOVEL** na mesma rede local.
 
