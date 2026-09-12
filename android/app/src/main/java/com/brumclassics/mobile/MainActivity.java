@@ -116,6 +116,7 @@ public final class MainActivity extends Activity {
     private org.json.JSONObject sessionStatus = new org.json.JSONObject();
     private org.json.JSONObject companion = new org.json.JSONObject();
     private org.json.JSONObject performance = new org.json.JSONObject();
+    private org.json.JSONObject notificationSnapshot = new org.json.JSONObject();
     private final Map<String, TextView> performanceValues = new HashMap<>();
     private final PerformanceLiveState performanceLive = new PerformanceLiveState();
     private LinearLayout performancePanel;
@@ -154,6 +155,7 @@ public final class MainActivity extends Activity {
                         org.json.JSONObject nextSessionStatus = snapshot.optJSONObject("sessionStatus") == null ? new org.json.JSONObject() : snapshot.optJSONObject("sessionStatus");
                         org.json.JSONObject nextCompanion = snapshot.optJSONObject("companion") == null ? new org.json.JSONObject() : snapshot.optJSONObject("companion");
                         org.json.JSONObject nextPerformance = snapshot.optJSONObject("performance") == null ? new org.json.JSONObject() : snapshot.optJSONObject("performance");
+                        org.json.JSONObject nextNotifications = snapshot.optJSONObject("notifications") == null ? new org.json.JSONObject() : snapshot.optJSONObject("notifications");
                         org.json.JSONObject nextExperience = snapshot.optJSONObject("experience") == null ? new org.json.JSONObject() : snapshot.optJSONObject("experience");
                         repository.replaceFromSnapshot(rawJson);
                         List<Game> nextGames = repository.all();
@@ -162,6 +164,7 @@ public final class MainActivity extends Activity {
                             sessionStatus = nextSessionStatus;
                             companion = nextCompanion;
                             performance = nextPerformance;
+                            notificationSnapshot = nextNotifications;
                             performanceLive.accept(performance.optBoolean("active"), performance.optString("gameId", ""), SystemClock.elapsedRealtime());
                             experience = nextExperience;
                             games = nextGames;
@@ -339,6 +342,7 @@ public final class MainActivity extends Activity {
             if (classic != null) showClassicDetails(classic); else showClassics();
         }
         else if ("classic-settings".equals(currentScreen)) showClassicSettings();
+        else if ("notifications".equals(currentScreen)) showNotifications();
         else if ("bcard".equals(currentScreen)) {
             for (Game game : games) if (game.id.equals(bCardGameId)) { showBCard(game); return; }
             showBCardLibrary();
@@ -587,6 +591,71 @@ public final class MainActivity extends Activity {
         dialog.show();
     }
 
+    private void showNotifications() {
+        ScrollView scroll = scroll(); LinearLayout page = page(); scroll.addView(page);
+        page.addView(backHeader("CENTRAL BRUM", this::showHome));
+        page.addView(text("Notificações", 29, TEXT, true), margins(-1, 24, -1, 7));
+        page.addView(text("Conquistas, sessões, saves, instalações e avisos do launcher.", 10, MUTED, false));
+        int unread = Math.max(0, notificationSnapshot.optInt("unread", 0));
+        page.addView(sectionHeading(unread > 0 ? unread + (unread == 1 ? " NÃO LIDA" : " NÃO LIDAS") : "TUDO EM DIA", unread > 0 ? "MARCAR TODAS" : "", v -> {
+            bridgeClient.markNotificationRead("", true, new BridgeClient.NotificationCallback() {
+                @Override public void onSuccess(int remaining) {
+                    try {
+                        notificationSnapshot.put("unread", remaining);
+                        org.json.JSONArray current = notificationSnapshot.optJSONArray("entries");
+                        if (current != null) for (int i = 0; i < current.length(); i++) if (current.optJSONObject(i) != null) current.optJSONObject(i).put("readAt", "agora");
+                    } catch (Exception ignored) {}
+                    showNotifications();
+                }
+                @Override public void onError(String message) { Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show(); }
+            });
+        }), margins(-1, 28, -1, 12));
+        org.json.JSONArray entries = notificationSnapshot.optJSONArray("entries");
+        if (entries == null || entries.length() == 0) {
+            LinearLayout empty = column(); empty.setPadding(dp(18), dp(20), dp(18), dp(20)); empty.setBackground(background(SURFACE, 4, LINE, 1));
+            empty.addView(eyebrow("NENHUMA NOTIFICAÇÃO"));
+            empty.addView(text(bridgeClient.isConfigured() ? "Quando algo importante acontecer no launcher, aparecerá aqui." : "Conecte-se ao launcher atualizado para sincronizar sua central.", 10, MUTED, false), margins(-1, 9, -1, 0));
+            page.addView(empty);
+        } else {
+            for (int index = 0; index < entries.length(); index++) {
+                org.json.JSONObject item = entries.optJSONObject(index);
+                if (item == null) continue;
+                String id = item.optString("id", "");
+                String gameId = item.optString("gameId", "");
+                boolean read = !item.optString("readAt", "").isEmpty();
+                String severity = item.optString("severity", "info");
+                int tone = "error".equals(severity) ? Color.rgb(255, 91, 91) : "warning".equals(severity) ? Color.rgb(255, 176, 66) : "success".equals(severity) ? ACCENT : Color.rgb(74, 203, 255);
+                LinearLayout card = column(); card.setPadding(dp(15), dp(14), dp(15), dp(14)); card.setBackground(background(SURFACE, 4, read ? LINE : Color.argb(105, 157, 255, 59), 1));
+                LinearLayout top = row(); top.setGravity(Gravity.CENTER_VERTICAL);
+                TextView category = text(item.optString("category", "AVISO").toUpperCase(Locale.ROOT), 7, tone, true); category.setLetterSpacing(.14f);
+                top.addView(category, new LinearLayout.LayoutParams(0, -2, 1));
+                if (!read) top.addView(text("●", 11, ACCENT, true));
+                card.addView(top);
+                card.addView(text(item.optString("title", "BRUMCLASSICS"), 15, TEXT, true), margins(-1, 8, -1, 0));
+                String message = item.optString("message", ""); if (!message.isEmpty()) card.addView(text(message, 10, MUTED, false), margins(-1, 6, -1, 0));
+                String gameTitle = item.optString("gameTitle", "");
+                String when = notificationTime(item.optString("createdAt", ""));
+                if (!gameTitle.isEmpty() || !when.isEmpty()) card.addView(text(gameTitle + (!gameTitle.isEmpty() && !when.isEmpty() ? " · " : "") + when, 7, MUTED, true), margins(-1, 10, -1, 0));
+                card.setAlpha(read ? .68f : 1f);
+                card.setOnClickListener(v -> {
+                    if (!read) bridgeClient.markNotificationRead(id, false, new BridgeClient.NotificationCallback() {
+                        @Override public void onSuccess(int remaining) { }
+                        @Override public void onError(String error) { Toast.makeText(MainActivity.this, error, Toast.LENGTH_LONG).show(); }
+                    });
+                    if (!gameId.isEmpty()) for (Game game : games) if (game.id.equals(gameId)) { detailsReturnScreen = "notifications"; showDetails(game); return; }
+                });
+                page.addView(card, margins(-1, 0, -1, 9));
+            }
+        }
+        page.addView(space(30)); setScreen("notifications", scroll);
+    }
+
+    private String notificationTime(String value) {
+        if (value == null || value.isEmpty()) return "";
+        String clean = value.replace('T', ' ');
+        return clean.length() >= 16 ? clean.substring(0, 16) : clean;
+    }
+
     private void showMoments() {
         ScrollView scroll = scroll(); LinearLayout page = page(); scroll.addView(page);
         page.addView(brandHeader("BRUMMOMENTS"));
@@ -756,6 +825,21 @@ public final class MainActivity extends Activity {
         headline.setLineSpacing(0, .93f);
         page.addView(headline);
         page.addView(text("Continue de onde parou ou encontre a próxima história.", 12, MUTED, false), margins(-1, 12, -1, 27));
+
+        LinearLayout notificationsAccess = row();
+        notificationsAccess.setGravity(Gravity.CENTER_VERTICAL);
+        notificationsAccess.setPadding(dp(16), dp(14), dp(14), dp(14));
+        notificationsAccess.setBackground(background(SURFACE, 5, LINE, 1));
+        LinearLayout notificationsCopy = column();
+        int unreadNotifications = Math.max(0, notificationSnapshot.optInt("unread", 0));
+        notificationsCopy.addView(text("NOTIFICAÇÕES" + (unreadNotifications > 0 ? " · " + unreadNotifications : ""), 15, TEXT, true));
+        notificationsCopy.addView(text(unreadNotifications > 0 ? "Avisos não lidos sincronizados com o launcher" : "Conquistas, sessões, saves e atualizações", 9, MUTED, false), margins(-1, 5, -1, 0));
+        notificationsAccess.addView(notificationsCopy, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView notificationsArrow = text(unreadNotifications > 0 ? "●" : "›", unreadNotifications > 0 ? 14 : 28, unreadNotifications > 0 ? ACCENT : MUTED, true);
+        notificationsArrow.setGravity(Gravity.CENTER);
+        notificationsAccess.addView(notificationsArrow, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        notificationsAccess.setOnClickListener(v -> showNotifications());
+        page.addView(notificationsAccess, margins(-1, 0, -1, 18));
 
         if (!repository.isSynchronizedLibrary()) {
             LinearLayout demo = column();

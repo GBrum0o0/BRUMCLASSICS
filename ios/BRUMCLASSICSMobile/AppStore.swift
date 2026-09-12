@@ -185,6 +185,35 @@ final class AppStore: ObservableObject {
         } catch { return error.localizedDescription }
     }
 
+    func markNotificationRead(_ notification: MobileNotification) async {
+        guard !notification.isRead else { return }
+        guard connection == .online else { message = "Conecte o iPhone ao launcher para marcar a notificação como lida."; return }
+        do {
+            try await bridge.markNotificationRead(notification.id)
+            if var center = snapshot.notifications, let index = center.entries.firstIndex(where: { $0.id == notification.id }) {
+                center.entries[index].readAt = ISO8601DateFormatter().string(from: Date())
+                center.unread = max(0, center.unread - 1)
+                snapshot.notifications = center
+                try? await offline.saveSnapshot(snapshot)
+            }
+        } catch { message = error.localizedDescription }
+    }
+
+    func markAllNotificationsRead() async {
+        guard (snapshot.notifications?.unread ?? 0) > 0 else { return }
+        guard connection == .online else { message = "Conecte o iPhone ao launcher para marcar as notificações como lidas."; return }
+        do {
+            try await bridge.markAllNotificationsRead()
+            if var center = snapshot.notifications {
+                let stamp = ISO8601DateFormatter().string(from: Date())
+                for index in center.entries.indices where !center.entries[index].isRead { center.entries[index].readAt = stamp }
+                center.unread = 0
+                snapshot.notifications = center
+                try? await offline.saveSnapshot(snapshot)
+            }
+        } catch { message = error.localizedDescription }
+    }
+
     func recordLocalLaunch(gameID: String, at date: Date = Date()) async {
         guard let index = snapshot.games.firstIndex(where: { $0.id == gameID }) else { return }
         let stamp = ISO8601DateFormatter().string(from: date)
@@ -336,7 +365,7 @@ final class AppStore: ObservableObject {
             }
             return
         }
-        guard ["ready", "library_changed", "companion_changed", "achievement_unlocked", "install_changed", "notes_changed", "library_state_changed", "collections_changed", "activity_changed", "profile_changed"].contains(event["type"] as? String ?? "") else { return }
+        guard ["ready", "library_changed", "companion_changed", "achievement_unlocked", "install_changed", "notes_changed", "library_state_changed", "collections_changed", "activity_changed", "profile_changed", "notifications_changed"].contains(event["type"] as? String ?? "") else { return }
         await refresh()
     }
 }

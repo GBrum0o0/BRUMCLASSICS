@@ -25,6 +25,9 @@ struct HomeView: View {
                     Text(greeting).font(.system(size: 20, weight: .bold)).foregroundStyle(BrumTheme.primary)
                     Text("Sua biblioteca,\nem qualquer lugar.").font(.system(size: 40, weight: .black)).foregroundStyle(BrumTheme.text)
                 }
+                NavigationLink { NotificationsView() } label: {
+                    SettingsRow(icon: "bell.fill", title: "NOTIFICAÇÕES", detail: notificationDetail)
+                }
                 if let active = store.companionGame, store.connection == .online {
                     Button { selection = 3 } label: { CompanionCard(game: active) }.buttonStyle(.plain)
                 }
@@ -46,6 +49,11 @@ struct HomeView: View {
     }
 
     private var greeting: String { let hour = Calendar.current.component(.hour, from: Date()); return hour < 12 ? "Bom dia." : hour < 18 ? "Boa tarde." : "Boa noite." }
+    private var notificationDetail: String {
+        let center = store.snapshot.notifications ?? .empty
+        if center.unread > 0 { return "\(center.unread) não \(center.unread == 1 ? "lida" : "lidas") · sincronizadas com o launcher" }
+        return center.total > 0 ? "Tudo em dia · \(center.total) no histórico" : "Avisos, conquistas, sessões e atualizações"
+    }
 }
 
 struct PocketFeaturedGameCard: View {

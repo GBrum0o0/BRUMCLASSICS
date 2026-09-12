@@ -56,6 +56,7 @@ actor BridgeClient {
     struct Device: Codable { let id: String; let name: String }
     struct ServerEnvelope<T: Decodable>: Decodable { let ok: Bool?; let result: T?; let message: String?; let error: String? }
     struct EmptyResult: Codable {}
+    struct NotificationReadResponse: Decodable { let ok: Bool; let unread: Int }
     struct MomentResponse: Decodable { let id: String; let gameId: String; let gameTitle: String; let capturedAt: String; let imagePath: String }
 
     private let delegate = PinnedSessionDelegate()
@@ -83,6 +84,16 @@ actor BridgeClient {
     }
 
     func snapshot() async throws -> LibrarySnapshot { try await request(path: "/v1/snapshot") }
+
+    func markNotificationRead(_ id: String) async throws {
+        guard !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let body = try JSONSerialization.data(withJSONObject: ["id": id])
+        let _: NotificationReadResponse = try await request(path: "/v1/notifications/read", method: "POST", body: body)
+    }
+
+    func markAllNotificationsRead() async throws {
+        let _: NotificationReadResponse = try await request(path: "/v1/notifications/read-all", method: "POST", body: Data())
+    }
 
     func syncPocketAchievements(gameID: String, raGameID: Int, username: String) async throws {
         let body = try JSONSerialization.data(withJSONObject: ["gameId": gameID, "raGameId": raGameID, "username": username])
@@ -196,7 +207,7 @@ actor BridgeClient {
         guard let url = URL(string: "\(scheme)://\(host):\(port)\(path)") else { throw BridgeError.invalidResponse("Endereço local inválido.") }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("BRUMCLASSICS-MOVEL/0.4.0 iOS", forHTTPHeaderField: "User-Agent")
+        request.setValue("BRUMCLASSICS-MOVEL/0.8.0 iOS", forHTTPHeaderField: "User-Agent")
         if authenticated { guard !token.isEmpty else { throw BridgeError.notPaired }; request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         return request
     }

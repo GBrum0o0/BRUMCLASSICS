@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## Launcher 1.59.0 e aplicativos móveis — Central BRUM em todos os dispositivos
+
+- O launcher usa o protocolo móvel 9 para entregar somente as notificações seguras do perfil ativo.
+- iOS 0.8.0 e Android 0.17.0 mostram conquistas, sessões, saves, instalações, atualizações e avisos.
+- Leitura individual e “marcar todas” são sincronizadas de volta por uma rota autenticada.
+- Mudanças chegam em tempo real; o último snapshot continua disponível offline no celular.
+- Perfil, chaves internas, credenciais e caminhos do computador não fazem parte da resposta móvel.
+- Caches do protocolo 8 continuam abrindo para permitir atualização sem apagar dados ou refazer o pareamento.
+
 ## Launcher 1.58.0 — proteção, notificações e recuperação
 
 - Central persistente de notificações por jogador para conquistas, sessões, saves, instalações, atualizações e incidentes.

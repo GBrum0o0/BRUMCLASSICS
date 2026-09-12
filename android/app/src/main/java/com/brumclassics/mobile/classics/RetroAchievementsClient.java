@@ -38,7 +38,7 @@ public final class RetroAchievementsClient {
                     + URLEncoder.encode(key.trim(), "UTF-8") + "&u=" + URLEncoder.encode(username.trim(), "UTF-8") + "&g=" + gameId;
                 HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
                 connection.setConnectTimeout(8_000); connection.setReadTimeout(20_000); connection.setUseCaches(false);
-                connection.setRequestProperty("Accept", "application/json"); connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android/0.16.0");
+                connection.setRequestProperty("Accept", "application/json"); connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android/0.17.0");
                 int code = connection.getResponseCode();
                 if (code != 200) throw new IllegalStateException("RetroAchievements indisponível ou credencial inválida (" + code + ").");
                 String raw; try (InputStream input = connection.getInputStream()) { raw = new String(readAll(input, 12 * 1024 * 1024), StandardCharsets.UTF_8); }

@@ -48,6 +48,11 @@ public final class BridgeClient {
         void onError(String safeMessage);
     }
 
+    public interface NotificationCallback {
+        void onSuccess(int unread);
+        void onError(String safeMessage);
+    }
+
     public interface BitmapCallback { void onBitmap(Bitmap bitmap); }
 
     public interface CompanionCallback {
@@ -406,6 +411,32 @@ public final class BridgeClient {
         });
     }
 
+    public void markNotificationRead(String id, boolean all, NotificationCallback callback) {
+        if (!isConfigured()) { callback.onError("Conecte este celular ao launcher primeiro."); return; }
+        String safeId = id == null ? "" : id.trim();
+        if (!all && (safeId.isEmpty() || safeId.length() > 100)) { callback.onError("Notificação inválida."); return; }
+        executor.execute(() -> {
+            try {
+                String path = all ? "/v1/notifications/read-all" : "/v1/notifications/read";
+                JSONObject body = new JSONObject();
+                if (!all) body.put("id", safeId);
+                HttpURLConnection connection = open(baseUrl() + path, "POST", true);
+                connection.setDoOutput(true);
+                byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
+                connection.setFixedLengthStreamingMode(bytes.length);
+                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                try (OutputStream output = connection.getOutputStream()) { output.write(bytes); }
+                String raw = readResponse(connection, 128 * 1024);
+                JSONObject result = raw.isEmpty() ? new JSONObject() : new JSONObject(raw);
+                if (connection.getResponseCode() == 401) { clearPairing(); throw new IllegalStateException("A autorização foi revogada no launcher."); }
+                if (connection.getResponseCode() != 200 || !result.optBoolean("ok", false)) throw new IllegalStateException(result.optString("message", "O launcher recusou a alteração."));
+                int unread = Math.max(0, result.optInt("unread", 0));
+                post(() -> callback.onSuccess(unread));
+                fetchSnapshot();
+            } catch (Exception error) { post(() -> callback.onError(safeMessage(error))); }
+        });
+    }
+
     private void flushCompanionNotes() {
         if (!isConfigured()) return;
         companionExecutor.execute(() -> {
@@ -591,7 +622,8 @@ public final class BridgeClient {
             post(() -> { if (listener != null) listener.onEvent(type, payload); });
             boolean libraryEvent = "library_changed".equals(type) || "achievement_unlocked".equals(type)
                 || "collections_changed".equals(type) || "session_completed".equals(type) || "activity_changed".equals(type)
-                || "notes_changed".equals(type) || "profile_changed".equals(type) || "companion_changed".equals(type);
+                || "notes_changed".equals(type) || "profile_changed".equals(type) || "companion_changed".equals(type)
+                || "notifications_changed".equals(type);
             boolean terminalInstall = false;
             if ("install_changed".equals(type)) {
                 JSONObject update = payload.optJSONObject("update");
@@ -752,7 +784,7 @@ public final class BridgeClient {
         connection.setReadTimeout(12000);
         connection.setUseCaches(false);
         connection.setRequestProperty("Accept", "application/json");
-        connection.setRequestProperty("User-Agent", "BRUMCLASSICS-MOVEL/0.16.0 Android");
+        connection.setRequestProperty("User-Agent", "BRUMCLASSICS-MOVEL/0.17.0 Android");
         if (authenticated) connection.setRequestProperty("Authorization", "Bearer " + preferences.getString("token", ""));
     }
 

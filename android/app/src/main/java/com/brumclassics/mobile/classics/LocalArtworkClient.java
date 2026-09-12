@@ -97,7 +97,7 @@ public final class LocalArtworkClient {
 
     private HttpURLConnection open(URL url) throws Exception {
         HttpURLConnection connection = (HttpURLConnection) url.openConnection(); connection.setConnectTimeout(8_000); connection.setReadTimeout(20_000);
-        connection.setUseCaches(false); connection.setRequestProperty("Accept", "application/json,image/png,*/*"); connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android/0.16.0"); return connection;
+        connection.setUseCaches(false); connection.setRequestProperty("Accept", "application/json,image/png,*/*"); connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android/0.17.0"); return connection;
     }
 
     private byte[] readResponse(HttpURLConnection connection, int maximum) throws Exception {

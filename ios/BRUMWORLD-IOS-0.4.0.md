@@ -1,6 +1,6 @@
 # BRUMWORLD · CLASSICS Everywhere
 
-> Atualização iOS 0.7.6: escolha RetroArch somente na primeira vez. Nos próximos toques, o jogo abre diretamente, aparece como o mais recente com a capa do PC ou do cache local e a sessão é concluída quando você retorna ao BRUMCLASSICS. O launcher 1.55.4 confirma o vínculo da ROM antes de receber horas e atividade. Logs autorizados fornecem o tempo preciso; sem eles, o app mantém um cronômetro persistente de contingência.
+> Atualização iOS 0.8.0: a Central BRUM sincroniza avisos com o launcher 1.59.0. No CLASSICS Everywhere, escolha RetroArch somente na primeira vez. Nos próximos toques, o jogo abre diretamente, aparece como o mais recente com a capa do PC ou do cache local e a sessão é concluída quando você retorna ao BRUMCLASSICS.
 
 ## 1. Instalar
 

@@ -82,6 +82,16 @@ final class SnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.games.first?.title, "Counter-Strike 2")
         XCTAssertEqual(snapshot.games.first?.achievementProgress, 50)
         XCTAssertEqual(snapshot.games.first?.playtimeLabel, "2 h 0 min")
+        XCTAssertNil(snapshot.notifications)
+    }
+
+    func testSnapshotDecodesSafeNotificationCenter() throws {
+        let json = #"{"protocolVersion":9,"revision":5,"generatedAt":"2026-09-12T12:00:00Z","games":[],"collections":[],"activity":[],"notifications":{"entries":[{"id":"notice-1","category":"achievement","title":"Conquista desbloqueada","message":"Primeiros passos","gameId":"classic:1","gameTitle":"Jogo","createdAt":"2026-09-12T11:59:00Z","readAt":"","action":"game","severity":"success"}],"unread":1,"total":1}}"#
+        let snapshot = try JSONDecoder().decode(LibrarySnapshot.self, from: Data(json.utf8))
+        let center = try XCTUnwrap(snapshot.notifications)
+        XCTAssertEqual(center.unread, 1)
+        XCTAssertEqual(center.entries.first?.title, "Conquista desbloqueada")
+        XCTAssertFalse(try XCTUnwrap(center.entries.first).isRead)
     }
 
     func testInvalidPairingCodeIsRejected() {

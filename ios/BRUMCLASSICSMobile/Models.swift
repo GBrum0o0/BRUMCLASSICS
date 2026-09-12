@@ -9,8 +9,32 @@ struct LibrarySnapshot: Codable, Equatable {
     var activity: [ActivityItem]
     var companion: CompanionState?
     var performance: PerformanceState?
+    var notifications: MobileNotificationSnapshot?
 
-    static let empty = LibrarySnapshot(protocolVersion: 8, revision: 0, generatedAt: "", games: [], collections: [], activity: [], companion: nil, performance: nil)
+    static let empty = LibrarySnapshot(protocolVersion: 9, revision: 0, generatedAt: "", games: [], collections: [], activity: [], companion: nil, performance: nil, notifications: nil)
+}
+
+struct MobileNotificationSnapshot: Codable, Equatable {
+    var entries: [MobileNotification]
+    var unread: Int
+    var total: Int
+
+    static let empty = MobileNotificationSnapshot(entries: [], unread: 0, total: 0)
+}
+
+struct MobileNotification: Codable, Identifiable, Equatable {
+    let id: String
+    let category: String
+    let title: String
+    let message: String
+    let gameId: String
+    let gameTitle: String
+    let createdAt: String
+    var readAt: String
+    let action: String
+    let severity: String
+
+    var isRead: Bool { !readAt.isEmpty }
 }
 
 struct GameCollection: Codable, Identifiable, Equatable { let id: String; let name: String }

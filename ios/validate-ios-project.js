@@ -12,6 +12,7 @@ const required = [
   'project.yml', 'BRUMCLASSICSMobile/Info.plist', 'BRUMCLASSICSMobile/PrivacyInfo.xcprivacy',
   'BRUMCLASSICSMobile/BRUMCLASSICSMobileApp.swift', 'BRUMCLASSICSMobile/AppStore.swift',
   'BRUMCLASSICSMobile/BridgeClient.swift', 'BRUMCLASSICSMobile/Models.swift',
+  'BRUMCLASSICSMobile/NotificationsView.swift',
   'BRUMCLASSICSMobile/PersonalUpdateService.swift',
   'BRUMCLASSICSMobile/ProfileView.swift', 'BRUMCLASSICSMobile/BCardView.swift',
   'BRUMCLASSICSMobile/ROMFolderLibrary.swift',
@@ -25,7 +26,7 @@ for (const relative of required) {
 
 const swiftFiles = fs.readdirSync(app).filter((name) => name.endsWith('.swift'));
 const source = swiftFiles.map((name) => fs.readFileSync(path.join(app, name), 'utf8')).join('\n');
-const requiredEndpoints = ['/v1/pair', '/v1/snapshot', '/v1/ws', '/v1/remote', '/v1/companion/notes', '/v1/companion/library-state', '/v1/companion/capture', '/v1/moments/'];
+const requiredEndpoints = ['/v1/pair', '/v1/snapshot', '/v1/ws', '/v1/remote', '/v1/companion/notes', '/v1/companion/library-state', '/v1/companion/capture', '/v1/moments/', '/v1/notifications/read', '/v1/notifications/read-all'];
 for (const endpoint of requiredEndpoints) if (!source.includes(endpoint)) throw new Error(`Endpoint não portado: ${endpoint}`);
 
 const requiredCommands = ['bcard_launch'];
@@ -64,6 +65,7 @@ if (bcardView.includes('Picker(') || bcardView.includes('BrumLogo(') || bcardVie
 if (bcardView.split('private func send')[1].includes('offset = 0')) throw new Error('B-CARD lançado não pode retornar ao centro.');
 for (const marker of ['ClassicsEverywhereView', 'PocketSetupView', 'PocketRules.launchURL', '/v1/classics/achievements/sync', 'API_GetGameInfoAndUserProgress.php']) if (!source.includes(marker)) throw new Error(`CLASSICS iPhone incompleto: ${marker}`);
 if (!source.includes('companion-capture') || !source.includes('MobileSettingsView')) throw new Error('Captura ou configurações móveis ausentes.');
+for (const marker of ['MobileNotificationSnapshot', 'NotificationsView', 'notifications_changed', 'markAllNotificationsRead']) if (!source.includes(marker)) throw new Error(`Central BRUM incompleta: ${marker}`);
 
 if (!source.includes('SecureStore.write')) throw new Error('Token não está protegido pelo Keychain.');
 if (!source.includes('SHA256.hash(data: data)')) throw new Error('Certificate pinning ausente.');
@@ -85,5 +87,6 @@ if (icon.readUInt32BE(16) !== 1024 || icon.readUInt32BE(20) !== 1024) throw new 
 
 const protocolMatch = source.match(/protocolVersion\s*>=\s*(\d+)/);
 if (!protocolMatch || Number(protocolMatch[1]) !== 8) throw new Error('Versão do protocolo móvel divergente.');
+if (!source.includes('LibrarySnapshot(protocolVersion: 9')) throw new Error('Snapshot atual precisa anunciar o protocolo móvel 9.');
 
-console.log(JSON.stringify({ ok: true, swiftFiles: swiftFiles.length, endpoints: requiredEndpoints.length, commands: requiredCommands.length, protocolVersion: 8, appIcon: '1024x1024' }, null, 2));
+console.log(JSON.stringify({ ok: true, swiftFiles: swiftFiles.length, endpoints: requiredEndpoints.length, commands: requiredCommands.length, protocolVersion: 9, minimumCompatibleProtocol: 8, appIcon: '1024x1024' }, null, 2));

@@ -1,4 +1,4 @@
-# BRUMCLASSICS MÓVEL Android 0.16.0
+# BRUMCLASSICS MÓVEL Android 0.17.0
 
 Jogos cadastrados no launcher como **não oficiais** são sincronizados como itens locais instalados. O aplicativo recebe somente a classificação e o SteamID de referência quando houver; o caminho do executável nunca sai do computador. B-CARD, anotações e BRUMCOMPANION continuam usando a identidade segura enviada pelo launcher.
 
@@ -6,7 +6,7 @@ Esta versão também adiciona **CLASSICS Everywhere**: a biblioteca local de ROM
 
 ## Instalar e atualizar
 
-Instale o APK 0.16.0 da release oficial sobre o aplicativo existente, sem limpar seus dados. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente. Se a rede externa estiver indisponível, o launcher pareado pode oferecer o mesmo APK localmente.
+Instale o APK 0.17.0 da release oficial sobre o aplicativo existente, sem limpar seus dados. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente. Se a rede externa estiver indisponível, o launcher pareado pode oferecer o mesmo APK localmente.
 
 ## Parear com segurança
 
@@ -22,6 +22,10 @@ O código expira. Se expirar, gere outro. Não desative a validação do certifi
 A tela Início destaca o último jogo, Favoritos, Quero jogar e Minha jornada. Depois de sincronizadas, biblioteca, capas, conquistas, estatísticas e anotações permanecem no celular. Fora da rede, mostram a última cópia recebida, não dados em tempo real. Itens ainda não baixados podem ficar indisponíveis offline.
 
 Anotações e Quero jogar editados offline entram em uma fila. Ao retornar à rede com o launcher aberto, as alterações são enviadas. Se os dois aparelhos alterarem o mesmo campo, escolha qual versão preservar; não é necessário limpar o banco.
+
+## Central BRUM
+
+Com o launcher 1.59.0, **Notificações** na tela Início reúne conquistas, sessões, saves, instalações, atualizações e avisos do sistema. O contador mostra somente os itens não lidos do perfil ativo. Toque em um aviso para marcá-lo como lido e abrir o jogo relacionado, ou use **Marcar todas**. A leitura exige conexão; o último histórico sincronizado continua visível offline.
 
 ## B-CARD
 
