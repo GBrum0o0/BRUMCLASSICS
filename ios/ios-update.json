@@ -1,9 +1,11 @@
 {
-  "version": "0.8.0",
-  "build": 18,
+  "version": "0.8.1",
+  "build": 19,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.8.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.8.1",
   "notes": [
+    "A seção Conquistas agora permite pesquisar jogos do launcher e CLASSICS do iPhone pelo nome.",
+    "A busca ignora acentos e maiúsculas, aceita várias palavras e abre o detalhe com todas as conquistas disponíveis.",
     "A Central BRUM sincroniza conquistas, sessões, saves, instalações, atualizações e avisos do launcher.",
     "Notificações não lidas aparecem na tela Início e podem ser abertas ou marcadas como lidas no iPhone.",
     "O comando Marcar todas como lidas atualiza o mesmo perfil ativo no computador.",

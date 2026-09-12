@@ -1,6 +1,6 @@
 # CLASSICS no iPhone: horas offline e conquistas
 
-iOS **0.8.0 (build 18)** + launcher **1.55.4 ou posterior**. A Central BRUM requer o launcher 1.59.0.
+iOS **0.8.1 (build 19)** + launcher **1.55.4 ou posterior**. A Central BRUM requer o launcher 1.59.0.
 
 Quando a ROM ainda não estiver vinculada, o iPhone envia o nome e o arquivo. O launcher só aceita uma correspondência CLASSICS exata e única, devolve o ID confirmado e salva a data da sessão no perfil ativo. Nenhuma aproximação ambígua recebe horas.
 

@@ -1,6 +1,6 @@
 # BRUMCLASSICS MÓVEL para iOS
 
-Versão 0.8.0: a **Central BRUM** leva ao iPhone os avisos do perfil ativo no launcher 1.59.0, com leitura individual ou completa e cache offline. Permanecem disponíveis a [importação única e abertura direta pelo RetroArch](RETROARCH-COMPATIVEL.md), as [horas offline e sincronização com o PC](HORAS-OFFLINE.md), B-CARD e BRUMCOMPANION. O IPA sem assinatura é anexado à versão `ios-v0.8.0`.
+Versão 0.8.1: a seção **Conquistas** permite pesquisar jogos sincronizados do launcher e CLASSICS do iPhone pelo nome, ignorando acentos e maiúsculas, e abrir o progresso completo do resultado. A **Central BRUM** continua levando ao iPhone os avisos do perfil ativo no launcher 1.59.0, com leitura individual ou completa e cache offline. Permanecem disponíveis a [importação única e abertura direta pelo RetroArch](RETROARCH-COMPATIVEL.md), as [horas offline e sincronização com o PC](HORAS-OFFLINE.md), B-CARD e BRUMCOMPANION. O IPA sem assinatura é anexado à versão `ios-v0.8.1`.
 
 Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o protocolo local seguro versão 9, mantém compatibilidade de leitura com caches do protocolo 8 e não altera dados fora das ações explícitas do usuário.
 
@@ -8,7 +8,7 @@ Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o protocolo local
 
 - Início com último jogo, favoritos, “Quero jogar”, jornada e sessão ativa.
 - Biblioteca pesquisável com Jogos, CLASSICS, favoritos e instalados.
-- Central de conquistas ordenável pelos jogos mais próximos de 100%.
+- Central de conquistas pesquisável e ordenável pelos jogos mais próximos de 100%.
 - Estatísticas e distribuição por plataforma.
 - Perfil e pareamento pelo QR Code exibido em Configurações → MÓVEL.
 - Cache offline do snapshot e das capas no Application Support do iOS.

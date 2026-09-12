@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## iOS 0.8.1 — pesquisa de jogos em Conquistas
+
+- A seção Conquistas permite pesquisar jogos do launcher e CLASSICS do próprio iPhone.
+- A busca ignora acentos e diferenças entre maiúsculas e minúsculas, além de aceitar várias palavras em qualquer ordem.
+- Cada resultado abre o detalhe do jogo com todas as conquistas disponíveis e seu progresso.
+- Uma orientação específica aparece quando a pesquisa não encontra nenhum jogo com conquistas sincronizadas.
+
 ## Launcher 1.59.0 e aplicativos móveis — Central BRUM em todos os dispositivos
 
 - O launcher usa o protocolo móvel 9 para entregar somente as notificações seguras do perfil ativo.

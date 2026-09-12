@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.59.0"><strong>Windows 1.59.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.17.0"><strong>Android 0.17.0</strong></a> ·
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.8.0"><strong>iOS 0.8.0</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.8.1"><strong>iOS 0.8.1</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
   <a href="PRIVACY.md">Privacidade</a> ·
   <a href="SECURITY.md">Segurança</a>
@@ -61,11 +61,11 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 | --- | ---: | --- |
 | Windows | 1.59.0 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.59.0) |
 | Android | 0.17.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.17.0) · [Guia](docs/MOVEL.md) |
-| iOS pessoal | 0.8.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.8.0) · [Guia](ios/README-IOS.md) |
+| iOS pessoal | 0.8.1 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.8.1) · [Guia](ios/README-IOS.md) |
 
 Os hashes SHA-256 acompanham os arquivos publicados. O GitHub hospeda executáveis, APKs e IPAs somente em Releases; esses binários não entram no histórico do repositório.
 
-A versão pessoal para iPhone é compilada separadamente em **Actions → Build iOS pessoal**. O artefato contém um IPA sem assinatura para instalação com AltStore ou Sideloadly. No iOS 0.8.0, a Central BRUM acompanha os avisos do launcher 1.59.0; `CLASSICS Everywhere`, horas, capas e sessões continuam disponíveis. Consulte [as instruções do iOS](ios/README-IOS.md) e o [guia do RetroArch compatível](ios/RETROARCH-COMPATIVEL.md).
+A versão pessoal para iPhone é compilada separadamente em **Actions → Build iOS pessoal**. O artefato contém um IPA sem assinatura para instalação com AltStore ou Sideloadly. No iOS 0.8.1, Conquistas permite pesquisar jogos e abrir o progresso completo; a Central BRUM acompanha os avisos do launcher 1.59.0. `CLASSICS Everywhere`, horas, capas e sessões continuam disponíveis. Consulte [as instruções do iOS](ios/README-IOS.md) e o [guia do RetroArch compatível](ios/RETROARCH-COMPATIVEL.md).
 
 ## Versões atuais
 
@@ -73,7 +73,7 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 - **Launcher 1.58.0:** Central de Notificações, backup completo e seletivo de perfil, saves e mídias, além de recuperação de encerramentos inesperados.
 - **Launcher 1.57.0:** diagnósticos de sessões e RetroAchievements, calibração de controles e Saúde da Biblioteca.
 - **Android 0.17.0:** Central BRUM, além de CLASSICS Everywhere, RetroAchievements, capas e horas locais.
-- **iOS 0.8.0:** Central BRUM, abertura pelo RetroArch, sessões móveis e vínculo seguro com o launcher.
+- **iOS 0.8.1:** busca de jogos em Conquistas, Central BRUM, abertura pelo RetroArch, sessões móveis e vínculo seguro com o launcher.
 
 Veja o [histórico completo](CHANGELOG.md) e as [notas do Android 0.17.0](releases/android-v0.17.0/RELEASE-NOTES.md).
 

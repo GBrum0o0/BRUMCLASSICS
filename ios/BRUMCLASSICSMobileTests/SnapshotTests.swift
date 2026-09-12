@@ -99,6 +99,15 @@ final class SnapshotTests: XCTestCase {
         XCTAssertNil(PairingPayload(url: url))
     }
 
+    func testAchievementGameSearchIgnoresCaseAccentsAndWordOrder() {
+        let fields = ["Pokémon Emerald", "Game Boy Advance", "RetroAchievements"]
+        XCTAssertTrue(AchievementGameSearch.matches("pokemon", fields: fields))
+        XCTAssertTrue(AchievementGameSearch.matches("advance emerald", fields: fields))
+        XCTAssertTrue(AchievementGameSearch.matches("RETROACHIEVEMENTS", fields: fields))
+        XCTAssertFalse(AchievementGameSearch.matches("metroid", fields: fields))
+        XCTAssertTrue(AchievementGameSearch.matches("   ", fields: fields))
+    }
+
     func testPersonalUpdateUsesSemanticVersionAndBuild() throws {
         let url = try XCTUnwrap(URL(string: "https://github.com/GBrum0o0/BRUMCLASSICS/actions"))
         let newerVersion = PersonalUpdateManifest(version: "0.2.0", build: 1, minimumIOS: "16.0", buildURL: url, notes: [])
