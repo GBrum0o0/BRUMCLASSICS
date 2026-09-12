@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## Launcher 1.58.0 — proteção, notificações e recuperação
+
+- Central persistente de notificações por jogador para conquistas, sessões, saves, instalações, atualizações e incidentes.
+- Ações dos avisos levam ao jogo, à Atividade ou à área de atualização correspondente.
+- Backup portátil v2 com seleção independente de dados, saves, artes e capas, estados CLASSICS e capturas.
+- Restauração seletiva, SHA-256 por arquivo, limites de segurança e compatibilidade com backups v1.57.0.
+- Diário de execução diferencia saída normal de falha, registra incidentes no diagnóstico e tenta recuperar a interface uma única vez.
+- Credenciais, tokens e chaves de lojas continuam excluídos de qualquer backup.
+
 ## Launcher 1.57.0 — central de confiabilidade
 
 - Central de Sessões com processo, PID, reconexão, encerramento manual e correção auditável do histórico.
