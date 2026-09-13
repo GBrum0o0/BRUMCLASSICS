@@ -86,7 +86,7 @@ struct AchievementList: View {
             }
             if game.allowsManualAchievements {
                 Text("REGISTRO MANUAL · toque em um item bloqueado ou manual. Confirmações oficiais permanecem protegidas.")
-                    .font(.caption2.bold()).tracking(.7).foregroundStyle(BrumTheme.primary)
+                    .font(.caption2.bold()).tracking(0.7).foregroundStyle(BrumTheme.primary)
             }
             if visible.isEmpty {
                 Text(search.isEmpty ? "A conexão não forneceu um catálogo. Cadastre a conquista para registrar seu histórico." : "Nenhuma conquista corresponde à busca.")
