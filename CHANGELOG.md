@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## Launcher 1.63.0 — conquistas prontas e Console no PC
+
+- O loading inicial prepara os catálogos de conquistas de todos os jogos presentes antes de revelar a interface.
+- Catálogos, tentativas indisponíveis e progresso ficam persistidos; aberturas seguintes reutilizam os dados locais e evitam consultas repetidas.
+- Steam e RetroAchievements preservam os valores oficiais. Conquistas sem pontuação publicada recebem 10 PTS BRUM.
+- Conquistas antigas com zero pontos são migradas automaticamente.
+- **Captura** passa a se chamar **Console no PC**, com comandos voltados a conectar um videogame por uma placa de vídeo USB.
+- A seção fica oculta por padrão e pode ser ativada em **Configurações → Experiência**.
+- Android 0.19.0 e iOS 0.10.0 recebem a pontuação normalizada pela sincronização do launcher, sem exigir novos aplicativos.
+
 ## Launcher 1.62.1 — correções de alinhamento e rolagem
 
 - O botão Voltar de **Explorar conexões** mantém a seta centralizada no círculo, inclusive com o dimensionamento de tela do Windows.
