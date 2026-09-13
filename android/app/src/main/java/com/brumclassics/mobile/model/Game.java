@@ -44,13 +44,18 @@ public final class Game {
         public final int points;
         public final String unlockedAt;
         public final boolean manual;
+        public final String badgeUrl;
 
         public Achievement(String id, String title, String description, boolean unlocked, int points, String unlockedAt) {
-            this(id, title, description, unlocked, points, unlockedAt, false);
+            this(id, title, description, unlocked, points, unlockedAt, false, "");
         }
 
         public Achievement(String id, String title, String description, boolean unlocked, int points, String unlockedAt, boolean manual) {
-            this.id = id; this.title = title; this.description = description; this.unlocked = unlocked; this.points = points; this.unlockedAt = unlockedAt; this.manual = manual;
+            this(id, title, description, unlocked, points, unlockedAt, manual, "");
+        }
+
+        public Achievement(String id, String title, String description, boolean unlocked, int points, String unlockedAt, boolean manual, String badgeUrl) {
+            this.id = id; this.title = title; this.description = description; this.unlocked = unlocked; this.points = points; this.unlockedAt = unlockedAt; this.manual = manual; this.badgeUrl = badgeUrl == null ? "" : badgeUrl;
         }
     }
 

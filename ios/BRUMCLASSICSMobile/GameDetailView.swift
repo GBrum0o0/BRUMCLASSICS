@@ -60,10 +60,11 @@ struct NotesEditor: View {
 }
 
 struct AchievementList: View {
+    @EnvironmentObject private var store: AppStore
     let game: Game
     @State private var search = ""
-    @State private var editing: Game.Achievement?
-    @State private var creating = false
+    @State private var pending: Game.Achievement?
+    @State private var saving = false
 
     private var visible: [Game.Achievement] {
         game.achievements.filter { AchievementGameSearch.matches(search, fields: [$0.title, $0.description]) }
@@ -71,13 +72,7 @@ struct AchievementList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                BrumSectionLabel(text: "CONQUISTAS")
-                Spacer()
-                if game.allowsManualAchievements {
-                    Button("CADASTRAR") { creating = true }.font(.caption.bold()).foregroundStyle(BrumTheme.primary)
-                }
-            }
+            BrumSectionLabel(text: "CONQUISTAS")
             if !game.achievements.isEmpty {
                 TextField("Buscar conquista", text: $search)
                     .textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -85,20 +80,19 @@ struct AchievementList: View {
                     .foregroundStyle(BrumTheme.text)
             }
             if game.allowsManualAchievements {
-                Text("REGISTRO MANUAL · toque em um item bloqueado ou manual. Confirmações oficiais permanecem protegidas.")
+                Text("\(game.achievementCatalogLabel) · toque para marcar ou desfazer. Confirmações oficiais permanecem protegidas.")
                     .font(.caption2.bold()).tracking(0.7).foregroundStyle(BrumTheme.primary)
             }
             if visible.isEmpty {
-                Text(search.isEmpty ? "A conexão não forneceu um catálogo. Cadastre a conquista para registrar seu histórico." : "Nenhuma conquista corresponde à busca.")
+                Text(search.isEmpty ? "Abra este jogo na seção Conquistas do launcher para localizar o catálogo oficial." : "Nenhuma conquista corresponde à busca.")
                     .font(.caption).foregroundStyle(BrumTheme.muted)
             }
             ForEach(visible) { item in
                 Button {
-                    if game.allowsManualAchievements && (!item.unlocked || item.manual == true) { editing = item }
+                    if game.allowsManualAchievements && (!item.unlocked || item.manual == true) { pending = item }
                 } label: {
                     HStack(spacing: 12) {
-                        Image(systemName: item.unlocked ? "trophy.fill" : "lock.fill")
-                            .foregroundStyle(item.unlocked ? BrumTheme.primary : BrumTheme.muted).frame(width: 28)
+                        AchievementBadge(item: item)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(item.title).font(.subheadline.bold()).foregroundStyle(BrumTheme.text)
                             Text(item.description).font(.caption).foregroundStyle(BrumTheme.muted).lineLimit(2)
@@ -111,73 +105,44 @@ struct AchievementList: View {
                 }.buttonStyle(.plain).disabled(item.unlocked && item.manual != true)
             }
         }
-        .sheet(item: $editing) { ManualAchievementEditor(game: game, achievement: $0) }
-        .sheet(isPresented: $creating) { ManualAchievementEditor(game: game, achievement: nil) }
+        .confirmationDialog(pending?.manual == true ? "Desmarcar conquista?" : "Marcar como desbloqueada?", isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } }), titleVisibility: .visible) {
+            if let item = pending {
+                Button(item.manual == true ? "Desmarcar" : "Marcar como desbloqueada", role: item.manual == true ? .destructive : nil) {
+                    Task {
+                        saving = true
+                        _ = await store.setManualAchievement(game: game, achievement: item, unlocked: item.manual != true)
+                        saving = false
+                        pending = nil
+                    }
+                }
+            }
+            Button("Cancelar", role: .cancel) { pending = nil }
+        } message: {
+            Text(pending.map { "\($0.title) · o progresso será identificado como manual." } ?? "")
+        }
+        .allowsHitTesting(!saving)
     }
 }
 
-struct ManualAchievementEditor: View {
-    @EnvironmentObject private var store: AppStore
-    @Environment(\.dismiss) private var dismiss
-    let game: Game
-    let achievement: Game.Achievement?
-    @State private var title = ""
-    @State private var description = ""
-    @State private var points = 0
-    @State private var unlockedAt = Date()
-    @State private var saving = false
-    private var creating: Bool { achievement == nil }
-
+private struct AchievementBadge: View {
+    let item: Game.Achievement
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    if creating {
-                        TextField("Nome da conquista", text: $title)
-                        TextField("Descrição opcional", text: $description, axis: .vertical)
-                        Stepper("Pontos: \(points)", value: $points, in: 0...100000)
-                    } else {
-                        Text(achievement?.title ?? "").font(.headline)
-                        if !(achievement?.description ?? "").isEmpty { Text(achievement?.description ?? "").foregroundStyle(BrumTheme.muted) }
-                    }
-                } header: { Text("CONQUISTA") }
-                Section {
-                    DatePicker("Desbloqueada em", selection: $unlockedAt, in: ...Date(), displayedComponents: [.date, .hourAndMinute])
-                } footer: { Text("O item será identificado como manual até uma fonte oficial confirmar o mesmo ID.") }
-                if achievement?.manual == true {
-                    Button("DESFAZER REGISTRO MANUAL", role: .destructive) {
-                        Task {
-                            saving = true
-                            if await store.setManualAchievement(game: game, achievement: achievement, title: achievement?.title ?? "", description: achievement?.description ?? "", points: achievement?.points ?? 0, unlocked: false, unlockedAt: unlockedAt) { dismiss() }
-                            saving = false
-                        }
-                    }
+        Group {
+            if let raw = item.badgeUrl, let url = URL(string: raw), !raw.isEmpty {
+                AsyncImage(url: url) { phase in
+                    if let image = phase.image { image.resizable().scaledToFill() }
+                    else { fallback }
                 }
-            }
-            .scrollContentBackground(.hidden).background(BrumTheme.background)
-            .navigationTitle(creating ? "Cadastrar conquista" : "Registro manual")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Marcar") {
-                        Task {
-                            saving = true
-                            if await store.setManualAchievement(game: game, achievement: achievement, title: creating ? title : achievement?.title ?? "", description: creating ? description : achievement?.description ?? "", points: creating ? points : achievement?.points ?? 0, unlocked: true, unlockedAt: unlockedAt) { dismiss() }
-                            saving = false
-                        }
-                    }.disabled(saving || creating && title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            }
+            } else { fallback }
         }
-        .onAppear {
-            title = achievement?.title ?? ""
-            description = achievement?.description ?? ""
-            points = achievement?.points ?? 0
-            if let raw = achievement?.unlockedAt {
-                let precise = ISO8601DateFormatter()
-                precise.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                if let date = precise.date(from: raw) ?? ISO8601DateFormatter().date(from: raw) { unlockedAt = min(date, Date()) }
-            }
+        .frame(width: 48, height: 48).clipShape(RoundedRectangle(cornerRadius: 7))
+        .opacity(item.unlocked ? 1 : 0.55).saturation(item.unlocked ? 1 : 0.25)
+    }
+
+    private var fallback: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 7).fill(BrumTheme.surface)
+            Image(systemName: item.unlocked ? "trophy.fill" : "lock.fill").foregroundStyle(item.unlocked ? BrumTheme.primary : BrumTheme.muted)
         }
     }
 }

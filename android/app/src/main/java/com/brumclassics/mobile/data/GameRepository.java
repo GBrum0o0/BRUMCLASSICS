@@ -69,7 +69,8 @@ public final class GameRepository {
                 achievements.add(new Game.Achievement(
                     achievement.optString("id", ""), achievement.optString("title", "Conquista"),
                     achievement.optString("description", ""), achievement.optBoolean("unlocked", false),
-                    achievement.optInt("points", 0), achievement.optString("unlockedAt", ""), achievement.optBoolean("manual", false)
+                    achievement.optInt("points", 0), achievement.optString("unlockedAt", ""), achievement.optBoolean("manual", false),
+                    achievement.optString("badgeUrl", "")
                 ));
             }
             int hash = title.hashCode();

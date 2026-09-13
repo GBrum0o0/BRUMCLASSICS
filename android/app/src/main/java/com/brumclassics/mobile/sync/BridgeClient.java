@@ -84,19 +84,15 @@ public final class BridgeClient {
         postClassic("/v1/classics/achievements/sync", body, callback);
     }
 
-    public void setManualAchievement(Game game, Game.Achievement achievement, String title, String description,
-                                     int points, boolean unlocked, long unlockedAt, ClassicsCallback callback) {
+    public void setManualAchievement(Game game, Game.Achievement achievement, boolean unlocked, ClassicsCallback callback) {
         if (!isConfigured()) { callback.onError("Conecte este celular ao launcher para sincronizar o registro manual."); return; }
         if (game == null || game.id.isEmpty() || !game.manualAchievementAllowed) { callback.onError("A edição manual não está disponível para esta fonte."); return; }
+        if (achievement == null || achievement.id.isEmpty()) { callback.onError("Conquista inválida."); return; }
         JSONObject body = new JSONObject();
         try {
             body.put("gameId", game.id);
-            body.put("achievementId", achievement == null ? "" : achievement.id);
-            body.put("title", title == null ? "" : title);
-            body.put("description", description == null ? "" : description);
-            body.put("points", Math.max(0, points));
+            body.put("achievementId", achievement.id);
             body.put("unlocked", unlocked);
-            if (unlocked && unlockedAt > 0) body.put("unlockedAt", new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.ROOT).format(new java.util.Date(unlockedAt)));
             body.put("updatedAt", new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.ROOT).format(new java.util.Date()));
         } catch (Exception error) { callback.onError("Dados da conquista inválidos."); return; }
         postClassic("/v1/achievements/manual", body, callback);
@@ -803,7 +799,7 @@ public final class BridgeClient {
         connection.setReadTimeout(12000);
         connection.setUseCaches(false);
         connection.setRequestProperty("Accept", "application/json");
-        connection.setRequestProperty("User-Agent", "BRUMCLASSICS-MOVEL/0.18.0 Android");
+        connection.setRequestProperty("User-Agent", "BRUMCLASSICS-MOVEL/0.19.0 Android");
         if (authenticated) connection.setRequestProperty("Authorization", "Bearer " + preferences.getString("token", ""));
     }
 

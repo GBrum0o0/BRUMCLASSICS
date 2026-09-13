@@ -86,6 +86,8 @@ struct Game: Codable, Identifiable, Hashable {
     let achievementsTotal: Int?
     let achievementsAvailable: Bool
     let manualAchievementAllowed: Bool?
+    let achievementCatalogSource: String?
+    let achievementCatalogTitle: String?
     let achievements: [Achievement]
     let storyCompleted: Bool
     var favorite: Bool
@@ -99,6 +101,9 @@ struct Game: Codable, Identifiable, Hashable {
 
     var isClassic: Bool { category == "classic" }
     var allowsManualAchievements: Bool { manualAchievementAllowed == true }
+    var achievementCatalogLabel: String {
+        achievementCatalogSource == "steam" ? "CATÁLOGO STEAM · PROGRESSO MANUAL" : "PROGRESSO MANUAL"
+    }
     var achievementProgress: Int { guard let total = achievementsTotal, total > 0 else { return 0 }; return min(100, Int((Double(achievementsCollected ?? 0) / Double(total)) * 100)) }
     var playtimeLabel: String { guard playtimeAvailable, let raw = playtimeMinutes, raw.isFinite, raw >= 0, raw < Double(Int.max) else { return "INDISPONÍVEL" }; let value = Int(raw); return value >= 60 ? "\(value / 60) h \(value % 60) min" : "\(value) min" }
     var statusLabel: String { if storyCompleted { return "HISTÓRIA COMPLETADA" }; if wantToPlay { return "QUERO JOGAR" }; if (playtimeMinutes ?? 0) > 0 { return "JOGANDO" }; return installed ? "INSTALADO" : "NÃO INSTALADO" }

@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Color;
+import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.graphics.Typeface;
@@ -69,6 +70,10 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 public final class MainActivity extends Activity {
     private static final int REQUEST_ROM_TREE = 7301;
@@ -332,6 +337,7 @@ public final class MainActivity extends Activity {
 
     private void refreshCurrentScreen() {
         if ("library".equals(currentScreen)) showLibrary();
+        else if ("achievements".equals(currentScreen)) showAchievements();
         else if ("stats".equals(currentScreen)) showStats();
         else if ("companion".equals(currentScreen)) showCompanion();
         else if ("moments".equals(currentScreen)) showMoments();
@@ -369,6 +375,7 @@ public final class MainActivity extends Activity {
         nav.setBackground(background(SURFACE, 0, LINE, 1));
         nav.addView(navButton("INÍCIO", "home"));
         nav.addView(navButton("BIBLIOTECA", "library"));
+        nav.addView(navButton("CONQUISTAS", "achievements"));
         nav.addView(navButton("ESTATÍSTICAS", "stats"));
         nav.addView(navButton("COMPANION", "companion"));
         nav.addView(navButton("PERFIL", "profile"));
@@ -393,6 +400,7 @@ public final class MainActivity extends Activity {
     private void navigate(String screen) {
         if ("home".equals(screen)) showHome();
         else if ("library".equals(screen)) showLibrary();
+        else if ("achievements".equals(screen)) showAchievements();
         else if ("stats".equals(screen)) showStats();
         else if ("companion".equals(screen)) showCompanion();
         else if ("moments".equals(screen)) showMoments();
@@ -1623,7 +1631,7 @@ public final class MainActivity extends Activity {
         if (!game.achievements.isEmpty()) {
             int unlocked = 0; for (Game.Achievement achievement : game.achievements) if (achievement.unlocked) unlocked++;
             page.addView(sectionHeading("CONQUISTAS · " + unlocked + "/" + game.achievements.size(), "BUSCAR", v -> showAchievementBrowser(game)), margins(-1, 32, -1, 10));
-            if (game.manualAchievementAllowed) page.addView(text("REGISTRO MANUAL DISPONÍVEL · toque em uma conquista para alterar", 7, ACCENT, true), margins(-1, 0, -1, 8));
+            if (game.manualAchievementAllowed) page.addView(text("CATÁLOGO STEAM · PROGRESSO MANUAL · toque para marcar ou desfazer", 7, ACCENT, true), margins(-1, 0, -1, 8));
             int shown = 0;
             for (Game.Achievement achievement : game.achievements) {
                 if (shown++ >= 12) break;
@@ -1631,8 +1639,7 @@ public final class MainActivity extends Activity {
                 achievementRow.setGravity(Gravity.CENTER_VERTICAL);
                 achievementRow.setPadding(dp(13), dp(13), dp(13), dp(13));
                 achievementRow.setBackground(background(SURFACE, 3, LINE, 1));
-                TextView symbol = text(achievement.unlocked ? "◆" : "◇", 15, achievement.unlocked ? ACCENT : MUTED, true);
-                achievementRow.addView(symbol, new LinearLayout.LayoutParams(dp(30), -2));
+                achievementRow.addView(achievementBadge(achievement), new LinearLayout.LayoutParams(dp(46), dp(46)));
                 LinearLayout achievementCopy = column();
                 achievementCopy.addView(text(achievement.title, 11, achievement.unlocked ? TEXT : MUTED, true));
                 if (!achievement.description.isEmpty()) achievementCopy.addView(text(achievement.description, 8, MUTED, false), margins(-1, 4, -1, 0));
@@ -1642,8 +1649,8 @@ public final class MainActivity extends Activity {
                 page.addView(achievementRow, margins(-1, 5, -1, 0));
             }
         } else if (game.manualAchievementAllowed) {
-            page.addView(sectionHeading("CONQUISTAS", "CADASTRAR", v -> showManualAchievementDialog(game, null)), margins(-1, 32, -1, 10));
-            page.addView(text("A loja não fornece um catálogo completo. Cadastre e marque manualmente as conquistas que você já obteve.", 9, MUTED, false));
+            page.addView(sectionHeading("CONQUISTAS", "", null), margins(-1, 32, -1, 10));
+            page.addView(text("CATÁLOGO PENDENTE · abra este jogo na seção Conquistas do launcher para localizar os dados oficiais.", 9, MUTED, false));
         } else if (!game.achievementsAvailable) {
             page.addView(sectionHeading("CONQUISTAS", "", null), margins(-1, 32, -1, 10));
             page.addView(text("INDISPONÍVEL · O progresso oficial ainda não foi sincronizado.", 9, MUTED, false));
@@ -1698,8 +1705,7 @@ public final class MainActivity extends Activity {
         scroll.addView(list);
         root.addView(scroll, new LinearLayout.LayoutParams(-1, dp(430)));
         AlertDialog dialog = new AlertDialog.Builder(this).setTitle("CONQUISTAS · " + game.title).setView(root)
-            .setNegativeButton("FECHAR", null)
-            .setPositiveButton(game.manualAchievementAllowed ? "CADASTRAR" : "", null).create();
+            .setNegativeButton("FECHAR", null).create();
         Runnable render = () -> {
             list.removeAllViews();
             String filter = search.getText().toString().trim().toLowerCase(Locale.ROOT);
@@ -1712,7 +1718,7 @@ public final class MainActivity extends Activity {
                 row.setGravity(Gravity.CENTER_VERTICAL);
                 row.setPadding(dp(12), dp(12), dp(12), dp(12));
                 row.setBackground(background(SURFACE, 3, LINE, 1));
-                row.addView(text(item.unlocked ? "◆" : "◇", 15, item.unlocked ? ACCENT : MUTED, true), new LinearLayout.LayoutParams(dp(30), -2));
+                row.addView(achievementBadge(item), new LinearLayout.LayoutParams(dp(46), dp(46)));
                 LinearLayout copy = column();
                 copy.addView(text(item.title, 11, item.unlocked ? TEXT : MUTED, true));
                 String detail = item.description + (item.manual ? " · REGISTRO MANUAL" : item.unlocked ? " · OFICIAL" : "");
@@ -1729,66 +1735,108 @@ public final class MainActivity extends Activity {
             public void afterTextChanged(Editable e) {}
         });
         dialog.setOnShowListener(ignored -> {
-            if (game.manualAchievementAllowed) dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> { dialog.dismiss(); showManualAchievementDialog(game, null); });
             render.run();
         });
         dialog.show();
     }
 
     private void showManualAchievementDialog(Game game, Game.Achievement achievement) {
-        boolean creating = achievement == null;
-        LinearLayout form = column();
-        form.setPadding(dp(18), dp(4), dp(18), dp(4));
-        EditText name = pairingField("Nome da conquista", creating ? "" : achievement.title);
-        EditText description = pairingField("Descrição opcional", creating ? "" : achievement.description);
-        EditText points = pairingField("Pontos opcionais", creating ? "0" : String.valueOf(achievement.points));
-        points.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
-        if (creating) { form.addView(name); form.addView(description); form.addView(points); }
-        java.text.SimpleDateFormat display = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.ROOT);
-        display.setLenient(false);
-        long previous = achievement == null || achievement.unlockedAt.isEmpty() ? System.currentTimeMillis() : parseIsoTime(achievement.unlockedAt);
-        EditText date = pairingField("Data e hora · DD/MM/AAAA HH:MM", display.format(new java.util.Date(previous > 0 ? previous : System.currentTimeMillis())));
-        form.addView(date);
-        AlertDialog.Builder builder = new AlertDialog.Builder(this)
-            .setTitle(creating ? "CADASTRAR CONQUISTA" : achievement.title)
-            .setMessage("Registro manual para conexões sem leitura oficial completa.")
-            .setView(form).setPositiveButton("MARCAR", null).setNeutralButton("CANCELAR", null);
-        if (achievement != null && achievement.manual) builder.setNegativeButton("DESFAZER", null);
-        AlertDialog dialog = builder.create();
+        if (achievement == null) return;
+        boolean unlock = !achievement.manual;
+        AlertDialog dialog = new AlertDialog.Builder(this)
+            .setTitle(unlock ? "MARCAR COMO DESBLOQUEADA?" : "DESMARCAR CONQUISTA?")
+            .setMessage(achievement.title + "\n\n" + achievement.description + "\n\nO progresso ficará identificado como manual.")
+            .setPositiveButton(unlock ? "MARCAR" : "DESMARCAR", null)
+            .setNegativeButton("CANCELAR", null).create();
         dialog.setOnShowListener(ignored -> {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(ACCENT);
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(unlock ? ACCENT : Color.rgb(255, 92, 92));
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-                String title = creating ? name.getText().toString().trim() : achievement.title;
-                if (title.isEmpty()) { name.setError("Informe o nome."); return; }
-                long unlockedAt;
-                try { unlockedAt = display.parse(date.getText().toString().trim()).getTime(); }
-                catch (Exception error) { date.setError("Use DD/MM/AAAA HH:MM."); return; }
-                if (unlockedAt > System.currentTimeMillis() + 300000) { date.setError("A data não pode estar no futuro."); return; }
-                int score = 0;
-                try { score = Math.max(0, Integer.parseInt(points.getText().toString().trim())); } catch (Exception ignored2) {}
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
-                bridgeClient.setManualAchievement(game, achievement, title, creating ? description.getText().toString().trim() : achievement.description,
-                    score, true, unlockedAt, new BridgeClient.ClassicsCallback() {
-                        public void onResult(org.json.JSONObject result) { dialog.dismiss(); Toast.makeText(MainActivity.this, "Conquista registrada manualmente.", Toast.LENGTH_LONG).show(); bridgeClient.fetchSnapshot(); }
-                        public void onError(String message) { dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true); Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show(); }
-                    });
-            });
-            if (achievement != null && achievement.manual) dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener(v -> {
-                bridgeClient.setManualAchievement(game, achievement, achievement.title, achievement.description, achievement.points, false, 0, new BridgeClient.ClassicsCallback() {
-                    public void onResult(org.json.JSONObject result) { dialog.dismiss(); Toast.makeText(MainActivity.this, "Registro manual removido.", Toast.LENGTH_LONG).show(); bridgeClient.fetchSnapshot(); }
-                    public void onError(String message) { Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show(); }
+                v.setEnabled(false);
+                bridgeClient.setManualAchievement(game, achievement, unlock, new BridgeClient.ClassicsCallback() {
+                    public void onResult(org.json.JSONObject result) { dialog.dismiss(); Toast.makeText(MainActivity.this, unlock ? "Conquista marcada como desbloqueada." : "Conquista desmarcada.", Toast.LENGTH_LONG).show(); bridgeClient.fetchSnapshot(); }
+                    public void onError(String message) { v.setEnabled(true); Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show(); }
                 });
             });
         });
         dialog.show();
     }
 
-    private long parseIsoTime(String value) {
-        try { return new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.ROOT).parse(value).getTime(); }
-        catch (Exception ignored) {
-            try { return new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.ROOT).parse(value).getTime(); }
-            catch (Exception ignored2) { return 0; }
-        }
+    private ImageView achievementBadge(Game.Achievement achievement) {
+        ImageView image = new ImageView(this);
+        image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        image.setPadding(dp(6), dp(6), dp(6), dp(6));
+        image.setBackground(background(RAISED, 7, LINE, 1));
+        image.setImageResource(achievement.unlocked ? android.R.drawable.btn_star_big_on : android.R.drawable.ic_lock_lock);
+        image.setColorFilter(achievement.unlocked ? ACCENT : MUTED);
+        image.setAlpha(achievement.unlocked ? 1f : .55f);
+        String source = achievement.badgeUrl == null ? "" : achievement.badgeUrl.trim();
+        if (source.isEmpty()) return image;
+        modelExecutor.execute(() -> {
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL(source);
+                String host = url.getHost().toLowerCase(Locale.ROOT);
+                if (!"https".equalsIgnoreCase(url.getProtocol()) || !(host.endsWith("steamstatic.com") || host.endsWith("akamaihd.net"))) return;
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setConnectTimeout(6000); connection.setReadTimeout(8000); connection.setInstanceFollowRedirects(false);
+                connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android/0.19.0");
+                if (connection.getResponseCode() != 200 || connection.getContentLengthLong() > 2 * 1024 * 1024) return;
+                byte[] buffer = new byte[8192]; int read; int total = 0;
+                ByteArrayOutputStream output = new ByteArrayOutputStream();
+                try (InputStream input = connection.getInputStream()) {
+                    while ((read = input.read(buffer)) != -1) { total += read; if (total > 2 * 1024 * 1024) return; output.write(buffer, 0, read); }
+                }
+                byte[] bytes = output.toByteArray();
+                Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                if (bitmap != null) handler.post(() -> { image.clearColorFilter(); image.setPadding(0, 0, 0, 0); image.setImageBitmap(bitmap); });
+            } catch (Exception ignored) { }
+            finally { if (connection != null) connection.disconnect(); }
+        });
+        return image;
+    }
+
+    private void showAchievements() {
+        ScrollView scroll = scroll();
+        LinearLayout page = page();
+        scroll.addView(page);
+        page.addView(brandHeader("CONQUISTAS"));
+        page.addView(text("Todos os seus jogos", 29, TEXT, true), margins(-1, 26, -1, 5));
+        page.addView(text("Pesquise um jogo para consultar o catálogo e alterar o progresso permitido.", 11, MUTED, false));
+        EditText search = pairingField("Pesquisar jogo, plataforma ou loja", "");
+        page.addView(search, margins(-1, 22, -1, 12));
+        LinearLayout list = column();
+        page.addView(list);
+        Runnable render = () -> {
+            list.removeAllViews();
+            String filter = search.getText().toString().trim().toLowerCase(Locale.ROOT);
+            int found = 0;
+            for (Game game : games) {
+                if (game.achievements.isEmpty() && !game.manualAchievementAllowed) continue;
+                String searchable = (game.title + " " + game.platform + " " + game.genre).toLowerCase(Locale.ROOT);
+                if (!filter.isEmpty() && !searchable.contains(filter)) continue;
+                found++;
+                int unlocked = 0; for (Game.Achievement item : game.achievements) if (item.unlocked) unlocked++;
+                LinearLayout card = row(); card.setGravity(Gravity.CENTER_VERTICAL); card.setPadding(dp(15), dp(15), dp(15), dp(15)); card.setBackground(background(SURFACE, 4, LINE, 1));
+                LinearLayout copy = column();
+                copy.addView(text(game.title, 14, TEXT, true));
+                String detail = game.achievements.isEmpty() ? "CATÁLOGO PENDENTE NO LAUNCHER" : unlocked + "/" + game.achievements.size() + " DESBLOQUEADAS";
+                copy.addView(text(detail, 8, game.manualAchievementAllowed ? ACCENT : MUTED, true), margins(-1, 5, -1, 0));
+                copy.addView(text(game.platform.toUpperCase(Locale.ROOT) + " · " + game.genre.toUpperCase(Locale.ROOT), 7, MUTED, false), margins(-1, 4, -1, 0));
+                card.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+                card.addView(text("ABRIR  ›", 8, ACCENT, true));
+                card.setOnClickListener(v -> showDetails(game));
+                list.addView(card, margins(-1, 4, -1, 4));
+            }
+            if (found == 0) list.addView(text("Nenhum jogo corresponde à pesquisa.", 10, MUTED, false), margins(-1, 24, -1, 24));
+        };
+        search.addTextChangedListener(new TextWatcher() {
+            public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
+            public void onTextChanged(CharSequence s, int st, int before, int count) { render.run(); }
+            public void afterTextChanged(Editable e) {}
+        });
+        render.run();
+        page.addView(space(24));
+        setScreen("achievements", scroll);
     }
 
     private void showStats() {

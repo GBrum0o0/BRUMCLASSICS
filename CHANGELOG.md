@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## Launcher 1.62.0, Android 0.19.0 e iOS 0.10.0 — catálogo oficial com progresso manual
+
+- Jogos sem leitura direta podem receber imagem, título e descrição publicados oficialmente no catálogo da Steam.
+- O launcher usa correspondência exata ou Steam AppID informado pelo jogador e identifica a origem do catálogo sem apresentar o desbloqueio como oficial.
+- A Central de Conquistas pesquisa jogos por nome, loja ou sistema; a pesquisa interna localiza títulos e descrições.
+- Um clique ou toque marca e desfaz o progresso manual sem solicitar data.
+- Android ganha uma aba própria de Conquistas; iPhone e Android exibem os emblemas oficiais sincronizados.
+- Registros anteriores compatíveis são migrados por título ao catálogo oficial sem duplicar a contagem.
+- Progresso lido diretamente da Steam ou do RetroAchievements continua protegido contra edição.
+
 ## Launcher 1.61.0, Android 0.18.0 e iOS 0.9.0 — conquistas manuais sincronizadas
 
 - Jogos cuja conexão não oferece leitura oficial completa permitem marcar e desfazer conquistas manualmente.

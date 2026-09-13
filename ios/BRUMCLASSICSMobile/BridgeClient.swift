@@ -100,17 +100,13 @@ actor BridgeClient {
         let _: [String: Bool] = try await request(path: "/v1/classics/achievements/sync", method: "POST", body: body)
     }
 
-    func setManualAchievement(gameID: String, achievementID: String, title: String, description: String, points: Int, unlocked: Bool, unlockedAt: Date) async throws {
+    func setManualAchievement(gameID: String, achievementID: String, unlocked: Bool) async throws {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let body = try JSONSerialization.data(withJSONObject: [
             "gameId": gameID,
             "achievementId": achievementID,
-            "title": title,
-            "description": description,
-            "points": max(0, points),
             "unlocked": unlocked,
-            "unlockedAt": unlocked ? formatter.string(from: unlockedAt) : "",
             "updatedAt": formatter.string(from: Date())
         ])
         let _: ServerEnvelope<EmptyResult> = try await request(path: "/v1/achievements/manual", method: "POST", body: body)
@@ -223,7 +219,7 @@ actor BridgeClient {
         guard let url = URL(string: "\(scheme)://\(host):\(port)\(path)") else { throw BridgeError.invalidResponse("Endereço local inválido.") }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("BRUMCLASSICS-MOVEL/0.9.0 iOS", forHTTPHeaderField: "User-Agent")
+        request.setValue("BRUMCLASSICS-MOVEL/0.10.0 iOS", forHTTPHeaderField: "User-Agent")
         if authenticated { guard !token.isEmpty else { throw BridgeError.notPaired }; request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         return request
     }

@@ -49,7 +49,7 @@ final class AppStore: ObservableObject {
         catch { return "Progresso salvo no iPhone. O PC ainda não confirmou: \(error.localizedDescription). Atualize o launcher e confira a mesma conta e o vínculo do jogo." }
     }
 
-    func setManualAchievement(game: Game, achievement: Game.Achievement?, title: String, description: String, points: Int, unlocked: Bool, unlockedAt: Date) async -> Bool {
+    func setManualAchievement(game: Game, achievement: Game.Achievement, unlocked: Bool) async -> Bool {
         guard connection == .online else {
             message = "Conecte o iPhone ao launcher na mesma rede para sincronizar o registro manual."
             return false
@@ -59,9 +59,9 @@ final class AppStore: ObservableObject {
             return false
         }
         do {
-            try await bridge.setManualAchievement(gameID: game.id, achievementID: achievement?.id ?? "", title: title, description: description, points: points, unlocked: unlocked, unlockedAt: unlockedAt)
+            try await bridge.setManualAchievement(gameID: game.id, achievementID: achievement.id, unlocked: unlocked)
             await refresh()
-            message = unlocked ? "Conquista registrada manualmente." : "Registro manual removido."
+            message = unlocked ? "Conquista marcada como desbloqueada." : "Conquista desmarcada."
             AppHaptics.success()
             return true
         } catch {

@@ -58,7 +58,8 @@ struct AchievementsView: View {
                                 GameCoverView(game: game, cornerRadius: 7).frame(width: 70, height: 98)
                                 VStack(alignment: .leading, spacing: 7) {
                                     Text(game.title).font(.headline).foregroundStyle(BrumTheme.text).lineLimit(2)
-                                    Text(game.achievements.isEmpty ? "CADASTRO MANUAL DISPONÍVEL" : "\(game.achievementsCollected ?? 0)/\(game.achievementsTotal ?? 0) DESBLOQUEADAS").font(.caption2.bold()).foregroundStyle(BrumTheme.muted)
+                                    Text(game.achievements.isEmpty ? "CATÁLOGO PENDENTE NO LAUNCHER" : "\(game.achievementsCollected ?? 0)/\(game.achievementsTotal ?? 0) DESBLOQUEADAS").font(.caption2.bold()).foregroundStyle(BrumTheme.muted)
+                                    if game.allowsManualAchievements && !game.achievements.isEmpty { Text(game.achievementCatalogLabel).font(.caption2.bold()).foregroundStyle(BrumTheme.primary) }
                                     ProgressView(value: Double(game.achievementProgress), total: 100).tint(BrumTheme.primary)
                                     Text("\(game.achievementProgress)%").font(.caption.bold()).foregroundStyle(BrumTheme.primary)
                                 }
