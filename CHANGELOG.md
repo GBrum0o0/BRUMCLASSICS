@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## Launcher 1.62.1 — correções de alinhamento e rolagem
+
+- O botão Voltar de **Explorar conexões** mantém a seta centralizada no círculo, inclusive com o dimensionamento de tela do Windows.
+- A janela de conquistas passa a usar toda a altura disponível sem ultrapassar a área visível.
+- A lista de conquistas ganha espaço inferior real, permitindo rolar até a última linha sem esconder parte do cartão.
+- Android 0.19.0 e iOS 0.10.0 permanecem inalterados nesta correção exclusiva do launcher.
+
 ## Launcher 1.62.0, Android 0.19.0 e iOS 0.10.0 — catálogo oficial com progresso manual
 
 - Jogos sem leitura direta podem receber imagem, título e descrição publicados oficialmente no catálogo da Steam.
