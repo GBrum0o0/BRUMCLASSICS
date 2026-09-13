@@ -1,9 +1,12 @@
 {
-  "version": "0.8.1",
-  "build": 19,
+  "version": "0.9.0",
+  "build": 20,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.8.1",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.9.0",
   "notes": [
+    "Conquistas agora podem ser pesquisadas, cadastradas, datadas e desfeitas manualmente quando a conexão não oferece leitura oficial completa.",
+    "O registro é salvo no perfil ativo pelo launcher 1.61.0 e sincronizado com Android e iPhone pelo protocolo móvel 10.",
+    "Confirmações oficiais permanecem protegidas e substituem o rótulo manual quando a fonte reconhece o mesmo item.",
     "A seção Conquistas agora permite pesquisar jogos do launcher e CLASSICS do iPhone pelo nome.",
     "A busca ignora acentos e maiúsculas, aceita várias palavras e abre o detalhe com todas as conquistas disponíveis.",
     "A Central BRUM sincroniza conquistas, sessões, saves, instalações, atualizações e avisos do launcher.",

@@ -11,7 +11,7 @@ struct LibrarySnapshot: Codable, Equatable {
     var performance: PerformanceState?
     var notifications: MobileNotificationSnapshot?
 
-    static let empty = LibrarySnapshot(protocolVersion: 9, revision: 0, generatedAt: "", games: [], collections: [], activity: [], companion: nil, performance: nil, notifications: nil)
+    static let empty = LibrarySnapshot(protocolVersion: 10, revision: 0, generatedAt: "", games: [], collections: [], activity: [], companion: nil, performance: nil, notifications: nil)
 }
 
 struct MobileNotificationSnapshot: Codable, Equatable {
@@ -58,6 +58,7 @@ struct Game: Codable, Identifiable, Hashable {
         let hardcore: Bool?
         let unlockedAt: String
         let badgeUrl: String?
+        let manual: Bool?
     }
     struct Notes: Codable, Hashable {
         var whereStopped: String
@@ -84,6 +85,7 @@ struct Game: Codable, Identifiable, Hashable {
     let achievementsCollected: Int?
     let achievementsTotal: Int?
     let achievementsAvailable: Bool
+    let manualAchievementAllowed: Bool?
     let achievements: [Achievement]
     let storyCompleted: Bool
     var favorite: Bool
@@ -96,6 +98,7 @@ struct Game: Codable, Identifiable, Hashable {
     let artworkPath: String
 
     var isClassic: Bool { category == "classic" }
+    var allowsManualAchievements: Bool { manualAchievementAllowed == true }
     var achievementProgress: Int { guard let total = achievementsTotal, total > 0 else { return 0 }; return min(100, Int((Double(achievementsCollected ?? 0) / Double(total)) * 100)) }
     var playtimeLabel: String { guard playtimeAvailable, let raw = playtimeMinutes, raw.isFinite, raw >= 0, raw < Double(Int.max) else { return "INDISPONÍVEL" }; let value = Int(raw); return value >= 60 ? "\(value / 60) h \(value % 60) min" : "\(value) min" }
     var statusLabel: String { if storyCompleted { return "HISTÓRIA COMPLETADA" }; if wantToPlay { return "QUERO JOGAR" }; if (playtimeMinutes ?? 0) > 0 { return "JOGANDO" }; return installed ? "INSTALADO" : "NÃO INSTALADO" }

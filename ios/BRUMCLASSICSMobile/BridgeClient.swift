@@ -76,7 +76,7 @@ actor BridgeClient {
         let body: [String: Any] = ["code": payload.code, "deviceName": UIDevice.current.name]
         let data = try JSONSerialization.data(withJSONObject: body)
         let response: PairResponse = try await request(path: "/v1/pair", method: "POST", body: data, authenticated: false, overrideHost: payload.host, overridePort: payload.port)
-        guard response.protocolVersion >= 8 else { throw BridgeError.invalidResponse("O launcher precisa ser atualizado para o protocolo móvel atual.") }
+        guard response.protocolVersion >= 10 else { throw BridgeError.invalidResponse("Atualize o launcher para usar conquistas manuais e o protocolo móvel atual.") }
         let config = PairingConfiguration(host: payload.host, port: payload.port, fingerprint: payload.pin, deviceID: response.device.id, deviceName: response.device.name)
         configuration = config
         token = response.token
@@ -98,6 +98,22 @@ actor BridgeClient {
     func syncPocketAchievements(gameID: String, raGameID: Int, username: String) async throws {
         let body = try JSONSerialization.data(withJSONObject: ["gameId": gameID, "raGameId": raGameID, "username": username])
         let _: [String: Bool] = try await request(path: "/v1/classics/achievements/sync", method: "POST", body: body)
+    }
+
+    func setManualAchievement(gameID: String, achievementID: String, title: String, description: String, points: Int, unlocked: Bool, unlockedAt: Date) async throws {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let body = try JSONSerialization.data(withJSONObject: [
+            "gameId": gameID,
+            "achievementId": achievementID,
+            "title": title,
+            "description": description,
+            "points": max(0, points),
+            "unlocked": unlocked,
+            "unlockedAt": unlocked ? formatter.string(from: unlockedAt) : "",
+            "updatedAt": formatter.string(from: Date())
+        ])
+        let _: ServerEnvelope<EmptyResult> = try await request(path: "/v1/achievements/manual", method: "POST", body: body)
     }
 
     func syncPocketTime(_ record: PocketRuntimeRecord, game: PocketClassic) async throws -> PocketTimeReceipt {
@@ -207,7 +223,7 @@ actor BridgeClient {
         guard let url = URL(string: "\(scheme)://\(host):\(port)\(path)") else { throw BridgeError.invalidResponse("Endereço local inválido.") }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("BRUMCLASSICS-MOVEL/0.8.1 iOS", forHTTPHeaderField: "User-Agent")
+        request.setValue("BRUMCLASSICS-MOVEL/0.9.0 iOS", forHTTPHeaderField: "User-Agent")
         if authenticated { guard !token.isEmpty else { throw BridgeError.notPaired }; request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         return request
     }

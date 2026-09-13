@@ -84,6 +84,24 @@ public final class BridgeClient {
         postClassic("/v1/classics/achievements/sync", body, callback);
     }
 
+    public void setManualAchievement(Game game, Game.Achievement achievement, String title, String description,
+                                     int points, boolean unlocked, long unlockedAt, ClassicsCallback callback) {
+        if (!isConfigured()) { callback.onError("Conecte este celular ao launcher para sincronizar o registro manual."); return; }
+        if (game == null || game.id.isEmpty() || !game.manualAchievementAllowed) { callback.onError("A edição manual não está disponível para esta fonte."); return; }
+        JSONObject body = new JSONObject();
+        try {
+            body.put("gameId", game.id);
+            body.put("achievementId", achievement == null ? "" : achievement.id);
+            body.put("title", title == null ? "" : title);
+            body.put("description", description == null ? "" : description);
+            body.put("points", Math.max(0, points));
+            body.put("unlocked", unlocked);
+            if (unlocked && unlockedAt > 0) body.put("unlockedAt", new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.ROOT).format(new java.util.Date(unlockedAt)));
+            body.put("updatedAt", new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.ROOT).format(new java.util.Date()));
+        } catch (Exception error) { callback.onError("Dados da conquista inválidos."); return; }
+        postClassic("/v1/achievements/manual", body, callback);
+    }
+
     public void syncClassicTime(String gameId, String streamId, String filename, String title, long totalSeconds, long playedAt, ClassicsCallback callback) {
         if (!isConfigured()) { callback.onError("Conecte este celular ao launcher primeiro."); return; }
         JSONObject body = new JSONObject();
@@ -370,6 +388,7 @@ public final class BridgeClient {
                 String response = readResponse(connection, 128 * 1024);
                 if (connection.getResponseCode() != 201) throw new IllegalStateException(pairingError(response, connection.getResponseCode()));
                 JSONObject result = new JSONObject(response);
+                if (result.optInt("protocolVersion", 0) < 10) throw new IllegalStateException("Atualize o launcher para usar conquistas manuais.");
                 String token = result.optString("token", "");
                 if (token.length() < 32) throw new IllegalStateException("O launcher retornou uma autorização inválida.");
                 preferences.edit().putString("host", host).putInt("port", port).putString("token", token).putString("tls_pin", pin).apply();
@@ -784,7 +803,7 @@ public final class BridgeClient {
         connection.setReadTimeout(12000);
         connection.setUseCaches(false);
         connection.setRequestProperty("Accept", "application/json");
-        connection.setRequestProperty("User-Agent", "BRUMCLASSICS-MOVEL/0.17.0 Android");
+        connection.setRequestProperty("User-Agent", "BRUMCLASSICS-MOVEL/0.18.0 Android");
         if (authenticated) connection.setRequestProperty("Authorization", "Bearer " + preferences.getString("token", ""));
     }
 

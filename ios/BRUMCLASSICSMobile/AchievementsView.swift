@@ -20,7 +20,7 @@ struct AchievementsView: View {
     @State private var searchText = ""
     private var games: [Game] {
         store.snapshot.games.filter {
-            $0.achievementsAvailable && ($0.achievementsTotal ?? 0) > 0 &&
+            (($0.achievementsAvailable && ($0.achievementsTotal ?? 0) > 0) || $0.allowsManualAchievements) &&
                 AchievementGameSearch.matches(searchText, fields: [$0.title, $0.platform, $0.store])
         }.sorted {
             if closestFirst && $0.achievementProgress != $1.achievementProgress { return $0.achievementProgress > $1.achievementProgress }
@@ -58,7 +58,7 @@ struct AchievementsView: View {
                                 GameCoverView(game: game, cornerRadius: 7).frame(width: 70, height: 98)
                                 VStack(alignment: .leading, spacing: 7) {
                                     Text(game.title).font(.headline).foregroundStyle(BrumTheme.text).lineLimit(2)
-                                    Text("\(game.achievementsCollected ?? 0)/\(game.achievementsTotal ?? 0) DESBLOQUEADAS").font(.caption2.bold()).foregroundStyle(BrumTheme.muted)
+                                    Text(game.achievements.isEmpty ? "CADASTRO MANUAL DISPONÍVEL" : "\(game.achievementsCollected ?? 0)/\(game.achievementsTotal ?? 0) DESBLOQUEADAS").font(.caption2.bold()).foregroundStyle(BrumTheme.muted)
                                     ProgressView(value: Double(game.achievementProgress), total: 100).tint(BrumTheme.primary)
                                     Text("\(game.achievementProgress)%").font(.caption.bold()).foregroundStyle(BrumTheme.primary)
                                 }

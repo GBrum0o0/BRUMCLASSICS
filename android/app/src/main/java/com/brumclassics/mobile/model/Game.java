@@ -17,6 +17,7 @@ public final class Game {
     public final int minutesPlayed;
     public final boolean playtimeAvailable;
     public final boolean achievementsAvailable;
+    public final boolean manualAchievementAllowed;
     public final boolean recent;
     public final int colorStart;
     public final int colorEnd;
@@ -42,9 +43,14 @@ public final class Game {
         public final boolean unlocked;
         public final int points;
         public final String unlockedAt;
+        public final boolean manual;
 
         public Achievement(String id, String title, String description, boolean unlocked, int points, String unlockedAt) {
-            this.id = id; this.title = title; this.description = description; this.unlocked = unlocked; this.points = points; this.unlockedAt = unlockedAt;
+            this(id, title, description, unlocked, points, unlockedAt, false);
+        }
+
+        public Achievement(String id, String title, String description, boolean unlocked, int points, String unlockedAt, boolean manual) {
+            this.id = id; this.title = title; this.description = description; this.unlocked = unlocked; this.points = points; this.unlockedAt = unlockedAt; this.manual = manual;
         }
     }
 
@@ -97,7 +103,7 @@ public final class Game {
         this(id, title, description, platform, genre, status, progress, minutesPlayed, recent,
             colorStart, colorEnd, artworkPath, installed, achievements, playtimeAvailable,
             achievementsAvailable, whereStopped, objectives, tips, commands, notesRevision,
-            notesUpdatedAt, favorite, wantToPlay, libraryStateRevision, libraryStateUpdatedAt, lastPlayedAt, "");
+            notesUpdatedAt, favorite, wantToPlay, libraryStateRevision, libraryStateUpdatedAt, lastPlayedAt, "", false);
     }
 
     public Game(String id, String title, String description, String platform, String genre,
@@ -107,6 +113,20 @@ public final class Game {
                 String whereStopped, String objectives, String tips, String commands,
                 int notesRevision, String notesUpdatedAt, boolean favorite, boolean wantToPlay,
                 int libraryStateRevision, String libraryStateUpdatedAt, String lastPlayedAt, String category) {
+        this(id, title, description, platform, genre, status, progress, minutesPlayed, recent,
+            colorStart, colorEnd, artworkPath, installed, achievements, playtimeAvailable,
+            achievementsAvailable, whereStopped, objectives, tips, commands, notesRevision,
+            notesUpdatedAt, favorite, wantToPlay, libraryStateRevision, libraryStateUpdatedAt, lastPlayedAt, category, false);
+    }
+
+    public Game(String id, String title, String description, String platform, String genre,
+                Status status, int progress, int minutesPlayed, boolean recent,
+                int colorStart, int colorEnd, String artworkPath, boolean installed,
+                List<Achievement> achievements, boolean playtimeAvailable, boolean achievementsAvailable,
+                String whereStopped, String objectives, String tips, String commands,
+                int notesRevision, String notesUpdatedAt, boolean favorite, boolean wantToPlay,
+                int libraryStateRevision, String libraryStateUpdatedAt, String lastPlayedAt, String category,
+                boolean manualAchievementAllowed) {
         this.id = id;
         this.title = title;
         this.description = description;
@@ -118,6 +138,7 @@ public final class Game {
         this.minutesPlayed = minutesPlayed;
         this.playtimeAvailable = playtimeAvailable;
         this.achievementsAvailable = achievementsAvailable;
+        this.manualAchievementAllowed = manualAchievementAllowed;
         this.recent = recent;
         this.colorStart = colorStart;
         this.colorEnd = colorEnd;

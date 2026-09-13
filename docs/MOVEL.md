@@ -1,4 +1,4 @@
-# BRUMCLASSICS MÓVEL Android 0.17.0
+# BRUMCLASSICS MÓVEL Android 0.18.0
 
 Jogos cadastrados no launcher como **não oficiais** são sincronizados como itens locais instalados. O aplicativo recebe somente a classificação e o SteamID de referência quando houver; o caminho do executável nunca sai do computador. B-CARD, anotações e BRUMCOMPANION continuam usando a identidade segura enviada pelo launcher.
 
@@ -6,7 +6,9 @@ Esta versão também adiciona **CLASSICS Everywhere**: a biblioteca local de ROM
 
 ## Instalar e atualizar
 
-Instale o APK 0.17.0 da release oficial sobre o aplicativo existente, sem limpar seus dados. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente. Se a rede externa estiver indisponível, o launcher pareado pode oferecer o mesmo APK localmente.
+Instale o APK 0.18.0 da release oficial sobre o aplicativo existente, sem limpar seus dados. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente. Se a rede externa estiver indisponível, o launcher pareado pode oferecer o mesmo APK localmente.
+
+Em fontes sem leitura oficial completa, abra o jogo e use **Conquistas → Buscar** para marcar, datar ou desfazer um desbloqueio. Quando a loja não fornecer a lista, use **Cadastrar**. O protocolo 10 do launcher 1.61.0 salva tudo no perfil ativo e protege itens oficiais.
 
 ## Parear com segurança
 

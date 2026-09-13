@@ -54,6 +54,7 @@ public final class GameRepository {
             String title = item.optString("title", "").trim();
             if (id.isEmpty() || title.isEmpty()) continue;
             boolean playtimeAvailable = item.optBoolean("playtimeAvailable", !item.isNull("playtimeMinutes"));
+            boolean manualAchievementAllowed = item.optBoolean("manualAchievementAllowed", false);
             boolean achievementsAvailable = item.optBoolean("achievementsAvailable", !item.isNull("achievementsCollected") && !item.isNull("achievementsTotal"));
             int collected = achievementsAvailable ? Math.max(0, item.optInt("achievementsCollected", 0)) : 0;
             int total = achievementsAvailable ? Math.max(0, item.optInt("achievementsTotal", 0)) : 0;
@@ -68,7 +69,7 @@ public final class GameRepository {
                 achievements.add(new Game.Achievement(
                     achievement.optString("id", ""), achievement.optString("title", "Conquista"),
                     achievement.optString("description", ""), achievement.optBoolean("unlocked", false),
-                    achievement.optInt("points", 0), achievement.optString("unlockedAt", "")
+                    achievement.optInt("points", 0), achievement.optString("unlockedAt", ""), achievement.optBoolean("manual", false)
                 ));
             }
             int hash = title.hashCode();
@@ -91,7 +92,7 @@ public final class GameRepository {
                 Math.max(0, notes.optInt("revision", 0)), notes.optString("updatedAt", ""),
                 item.optBoolean("favorite", false), item.optBoolean("wantToPlay", false),
                 Math.max(0, item.optInt("libraryStateRevision", 0)),
-                item.optString("libraryStateUpdatedAt", ""), item.optString("lastPlayedAt", ""), item.optString("category", "")
+                item.optString("libraryStateUpdatedAt", ""), item.optString("lastPlayedAt", ""), item.optString("category", ""), manualAchievementAllowed
             ));
         }
         if (input.length() > 0 && synchronizedGames.isEmpty()) {

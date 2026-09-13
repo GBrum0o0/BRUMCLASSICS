@@ -1620,9 +1620,10 @@ public final class MainActivity extends Activity {
         metrics.addView(metricCard(game.genre, "GÊNERO"), weightedMargins(6, 0, 0, 0));
         page.addView(metrics, margins(-1, 24, -1, 0));
 
-        if (game.achievementsAvailable && !game.achievements.isEmpty()) {
+        if (!game.achievements.isEmpty()) {
             int unlocked = 0; for (Game.Achievement achievement : game.achievements) if (achievement.unlocked) unlocked++;
-            page.addView(sectionHeading("CONQUISTAS · " + unlocked + "/" + game.achievements.size(), "", null), margins(-1, 32, -1, 10));
+            page.addView(sectionHeading("CONQUISTAS · " + unlocked + "/" + game.achievements.size(), "BUSCAR", v -> showAchievementBrowser(game)), margins(-1, 32, -1, 10));
+            if (game.manualAchievementAllowed) page.addView(text("REGISTRO MANUAL DISPONÍVEL · toque em uma conquista para alterar", 7, ACCENT, true), margins(-1, 0, -1, 8));
             int shown = 0;
             for (Game.Achievement achievement : game.achievements) {
                 if (shown++ >= 12) break;
@@ -1637,11 +1638,15 @@ public final class MainActivity extends Activity {
                 if (!achievement.description.isEmpty()) achievementCopy.addView(text(achievement.description, 8, MUTED, false), margins(-1, 4, -1, 0));
                 achievementRow.addView(achievementCopy, new LinearLayout.LayoutParams(0, -2, 1));
                 if (achievement.points > 0) achievementRow.addView(text(achievement.points + " PTS", 7, achievement.unlocked ? ACCENT : MUTED, true));
+                if (game.manualAchievementAllowed && (!achievement.unlocked || achievement.manual)) achievementRow.setOnClickListener(v -> showManualAchievementDialog(game, achievement));
                 page.addView(achievementRow, margins(-1, 5, -1, 0));
             }
+        } else if (game.manualAchievementAllowed) {
+            page.addView(sectionHeading("CONQUISTAS", "CADASTRAR", v -> showManualAchievementDialog(game, null)), margins(-1, 32, -1, 10));
+            page.addView(text("A loja não fornece um catálogo completo. Cadastre e marque manualmente as conquistas que você já obteve.", 9, MUTED, false));
         } else if (!game.achievementsAvailable) {
             page.addView(sectionHeading("CONQUISTAS", "", null), margins(-1, 32, -1, 10));
-            page.addView(text("INDISPONÍVEL · A loja não forneceu um progresso verificável para este jogo.", 9, MUTED, false));
+            page.addView(text("INDISPONÍVEL · O progresso oficial ainda não foi sincronizado.", 9, MUTED, false));
         }
 
         boolean favored = isFavorite(game);
@@ -1681,6 +1686,109 @@ public final class MainActivity extends Activity {
         future.setLetterSpacing(.11f);
         page.addView(future, margins(-1, 15, -1, 28));
         setScreen("details", scroll);
+    }
+
+    private void showAchievementBrowser(Game game) {
+        LinearLayout root = column();
+        root.setPadding(dp(18), dp(6), dp(18), dp(10));
+        EditText search = pairingField("Buscar por nome ou descrição", "");
+        root.addView(search, margins(-1, 0, -1, 10));
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout list = column();
+        scroll.addView(list);
+        root.addView(scroll, new LinearLayout.LayoutParams(-1, dp(430)));
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("CONQUISTAS · " + game.title).setView(root)
+            .setNegativeButton("FECHAR", null)
+            .setPositiveButton(game.manualAchievementAllowed ? "CADASTRAR" : "", null).create();
+        Runnable render = () -> {
+            list.removeAllViews();
+            String filter = search.getText().toString().trim().toLowerCase(Locale.ROOT);
+            int found = 0;
+            for (Game.Achievement item : game.achievements) {
+                String searchable = (item.title + " " + item.description).toLowerCase(Locale.ROOT);
+                if (!filter.isEmpty() && !searchable.contains(filter)) continue;
+                found++;
+                LinearLayout row = row();
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setPadding(dp(12), dp(12), dp(12), dp(12));
+                row.setBackground(background(SURFACE, 3, LINE, 1));
+                row.addView(text(item.unlocked ? "◆" : "◇", 15, item.unlocked ? ACCENT : MUTED, true), new LinearLayout.LayoutParams(dp(30), -2));
+                LinearLayout copy = column();
+                copy.addView(text(item.title, 11, item.unlocked ? TEXT : MUTED, true));
+                String detail = item.description + (item.manual ? " · REGISTRO MANUAL" : item.unlocked ? " · OFICIAL" : "");
+                if (!detail.trim().isEmpty()) copy.addView(text(detail, 8, item.manual ? ACCENT : MUTED, false), margins(-1, 4, -1, 0));
+                row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+                if (game.manualAchievementAllowed && (!item.unlocked || item.manual)) row.setOnClickListener(v -> { dialog.dismiss(); showManualAchievementDialog(game, item); });
+                list.addView(row, margins(-1, 3, -1, 3));
+            }
+            if (found == 0) list.addView(text("Nenhuma conquista encontrada.", 10, MUTED, false), margins(-1, 18, -1, 18));
+        };
+        search.addTextChangedListener(new TextWatcher() {
+            public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
+            public void onTextChanged(CharSequence s, int st, int before, int count) { render.run(); }
+            public void afterTextChanged(Editable e) {}
+        });
+        dialog.setOnShowListener(ignored -> {
+            if (game.manualAchievementAllowed) dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> { dialog.dismiss(); showManualAchievementDialog(game, null); });
+            render.run();
+        });
+        dialog.show();
+    }
+
+    private void showManualAchievementDialog(Game game, Game.Achievement achievement) {
+        boolean creating = achievement == null;
+        LinearLayout form = column();
+        form.setPadding(dp(18), dp(4), dp(18), dp(4));
+        EditText name = pairingField("Nome da conquista", creating ? "" : achievement.title);
+        EditText description = pairingField("Descrição opcional", creating ? "" : achievement.description);
+        EditText points = pairingField("Pontos opcionais", creating ? "0" : String.valueOf(achievement.points));
+        points.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        if (creating) { form.addView(name); form.addView(description); form.addView(points); }
+        java.text.SimpleDateFormat display = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.ROOT);
+        display.setLenient(false);
+        long previous = achievement == null || achievement.unlockedAt.isEmpty() ? System.currentTimeMillis() : parseIsoTime(achievement.unlockedAt);
+        EditText date = pairingField("Data e hora · DD/MM/AAAA HH:MM", display.format(new java.util.Date(previous > 0 ? previous : System.currentTimeMillis())));
+        form.addView(date);
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+            .setTitle(creating ? "CADASTRAR CONQUISTA" : achievement.title)
+            .setMessage("Registro manual para conexões sem leitura oficial completa.")
+            .setView(form).setPositiveButton("MARCAR", null).setNeutralButton("CANCELAR", null);
+        if (achievement != null && achievement.manual) builder.setNegativeButton("DESFAZER", null);
+        AlertDialog dialog = builder.create();
+        dialog.setOnShowListener(ignored -> {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(ACCENT);
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                String title = creating ? name.getText().toString().trim() : achievement.title;
+                if (title.isEmpty()) { name.setError("Informe o nome."); return; }
+                long unlockedAt;
+                try { unlockedAt = display.parse(date.getText().toString().trim()).getTime(); }
+                catch (Exception error) { date.setError("Use DD/MM/AAAA HH:MM."); return; }
+                if (unlockedAt > System.currentTimeMillis() + 300000) { date.setError("A data não pode estar no futuro."); return; }
+                int score = 0;
+                try { score = Math.max(0, Integer.parseInt(points.getText().toString().trim())); } catch (Exception ignored2) {}
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
+                bridgeClient.setManualAchievement(game, achievement, title, creating ? description.getText().toString().trim() : achievement.description,
+                    score, true, unlockedAt, new BridgeClient.ClassicsCallback() {
+                        public void onResult(org.json.JSONObject result) { dialog.dismiss(); Toast.makeText(MainActivity.this, "Conquista registrada manualmente.", Toast.LENGTH_LONG).show(); bridgeClient.fetchSnapshot(); }
+                        public void onError(String message) { dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true); Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show(); }
+                    });
+            });
+            if (achievement != null && achievement.manual) dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener(v -> {
+                bridgeClient.setManualAchievement(game, achievement, achievement.title, achievement.description, achievement.points, false, 0, new BridgeClient.ClassicsCallback() {
+                    public void onResult(org.json.JSONObject result) { dialog.dismiss(); Toast.makeText(MainActivity.this, "Registro manual removido.", Toast.LENGTH_LONG).show(); bridgeClient.fetchSnapshot(); }
+                    public void onError(String message) { Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show(); }
+                });
+            });
+        });
+        dialog.show();
+    }
+
+    private long parseIsoTime(String value) {
+        try { return new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.ROOT).parse(value).getTime(); }
+        catch (Exception ignored) {
+            try { return new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.ROOT).parse(value).getTime(); }
+            catch (Exception ignored2) { return 0; }
+        }
     }
 
     private void showStats() {

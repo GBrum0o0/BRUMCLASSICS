@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## Launcher 1.61.0, Android 0.18.0 e iOS 0.9.0 — conquistas manuais sincronizadas
+
+- Jogos cuja conexão não oferece leitura oficial completa permitem marcar e desfazer conquistas manualmente.
+- A data e a hora podem representar um desbloqueio antigo; cada registro fica associado ao jogador ativo.
+- A busca por nome ou descrição funciona no launcher, Android e iPhone.
+- Quando a plataforma não entrega sequer o catálogo, o usuário pode cadastrar nome, descrição e pontos.
+- Registros manuais aparecem identificados e nunca alteram uma conquista já confirmada oficialmente.
+- Se uma fonte oficial futuramente fornecer o mesmo ID ou título, o item pessoal é promovido sem duplicar a contagem.
+- O protocolo móvel 10 adiciona uma rota autenticada e limitada para sincronizar somente os campos necessários.
+- A matriz de capacidades das lojas foi refinada: integrações privadas ou não documentadas não são apresentadas como APIs oficiais.
+
 ## Launcher 1.60.1 — conexões em foco
 
 - O catálogo de conexões ganha cartões mais compactos e hierarquia visual inspirada no conceito aprovado, preservando o preto e verde do BRUMCLASSICS.

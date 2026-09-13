@@ -86,7 +86,7 @@ const icon = fs.readFileSync(path.join(app, 'Assets.xcassets/AppIcon.appiconset/
 if (icon.readUInt32BE(16) !== 1024 || icon.readUInt32BE(20) !== 1024) throw new Error('AppIcon precisa ter 1024 × 1024 pixels.');
 
 const protocolMatch = source.match(/protocolVersion\s*>=\s*(\d+)/);
-if (!protocolMatch || Number(protocolMatch[1]) !== 8) throw new Error('Versão do protocolo móvel divergente.');
-if (!source.includes('LibrarySnapshot(protocolVersion: 9')) throw new Error('Snapshot atual precisa anunciar o protocolo móvel 9.');
+if (!protocolMatch || Number(protocolMatch[1]) !== 10) throw new Error('Versão do protocolo móvel divergente.');
+if (!source.includes('LibrarySnapshot(protocolVersion: 10')) throw new Error('Snapshot atual precisa anunciar o protocolo móvel 10.');
 
-console.log(JSON.stringify({ ok: true, swiftFiles: swiftFiles.length, endpoints: requiredEndpoints.length, commands: requiredCommands.length, protocolVersion: 9, minimumCompatibleProtocol: 8, appIcon: '1024x1024' }, null, 2));
+console.log(JSON.stringify({ ok: true, swiftFiles: swiftFiles.length, endpoints: requiredEndpoints.length, commands: requiredCommands.length, protocolVersion: 10, minimumCompatibleProtocol: 10, appIcon: '1024x1024' }, null, 2));

@@ -49,6 +49,27 @@ final class AppStore: ObservableObject {
         catch { return "Progresso salvo no iPhone. O PC ainda não confirmou: \(error.localizedDescription). Atualize o launcher e confira a mesma conta e o vínculo do jogo." }
     }
 
+    func setManualAchievement(game: Game, achievement: Game.Achievement?, title: String, description: String, points: Int, unlocked: Bool, unlockedAt: Date) async -> Bool {
+        guard connection == .online else {
+            message = "Conecte o iPhone ao launcher na mesma rede para sincronizar o registro manual."
+            return false
+        }
+        guard game.allowsManualAchievements else {
+            message = "Esta fonte possui progresso oficial protegido contra edição manual."
+            return false
+        }
+        do {
+            try await bridge.setManualAchievement(gameID: game.id, achievementID: achievement?.id ?? "", title: title, description: description, points: points, unlocked: unlocked, unlockedAt: unlockedAt)
+            await refresh()
+            message = unlocked ? "Conquista registrada manualmente." : "Registro manual removido."
+            AppHaptics.success()
+            return true
+        } catch {
+            message = error.localizedDescription
+            return false
+        }
+    }
+
     func syncPocketTime(_ record: PocketRuntimeRecord, game: PocketClassic) async throws -> PocketTimeReceipt {
         guard connection == .online, let fingerprint = configuration?.fingerprint,
               record.serverFingerprint.isEmpty || record.serverFingerprint == fingerprint else { throw PocketError.message("Conecte-se ao PC original para enviar as horas pendentes.") }
