@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## Launcher 1.63.1 — inicialização responsiva
+
+- O loading inicial deixa de permanecer acima das outras janelas e é exibido sem tomar o foco.
+- A interface é liberada após no máximo seis segundos de preparo de conquistas; consultas restantes continuam salvando o cache em segundo plano.
+- Catálogos e migrações passam a ser persistidos em lotes, evitando centenas de regravações do perfil.
+- A associação entre catálogos e conquistas existentes passa de busca quadrática para um índice linear por título.
+- Na biblioteca real de validação, com mais de 21 mil conquistas em catálogos pessoais, a projeção caiu de aproximadamente 24 segundos para 135 ms.
+- Android 0.19.0 e iOS 0.10.0 permanecem inalterados nesta correção exclusiva do launcher.
+
 ## Launcher 1.63.0 — conquistas prontas e Console no PC
 
 - O loading inicial prepara os catálogos de conquistas de todos os jogos presentes antes de revelar a interface.

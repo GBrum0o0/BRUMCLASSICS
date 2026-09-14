@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.63.0"><strong>Windows 1.63.0</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.63.1"><strong>Windows 1.63.1</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.19.0"><strong>Android 0.19.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.10.0"><strong>iOS 0.10.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -35,7 +35,7 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - Jogos não oficiais podem ser cadastrados com executável local e SteamID opcional. **BUSCAR DADOS** usa o ID exato ou uma correspondência segura pelo nome para mostrar título oficial e recuperar capa e imagens, sem criar uma falsa licença de loja.
 - Remover da biblioteca sem desinstalar o jogo; correção de seção pelo Perfil → Editar jogo.
 - Conquistas modernas e RetroAchievements.
-- Catálogos de conquistas preparados no loading inicial e preservados no cache local; todas as conquistas possuem pontuação.
+- Catálogos de conquistas preparados a partir do loading inicial e preservados no cache local; a interface é liberada em até seis segundos e o restante continua em segundo plano, sem travar o launcher. Todas as conquistas possuem pontuação.
 - Registro pessoal de **História completada** para jogos modernos e CLASSICS, separado do percentual de conquistas.
 - CLASSICS com RetroArch, save states e Quick Resume.
 - Living Room Mode com controle e mídia física 3D.
@@ -62,7 +62,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 1.63.0 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.63.0) |
+| Windows | 1.63.1 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.63.1) |
 | Android | 0.19.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.19.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.10.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.10.0) · [Guia](ios/README-IOS.md) |
 
@@ -72,7 +72,8 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 
 ## Versões atuais
 
-- **Launcher 1.63.0:** conquistas preparadas antes da interface, pontuação completa e Console no PC opcional.
+- **Launcher 1.63.1:** loading sem prioridade sobre outras janelas, abertura responsiva e processamento de catálogos otimizado para bibliotecas grandes.
+- **Launcher 1.63.0:** preparação integral de conquistas, pontuação completa e Console no PC opcional.
 - **Launcher 1.62.0:** catálogo visual oficial, pesquisa de jogos e marcação manual direta para fontes sem leitura de progresso.
 - **Launcher 1.60.0:** lojas, RetroAchievements e RetroArch reunidos em um explorador com conexão acompanhada e monitoramento refinado.
 - **Launcher 1.59.0:** sincronização autenticada da Central BRUM com iPhone e Android.
