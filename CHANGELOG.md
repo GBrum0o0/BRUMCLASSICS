@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## Launcher 1.64.0 — biblioteca viva
+
+- Capas usam miniaturas locais leves, aparecem progressivamente e não dependem mais de passar o ponteiro.
+- Itens visíveis, favoritos, instalados e recentes recebem prioridade; as próximas fileiras são antecipadas e a fila continua entre aberturas.
+- Cache inválido é reparado individualmente e pode ser limpo ou regenerado em Configurações → Experiência sem apagar artes originais.
+- Biblioteca, Perfil do Jogo e Conquistas compartilham o mesmo cache visual.
+- Fundo dinâmico por jogo, profundidade discreta, cartão selecionado refinado e Vitrine opcional ampliam a identidade BRUMCLASSICS.
+- Perfil ganha apresentação cinematográfica; conquistas desbloqueadas, raras e especiais recebem tratamentos próprios.
+- Modo Economia, modo sem distrações, sons opcionais, transições consistentes e respeito a movimento reduzido completam a atualização.
+- Android 0.19.0 e iOS 0.10.0 permanecem inalterados nesta atualização exclusiva do launcher.
+
 ## Launcher 1.63.1 — inicialização responsiva
 
 - O loading inicial deixa de permanecer acima das outras janelas e é exibido sem tomar o foco.

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.63.1"><strong>Windows 1.63.1</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.64.0"><strong>Windows 1.64.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.19.0"><strong>Android 0.19.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.10.0"><strong>iOS 0.10.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -32,6 +32,8 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - Explorador único de conexões para lojas, RetroAchievements e RetroArch, com busca, permissões, diagnóstico e monitoramento visível.
 - Família Steam opcional: jogos compartilhados atualmente acessíveis entram identificados separadamente, sem serem tratados como compras da conta.
 - Busca, filtros, coleções, favoritos e prioridade de loja.
+- Capas progressivas com miniaturas locais, antecipação das próximas fileiras e fila persistente que evita recarregar imagens completas.
+- Fundo dinâmico por jogo, Vitrine opcional, cartões com profundidade discreta, modo sem distrações e modo Economia.
 - Jogos não oficiais podem ser cadastrados com executável local e SteamID opcional. **BUSCAR DADOS** usa o ID exato ou uma correspondência segura pelo nome para mostrar título oficial e recuperar capa e imagens, sem criar uma falsa licença de loja.
 - Remover da biblioteca sem desinstalar o jogo; correção de seção pelo Perfil → Editar jogo.
 - Conquistas modernas e RetroAchievements.
