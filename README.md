@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.64.0"><strong>Windows 1.64.0</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.65.0"><strong>Windows 1.65.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.19.0"><strong>Android 0.19.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.10.0"><strong>iOS 0.10.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -32,7 +32,7 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - Explorador único de conexões para lojas, RetroAchievements e RetroArch, com busca, permissões, diagnóstico e monitoramento visível.
 - Família Steam opcional: jogos compartilhados atualmente acessíveis entram identificados separadamente, sem serem tratados como compras da conta.
 - Busca, filtros, coleções, favoritos e prioridade de loja.
-- Capas progressivas com miniaturas locais, antecipação das próximas fileiras e fila persistente que evita recarregar imagens completas.
+- Capas locais aparecem no primeiro frame e migram para miniaturas otimizadas assim que o cache termina, sem depender de passar o mouse sobre os cartões.
 - Fundo dinâmico por jogo, Vitrine opcional, cartões com profundidade discreta, modo sem distrações e modo Economia.
 - Jogos não oficiais podem ser cadastrados com executável local e SteamID opcional. **BUSCAR DADOS** usa o ID exato ou uma correspondência segura pelo nome para mostrar título oficial e recuperar capa e imagens, sem criar uma falsa licença de loja.
 - Remover da biblioteca sem desinstalar o jogo; correção de seção pelo Perfil → Editar jogo.
@@ -43,7 +43,8 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - Living Room Mode com controle e mídia física 3D.
 - Perfis por dispositivo para controles genéricos, com layout PlayStation, Xbox ou Nintendo e aprendizado de botões.
 - Calibração de drift e ajustes de analógicos por controle.
-- Console no PC opcional para conectar um videogame por placa de vídeo USB; a seção fica desativada por padrão e pode ser exibida em **Configurações → Experiência**.
+- Console no PC opcional para placa de captura ou uso remoto oficial, com perfis por console, gravação, replay, janela flutuante e diagnóstico ao vivo; a seção fica desativada por padrão e pode ser exibida em **Configurações → Experiência**.
+- Monitoramento de instalações por eventos locais e verificação adaptativa, com confirmação dupla antes de retirar o estado instalado e verificação imediata por loja em Conexões.
 - Central de Sessões com evidências do processo e correção auditável.
 - Saúde da Biblioteca e backup portátil do perfil com verificação SHA-256.
 - BRUMWORLD: revista interativa com guias visuais do launcher e do aplicativo.
@@ -64,7 +65,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 1.63.1 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.63.1) |
+| Windows | 1.65.0 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.65.0) |
 | Android | 0.19.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.19.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.10.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.10.0) · [Guia](ios/README-IOS.md) |
 
@@ -74,6 +75,8 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 
 ## Versões atuais
 
+- **Launcher 1.65.0:** monitoramento adaptativo de instalações, capas imediatas e Console no PC com gravação, replay, diagnóstico e uso remoto oficial.
+- **Launcher 1.64.0:** cache visual inteligente, capas progressivas, fundos dinâmicos e novos modos de experiência.
 - **Launcher 1.63.1:** loading sem prioridade sobre outras janelas, abertura responsiva e processamento de catálogos otimizado para bibliotecas grandes.
 - **Launcher 1.63.0:** preparação integral de conquistas, pontuação completa e Console no PC opcional.
 - **Launcher 1.62.0:** catálogo visual oficial, pesquisa de jogos e marcação manual direta para fontes sem leitura de progresso.
@@ -99,7 +102,7 @@ Veja o [histórico completo](CHANGELOG.md) e as [notas do Android 0.19.0](releas
 
 ## Instalação rápida
 
-1. Baixe o executável portátil da [release Windows 1.63.0](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.63.0).
+1. Baixe o executável portátil da [release Windows 1.65.0](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.65.0).
 2. Execute `BRUMCLASSICS OFICIAL.exe`.
 3. Abra **Configurações → Conexões → Explorar conexões** e vincule somente suas próprias contas.
 4. Para CLASSICS, coloque somente suas próprias ROMs na pasta `RETROGAMES`.

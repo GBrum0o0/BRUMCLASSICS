@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## Launcher 1.65.0 — instalações em tempo real e Console no PC
+
+- O monitor reage às alterações locais das lojas e usa verificações adaptativas como confirmação.
+- Um jogo só deixa de constar como instalado após duas verificações negativas, reduzindo falsos estados durante atualizações e trocas de manifestos.
+- Conexões informa o estado do monitor por loja e oferece uma verificação imediata.
+- Capas locais aparecem no primeiro frame, sem depender de passar o mouse, e migram para a miniatura otimizada quando o cache termina.
+- Console no PC reúne placa de captura e uso remoto oficial, com perfis por console, gravação, replay, janela flutuante e tela cheia.
+- O diagnóstico ao vivo informa formato, quadros descartados, áudio, processamento, CPU, memória e GPU sem simular medições indisponíveis.
+- Android 0.19.0 e iOS 0.10.0 permanecem inalterados nesta atualização exclusiva do launcher Windows.
+
 ## Launcher 1.64.0 — biblioteca viva
 
 - Capas usam miniaturas locais leves, aparecem progressivamente e não dependem mais de passar o ponteiro.
