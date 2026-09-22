@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## Launcher 1.66.0 — conquistas e coleções protegidas
+
+- A sincronização rápida da Steam não substitui mais catálogos de conquistas já salvos por listas vazias.
+- Jogos marcados como disponíveis, mas sem catálogo, são reparados imediatamente em segundo plano na próxima abertura.
+- Coleções passam a manter um índice independente da biblioteca, protegido contra reconstruções de `library.json`.
+- Quando existe uma cópia válida anterior, o launcher recupera automaticamente os vínculos de coleção por identidade oficial do jogo.
+- A abertura com cache limita a espera pelas conquistas a 700 ms; o restante continua em segundo plano.
+- Android 0.19.0 e iOS 0.10.0 permanecem inalterados nesta correção exclusiva do launcher Windows.
+
 ## Launcher 1.65.0 — instalações em tempo real e Console no PC
 
 - O monitor reage às alterações locais das lojas e usa verificações adaptativas como confirmação.
