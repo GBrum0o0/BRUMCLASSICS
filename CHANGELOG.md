@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## Launcher 1.67.0 — perfis portáteis
+
+- Um botão de perfil ao lado das Configurações abre a nova central de jogadores.
+- Cada perfil pode ter nome de usuário e senha, mantendo coleções, favoritos, conquistas manuais, progresso pessoal e preferências visuais separados.
+- A exportação `.brumprofile` usa AES-256-GCM e senha; a importação cria outro perfil sem substituir os dados já existentes.
+- Jogos reconectados em outro computador recuperam suas coleções pela identidade oficial da loja, mesmo quando o ID interno do launcher muda.
+- Tokens, chaves, sessões e senhas das lojas nunca entram no arquivo exportado; as conexões precisam ser refeitas no novo computador.
+- A central informa o espaço usado por miniaturas e metadados e permite limpar somente esses caches, preservando perfil, organização e conquistas.
+- Android 0.19.0 e iOS 0.10.0 permanecem compatíveis e não precisam de novos pacotes para esta atualização exclusiva do launcher Windows.
+
 ## Launcher 1.66.0 — conquistas e coleções protegidas
 
 - A sincronização rápida da Steam não substitui mais catálogos de conquistas já salvos por listas vazias.
