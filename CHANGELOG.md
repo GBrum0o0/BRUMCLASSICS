@@ -1,5 +1,17 @@
 # Histórico de versões
 
+## Launcher 1.69.0 — biblioteca persistente
+
+- Jogos previamente confirmados permanecem salvos durante falhas de conexão, expiração do token familiar e respostas incompletas das lojas.
+- Coleções, favoritos, capas e catálogos de conquistas sobrevivem à renovação da conexão.
+- A biblioteca durável é a fonte principal na abertura, com verificação das lojas conectadas em segundo plano a cada início.
+- Ausências em consultas completas pedem verificação antes de sinalizar acesso indisponível, sem apagar o cartão.
+- Jogos de instalações locais verificadas permanecem registrados mesmo depois de desinstalados.
+- O monitor de instalações preserva a organização e grava sobre a biblioteca mais recente.
+- Novos jogos de qualquer loja acionam a preparação de capas e catálogos pendentes, conforme a disponibilidade das fontes.
+- Licenças continuam sob controle das lojas; catálogos públicos, mudança de conta, desconexão e remoção explícitas respeitam as regras existentes.
+- Android 0.19.0 e iOS 0.10.0 não tiveram alterações de código ou protocolo nesta atualização.
+
 ## Launcher 1.68.0 — identidade do jogador
 
 - O perfil **Jogador principal** começa como um espaço provisório e pede nome e senha quando a central é acessada pela primeira vez.

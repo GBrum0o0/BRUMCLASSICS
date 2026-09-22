@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.68.0"><strong>Windows 1.68.0</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.69.0"><strong>Windows 1.69.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.19.0"><strong>Android 0.19.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.10.0"><strong>iOS 0.10.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -28,6 +28,7 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 ## Principais recursos
 
 - Biblioteca unificada de jogos modernos e clássicos.
+- Registro persistente dos jogos já confirmados: falhas de conexão e renovação de tokens preservam coleções, favoritos, capas e catálogos salvos. O acesso atual é indicado separadamente e continua sujeito à licença da loja.
 - Integração com Steam, Epic Games, GOG, EA App e Ubisoft Connect, conforme a disponibilidade de cada serviço.
 - Explorador único de conexões para lojas, RetroAchievements e RetroArch, com busca, permissões, diagnóstico e monitoramento visível.
 - Família Steam opcional: jogos compartilhados atualmente acessíveis entram identificados separadamente, sem serem tratados como compras da conta.
@@ -66,7 +67,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 1.68.0 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.68.0) |
+| Windows | 1.69.0 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.69.0) |
 | Android | 0.19.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.19.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.10.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.10.0) · [Guia](ios/README-IOS.md) |
 
@@ -76,6 +77,7 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 
 ## Versões atuais
 
+- **Launcher 1.69.0:** biblioteca persistente, jogos preservados durante falhas de conexão e verificação de acesso em segundo plano.
 - **Launcher 1.68.0:** configuração segura do perfil principal sem perder dados, foto personalizada e exclusão de perfis com confirmação.
 - **Launcher 1.67.0:** perfis locais protegidos por senha, preferências por jogador, exportação/importação criptografada e gerenciamento seguro de cache.
 - **Launcher 1.66.0:** preservação e reparo de conquistas Steam, proteção independente das coleções e abertura mais rápida com cache.
@@ -106,7 +108,7 @@ Veja o [histórico completo](CHANGELOG.md) e as [notas do Android 0.19.0](releas
 
 ## Instalação rápida
 
-1. Baixe o executável portátil da [release Windows 1.68.0](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.68.0).
+1. Baixe o executável portátil da [release Windows 1.69.0](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.69.0).
 2. Execute `BRUMCLASSICS OFICIAL.exe`.
 3. Abra **Configurações → Conexões → Explorar conexões** e vincule somente suas próprias contas.
 4. Para CLASSICS, coloque somente suas próprias ROMs na pasta `RETROGAMES`.
