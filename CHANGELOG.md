@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## Launcher 1.68.0 — identidade do jogador
+
+- O perfil **Jogador principal** começa como um espaço provisório e pede nome e senha quando a central é acessada pela primeira vez.
+- A configuração acontece no próprio perfil existente: coleções, favoritos, conquistas manuais e preferências já registradas são preservados.
+- Cada jogador pode escolher uma imagem própria; ela é recortada ao centro, otimizada para PNG 512 × 512 e exibida no cabeçalho e na central.
+- A foto acompanha a exportação criptografada `.brumprofile` e volta ao importar o jogador em outro computador.
+- Qualquer perfil pode ser apagado pela central. Perfis protegidos exigem a senha e a confirmação informa claramente quais dados serão removidos.
+- A exclusão limpa somente os dados pessoais daquele jogador e não remove o arquivo original usado como foto.
+- Ao apagar o perfil principal, o launcher cria automaticamente um novo **Jogador principal** provisório.
+- Android 0.19.0 e iOS 0.10.0 permanecem compatíveis e não precisam de novos pacotes para esta atualização exclusiva do launcher Windows.
+
 ## Launcher 1.67.0 — perfis portáteis
 
 - Um botão de perfil ao lado das Configurações abre a nova central de jogadores.
