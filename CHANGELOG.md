@@ -1,5 +1,17 @@
 # Histórico de versões
 
+## Launcher 1.70.0 — perfil refinado e confiabilidade
+
+- A central do jogador foi redesenhada com apresentação centralizada, cantos arredondados, foto e três destaques pessoais: jogo com mais horas, favorito e último jogado.
+- Gerenciamento de perfis, imagem, senha, importação, exportação, cache e exclusão passa a ter uma tela própria com retorno ao resumo.
+- Perfis protegidos voltam bloqueados depois de reiniciar e não expõem nem alteram dados pessoais antes da senha correta.
+- Sessões locais e CLASSICS permanecem vinculadas ao jogador que iniciou o jogo, mesmo após trocar o perfil ativo.
+- Atualizações concorrentes preservam marcações manuais de conquistas, coleções, favoritos e o perfil de destino correto.
+- Desconectar uma loja durante uma sincronização não permite que uma resposta antiga restaure a conexão.
+- Entradas inválidas da biblioteca são isoladas para diagnóstico sem apagar os jogos válidos.
+- O executável permanente passa a ser renovado corretamente ao abrir um portátil manualmente atualizado.
+- Android 0.19.0 e iOS 0.10.0 não tiveram alterações de código ou protocolo nesta atualização.
+
 ## Launcher 1.69.0 — biblioteca persistente
 
 - Jogos previamente confirmados permanecem salvos durante falhas de conexão, expiração do token familiar e respostas incompletas das lojas.

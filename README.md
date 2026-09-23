@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.69.0"><strong>Windows 1.69.0</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.70.0"><strong>Windows 1.70.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.19.0"><strong>Android 0.19.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.10.0"><strong>iOS 0.10.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -33,7 +33,7 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - Explorador único de conexões para lojas, RetroAchievements e RetroArch, com busca, permissões, diagnóstico e monitoramento visível.
 - Família Steam opcional: jogos compartilhados atualmente acessíveis entram identificados separadamente, sem serem tratados como compras da conta.
 - Busca, filtros, coleções, favoritos e prioridade de loja.
-- Central de perfis ao lado das Configurações, com primeiro acesso seguro, foto personalizada, exclusão protegida, dados separados por jogador e exportação criptografada em `.brumprofile` para levar coleções, conquistas manuais e preferências a outro computador.
+- Central de perfis ao lado das Configurações, com foto em destaque, jogo mais jogado, favorito e recente, primeiro acesso seguro, exclusão protegida, dados separados por jogador e exportação criptografada em `.brumprofile` para levar coleções, conquistas manuais e preferências a outro computador.
 - Capas locais aparecem no primeiro frame e migram para miniaturas otimizadas assim que o cache termina, sem depender de passar o mouse sobre os cartões.
 - Fundo dinâmico por jogo, Vitrine opcional, cartões com profundidade discreta, modo sem distrações e modo Economia.
 - Jogos não oficiais podem ser cadastrados com executável local e SteamID opcional. **BUSCAR DADOS** usa o ID exato ou uma correspondência segura pelo nome para mostrar título oficial e recuperar capa e imagens, sem criar uma falsa licença de loja.
@@ -67,7 +67,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 1.69.0 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.69.0) |
+| Windows | 1.70.0 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.70.0) |
 | Android | 0.19.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.19.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.10.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.10.0) · [Guia](ios/README-IOS.md) |
 
@@ -77,6 +77,7 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 
 ## Versões atuais
 
+- **Launcher 1.70.0:** perfil centralizado com destaques pessoais, bloqueio real por senha e correções de concorrência, sessões e atualização permanente.
 - **Launcher 1.69.0:** biblioteca persistente, jogos preservados durante falhas de conexão e verificação de acesso em segundo plano.
 - **Launcher 1.68.0:** configuração segura do perfil principal sem perder dados, foto personalizada e exclusão de perfis com confirmação.
 - **Launcher 1.67.0:** perfis locais protegidos por senha, preferências por jogador, exportação/importação criptografada e gerenciamento seguro de cache.
