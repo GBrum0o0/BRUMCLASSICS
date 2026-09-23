@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## Launcher 1.70.2 — biblioteca estável
+
+- Arquivos temporários do GOG, dados de conquistas da Ubisoft, logs e outros eventos sem relação com instalações deixam de acionar auditorias completas.
+- Eventos repetidos dos observadores locais são agrupados e limitados por loja.
+- As verificações periódicas de Steam, Epic, GOG e Ubisoft são escalonadas para evitar uma sequência contínua de leituras.
+- O monitor compara o estado real das instalações antes de salvar; alterações apenas em timestamps e metadados de consulta não regravam a biblioteca nem o cache.
+- O estado **VERIFICANDO** atualiza somente os cartões correspondentes, sem reconstruir a grade inteira.
+- Capas, foco, seleção e rolagem permanecem estáveis enquanto o monitor trabalha.
+- Instalações, desinstalações e mudanças reais continuam persistidas e exibidas normalmente.
+- Android 0.19.0 e iOS 0.10.0 não tiveram alterações de código ou protocolo nesta atualização.
+
 ## Launcher 1.70.1 — perfis e sessões protegidos
 
 - Rotas pessoais, ações móveis e alterações da biblioteca exigem que o perfil ativo esteja desbloqueado.
