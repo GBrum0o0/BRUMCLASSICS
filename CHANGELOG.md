@@ -1,5 +1,17 @@
 # Histórico de versões
 
+## Launcher 1.70.1 — perfis e sessões protegidos
+
+- Rotas pessoais, ações móveis e alterações da biblioteca exigem que o perfil ativo esteja desbloqueado.
+- Quick Resume, Console no PC, sessões locais, recapitulações e conquistas permanecem ligados ao jogador que iniciou a atividade, mesmo após uma troca de perfil.
+- O status móvel mostra somente a sessão correspondente ao perfil ativo.
+- Perfis com jogo ou captura em andamento não podem ser apagados até a sessão terminar.
+- Horas locais e destaques de perfis secundários deixam de alterar ou reutilizar os contadores globais compartilhados.
+- O pré-carregamento de conquistas é refeito ao selecionar, desbloquear ou importar um perfil e salva o resultado no jogador correto.
+- Sincronizações são refeitas quando contas mudam durante a consulta; respostas antigas deixam de restaurar uma conexão removida.
+- O executável permanente recupera seu marcador quando ele estiver ausente, sem exigir reinstalação.
+- Android 0.19.0 e iOS 0.10.0 não tiveram alterações de código ou protocolo nesta atualização.
+
 ## Launcher 1.70.0 — perfil refinado e confiabilidade
 
 - A central do jogador foi redesenhada com apresentação centralizada, cantos arredondados, foto e três destaques pessoais: jogo com mais horas, favorito e último jogado.
