@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## Launcher 1.70.4 — BRUMWORLD e interação
+
+- A BRUMWORLD passa a documentar o Explorador de Conexões, a biblioteca persistente, o monitoramento local e o cache imediato de capas.
+- Os guias agora explicam controles genéricos, Console no PC, pesquisa de conquistas, pontuação, desbloqueio manual e perfis portáteis.
+- As versões atuais do aplicativo móvel aparecem corretamente como Android 0.19.0 e iOS 0.10.0.
+- Botões de voltar, fechar, ações textuais e controles compactos usam geometria centralizada e áreas clicáveis previsíveis.
+- Configurações, Perfil, Conexões, Conquistas, Console no PC, notificações e BRUMWORLD foram revisados visualmente.
+- O menu contextual volta a abrir quando o botão direito é usado diretamente sobre Jogar ou Baixar.
+- Android 0.19.0 e iOS 0.10.0 não tiveram alterações de código ou protocolo nesta atualização.
+
 ## Launcher 1.70.3 — perfil e BRUMWORLD
 
 - Perfis protegidos podem permanecer conectados neste computador por meio do armazenamento seguro do Windows, sem gravar a senha.
