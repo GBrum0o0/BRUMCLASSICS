@@ -1,5 +1,17 @@
 # Histórico de versões
 
+## Launcher 1.70.6 — jogos não oficiais e horas recuperáveis
+
+- Jogos cadastrados manualmente passam a ter um registro durável vinculado ao caminho normalizado do executável.
+- Se um jogo não oficial desaparecer da biblioteca, o launcher recupera o mesmo ID, título, coleção, favorito, imagens e informações conhecidas.
+- Readicionar o mesmo executável reutiliza a identidade anterior em vez de criar um jogo desconectado do histórico.
+- O tempo local é reconciliado pela maior evidência válida entre biblioteca, perfil e sessões concluídas da Atividade, sem somar fontes duplicadas.
+- O caso observado de `82 segundos` no cartão com `160.970 segundos` preservados no perfil e na Atividade passa a exibir novamente o total comprovado.
+- Horas oficiais fornecidas por Steam ou outra loja permanecem intactas; o contador local continua separado.
+- O histórico de atividades é indexado em uma única passagem na abertura, evitando uma busca completa para cada jogo.
+- Foram incluídas regressões automatizadas para múltiplos jogos manuais, reaproveitamento de identidade e proteção contra redução do contador.
+- Android 0.19.0 e iOS 0.10.0 não tiveram alterações de código ou protocolo nesta atualização.
+
 ## Launcher 1.70.5 — Central do Jogador e privacidade na BRUMWORLD
 
 - A BRUMWORLD cresce de 14 para 16 páginas, com sumário, navegação, progresso e atalhos atualizados.

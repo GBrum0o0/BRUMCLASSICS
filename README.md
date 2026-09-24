@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.70.5"><strong>Windows 1.70.5</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.70.6"><strong>Windows 1.70.6</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.19.0"><strong>Android 0.19.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.10.0"><strong>iOS 0.10.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -37,6 +37,7 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - Capas locais aparecem no primeiro frame e migram para miniaturas otimizadas assim que o cache termina, sem depender de passar o mouse sobre os cartões.
 - Fundo dinâmico por jogo, Vitrine opcional, cartões com profundidade discreta, modo sem distrações e modo Economia.
 - Jogos não oficiais podem ser cadastrados com executável local e SteamID opcional. **BUSCAR DADOS** usa o ID exato ou uma correspondência segura pelo nome para mostrar título oficial e recuperar capa e imagens, sem criar uma falsa licença de loja.
+- Cada jogo não oficial mantém uma identidade durável pelo executável. Se o cartão desaparecer ou for readicionado, o launcher recupera o cadastro, a coleção e o maior tempo comprovado entre biblioteca, perfil e Atividade.
 - Remover da biblioteca sem desinstalar o jogo; correção de seção pelo Perfil → Editar jogo.
 - Conquistas modernas e RetroAchievements.
 - Catálogos de conquistas preparados a partir do loading inicial e preservados no cache local; a interface é liberada em até seis segundos e o restante continua em segundo plano, sem travar o launcher. Todas as conquistas possuem pontuação.
@@ -67,7 +68,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 1.70.5 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.70.5) |
+| Windows | 1.70.6 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.70.6) |
 | Android | 0.19.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.19.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.10.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.10.0) · [Guia](ios/README-IOS.md) |
 
@@ -77,6 +78,7 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 
 ## Versões atuais
 
+- **Launcher 1.70.6:** jogos não oficiais preservam identidade, organização e horas; perfil e Atividade reparam o maior tempo comprovado sem duplicá-lo.
 - **Launcher 1.70.5:** BRUMWORLD ampliada com guias da Central do Jogador, Cofre de Saves, notificações, backup seletivo e privacidade.
 - **Launcher 1.70.3:** perfil conectado com proteção do Windows, editor de enquadramento da foto, botões de fechar alinhados e BRUMWORLD proporcional.
 - **Launcher 1.70.2:** monitoramento de instalações sem gravações repetidas nem reconstrução da grade, eliminando a piscada dos cartões e capas.
