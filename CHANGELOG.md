@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## Launcher 1.70.3 — perfil e BRUMWORLD
+
+- Perfis protegidos podem permanecer conectados neste computador por meio do armazenamento seguro do Windows, sem gravar a senha.
+- A senha continua obrigatória para apagar o perfil ou alterá-la, e uma opção remove a autorização local para a próxima abertura.
+- A foto do jogador ganha editor de enquadramento com zoom, arraste e centralização; o recorte acompanha a exportação do perfil.
+- Botões de fechar passam a usar alvo clicável uniforme e centralizado de 44 × 44 pixels.
+- A BRUMWORLD preserva proporção 3:2 e oferece os modos Ajustar, 100% e Tela cheia.
+- O leitor deixa de ficar deslocado ou atrás da barra superior e se adapta a resoluções menores, incluindo 1280 × 720.
+- Android 0.19.0 e iOS 0.10.0 não tiveram alterações de código ou protocolo nesta atualização.
+
 ## Launcher 1.70.2 — biblioteca estável
 
 - Arquivos temporários do GOG, dados de conquistas da Ubisoft, logs e outros eventos sem relação com instalações deixam de acionar auditorias completas.
