@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## Launcher 1.70.8 — Vitrine correta em Todos
+
+- Corrigido o destaque que mudava para outro jogo ao trocar o status de **Instalados** para **Todos**.
+- A causa era o carregamento progressivo da grade: a Vitrine procurava a última sessão somente entre os 24 cartões desenhados inicialmente.
+- A escolha agora percorre todos os resultados do filtro, enquanto o limite de 24 continua valendo apenas para a renderização das capas.
+- O cenário foi reproduzido com 31 jogos e o último jogo colocado além da primeira página visual.
+- Prévia ao passar sobre outra capa, retorno automático e histórico específico do perfil continuam preservados.
+- Android 0.19.0 e iOS 0.10.0 não tiveram alterações de código ou protocolo nesta atualização.
+
 ## Launcher 1.70.7 — Vitrine pessoal da biblioteca
 
 - Quando ativada, a Vitrine da Biblioteca passa a abrir com o último jogo jogado pelo perfil atual.

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.70.7"><strong>Windows 1.70.7</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.70.8"><strong>Windows 1.70.8</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.19.0"><strong>Android 0.19.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.10.0"><strong>iOS 0.10.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -69,7 +69,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 1.70.7 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.70.7) |
+| Windows | 1.70.8 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.70.8) |
 | Android | 0.19.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.19.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.10.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.10.0) · [Guia](ios/README-IOS.md) |
 
@@ -79,6 +79,7 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 
 ## Versões atuais
 
+- **Launcher 1.70.8:** a Vitrine mantém o último jogo correto ao alternar entre Instalados e Todos, mesmo quando ele está além dos 24 primeiros cartões.
 - **Launcher 1.70.7:** a Vitrine da Biblioteca destaca o último jogo jogado pelo perfil, com prévia temporária das demais capas.
 - **Launcher 1.70.6:** jogos não oficiais preservam identidade, organização e horas; perfil e Atividade reparam o maior tempo comprovado sem duplicá-lo.
 - **Launcher 1.70.5:** BRUMWORLD ampliada com guias da Central do Jogador, Cofre de Saves, notificações, backup seletivo e privacidade.
