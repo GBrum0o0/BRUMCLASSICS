@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## Launcher 1.70.7 — Vitrine pessoal da biblioteca
+
+- Quando ativada, a Vitrine da Biblioteca passa a abrir com o último jogo jogado pelo perfil atual.
+- A escolha considera o histórico pessoal do jogador selecionado, sem misturar a última sessão de outro perfil.
+- Passar o ponteiro ou navegar pelo teclado sobre outra capa exibe uma prévia temporária daquele jogo.
+- Ao sair da grade, a Vitrine retorna automaticamente ao último jogo jogado; o foco pelo teclado permanece respeitado enquanto estiver dentro da biblioteca.
+- Quando o perfil ainda não possui histórico, a Vitrine usa primeiro um jogo favorito e, na ausência dele, o primeiro jogo visível.
+- O destaque recebe os rótulos claros **Último jogo jogado**, **Prévia da biblioteca** ou **Destaque da biblioteca**.
+- Living Room Mode permanece independente e não é substituído pela Vitrine.
+- Android 0.19.0 e iOS 0.10.0 não tiveram alterações de código ou protocolo nesta atualização.
+
 ## Launcher 1.70.6 — jogos não oficiais e horas recuperáveis
 
 - Jogos cadastrados manualmente passam a ter um registro durável vinculado ao caminho normalizado do executável.
