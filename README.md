@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.70.4"><strong>Windows 1.70.4</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.70.5"><strong>Windows 1.70.5</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.19.0"><strong>Android 0.19.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.10.0"><strong>iOS 0.10.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -49,7 +49,7 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - Monitoramento de instalações por eventos locais e verificação adaptativa, com confirmação dupla antes de retirar o estado instalado e verificação imediata por loja em Conexões.
 - Central de Sessões com evidências do processo e correção auditável.
 - Saúde da Biblioteca, backup completo de recuperação com SHA-256 e perfil portátil criptografado com AES-256-GCM.
-- BRUMWORLD: revista interativa com guias visuais do launcher e do aplicativo.
+- BRUMWORLD: revista interativa com 16 páginas de guias visuais, incluindo Central do Jogador, Cofre de Saves, backup seletivo e privacidade local.
 - Aplicativo Android com biblioteca offline, capas, estatísticas e BRUMCOMPANION.
 - Aplicativo iOS pessoal em SwiftUI, com o mesmo cache offline, B-CARD e BRUMCOMPANION, preparado para sideload.
 - Central BRUM sincronizada com iPhone e Android, limitada ao perfil ativo e sem enviar credenciais ou caminhos locais.
@@ -67,7 +67,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 1.70.4 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.70.4) |
+| Windows | 1.70.5 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.70.5) |
 | Android | 0.19.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.19.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.10.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.10.0) · [Guia](ios/README-IOS.md) |
 
@@ -77,7 +77,7 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 
 ## Versões atuais
 
-- **Launcher 1.70.4:** BRUMWORLD atualizada, áreas clicáveis centralizadas e menu contextual corrigido sobre Jogar e Baixar.
+- **Launcher 1.70.5:** BRUMWORLD ampliada com guias da Central do Jogador, Cofre de Saves, notificações, backup seletivo e privacidade.
 - **Launcher 1.70.3:** perfil conectado com proteção do Windows, editor de enquadramento da foto, botões de fechar alinhados e BRUMWORLD proporcional.
 - **Launcher 1.70.2:** monitoramento de instalações sem gravações repetidas nem reconstrução da grade, eliminando a piscada dos cartões e capas.
 - **Launcher 1.70.1:** isolamento completo de perfis em sessões, Quick Resume, Console no PC, conquistas, sincronizações e status móvel.

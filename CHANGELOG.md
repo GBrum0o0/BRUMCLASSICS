@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## Launcher 1.70.5 — Central do Jogador e privacidade na BRUMWORLD
+
+- A BRUMWORLD cresce de 14 para 16 páginas, com sumário, navegação, progresso e atalhos atualizados.
+- A nova matéria **Central do Jogador** explica retomada de sessões, recomendações pessoais, gráficos de atividade, notificações e saúde do sistema.
+- O **Cofre de Saves** passa a ter orientação visual sobre versões por jogador, verificação SHA-256 e restauração.
+- A nova matéria **Backup e Privacidade** documenta seleção de dados, restauração verificada e reconexão das lojas em outro computador.
+- A revista esclarece que senhas, tokens, Web API Keys e sessões das lojas não entram no pacote portátil.
+- As duas páginas novas receberam ilustrações próprias e layout compacto para exibição integral em 1440 × 900 e 1280 × 720.
+- Android 0.19.0 e iOS 0.10.0 não tiveram alterações de código ou protocolo nesta atualização.
+
 ## Launcher 1.70.4 — BRUMWORLD e interação
 
 - A BRUMWORLD passa a documentar o Explorador de Conexões, a biblioteca persistente, o monitoramento local e o cache imediato de capas.
