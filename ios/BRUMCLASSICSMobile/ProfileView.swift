@@ -9,6 +9,10 @@ struct ProfileView: View {
             VStack(alignment: .leading, spacing: 20) {
                 PageHeader(kicker: "CONTA E DISPOSITIVO", title: "Perfil", subtitle: store.configuration?.deviceName ?? "iPhone não pareado")
                 NavigationLink { MobileSettingsView() } label: { SettingsRow(icon: "gearshape", title: "CONFIGURAÇÕES DO APP", detail: "Como iniciar CLASSICS pelo B-CARD") }.accessibilityIdentifier("mobile-settings-link")
+                NavigationLink { MobileDiagnosticsView() } label: { SettingsRow(icon: "stethoscope", title: "DIAGNÓSTICO", detail: store.syncSummary.title) }
+                if !store.noteConflicts.isEmpty {
+                    NavigationLink { ConflictCenterView() } label: { SettingsRow(icon: "arrow.triangle.branch", title: "CONFLITOS DE SINCRONIZAÇÃO", detail: "Compare o iPhone e o computador antes de escolher") }
+                }
                 BrumCard {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack { BrumSectionLabel(text: "CONEXÃO LOCAL SEGURA"); Spacer(); ConnectionDot(state: store.connection) }
@@ -48,11 +52,21 @@ struct ProfileView: View {
 }
 
 struct MobileSettingsView: View {
+    @EnvironmentObject private var store: AppStore
     @EnvironmentObject private var pocket: PocketClassicsStore
     @AppStorage("bcard_classic_launch_mode") private var mode = "new"
     @State private var choosingROMFolder = false
+    @AppStorage(OfflineContentPreferences.covers) private var offlineCovers = true
+    @AppStorage(OfflineContentPreferences.activity) private var offlineActivity = true
+    @AppStorage(OfflineContentPreferences.notifications) private var offlineNotifications = true
     var body: some View {
         Form {
+            Section("Disponível offline") {
+                Toggle("Capas otimizadas", isOn: $offlineCovers)
+                Toggle("Atividade e sessões", isOn: $offlineActivity)
+                Toggle("Central de notificações", isOn: $offlineNotifications)
+                Text("Jogos, coleções, progresso e conquistas ficam sempre salvos. Capas são reduzidas para economizar dados e armazenamento.").font(.caption).foregroundStyle(BrumTheme.muted)
+            }
             Section("CLASSICS no iPhone") {
                 LabeledContent("Pasta de ROMs", value: pocket.romFolderName)
                 Button(pocket.romFolderConfigured ? "ALTERAR PASTA DE ROMS" : "SELECIONAR PASTA DE ROMS") { choosingROMFolder = true }
@@ -72,12 +86,69 @@ struct MobileSettingsView: View {
                 Text("Essa preferência vale para os CLASSICS enviados pelo B-CARD. Jogos de PC usam a inicialização normal. Se o save escolhido não existir, o launcher informará o problema; seus saves não são apagados.").font(.caption).foregroundStyle(BrumTheme.muted)
             }
         }.scrollContentBackground(.hidden).background(BrumTheme.background).navigationTitle("Configurações do app")
+        .onChange(of: offlineCovers) { _ in Task { await store.applyOfflinePreferences() } }
+        .onChange(of: offlineActivity) { _ in Task { await store.applyOfflinePreferences() } }
+        .onChange(of: offlineNotifications) { _ in Task { await store.applyOfflinePreferences() } }
         .fileImporter(isPresented: $choosingROMFolder, allowedContentTypes: [.folder]) { result in
             switch result {
             case .success(let folder): Task { await pocket.configureROMFolder(folder) }
             case .failure(let error): pocket.message = error.localizedDescription
             }
         }
+    }
+}
+
+struct MobileDiagnosticsView: View {
+    @EnvironmentObject private var store: AppStore
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                PageHeader(kicker: "CONEXÃO E CACHE", title: "Diagnóstico", subtitle: "O que está funcionando e qual ação é necessária.")
+                diagnostic("PAREAMENTO", store.isPaired ? "Identidade segura confirmada" : "QR Code ainda não lido", store.isPaired)
+                diagnostic("COMPUTADOR", store.connection == .online ? "Disponível na rede local" : "Indisponível agora · reconexão automática ativa", store.connection == .online)
+                diagnostic("BIBLIOTECA OFFLINE", "\(store.snapshot.games.count) jogos salvos no aparelho", !store.snapshot.games.isEmpty)
+                diagnostic("FILA DE ENVIO", store.pendingCount == 0 ? "Nenhuma alteração pendente" : "\(store.pendingCount) alteração(ões) aguardando o computador", store.pendingCount == 0)
+                diagnostic("ÚLTIMA SINCRONIZAÇÃO", store.lastSuccessfulSyncAt.map(relativeTime) ?? "Nenhuma sincronização concluída", store.lastSuccessfulSyncAt != nil)
+                if let config = store.configuration { diagnostic("CERTIFICADO", "Impressão TLS verificada · \(String(config.fingerprint.prefix(12)))…", true) }
+                Text(store.syncSummary.action).font(.headline).foregroundStyle(BrumTheme.primary)
+                Button("TESTAR CONEXÃO AGORA") { Task { await store.refresh() } }.buttonStyle(PrimaryButtonStyle())
+            }.padding(20).frame(maxWidth: 760).frame(maxWidth: .infinity)
+        }.background(BrumTheme.background.ignoresSafeArea()).navigationTitle("Diagnóstico")
+    }
+    private func diagnostic(_ title: String, _ detail: String, _ ok: Bool) -> some View {
+        BrumCard { HStack(spacing: 13) { Image(systemName: ok ? "checkmark.circle.fill" : "exclamationmark.circle.fill").foregroundStyle(ok ? BrumTheme.primary : .orange); VStack(alignment: .leading) { Text(title).font(.caption.bold()).foregroundStyle(BrumTheme.text); Text(detail).font(.subheadline).foregroundStyle(BrumTheme.muted) }; Spacer() } }
+    }
+}
+
+struct ConflictCenterView: View {
+    @EnvironmentObject private var store: AppStore
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                PageHeader(kicker: "SEM PERDER DADOS", title: "Resolver conflitos", subtitle: "O rascunho do celular fica preservado até você escolher.")
+                ForEach(Array(store.noteConflicts), id: \.self) { gameID in
+                    if let game = store.snapshot.games.first(where: { $0.id == gameID }) {
+                        BrumCard {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text(game.title).font(.headline).foregroundStyle(BrumTheme.text)
+                                Text("IPHONE · ALTERAÇÃO LOCAL").font(.caption2.bold()).foregroundStyle(BrumTheme.primary)
+                                notePreview(game.notes)
+                                Text("COMPUTADOR · VERSÃO MAIS RECENTE").font(.caption2.bold()).foregroundStyle(.orange)
+                                notePreview(store.noteConflictRemote[gameID] ?? .empty)
+                                HStack {
+                                    Button("MANTER IPHONE") { Task { _ = await store.saveNotes(game: game, notes: game.notes, force: true) } }.buttonStyle(.borderedProminent).tint(BrumTheme.primary).foregroundStyle(.black)
+                                    Button("USAR COMPUTADOR", role: .destructive) { Task { _ = await store.useLauncherNotes(gameID: gameID) } }.buttonStyle(.bordered)
+                                }
+                            }
+                        }
+                    }
+                }
+            }.padding(20).frame(maxWidth: 900).frame(maxWidth: .infinity)
+        }.background(BrumTheme.background.ignoresSafeArea()).navigationTitle("Conflitos")
+    }
+    private func notePreview(_ notes: Game.Notes) -> some View {
+        Text([notes.whereStopped, notes.objectives, notes.tips, notes.commands].filter { !$0.isEmpty }.joined(separator: "\n").isEmpty ? "Sem texto" : [notes.whereStopped, notes.objectives, notes.tips, notes.commands].filter { !$0.isEmpty }.joined(separator: "\n"))
+            .font(.caption).foregroundStyle(BrumTheme.muted).lineLimit(6)
     }
 }
 

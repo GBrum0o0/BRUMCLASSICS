@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import UIKit
 
 enum SecureStore {
     private static let service = "com.brumclassics.mobile.ios"
@@ -93,7 +94,19 @@ actor OfflineStore {
 
     func saveArtwork(_ data: Data, for game: Game) throws {
         guard data.count <= 20 * 1024 * 1024 else { throw BridgeError.invalidResponse("A capa excede o limite permitido.") }
-        try data.write(to: artworkURL(for: game), options: [.atomic, .completeFileProtectionUnlessOpen])
+        guard let source = UIImage(data: data) else { throw BridgeError.invalidResponse("A capa recebida é inválida.") }
+        let limit = CGSize(width: 480, height: 720)
+        let scale = min(1, min(limit.width / max(source.size.width, 1), limit.height / max(source.size.height, 1)))
+        let size = CGSize(width: max(1, source.size.width * scale), height: max(1, source.size.height * scale))
+        let renderer = UIGraphicsImageRenderer(size: size)
+        let resized = renderer.image { _ in source.draw(in: CGRect(origin: .zero, size: size)) }
+        guard let optimized = resized.jpegData(compressionQuality: 0.78) else { throw BridgeError.invalidResponse("Não foi possível otimizar a capa.") }
+        try optimized.write(to: artworkURL(for: game), options: [.atomic, .completeFileProtectionUnlessOpen])
+    }
+
+    func clearArtwork() {
+        let files = (try? FileManager.default.contentsOfDirectory(at: artworkDirectory, includingPropertiesForKeys: nil)) ?? []
+        for file in files { try? FileManager.default.removeItem(at: file) }
     }
 
     func pruneArtwork(keeping games: [Game]) {

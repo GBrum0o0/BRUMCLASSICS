@@ -75,6 +75,18 @@ public final class BridgeClient {
     }
 
     public String serverFingerprint() { return preferences.getString("tls_pin", ""); }
+    public long lastSuccessfulSyncAt() { return preferences.getLong("last_successful_sync", 0L); }
+    public int pendingChanges() { return pendingCompanionNotes() + pendingLibraryChanges(); }
+    public boolean offlineCovers() { return preferences.getBoolean("offline_covers", true); }
+    public boolean offlineActivity() { return preferences.getBoolean("offline_activity", true); }
+    public boolean offlineNotifications() { return preferences.getBoolean("offline_notifications", true); }
+    public void setOfflinePreference(String key, boolean value) {
+        preferences.edit().putBoolean(key, value).apply();
+        if ("offline_covers".equals(key) && !value) {
+            artworkSyncGeneration.incrementAndGet(); memoryArtwork.evictAll();
+            executor.execute(() -> { File[] files = artworkDirectory.listFiles(); if (files != null) for (File file : files) if (file.getName().endsWith(".img")) file.delete(); });
+        }
+    }
 
     public void syncClassicAchievements(String gameId, int raGameId, String username, ClassicsCallback callback) {
         if (!isConfigured()) { callback.onError("Conecte este celular ao launcher primeiro."); return; }
@@ -290,6 +302,24 @@ public final class BridgeClient {
         try { return readCompanionOutbox().length(); } catch (Exception ignored) { return 0; }
     }
 
+    public String companionConflictSummary(String gameId) {
+        try {
+            JSONObject entry = readCompanionOutbox().optJSONObject(gameId);
+            if (entry == null) return "Seu rascunho está preservado no celular.";
+            return "CELULAR\n" + noteSummary(entry.optJSONObject("notes")) + "\n\nCOMPUTADOR\n" + noteSummary(entry.optJSONObject("latest"));
+        } catch (Exception ignored) { return "Seu rascunho está preservado no celular."; }
+    }
+
+    private String noteSummary(JSONObject value) {
+        if (value == null) return "Sem texto";
+        StringBuilder result = new StringBuilder();
+        for (String field : new String[]{"whereStopped", "objectives", "tips", "commands"}) {
+            String text = value.optString(field, "").trim();
+            if (!text.isEmpty()) { if (result.length() > 0) result.append("\n"); result.append(text); }
+        }
+        return result.length() == 0 ? "Sem texto" : result.length() > 500 ? result.substring(0, 500) + "…" : result.toString();
+    }
+
     public boolean wantToPlay(Game game) {
         if (game == null) return false;
         try {
@@ -412,6 +442,7 @@ public final class BridgeClient {
                 if (connection.getResponseCode() != 200) throw new IllegalStateException("O launcher respondeu com erro " + connection.getResponseCode() + ".");
                 new JSONObject(raw).getJSONArray("games");
                 writeSnapshotAtomically(raw);
+                preferences.edit().putLong("last_successful_sync", System.currentTimeMillis()).apply();
                 post(() -> { if (listener != null) listener.onSnapshot(raw); });
                 postStatus("connected", endpointLabel());
                 flushCompanionNotes();
@@ -704,7 +735,7 @@ public final class BridgeClient {
     }
 
     public void prefetchArtwork(java.util.List<Game> games) {
-        if (!isConfigured() || games == null || games.isEmpty()) return;
+        if (!isConfigured() || !offlineCovers() || games == null || games.isEmpty()) return;
         int generation = artworkSyncGeneration.incrementAndGet();
         java.util.List<Game> downloadable = new java.util.ArrayList<>();
         java.util.Set<String> retainedKeys = new java.util.HashSet<>();
@@ -799,7 +830,7 @@ public final class BridgeClient {
         connection.setReadTimeout(12000);
         connection.setUseCaches(false);
         connection.setRequestProperty("Accept", "application/json");
-        connection.setRequestProperty("User-Agent", "BRUMCLASSICS-MOVEL/0.19.0 Android");
+        connection.setRequestProperty("User-Agent", "BRUMCLASSICS-MOVEL/0.20.0 Android");
         if (authenticated) connection.setRequestProperty("Authorization", "Bearer " + preferences.getString("token", ""));
     }
 
@@ -843,8 +874,15 @@ public final class BridgeClient {
         bounds.inJustDecodeBounds = true;
         BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bounds);
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw new IllegalStateException("Imagem inválida.");
+        Bitmap decoded = decodeArtwork(bytes);
+        if (decoded == null) throw new IllegalStateException("Imagem inválida.");
+        int width = decoded.getWidth(), height = decoded.getHeight();
+        float ratio = Math.min(1f, Math.min(480f / Math.max(1, width), 720f / Math.max(1, height)));
+        Bitmap optimized = ratio < 1f ? Bitmap.createScaledBitmap(decoded, Math.max(1, Math.round(width * ratio)), Math.max(1, Math.round(height * ratio)), true) : decoded;
         File temporary = new File(cache.getAbsolutePath() + ".tmp-" + Thread.currentThread().getId() + "-" + System.nanoTime());
-        try (FileOutputStream output = new FileOutputStream(temporary)) { output.write(bytes); output.getFD().sync(); }
+        try (FileOutputStream output = new FileOutputStream(temporary)) { optimized.compress(Bitmap.CompressFormat.JPEG, 78, output); output.getFD().sync(); }
+        if (optimized != decoded) optimized.recycle();
+        decoded.recycle();
         if (cache.isFile()) { temporary.delete(); return; }
         if (!temporary.renameTo(cache)) { temporary.delete(); if (!cache.isFile()) throw new IllegalStateException("Não foi possível salvar a capa."); }
     }
@@ -902,6 +940,10 @@ public final class BridgeClient {
     }
 
     private void writeSnapshotAtomically(String raw) throws Exception {
+        JSONObject cached = new JSONObject(raw);
+        if (!offlineActivity()) cached.put("activity", new org.json.JSONArray());
+        if (!offlineNotifications()) cached.remove("notifications");
+        raw = cached.toString();
         AtomicFile atomicFile = new AtomicFile(snapshotFile);
         FileOutputStream output = null;
         try {

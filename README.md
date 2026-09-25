@@ -10,8 +10,8 @@
 
 <p align="center">
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.72.0"><strong>Windows 1.72.0</strong></a> ·
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.19.0"><strong>Android 0.19.0</strong></a> ·
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.10.0"><strong>iOS 0.10.0</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.20.0"><strong>Android 0.20.0</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.11.0"><strong>iOS 0.11.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
   <a href="PRIVACY.md">Privacidade</a> ·
   <a href="SECURITY.md">Segurança</a>
@@ -72,12 +72,12 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
 | Windows | 1.72.0 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.72.0) |
-| Android | 0.19.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.19.0) · [Guia](docs/MOVEL.md) |
-| iOS pessoal | 0.10.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.10.0) · [Guia](ios/README-IOS.md) |
+| Android | 0.20.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.20.0) · [Guia](docs/MOVEL.md) |
+| iOS pessoal | 0.11.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.11.0) · [Guia](ios/README-IOS.md) |
 
 Os hashes SHA-256 acompanham os arquivos publicados. O GitHub hospeda executáveis, APKs e IPAs somente em Releases; esses binários não entram no histórico do repositório.
 
-A versão pessoal para iPhone é compilada separadamente em **Actions → Build iOS pessoal**. O artefato contém um IPA sem assinatura para instalação com AltStore ou Sideloadly. No iOS 0.10.0, Conquistas pesquisa jogos, mostra emblemas e descrições oficiais e permite marcar ou desfazer progresso manual nas fontes sem leitura direta, sincronizado pelo launcher 1.62.0. `CLASSICS Everywhere`, horas, capas e sessões continuam disponíveis. Consulte [as instruções do iOS](ios/README-IOS.md) e o [guia do RetroArch compatível](ios/RETROARCH-COMPATIVEL.md).
+A versão pessoal para iPhone é compilada separadamente em **Actions → Build iOS pessoal**. O artefato contém um IPA sem assinatura para instalação com AltStore ou Sideloadly. No iOS 0.11.0, a tela inicial, o cache offline, o diagnóstico e a resolução de conflitos usam o mesmo estado transparente de sincronização do Android 0.20.0. Consulte [as instruções do iOS](ios/README-IOS.md) e o [guia do RetroArch compatível](ios/RETROARCH-COMPATIVEL.md).
 
 ## Versões atuais
 
@@ -104,10 +104,10 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 - **Launcher 1.59.0:** sincronização autenticada da Central BRUM com iPhone e Android.
 - **Launcher 1.58.0:** Central de Notificações, backup completo e seletivo de perfil, saves e mídias, além de recuperação de encerramentos inesperados.
 - **Launcher 1.57.0:** diagnósticos de sessões e RetroAchievements, calibração de controles e Saúde da Biblioteca.
-- **Android 0.19.0:** aba Conquistas, pesquisa de jogos, emblemas oficiais e marcação manual direta.
-- **iOS 0.10.0:** pesquisa de jogos, catálogo visual oficial, Central BRUM, RetroArch, sessões móveis e vínculo seguro.
+- **Android 0.20.0:** Início completo, estado offline transparente, diagnóstico, cache configurável e conflitos comparáveis.
+- **iOS 0.11.0:** paridade com Android, sessão ativa, conquistas recentes, diagnóstico e capas otimizadas.
 
-Veja o [histórico completo](CHANGELOG.md) e as [notas do Android 0.19.0](releases/android-v0.19.0/RELEASE-NOTES.md).
+Veja o [histórico completo](CHANGELOG.md) e as [notas do Android 0.20.0](releases/android-v0.20.0/RELEASE-NOTES.md).
 
 Consulte também o guia de [Conexões e origem dos dados](docs/CONEXOES.md), com os estados exibidos, o significado de cada origem e as limitações reais por plataforma.
 

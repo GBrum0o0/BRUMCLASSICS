@@ -37,14 +37,17 @@ jobs:
             android/app/src/main/java/com/brumclassics/mobile/data/HomeLibrary.java \
             android/app/src/main/java/com/brumclassics/mobile/data/BCardLibrary.java \
             android/app/src/main/java/com/brumclassics/mobile/classics/ClassicsRules.java \
+            android/app/src/main/java/com/brumclassics/mobile/sync/MobileSyncState.java \
             android/app/src/test/java/com/brumclassics/mobile/data/HomeLibraryTest.java \
             android/app/src/test/java/com/brumclassics/mobile/data/BCardLibraryTest.java \
             android/app/src/test/java/com/brumclassics/mobile/model/PerformanceLiveStateTest.java \
-            android/app/src/test/java/com/brumclassics/mobile/classics/ClassicsRulesTest.java
+            android/app/src/test/java/com/brumclassics/mobile/classics/ClassicsRulesTest.java \
+            android/app/src/test/java/com/brumclassics/mobile/sync/MobileSyncStateTest.java
           for test in \
             com.brumclassics.mobile.data.HomeLibraryTest \
             com.brumclassics.mobile.data.BCardLibraryTest \
             com.brumclassics.mobile.model.PerformanceLiveStateTest \
-            com.brumclassics.mobile.classics.ClassicsRulesTest; do
+            com.brumclassics.mobile.classics.ClassicsRulesTest \
+            com.brumclassics.mobile.sync.MobileSyncStateTest; do
             java -cp "$RUNNER_TEMP/brum-tests" "$test"
           done

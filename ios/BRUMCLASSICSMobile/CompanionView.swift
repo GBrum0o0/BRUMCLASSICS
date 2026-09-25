@@ -17,7 +17,7 @@ struct CompanionView: View {
                 if !store.canCaptureMoment && !store.capturingMoment {
                     Text(store.connection != .online ? "Conecte o iPhone ao launcher para capturar a tela do jogo." : "Inicie um jogo pelo launcher para habilitar a captura. Não é necessário ter anotações.").font(.caption).foregroundStyle(BrumTheme.muted)
                 }
-                if let game = store.companionGame {
+                if let game = store.activeGame {
                     BrumCard {
                         HStack(spacing: 16) {
                             GameCoverView(game: game).frame(width: 78, height: 108)

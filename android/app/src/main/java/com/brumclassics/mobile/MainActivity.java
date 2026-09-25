@@ -59,6 +59,7 @@ import com.brumclassics.mobile.classics.LocalClassic;
 import com.brumclassics.mobile.classics.LocalArtworkClient;
 import com.brumclassics.mobile.classics.RetroAchievementsClient;
 import com.brumclassics.mobile.sync.BridgeClient;
+import com.brumclassics.mobile.sync.MobileSyncState;
 import com.brumclassics.mobile.update.MobileUpdateManager;
 
 import java.util.ArrayList;
@@ -625,9 +626,13 @@ public final class MainActivity extends Activity {
             empty.addView(text(bridgeClient.isConfigured() ? "Quando algo importante acontecer no launcher, aparecerá aqui." : "Conecte-se ao launcher atualizado para sincronizar sua central.", 10, MUTED, false), margins(-1, 9, -1, 0));
             page.addView(empty);
         } else {
+            Set<String> shownNotifications = new LinkedHashSet<>();
+            int shownCount = 0;
             for (int index = 0; index < entries.length(); index++) {
                 org.json.JSONObject item = entries.optJSONObject(index);
                 if (item == null) continue;
+                String signature = item.optString("category") + "|" + item.optString("title") + "|" + item.optString("message") + "|" + item.optString("gameId");
+                if (!shownNotifications.add(signature) || shownCount++ >= 80) continue;
                 String id = item.optString("id", "");
                 String gameId = item.optString("gameId", "");
                 boolean read = !item.optString("readAt", "").isEmpty();
@@ -748,7 +753,7 @@ public final class MainActivity extends Activity {
 
     private void showCompanionConflict(Game game, EditText whereStopped, EditText objectives, EditText tips, EditText commands, TextView state) {
         new AlertDialog.Builder(this).setTitle("Anotações alteradas nos dois dispositivos")
-            .setMessage("Seu rascunho está preservado. Escolha manter o texto do celular ou recarregar a versão salva no launcher.")
+            .setMessage(bridgeClient.companionConflictSummary(game.id) + "\n\nEscolha qual versão deseja manter.")
             .setPositiveButton("MANTER CELULAR", (dialog, which) -> saveCompanionDraft(game, whereStopped, objectives, tips, commands, true, state))
             .setNegativeButton("USAR LAUNCHER", (dialog, which) -> { bridgeClient.discardCompanionDraft(game.id); state.setText("Recarregando anotações do launcher..."); })
             .setNeutralButton("CANCELAR", null).show();
@@ -834,6 +839,8 @@ public final class MainActivity extends Activity {
         page.addView(headline);
         page.addView(text("Continue de onde parou ou encontre a próxima história.", 12, MUTED, false), margins(-1, 12, -1, 27));
 
+        page.addView(syncSummaryCard(), margins(-1, 0, -1, 18));
+
         LinearLayout notificationsAccess = row();
         notificationsAccess.setGravity(Gravity.CENTER_VERTICAL);
         notificationsAccess.setPadding(dp(16), dp(14), dp(14), dp(14));
@@ -856,6 +863,17 @@ public final class MainActivity extends Activity {
             demo.addView(eyebrow("MODO DEMONSTRAÇÃO"));
             demo.addView(text("Estes jogos são exemplos. Abra Perfil → Conectar ao launcher para carregar sua biblioteca real.", 9, TEXT, false), margins(-1, 6, -1, 0));
             page.addView(demo, margins(-1, 0, -1, 18));
+        }
+
+        Game activeGame = companion.optBoolean("active", false) ? gameById(companion.optString("gameId", "")) : null;
+        if (activeGame != null && "connected".equals(syncState)) {
+            LinearLayout active = column(); active.setPadding(dp(16), dp(14), dp(16), dp(14));
+            active.setBackground(background(Color.argb(24, 157, 255, 59), 5, Color.argb(90, 157, 255, 59), 1));
+            active.addView(eyebrow("SESSÃO ATIVA · CONTINUAR NO CELULAR"));
+            active.addView(text(activeGame.title, 17, TEXT, true), margins(-1, 7, -1, 4));
+            active.addView(text("Anotações e desempenho ao vivo", 9, MUTED, false));
+            active.setOnClickListener(v -> showCompanion());
+            page.addView(active, margins(-1, 0, -1, 18));
         }
 
         LinearLayout bCardAccess = row();
@@ -930,6 +948,9 @@ public final class MainActivity extends Activity {
         hero.addView(heroInfo, new LinearLayout.LayoutParams(0, -2, 1));
         hero.setOnClickListener(v -> showDetails(featured));
         page.addView(hero);
+
+        LinearLayout recentAchievements = recentAchievementsCard();
+        if (recentAchievements != null) page.addView(recentAchievements, margins(-1, 26, -1, 0));
 
         List<Game> favorites = new ArrayList<>();
         List<Game> wantToPlay = new ArrayList<>();
@@ -1779,7 +1800,7 @@ public final class MainActivity extends Activity {
                 if (!"https".equalsIgnoreCase(url.getProtocol()) || !(host.endsWith("steamstatic.com") || host.endsWith("akamaihd.net"))) return;
                 connection = (HttpURLConnection) url.openConnection();
                 connection.setConnectTimeout(6000); connection.setReadTimeout(8000); connection.setInstanceFollowRedirects(false);
-                connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android/0.19.0");
+                connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android/0.20.0");
                 if (connection.getResponseCode() != 200 || connection.getContentLengthLong() > 2 * 1024 * 1024) return;
                 byte[] buffer = new byte[8192]; int read; int total = 0;
                 ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -1917,8 +1938,12 @@ public final class MainActivity extends Activity {
 
         page.addView(sectionHeading("CONFIGURAÇÕES", "", null));
         page.addView(settingToggle("ANIMAÇÕES SUAVES", "Transições curtas inspiradas no launcher oficial", true), margins(-1, 14, -1, 0));
-        page.addView(settingToggle("BIBLIOTECA OFFLINE", "Capas, conquistas e estatísticas ficam salvas automaticamente", true, false));
-        page.addView(settingToggle("NOTIFICAÇÕES", "Novidades e atividade da biblioteca", true));
+        page.addView(offlinePreferenceToggle("CAPAS OFFLINE OTIMIZADAS", "Miniaturas menores economizam dados e armazenamento", "offline_covers", bridgeClient.offlineCovers()));
+        page.addView(offlinePreferenceToggle("ATIVIDADE OFFLINE", "Sessões recentes ficam disponíveis sem o computador", "offline_activity", bridgeClient.offlineActivity()));
+        page.addView(offlinePreferenceToggle("NOTIFICAÇÕES OFFLINE", "Central útil, sem repetir avisos iguais", "offline_notifications", bridgeClient.offlineNotifications()));
+
+        page.addView(sectionHeading("DIAGNÓSTICO", "", null), margins(-1, 34, -1, 14));
+        page.addView(diagnosticsCard());
 
         page.addView(sectionHeading("INTEGRAÇÃO", "", null), margins(-1, 34, -1, 14));
         LinearLayout integration = column();
@@ -2118,6 +2143,58 @@ public final class MainActivity extends Activity {
         return item;
     }
 
+    private View offlinePreferenceToggle(String title, String subtitle, String key, boolean checked) {
+        LinearLayout item = row(); item.setGravity(Gravity.CENTER_VERTICAL); item.setPadding(0, dp(16), 0, dp(16));
+        item.setBackground(background(Color.TRANSPARENT, 0, LINE, 1));
+        LinearLayout copy = column(); copy.addView(text(title, 10, TEXT, true)); copy.addView(text(subtitle, 9, MUTED, false), margins(-1, 4, -1, 0));
+        item.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        Switch toggle = new Switch(this); toggle.setChecked(checked);
+        toggle.setOnCheckedChangeListener((button, value) -> { bridgeClient.setOfflinePreference(key, value); if (value && "offline_covers".equals(key)) bridgeClient.prefetchArtwork(games); });
+        item.addView(toggle); return item;
+    }
+
+    private View syncSummaryCard() {
+        MobileSyncState.Summary state = MobileSyncState.summarize(syncState, bridgeClient.isConfigured(), games.size(), bridgeClient.pendingChanges(), bridgeClient.lastSuccessfulSyncAt());
+        LinearLayout card = row(); card.setGravity(Gravity.TOP); card.setPadding(dp(16), dp(14), dp(16), dp(14));
+        card.setBackground(background(SURFACE, 5, state.healthy ? LINE : Color.argb(120, 255, 152, 44), 1));
+        TextView icon = text(state.healthy ? "✓" : "!", 20, state.healthy ? ACCENT : Color.rgb(255, 152, 44), true);
+        icon.setGravity(Gravity.CENTER); card.addView(icon, new LinearLayout.LayoutParams(dp(35), dp(35)));
+        LinearLayout copy = column(); copy.setPadding(dp(10), 0, 0, 0); copy.addView(text(state.title, 13, TEXT, true));
+        copy.addView(text(state.detail, 9, MUTED, false), margins(-1, 5, -1, 0));
+        copy.addView(text(state.action.toUpperCase(Locale.ROOT), 7, state.healthy ? ACCENT : Color.rgb(255, 152, 44), true), margins(-1, 8, -1, 0));
+        card.addView(copy, new LinearLayout.LayoutParams(0, -2, 1)); return card;
+    }
+
+    private View diagnosticsCard() {
+        LinearLayout card = column(); card.setPadding(dp(16), dp(16), dp(16), dp(16)); card.setBackground(background(SURFACE, 4, LINE, 1));
+        MobileSyncState.Summary state = MobileSyncState.summarize(syncState, bridgeClient.isConfigured(), games.size(), bridgeClient.pendingChanges(), bridgeClient.lastSuccessfulSyncAt());
+        card.addView(text(state.title, 15, TEXT, true)); card.addView(text(state.detail, 9, MUTED, false), margins(-1, 6, -1, 0));
+        card.addView(text("PAREAMENTO · " + (bridgeClient.isConfigured() ? "IDENTIDADE SEGURA CONFIRMADA" : "QR CODE NECESSÁRIO"), 7, bridgeClient.isConfigured() ? ACCENT : Color.rgb(255,152,44), true), margins(-1, 14, -1, 0));
+        card.addView(text("CACHE · " + games.size() + " JOGOS · " + bridgeClient.pendingChanges() + " ALTERAÇÕES PENDENTES", 7, MUTED, true), margins(-1, 8, -1, 0));
+        if (bridgeClient.isConfigured()) card.addView(text("CERTIFICADO TLS · " + bridgeClient.serverFingerprint().substring(0, Math.min(12, bridgeClient.serverFingerprint().length())) + "…", 7, MUTED, true), margins(-1, 8, -1, 0));
+        Button test = primaryButton("TESTAR CONEXÃO AGORA"); test.setOnClickListener(v -> bridgeClient.fetchSnapshot()); card.addView(test, margins(-1, 15, -1, 0, 46));
+        return card;
+    }
+
+    private Game gameById(String id) { for (Game game : games) if (game.id.equals(id)) return game; return null; }
+
+    private LinearLayout recentAchievementsCard() {
+        List<Object[]> rows = new ArrayList<>();
+        for (Game game : games) for (Game.Achievement achievement : game.achievements) if (achievement.unlocked) rows.add(new Object[]{game, achievement});
+        rows.sort((left, right) -> ((Game.Achievement) right[1]).unlockedAt.compareTo(((Game.Achievement) left[1]).unlockedAt));
+        if (rows.isEmpty()) return null;
+        LinearLayout block = column(); block.addView(sectionHeading("CONQUISTAS RECENTES", "VER TODAS", v -> showAchievements()));
+        HorizontalScrollView scroll = new HorizontalScrollView(this); scroll.setHorizontalScrollBarEnabled(false); LinearLayout list = row();
+        int limit = Math.min(8, rows.size());
+        for (int index = 0; index < limit; index++) {
+            Game game = (Game) rows.get(index)[0]; Game.Achievement achievement = (Game.Achievement) rows.get(index)[1];
+            LinearLayout item = column(); item.setPadding(dp(13), dp(12), dp(13), dp(12)); item.setBackground(background(SURFACE, 4, LINE, 1));
+            item.addView(text("★  " + achievement.title, 10, TEXT, true)); item.addView(text(game.title + " · " + achievement.points + " PTS", 7, MUTED, false), margins(-1, 5, -1, 0));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(245), -2); lp.setMargins(0, dp(13), dp(10), 0); list.addView(item, lp);
+        }
+        scroll.addView(list); block.addView(scroll); return block;
+    }
+
     private Button filterChip(String label, View.OnClickListener listener) {
         Button chip = button(label);
         chip.setTextSize(7);
@@ -2231,7 +2308,9 @@ public final class MainActivity extends Activity {
 
     private LinearLayout page() {
         LinearLayout page = column();
-        page.setPadding(dp(20), dp(18), dp(20), 0);
+        int widthDp = getResources().getConfiguration().screenWidthDp;
+        int side = widthDp >= 700 ? 48 : 20;
+        page.setPadding(dp(side), dp(18), dp(side), 0);
         return page;
     }
 
@@ -2303,9 +2382,11 @@ public final class MainActivity extends Activity {
                 int selectedPort;
                 try { selectedPort = Integer.parseInt(port.getText().toString()); } catch (Exception error) { port.setError("Porta inválida"); return; }
                 dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setText("TESTANDO…");
+                note.setText("1/3 Identidade segura · 2/3 Autorização · 3/3 Teste da biblioteca");
                 bridgeClient.pair(host.getText().toString(), selectedPort, code.getText().toString(), pin.getText().toString(), new BridgeClient.PairCallback() {
-                    public void onSuccess() { dialog.dismiss(); syncState = "connecting"; syncDetail = bridgeClient.endpointLabel(); showProfile(); }
-                    public void onError(String error) { dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true); code.setError(error); }
+                    public void onSuccess() { dialog.dismiss(); syncState = "connecting"; syncDetail = "Identidade confirmada · testando biblioteca"; showProfile(); }
+                    public void onError(String error) { dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true); dialog.getButton(AlertDialog.BUTTON_POSITIVE).setText("CONECTAR"); note.setText("O teste indicou o que precisa ser corrigido abaixo."); code.setError(error); }
                 });
             });
         });

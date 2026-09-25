@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## Android 0.20.0 e iOS 0.11.0 — experiência móvel e sincronização transparente
+
+- Início móvel com último jogo, sessão ativa, continuar sessão, conquistas recentes e Quero jogar.
+- Estado único e explícito para conexão, cache local, alterações pendentes e última sincronização concluída.
+- Pareamento por QR Code confirma identidade, autorização e biblioteca; a reconexão continua automática.
+- Diagnóstico guiado para rede, computador, certificado, cache e fila, sem expor logs técnicos.
+- Conflitos de anotações permitem comparar celular e computador antes de escolher.
+- Capas persistidas em miniaturas otimizadas; conteúdo offline configurável sem remover jogos, coleções ou conquistas.
+- Notificações repetidas são consolidadas e layouts ganham limites adequados para tablet e orientação horizontal.
+
 ## Launcher 1.72.0 — Conexões previsíveis
 
 - Cada loja diferencia conexão ativa, cliente não encontrado, login necessário, biblioteca preservada no cache, sincronização parcial e monitoramento local ativo.

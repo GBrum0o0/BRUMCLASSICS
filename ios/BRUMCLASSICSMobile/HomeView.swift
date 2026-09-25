@@ -25,10 +25,11 @@ struct HomeView: View {
                     Text(greeting).font(.system(size: 20, weight: .bold)).foregroundStyle(BrumTheme.primary)
                     Text("Sua biblioteca,\nem qualquer lugar.").font(.system(size: 40, weight: .black)).foregroundStyle(BrumTheme.text)
                 }
+                SyncStatusCard()
                 NavigationLink { NotificationsView() } label: {
                     SettingsRow(icon: "bell.fill", title: "NOTIFICAÇÕES", detail: notificationDetail)
                 }
-                if let active = store.companionGame, store.connection == .online {
+                if let active = store.activeGame, store.connection == .online {
                     Button { selection = 3 } label: { CompanionCard(game: active) }.buttonStyle(.plain)
                 }
                 if showPocketAsLatest, let lastPocketGame {
@@ -38,10 +39,11 @@ struct HomeView: View {
                 } else if let lastPlayed { FeaturedGameCard(game: lastPlayed) }
                 NavigationLink { BCardLibraryView() } label: { SettingsRow(icon: "rectangle.portrait.on.rectangle.portrait", title: "B-CARD", detail: "Seus jogos instalados · Jogos e CLASSICS") }
                 NavigationLink { ClassicsEverywhereView() } label: { SettingsRow(icon: "gamecontroller", title: "CLASSICS Everywhere", detail: "Suas ROMs locais · toque para jogar") }.accessibilityIdentifier("classics-everywhere-link")
+                RecentAchievementsStrip(items: Array(store.snapshot.recentAchievements.prefix(8)))
                 GameStrip(title: "FAVORITOS", games: favorites, empty: "Marque jogos como favoritos no launcher ou no perfil do jogo.")
                 GameStrip(title: "QUERO JOGAR", games: wantToPlay, empty: "Sua lista Quero jogar aparecerá aqui.")
                 JourneyCard(games: store.snapshot.games)
-            }.padding(20)
+            }.padding(20).frame(maxWidth: 1100, alignment: .leading).frame(maxWidth: .infinity)
         }
         .background(BrumTheme.background.ignoresSafeArea())
         .refreshable { await store.refresh() }
@@ -53,6 +55,51 @@ struct HomeView: View {
         let center = store.snapshot.notifications ?? .empty
         if center.unread > 0 { return "\(center.unread) não \(center.unread == 1 ? "lida" : "lidas") · sincronizadas com o launcher" }
         return center.total > 0 ? "Tudo em dia · \(center.total) no histórico" : "Avisos, conquistas, sessões e atualizações"
+    }
+}
+
+struct SyncStatusCard: View {
+    @EnvironmentObject private var store: AppStore
+    var body: some View {
+        let state = store.syncSummary
+        BrumCard {
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: state.isHealthy ? "checkmark.icloud.fill" : "exclamationmark.icloud.fill")
+                    .font(.title2).foregroundStyle(state.isHealthy ? BrumTheme.primary : .orange)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(state.title).font(.headline).foregroundStyle(BrumTheme.text)
+                    Text(state.detail).font(.caption).foregroundStyle(BrumTheme.muted)
+                    Text(state.action.uppercased()).font(.caption2.bold()).tracking(0.8).foregroundStyle(state.isHealthy ? BrumTheme.primary : .orange)
+                }
+                Spacer()
+            }
+        }
+    }
+}
+
+struct RecentAchievementsStrip: View {
+    let items: [RecentAchievement]
+    var body: some View {
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 14) {
+                BrumSectionLabel(text: "CONQUISTAS RECENTES")
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 12) {
+                        ForEach(items) { item in
+                            BrumCard {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "trophy.fill").foregroundStyle(BrumTheme.primary)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(item.achievement.title).font(.subheadline.bold()).foregroundStyle(BrumTheme.text).lineLimit(2)
+                                        Text("\(item.game.title) · \(item.achievement.points) PTS").font(.caption2).foregroundStyle(BrumTheme.muted).lineLimit(1)
+                                    }
+                                }.frame(width: 245, alignment: .leading)
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -161,8 +208,9 @@ struct CompanionCard: View {
             VStack(alignment: .leading, spacing: 13) {
                 HStack { BrumSectionLabel(text: "BRUMCOMPANION"); Spacer(); Text("SESSÃO ATIVA").font(.caption2.bold()).foregroundStyle(BrumTheme.primary) }
                 Text(game.title).font(.title3.bold()).foregroundStyle(BrumTheme.text)
-                Text([game.notes.whereStopped, game.notes.objectives, game.notes.tips, game.notes.commands].first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? "").font(.subheadline).foregroundStyle(BrumTheme.muted).lineLimit(3)
-                Text("ABRIR MINHAS ANOTAÇÕES").font(.caption.bold()).foregroundStyle(BrumTheme.primary)
+                let note = [game.notes.whereStopped, game.notes.objectives, game.notes.tips, game.notes.commands].first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                Text(note ?? "O jogo está aberto no computador. Acompanhe a sessão em tempo real.").font(.subheadline).foregroundStyle(BrumTheme.muted).lineLimit(3)
+                Text("CONTINUAR SESSÃO").font(.caption.bold()).foregroundStyle(BrumTheme.primary)
             }
         }
     }

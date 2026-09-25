@@ -1,9 +1,15 @@
 {
-  "version": "0.10.0",
-  "build": 21,
+  "version": "0.11.0",
+  "build": 22,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.10.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.11.0",
   "notes": [
+    "A tela inicial mostra último jogo, sessão ativa, continuar, conquistas recentes e Quero jogar.",
+    "O estado da sincronização distingue cache local, fila pendente, última sincronização e reconexão automática.",
+    "Novo diagnóstico explica rede, pareamento, certificado e computador indisponível sem logs técnicos.",
+    "Conflitos de anotações exibem lado a lado a versão do iPhone e a do computador.",
+    "Capas offline são otimizadas e o usuário escolhe capas, atividade e notificações disponíveis sem rede.",
+    "Layout refinado para iPad e orientação horizontal; notificações repetidas são consolidadas.",
     "Conquistas sem leitura direta agora exibem imagem, título e descrição do catálogo oficial carregado pelo launcher.",
     "Toque em uma conquista para marcar ou desfazer o progresso manual, sem formulário de data.",
     "A pesquisa de jogos e a pesquisa dentro de cada catálogo funcionam na seção Conquistas.",

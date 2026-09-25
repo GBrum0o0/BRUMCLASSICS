@@ -3,7 +3,12 @@ import SwiftUI
 struct NotificationsView: View {
     @EnvironmentObject private var store: AppStore
 
-    private var center: MobileNotificationSnapshot { store.snapshot.notifications ?? .empty }
+    private var center: MobileNotificationSnapshot {
+        let source = store.snapshot.notifications ?? .empty
+        var keys = Set<String>()
+        let useful = source.entries.filter { keys.insert("\($0.category)|\($0.title)|\($0.message)|\($0.gameId)").inserted }.prefix(80)
+        return .init(entries: Array(useful), unread: source.unread, total: source.total)
+    }
 
     var body: some View {
         ScrollView {
