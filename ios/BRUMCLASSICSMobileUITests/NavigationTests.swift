@@ -35,6 +35,7 @@ final class NavigationTests: XCTestCase {
         XCTAssertFalse(app.buttons["companion-capture"].isEnabled)
         app.tabBars.buttons["Perfil"].tap()
         app.buttons["mobile-settings-link"].tap()
+        if !app.staticTexts["Ao iniciar um clássico"].waitForExistence(timeout: 2) { app.swipeUp() }
         XCTAssertTrue(app.staticTexts["Ao iniciar um clássico"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Continuar no auto save"].exists || app.staticTexts["Continuar no auto save"].exists)
     }
