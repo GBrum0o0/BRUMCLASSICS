@@ -1,5 +1,17 @@
 # Histórico de versões
 
+## Launcher 1.72.0 — Conexões previsíveis
+
+- Cada loja diferencia conexão ativa, cliente não encontrado, login necessário, biblioteca preservada no cache, sincronização parcial e monitoramento local ativo.
+- A tela de detalhes mostra a última sincronização bem-sucedida, a quantidade de jogos e separa propriedade confirmada, instalação detectada, assinatura, Família Steam e registro local.
+- O novo botão **Diagnosticar conexão** verifica cliente, acesso, biblioteca, origem dos jogos e monitoramento com orientação direta, sem logs técnicos.
+- A reautenticação leva ao fluxo seguro disponível para Steam, Epic, GOG e EA.
+- Uma fila central impede que duas lojas atualizem a biblioteca simultaneamente e continua processando pedidos mesmo depois da falha de outra fonte.
+- Sincronizações estáveis redesenham apenas cartões modificados; entradas, remoções e mudanças de ordem ainda provocam uma reconstrução segura.
+- O último snapshot válido permanece carregado durante falhas de loja ou credencial, preservando a organização pessoal.
+- APIs privadas continuam desativadas; cada integração declara honestamente sua origem e suas limitações.
+- Android 0.19.0 e iOS 0.10.0 não tiveram alterações de código ou protocolo nesta atualização.
+
 ## Launcher 1.71.0 — Identidade visual e formatos de biblioteca
 
 - A seção **Configurações → Experiência** agora separa estilo da interface, paleta de cores e formato da biblioteca.
