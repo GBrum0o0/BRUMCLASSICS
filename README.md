@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.70.8"><strong>Windows 1.70.8</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.71.0"><strong>Windows 1.71.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.19.0"><strong>Android 0.19.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.10.0"><strong>iOS 0.10.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -35,6 +35,8 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - Busca, filtros, coleções, favoritos e prioridade de loja.
 - Central de perfis ao lado das Configurações, com foto em destaque, jogo mais jogado, favorito e recente, primeiro acesso seguro, exclusão protegida, dados separados por jogador e exportação criptografada em `.brumprofile` para levar coleções, conquistas manuais e preferências a outro computador.
 - Capas locais aparecem no primeiro frame e migram para miniaturas otimizadas assim que o cache termina, sem depender de passar o mouse sobre os cartões.
+- Três estilos estruturais — **Original**, **Cinemático** e **Retro CRT** — independentes da paleta de cores e salvos por perfil.
+- Biblioteca nos formatos **Grade**, **Prateleira** ou **Galeria**, combináveis livremente com qualquer estilo e sem substituir o Living Room.
 - Fundo dinâmico por jogo, Vitrine opcional, cartões com profundidade discreta, modo sem distrações e modo Economia.
 - A Vitrine opcional abre com o último jogo jogado pelo perfil atual, mostra prévias temporárias ao navegar pelas capas e retorna ao destaque recente quando a navegação termina.
 - Jogos não oficiais podem ser cadastrados com executável local e SteamID opcional. **BUSCAR DADOS** usa o ID exato ou uma correspondência segura pelo nome para mostrar título oficial e recuperar capa e imagens, sem criar uma falsa licença de loja.
@@ -69,7 +71,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 1.70.8 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.70.8) |
+| Windows | 1.71.0 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.71.0) |
 | Android | 0.19.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.19.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.10.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.10.0) · [Guia](ios/README-IOS.md) |
 
@@ -79,6 +81,7 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 
 ## Versões atuais
 
+- **Launcher 1.71.0:** estilos Original, Cinemático e Retro CRT, combinados com biblioteca em Grade, Prateleira ou Galeria e preferências salvas por perfil.
 - **Launcher 1.70.8:** a Vitrine mantém o último jogo correto ao alternar entre Instalados e Todos, mesmo quando ele está além dos 24 primeiros cartões.
 - **Launcher 1.70.7:** a Vitrine da Biblioteca destaca o último jogo jogado pelo perfil, com prévia temporária das demais capas.
 - **Launcher 1.70.6:** jogos não oficiais preservam identidade, organização e horas; perfil e Atividade reparam o maior tempo comprovado sem duplicá-lo.

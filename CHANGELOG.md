@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## Launcher 1.71.0 — Identidade visual e formatos de biblioteca
+
+- A seção **Configurações → Experiência** agora separa estilo da interface, paleta de cores e formato da biblioteca.
+- **Original** mantém a composição editorial e técnica já conhecida.
+- **Cinemático** amplia a arte, arredonda a navegação, expande a Vitrine e ativa o destaque automaticamente.
+- **Retro CRT** usa tipografia monoespaçada, scanlines, textura de monitor, blocos rígidos e cantos retos.
+- A biblioteca pode ser exibida em **Grade**, **Prateleira** ou **Galeria**, independentemente do estilo e da paleta escolhidos.
+- As escolhas aparecem em tempo real, são normalizadas com fallback seguro e acompanham cada perfil.
+- Living Room Mode permanece uma experiência independente e não é substituído pelos novos formatos.
+- Android 0.19.0 e iOS 0.10.0 não tiveram alterações de código ou protocolo nesta atualização.
+
 ## Launcher 1.70.8 — Vitrine correta em Todos
 
 - Corrigido o destaque que mudava para outro jogo ao trocar o status de **Instalados** para **Todos**.
