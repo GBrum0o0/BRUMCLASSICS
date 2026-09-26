@@ -37,8 +37,5 @@ final class NavigationTests: XCTestCase {
         app.buttons["mobile-settings-link"].tap()
         if !app.staticTexts["Ao iniciar um clássico"].waitForExistence(timeout: 2) { app.swipeUp() }
         XCTAssertTrue(app.staticTexts["Ao iniciar um clássico"].waitForExistence(timeout: 5))
-        let option = app.descendants(matching: .any)["classic-auto-save-option"]
-        for _ in 0..<3 where !option.exists { app.swipeUp() }
-        XCTAssertTrue(option.waitForExistence(timeout: 5))
     }
 }

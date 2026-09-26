@@ -80,7 +80,7 @@ struct MobileSettingsView: View {
             Section("B-CARD · CLASSICS") {
                 Picker("Ao iniciar um clássico", selection: $mode) {
                     Text("Novo jogo").tag("new")
-                    Text("Continuar no auto save").tag("continue-auto").accessibilityIdentifier("classic-auto-save-option")
+                    Text("Continuar no auto save").tag("continue-auto")
                     Text("Continuar no save manual").tag("continue-manual")
                 }.pickerStyle(.inline).accessibilityIdentifier("classic-launch-mode")
                 Text("Essa preferência vale para os CLASSICS enviados pelo B-CARD. Jogos de PC usam a inicialização normal. Se o save escolhido não existir, o launcher informará o problema; seus saves não são apagados.").font(.caption).foregroundStyle(BrumTheme.muted)
