@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## Launcher 1.72.1 — instalação Steam corrigida
+
+- O launcher verifica o manifesto, a pasta e o executável instalados antes de interpretar contadores históricos de download da Steam.
+- Uma instalação íntegra prevalece sobre valores antigos de `BytesToDownload` e `BytesDownloaded` mantidos no manifesto.
+- A estimativa de pouco espaço vira um aviso durante a transferência, sem criar sozinha um erro terminal.
+- Antes de mostrar um erro da loja, uma última verificação local pode confirmar o jogo como pronto para jogar.
+- Erros antigos desaparecem assim que a biblioteca reconhece a instalação válida.
+- Android 0.20.0 e iOS 0.11.0 permanecem compatíveis e não receberam alterações nesta correção do launcher Windows.
+
 ## Android 0.20.0 e iOS 0.11.0 — experiência móvel e sincronização transparente
 
 - Início móvel com último jogo, sessão ativa, continuar sessão, conquistas recentes e Quero jogar.
