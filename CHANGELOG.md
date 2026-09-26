@@ -1,5 +1,18 @@
 # Histórico de versões
 
+## Launcher 1.74.0 — recursos fáceis de encontrar
+
+- A configuração inicial virou um roteiro de cinco tarefas: perfil, conexão de loja, controles, visual e Living Room.
+- A busca geral por `Ctrl+K` encontra jogos, configurações, conexões e recursos e abre diretamente o destino correto.
+- Configurações comuns aparecem primeiro; CLASSICS, Móvel e Sistema ficam em **Mais configurações** até serem necessários.
+- Estados visíveis seguem a mesma linguagem: carregando, concluído, atenção, indisponível e ação necessária.
+- Estados vazios explicam por que não há conteúdo e oferecem uma ação contextual para corrigir o filtro, conectar uma loja ou adicionar um jogo.
+- Alterações de favorito e remoções da biblioteca podem ser desfeitas; jogos removidos são restaurados pelo arquivo protegido, preservando seus dados pessoais.
+- A interface pode usar densidade Compacta, Confortável ou Ampla e mantém navegação por mouse, teclado e controle.
+- Botões de voltar, fechar, confirmar e cancelar compartilham alinhamento e áreas clicáveis previsíveis.
+- A BRUMWORLD passou a explicar o roteiro inicial, a busca geral e a divulgação progressiva das opções avançadas.
+- Android 0.20.0 e iOS 0.11.0 permanecem compatíveis e não receberam alterações nesta atualização do launcher Windows.
+
 ## Launcher 1.73.0 — desempenho medido e coordenado
 
 - A linha do tempo interna registra tempo para abrir a janela, exibir a biblioteca, carregar capas, concluir sincronizações e executar workers.

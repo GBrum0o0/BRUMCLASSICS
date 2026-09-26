@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.73.0"><strong>Windows 1.73.0</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.74.0"><strong>Windows 1.74.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.20.0"><strong>Android 0.20.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.11.0"><strong>iOS 0.11.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -33,6 +33,10 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - Explorador único de conexões para lojas, RetroAchievements e RetroArch, com estados detalhados, última sincronização, origem dos jogos, diagnóstico guiado, fila central e preservação do último catálogo válido.
 - Família Steam opcional: jogos compartilhados atualmente acessíveis entram identificados separadamente, sem serem tratados como compras da conta.
 - Busca, filtros, coleções, favoritos e prioridade de loja.
+- Busca geral por `Ctrl+K` para localizar jogos, configurações, conexões e recursos sem conhecer a estrutura do launcher.
+- Roteiro inicial de cinco tarefas para preparar perfil, loja, controles, visual e Living Room; opções técnicas ficam recolhidas em **Mais configurações**.
+- Estados visuais consistentes, vazios com orientação e ação direta, além de **Desfazer** para favoritos, coleções e remoções da biblioteca.
+- Interface em densidade **Compacta**, **Confortável** ou **Ampla**, utilizável por mouse, teclado e controle.
 - Central de perfis ao lado das Configurações, com foto em destaque, jogo mais jogado, favorito e recente, primeiro acesso seguro, exclusão protegida, dados separados por jogador e exportação criptografada em `.brumprofile` para levar coleções, conquistas manuais e preferências a outro computador.
 - Capas locais aparecem no primeiro frame e migram para miniaturas otimizadas assim que o cache termina, sem depender de passar o mouse sobre os cartões.
 - Linha do tempo interna mede abertura, biblioteca, capas, sincronizações, workers e cartões reconstruídos; o diagnóstico aponta gargalos sem expor logs técnicos.
@@ -73,7 +77,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 1.73.0 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.73.0) |
+| Windows | 1.74.0 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.74.0) |
 | Android | 0.20.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.20.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.11.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.11.0) · [Guia](ios/README-IOS.md) |
 
@@ -83,6 +87,7 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 
 ## Versões atuais
 
+- **Launcher 1.74.0:** roteiro inicial, busca geral, configurações progressivas, estados consistentes, ações reversíveis e três densidades de interface.
 - **Launcher 1.73.0:** linha do tempo de desempenho, filas com prioridade, workers limitados, virtualização da biblioteca e suspensão de tarefas visuais ao minimizar.
 - **Launcher 1.72.1:** corrige falsos erros de instalação da Steam quando manifesto, pasta e executável já comprovam que o jogo está instalado.
 - **Launcher 1.72.0:** estados transparentes por loja, diagnóstico guiado, fila central de sincronização, atualização incremental e snapshot preservado durante falhas.
@@ -128,7 +133,7 @@ Consulte também o guia de [Conexões e origem dos dados](docs/CONEXOES.md), com
 
 ## Instalação rápida
 
-1. Baixe o executável portátil da [release Windows 1.72.0](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.72.0).
+1. Baixe o executável portátil da [release Windows 1.74.0](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.74.0).
 2. Execute `BRUMCLASSICS OFICIAL.exe`.
 3. Abra **Configurações → Conexões → Explorar conexões** e vincule somente suas próprias contas.
 4. Para CLASSICS, coloque somente suas próprias ROMs na pasta `RETROGAMES`.
