@@ -1,5 +1,19 @@
 # Histórico de versões
 
+## Launcher 1.73.0 — desempenho medido e coordenado
+
+- A linha do tempo interna registra tempo para abrir a janela, exibir a biblioteca, carregar capas, concluir sincronizações e executar workers.
+- O diagnóstico mostra tarefas mais lentas, picos, médias, quantidade de cartões processados e tamanho das filas em execução.
+- Workers de varredura passam por uma fila global com limite de concorrência; validação rápida, integridade e leitura retrô recebem prioridades diferentes.
+- Sincronizações manuais ultrapassam atualizações automáticas ainda aguardando, sem interromper a operação que já está ativa.
+- O snapshot local aparece primeiro e a validação rápida deixa de prender a abertura por mais de 350 ms.
+- Bibliotecas com mais de 120 jogos mantêm no DOM somente as linhas próximas da área visível.
+- Decodificação de capas fica limitada a três imagens simultâneas; tarefas visuais e a geração de miniaturas são suspensas quando o launcher fica oculto ou minimizado.
+- Atividade completa e diagnóstico continuam sob demanda; a abertura usa apenas um resumo leve do histórico.
+- Atualizações incrementais continuam reconstruindo somente os cartões alterados e agora registram quantos cartões foram refeitos.
+- SQLite não foi introduzido: o diagnóstico conserva a decisão de medir primeiro e só recomendar migração quando houver evidência de gargalo de armazenamento.
+- Android 0.20.0 e iOS 0.11.0 permanecem compatíveis e não receberam alterações nesta atualização do launcher Windows.
+
 ## Launcher 1.72.1 — instalação Steam corrigida
 
 - O launcher verifica o manifesto, a pasta e o executável instalados antes de interpretar contadores históricos de download da Steam.

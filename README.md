@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.72.1"><strong>Windows 1.72.1</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.73.0"><strong>Windows 1.73.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.20.0"><strong>Android 0.20.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.11.0"><strong>iOS 0.11.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -35,6 +35,8 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - Busca, filtros, coleções, favoritos e prioridade de loja.
 - Central de perfis ao lado das Configurações, com foto em destaque, jogo mais jogado, favorito e recente, primeiro acesso seguro, exclusão protegida, dados separados por jogador e exportação criptografada em `.brumprofile` para levar coleções, conquistas manuais e preferências a outro computador.
 - Capas locais aparecem no primeiro frame e migram para miniaturas otimizadas assim que o cache termina, sem depender de passar o mouse sobre os cartões.
+- Linha do tempo interna mede abertura, biblioteca, capas, sincronizações, workers e cartões reconstruídos; o diagnóstico aponta gargalos sem expor logs técnicos.
+- Filas com prioridade limitam trabalhos simultâneos, a biblioteca grande mantém apenas cartões próximos da área visível e tarefas visuais são suspensas quando o launcher fica minimizado.
 - Três estilos estruturais — **Original**, **Cinemático** e **Retro CRT** — independentes da paleta de cores e salvos por perfil.
 - Biblioteca nos formatos **Grade**, **Prateleira** ou **Galeria**, combináveis livremente com qualquer estilo e sem substituir o Living Room.
 - Fundo dinâmico por jogo, Vitrine opcional, cartões com profundidade discreta, modo sem distrações e modo Economia.
@@ -71,7 +73,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 1.72.1 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.72.1) |
+| Windows | 1.73.0 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.73.0) |
 | Android | 0.20.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.20.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.11.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.11.0) · [Guia](ios/README-IOS.md) |
 
@@ -81,6 +83,7 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 
 ## Versões atuais
 
+- **Launcher 1.73.0:** linha do tempo de desempenho, filas com prioridade, workers limitados, virtualização da biblioteca e suspensão de tarefas visuais ao minimizar.
 - **Launcher 1.72.1:** corrige falsos erros de instalação da Steam quando manifesto, pasta e executável já comprovam que o jogo está instalado.
 - **Launcher 1.72.0:** estados transparentes por loja, diagnóstico guiado, fila central de sincronização, atualização incremental e snapshot preservado durante falhas.
 - **Launcher 1.71.0:** estilos Original, Cinemático e Retro CRT, combinados com biblioteca em Grade, Prateleira ou Galeria e preferências salvas por perfil.
