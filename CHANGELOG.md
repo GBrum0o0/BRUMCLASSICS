@@ -1,5 +1,18 @@
 # Histórico de versões
 
+## Launcher 1.74.2 — BRUMWORLD em formato A4
+
+- A BRUMWORLD foi reconstruída na proporção real de uma folha A4 e ampliada de 16 para 48 páginas.
+- Capa, editorial, sumário em duas partes, 43 capítulos e contracapa agora formam uma revista completa e navegável.
+- O guia reúne biblioteca persistente, coleções, jogos não oficiais, conexões, instalações, conquistas, sessões, controles, CLASSICS, RetroArch, RetroAchievements, Living Room, Console no PC, saves, diagnóstico e atualização.
+- Perfil do Jogador, dados pertencentes ao perfil, foto, portabilidade e segurança recebem páginas próprias.
+- Android, iOS e PWA são documentados junto do pareamento, uso offline, conflitos, conquistas e notificações.
+- A relação entre ROM, RetroArch, identidade do jogo e perfil móvel ganhou um fluxo dedicado.
+- BRUMCOMPANION, B-CARD e BRUMMOMENTS agora possuem capítulos próprios.
+- O modo Ajustar preserva toda a folha em resoluções diferentes; o modo 100% mantém 794 × 1123 pixels e a configuração de reduzir animações não interfere mais no dimensionamento.
+- Botões da revista continuam abrindo as telas reais do launcher, sem criar menus duplicados.
+- Android 0.20.0 e iOS 0.11.0 permanecem compatíveis e não receberam alterações de código nesta atualização do launcher Windows.
+
 ## Launcher 1.74.1 — biblioteca estável durante a rolagem
 
 - Bibliotecas grandes deixam de desmontar e reconstruir blocos de cartões conforme o usuário sobe ou desce.
