@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.74.0"><strong>Windows 1.74.0</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.74.1"><strong>Windows 1.74.1</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.20.0"><strong>Android 0.20.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.11.0"><strong>iOS 0.11.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -77,7 +77,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 1.74.0 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.74.0) |
+| Windows | 1.74.1 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.74.1) |
 | Android | 0.20.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.20.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.11.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.11.0) · [Guia](ios/README-IOS.md) |
 
@@ -87,6 +87,7 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 
 ## Versões atuais
 
+- **Launcher 1.74.1:** rolagem estável em bibliotecas grandes, carregamento progressivo sem reconstruir cartões e ordem visual preservada.
 - **Launcher 1.74.0:** roteiro inicial, busca geral, configurações progressivas, estados consistentes, ações reversíveis e três densidades de interface.
 - **Launcher 1.73.0:** linha do tempo de desempenho, filas com prioridade, workers limitados, virtualização da biblioteca e suspensão de tarefas visuais ao minimizar.
 - **Launcher 1.72.1:** corrige falsos erros de instalação da Steam quando manifesto, pasta e executável já comprovam que o jogo está instalado.
@@ -133,7 +134,7 @@ Consulte também o guia de [Conexões e origem dos dados](docs/CONEXOES.md), com
 
 ## Instalação rápida
 
-1. Baixe o executável portátil da [release Windows 1.74.0](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.74.0).
+1. Baixe o executável portátil da [release Windows 1.74.1](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.74.1).
 2. Execute `BRUMCLASSICS OFICIAL.exe`.
 3. Abra **Configurações → Conexões → Explorar conexões** e vincule somente suas próprias contas.
 4. Para CLASSICS, coloque somente suas próprias ROMs na pasta `RETROGAMES`.

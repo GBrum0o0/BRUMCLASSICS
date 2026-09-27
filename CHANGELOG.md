@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## Launcher 1.74.1 — biblioteca estável durante a rolagem
+
+- Bibliotecas grandes deixam de desmontar e reconstruir blocos de cartões conforme o usuário sobe ou desce.
+- O carregamento passa a ser progressivo e cumulativo: novos jogos são acrescentados sem substituir os que já estavam visíveis.
+- A ordem dos jogos e a identidade dos elementos permanecem estáveis durante toda a rolagem.
+- Capas já carregadas não reiniciam e cartões acrescentados ou atualizados não repetem a animação de entrada.
+- O carregamento inicial continua limitado a 24 jogos e aumenta em páginas de 24, preservando a abertura rápida.
+- O cenário foi validado com 240 jogos, rolagem nos dois sentidos, 144 cartões carregados, nenhuma duplicata e nenhum espaçador virtual.
+- Android 0.20.0 e iOS 0.11.0 permanecem compatíveis e não receberam alterações nesta correção do launcher Windows.
+
 ## Launcher 1.74.0 — recursos fáceis de encontrar
 
 - A configuração inicial virou um roteiro de cinco tarefas: perfil, conexão de loja, controles, visual e Living Room.
