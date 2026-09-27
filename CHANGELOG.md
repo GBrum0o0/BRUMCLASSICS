@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## Launcher 1.74.3 — BRUMWORLD com telas reais e mais nítida
+
+- As 43 páginas de orientação da BRUMWORLD agora usam capturas verdadeiras do launcher e do aplicativo Android 0.20.0.
+- Imagens abstratas e exemplos genéricos foram removidos das matérias de guia.
+- Cada captura recebe três marcadores numerados relacionados diretamente às etapas e aos estados explicados na página.
+- Biblioteca, Conexões, conquistas, sessões, Perfil, controles, Living Room, Console no PC, sistema e demais interfaces são mostrados em seus estados reais.
+- Início móvel, biblioteca, conquistas, perfil, pareamento, CLASSICS, BRUMCOMPANION e B-CARD são apresentados com telas reais do aplicativo Android.
+- O modo Ajustar deixa de transformar a revista inteira como uma imagem rasterizada: texto e imagens são recalculados no tamanho exibido para preservar a nitidez.
+- A proporção A4, as 48 páginas, o modo 100% e a navegação por teclado, botões e sumário permanecem inalterados.
+- Android 0.20.0 e iOS 0.11.0 continuam compatíveis e não receberam alterações de código.
+
 ## Launcher 1.74.2 — BRUMWORLD em formato A4
 
 - A BRUMWORLD foi reconstruída na proporção real de uma folha A4 e ampliada de 16 para 48 páginas.
