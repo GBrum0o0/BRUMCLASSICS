@@ -1,5 +1,17 @@
 # Histórico de versões
 
+## Launcher 1.74.4 — BRUMWORLD legível e sem marcadores desconexos
+
+- O PWA foi retirado da edição atual da BRUMWORLD; o capítulo móvel apresenta Android e iOS.
+- Os círculos 1, 2 e 3 sobre as capturas foram removidos porque não correspondiam de forma precisa às explicações.
+- Cada captura real passa a ocupar toda a largura disponível na página.
+- As telas do launcher recebem recorte ampliado da região relevante, tornando botões, cartões e informações reconhecíveis no modo Ajustar.
+- As capturas móveis mostram diretamente a área útil da interface em vez do telefone inteiro reduzido.
+- Um botão **AMPLIAR IMAGEM** abre a captura completa sobre a revista, sem perder a página atual.
+- `Esc` fecha primeiro a imagem ampliada; outro `Esc` fecha a BRUMWORLD.
+- As 48 páginas A4, o sumário e os atalhos para as telas reais foram preservados.
+- Android 0.20.0 e iOS 0.11.0 continuam compatíveis e não receberam alterações de código.
+
 ## Launcher 1.74.3 — BRUMWORLD com telas reais e mais nítida
 
 - As 43 páginas de orientação da BRUMWORLD agora usam capturas verdadeiras do launcher e do aplicativo Android 0.20.0.
