@@ -1,5 +1,19 @@
 # Histórico de versões
 
+## Launcher 1.75.0 — Central de Downloads
+
+- A biblioteca recebe um botão **Downloads** próprio abaixo do painel lateral, mantendo a navegação principal limpa.
+- A nova central reúne transferências ativas, velocidade total, dados restantes, previsão de conclusão e fontes monitoradas.
+- Cada item identifica claramente se o progresso é confirmado, estimado ou apenas atividade local detectada.
+- A Steam fornece porcentagem, bytes, velocidade e tempo restante pelos manifestos oficiais.
+- Downloads iniciados diretamente pelo cliente Steam são reconhecidos automaticamente quando o jogo pertence à biblioteca.
+- Epic Games, GOG, EA App, Ubisoft Connect, Amazon Games e Xbox exibem somente estados locais realmente comprovados quando não existe progresso público confiável.
+- A fila permite abrir a loja e encerrar o monitoramento sem fingir que o launcher controla ações indisponíveis no cliente oficial.
+- Busca geral, notificações, BRUMNEWS e diagnóstico encaminham diretamente para a Central de Downloads.
+- O painel compacto de instalação deixa de cobrir a central quando ela está aberta.
+- Atualizações em segundo plano mantêm o contador lateral sem reconstruir a tela completa quando Downloads não está visível.
+- Android 0.20.0 e iOS 0.11.0 continuam compatíveis e não receberam alterações de código.
+
 ## Launcher 1.74.4 — BRUMWORLD legível e sem marcadores desconexos
 
 - O PWA foi retirado da edição atual da BRUMWORLD; o capítulo móvel apresenta Android e iOS.

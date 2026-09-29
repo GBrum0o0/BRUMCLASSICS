@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.74.4"><strong>Windows 1.74.4</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.75.0"><strong>Windows 1.75.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.20.0"><strong>Android 0.20.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.11.0"><strong>iOS 0.11.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -57,6 +57,7 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - Calibração de drift e ajustes de analógicos por controle.
 - Console no PC opcional para placa de captura ou uso remoto oficial, com perfis por console, gravação, replay, janela flutuante e diagnóstico ao vivo; a seção fica desativada por padrão e pode ser exibida em **Configurações → Experiência**.
 - Monitoramento de instalações por eventos locais e verificação adaptativa, com confirmação dupla antes de retirar o estado instalado e verificação imediata por loja em Conexões.
+- Central de Downloads acessível pela biblioteca, com fila, velocidade, dados restantes, previsão e progresso oficial da Steam. Downloads iniciados diretamente no cliente Steam também são detectados; lojas sem dados públicos confiáveis exibem somente atividade local comprovada.
 - Central de Sessões com evidências do processo e correção auditável.
 - Saúde da Biblioteca, backup completo de recuperação com SHA-256 e perfil portátil criptografado com AES-256-GCM.
 - BRUMWORLD: revista interativa com 48 páginas na proporção real A4 e 43 guias baseados em capturas verdadeiras do launcher e do Android. Cada imagem ocupa toda a largura, mostra a área relevante ampliada e pode ser aberta em tela cheia.
@@ -77,7 +78,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 1.74.4 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.74.4) |
+| Windows | 1.75.0 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.75.0) |
 | Android | 0.20.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.20.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.11.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.11.0) · [Guia](ios/README-IOS.md) |
 
@@ -87,6 +88,7 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 
 ## Versões atuais
 
+- **Launcher 1.75.0:** Central de Downloads integrada à biblioteca, com fila transparente, progresso oficial da Steam e detecção de transferências iniciadas no cliente.
 - **Launcher 1.74.4:** capturas grandes e legíveis na BRUMWORLD, sem marcadores desconexos, com ampliação em tela cheia e guia atual limitado a Android e iOS.
 - **Launcher 1.74.3:** BRUMWORLD transformada em guia real com 43 matérias baseadas em capturas do produto.
 - **Launcher 1.74.2:** BRUMWORLD reconstruída como revista A4 de 48 páginas, com sumário navegável e cobertura completa do launcher e do ecossistema móvel.
@@ -137,7 +139,7 @@ Consulte também o guia de [Conexões e origem dos dados](docs/CONEXOES.md), com
 
 ## Instalação rápida
 
-1. Baixe o executável portátil da [release Windows 1.74.4](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.74.4).
+1. Baixe o executável portátil da [release Windows 1.75.0](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.75.0).
 2. Execute `BRUMCLASSICS OFICIAL.exe`.
 3. Abra **Configurações → Conexões → Explorar conexões** e vincule somente suas próprias contas.
 4. Para CLASSICS, coloque somente suas próprias ROMs na pasta `RETROGAMES`.
