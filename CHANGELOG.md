@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## Launcher 1.75.1 — Monitoramento Steam em tempo real
+
+- Downloads iniciados diretamente no cliente Steam agora são descobertos pela pasta `steamapps\\downloading` e pelo manifesto oficial.
+- O launcher acompanha recursivamente os arquivos da transferência e atualiza o progresso a cada 1,5 segundo durante o download.
+- A primeira verificação da Steam acontece logo após a abertura, eliminando a espera anterior que podia chegar a três minutos.
+- Instalações novas e atualizações de jogos já instalados entram automaticamente na Central de Downloads.
+- A presença de uma pasta ou executável antigo não faz mais uma atualização ativa parecer concluída.
+- Foi corrigida a transição interna que impedia um download iniciado fora do launcher de avançar para o estado **Baixando**.
+- Android 0.20.0 e iOS 0.11.0 continuam compatíveis e não receberam alterações de código.
+
 ## Launcher 1.75.0 — Central de Downloads
 
 - A biblioteca recebe um botão **Downloads** próprio abaixo do painel lateral, mantendo a navegação principal limpa.
