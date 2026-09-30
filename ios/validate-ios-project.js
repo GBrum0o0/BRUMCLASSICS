@@ -17,6 +17,11 @@ const required = [
   'BRUMCLASSICSMobile/PersonalUpdateService.swift',
   'BRUMCLASSICSMobile/ProfileView.swift', 'BRUMCLASSICSMobile/BCardView.swift',
   'BRUMCLASSICSMobile/ROMFolderLibrary.swift',
+  'BRUMCLASSICSMobile/IntegratedEmulatorView.swift',
+  'BRUMCLASSICSMobile/Libretro/BrumLibretroAPI.h',
+  'BRUMCLASSICSMobile/Libretro/BrumLibretroEngine.h',
+  'BRUMCLASSICSMobile/Libretro/BrumLibretroEngine.mm',
+  'BRUMCLASSICSMobile/BRUMCLASSICSMobile-Bridging-Header.h',
   'BRUMCLASSICSMobile/MomentsView.swift', 'BRUMCLASSICSMobileTests/SnapshotTests.swift',
   'ios-update.json'
 ];
@@ -71,6 +76,9 @@ for (const marker of ['struct GamingModeView', 'GamingTabBar(selection:', 'Pront
   if (!source.includes(marker)) throw new Error(`Gaming Mode incompleto: ${marker}`);
 }
 if (!source.includes('pocket.launchROM(rom, launcher: store)') || !source.includes('store.launchBCard(game)')) throw new Error('Gaming Mode não decide entre execução local e computador.');
+for (const marker of ['IntegratedEmulatorSupport.supports', 'prepareIntegratedROM', 'stageForIntegratedPlay', 'JOGAR · BRUM CORE', 'finishIntegratedPlay']) {
+  if (!source.includes(marker)) throw new Error(`Emulação integrada incompleta: ${marker}`);
+}
 const homeSource = fs.readFileSync(path.join(app, 'HomeView.swift'), 'utf8');
 if (homeSource.includes('classics-everywhere-link') || homeSource.includes('NavigationLink { BCardLibraryView()')) throw new Error('Início ainda expõe atalhos removidos de B-CARD ou CLASSICS Everywhere.');
 if (!homeSource.includes('profile-home-link')) throw new Error('Perfil precisa estar acessível pelo Início.');
@@ -86,6 +94,9 @@ const updateManifest = JSON.parse(fs.readFileSync(path.join(root, 'ios-update.js
 const publishedUpdateManifest = JSON.parse(fs.readFileSync(path.join(root, '..', 'ios-update.json'), 'utf8'));
 const workflow = fs.readFileSync(path.join(root, '..', '.github', 'workflows', 'build-ios-personal.yml'), 'utf8');
 if (!workflow.includes('ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa')) throw new Error('Upload do IPA não pode ficar preso a uma versão antiga.');
+for (const marker of ['CORE_COMMIT="7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6"', 'mgba_libretro_ios.dylib', '-DCMAKE_SYSTEM_NAME=iOS', '--target mgba_libretro']) {
+  if (!workflow.includes(marker)) throw new Error(`Build reproduzível do core mGBA incompleto: ${marker}`);
+}
 if (!/^\d+\.\d+\.\d+$/.test(updateManifest.version)) throw new Error('Versão inválida em ios-update.json.');
 if (!String(updateManifest.buildUrl || '').startsWith('https://github.com/GBrum0o0/BRUMCLASSICS/')) throw new Error('URL do build pessoal inválida.');
 if (publishedUpdateManifest.version !== updateManifest.version || publishedUpdateManifest.build !== updateManifest.build || publishedUpdateManifest.buildUrl !== updateManifest.buildUrl) throw new Error('Manifesto público de atualização diverge do pacote iOS.');

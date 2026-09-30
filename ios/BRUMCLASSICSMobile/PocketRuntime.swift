@@ -7,14 +7,15 @@ struct PocketPlaySession: Codable, Equatable {
     let filename: String
     let launchedAt: Date
     var backgroundedAt: Date?
+    var integrated: Bool?
 }
 
 enum PocketSessionRules {
     static let maximumDuration = 24 * 60 * 60
 
     static func elapsed(_ session: PocketPlaySession, returnedAt: Date) -> Int? {
-        guard let backgroundedAt = session.backgroundedAt else { return nil }
-        let seconds = Int(returnedAt.timeIntervalSince(backgroundedAt).rounded(.down))
+        guard let startedAt = session.integrated == true ? session.launchedAt : session.backgroundedAt else { return nil }
+        let seconds = Int(returnedAt.timeIntervalSince(startedAt).rounded(.down))
         guard seconds > 0, seconds <= maximumDuration else { return nil }
         return seconds
     }
@@ -29,8 +30,8 @@ actor PocketPlaySessionFiles {
         file = directory.appendingPathComponent("active-play-session.json")
     }
 
-    func begin(_ game: PocketClassic, now: Date = Date()) throws {
-        let session = PocketPlaySession(gameID: game.id, filename: game.filename, launchedAt: now, backgroundedAt: nil)
+    func begin(_ game: PocketClassic, integrated: Bool = false, now: Date = Date()) throws {
+        let session = PocketPlaySession(gameID: game.id, filename: game.filename, launchedAt: now, backgroundedAt: nil, integrated: integrated ? true : nil)
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try JSONEncoder().encode(session).write(to: file, options: [.atomic, .completeFileProtectionUnlessOpen])
     }

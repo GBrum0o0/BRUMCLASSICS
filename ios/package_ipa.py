@@ -29,7 +29,7 @@ with zipfile.ZipFile(ipa, "w", zipfile.ZIP_DEFLATED) as archive:
         entry = zipfile.ZipInfo(f"Payload/{app.name}/{relative}")
         entry.create_system = 3
         entry.compress_type = zipfile.ZIP_DEFLATED
-        permissions = 0o755 if relative == executable else 0o644
+        permissions = 0o755 if relative == executable or relative.endswith(".dylib") else 0o644
         entry.external_attr = (stat.S_IFREG | permissions) << 16
         archive.writestr(entry, file.read_bytes())
 result = validate_ipa(ipa, version)

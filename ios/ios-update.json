@@ -1,9 +1,14 @@
 {
-  "version": "0.12.1",
-  "build": 24,
+  "version": "0.13.0",
+  "build": 25,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.12.1",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.13.0",
   "notes": [
+    "GB, GBC e GBA agora abrem dentro do BRUMCLASSICS pelo BRUM Core.",
+    "Esses sistemas não precisam mais importar a ROM para o RetroArch.",
+    "O núcleo mGBA vem incluído no IPA com controles virtuais, controle Bluetooth, áudio, vídeo e saves locais.",
+    "A ROM original permanece intacta na pasta autorizada; a preparação para jogar é automática.",
+    "Outros sistemas continuam usando o RetroArch como fallback enquanto recebem suporte integrado.",
     "A barra inferior agora respeita a área segura e não deixa conteúdo vazar por baixo.",
     "Estatísticas e Companion voltaram ao menu; Perfil e configurações ficam dentro da tela Início.",
     "B-CARD e CLASSICS Everywhere saíram da Início e continuam acessíveis pelo Perfil.",

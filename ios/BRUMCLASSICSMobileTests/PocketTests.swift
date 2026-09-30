@@ -117,6 +117,12 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(ROMTitleRules.clean("1636 - Pokemon Fire Red (U)(Squirrels).gba"), "Pokemon Fire Red")
         XCTAssertEqual(ROMTitleRules.clean("Pokemon_FireRed_Version.gba"), "Pokemon Fire Red")
     }
+    func testIntegratedCoreSupportsOnlyFirstValidatedSystems() {
+        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Pokemon.gba", filename: "Pokemon.gba", title: "Pokemon", fileSize: 1)))
+        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Tetris.gb", filename: "Tetris.gb", title: "Tetris", fileSize: 1)))
+        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Zelda.gbc", filename: "Zelda.gbc", title: "Zelda", fileSize: 1)))
+        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "Mario.sfc", filename: "Mario.sfc", title: "Mario", fileSize: 1)))
+    }
     func testROMArtworkMatchesSceneNameWithinPlatformAndKeepsOtherGamesOut() {
         let paths = ["Named_Boxarts/Pokemon - FireRed Version (USA, Europe).png", "Named_Boxarts/Pokemon - LeafGreen Version (USA).png", "Named_Snaps/Pokemon - FireRed Version (USA, Europe).png"]
         XCTAssertEqual(ROMArtworkRules.match(filename: "1636 - Pokemon Fire Red (U)(Squirrels).gba", paths: paths), paths[0])

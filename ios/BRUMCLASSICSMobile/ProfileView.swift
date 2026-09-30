@@ -73,7 +73,7 @@ struct MobileSettingsView: View {
                     .accessibilityIdentifier("choose-rom-folder")
                 Button("VERIFICAR PASTA AGORA") { Task { await pocket.refreshROMFolder() } }
                     .disabled(!pocket.romFolderConfigured)
-                Text("Escolha Downloads, iCloud Drive ou outra pasta disponível no app Arquivos. O BRUMCLASSICS apenas lê essa origem. No primeiro uso de cada ROM, o compartilhamento autorizado permite que o RetroArch importe sua própria cópia; depois, os próximos toques abrem o jogo diretamente.").font(.caption).foregroundStyle(BrumTheme.muted)
+                Text("Escolha Downloads, iCloud Drive ou outra pasta disponível no app Arquivos. GB, GBC e GBA abrem diretamente no BRUM Core, sem importação. Sistemas ainda não integrados continuam usando o RetroArch como compatibilidade.").font(.caption).foregroundStyle(BrumTheme.muted)
                 if !pocket.romFolderStatus.isEmpty { Text(pocket.romFolderStatus).font(.caption).foregroundStyle(BrumTheme.muted) }
                 NavigationLink("RetroArch e RetroAchievements") { PocketSetupView() }
             }

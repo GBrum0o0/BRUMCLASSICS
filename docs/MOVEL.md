@@ -29,9 +29,9 @@ Anotações e Quero jogar editados offline entram em uma fila. Ao retornar à re
 
 O botão circular **JOGAR**, no centro da navegação inferior, abre uma tela simples em orientação horizontal. Durante o Gaming Mode, a navegação inferior fica oculta e um botão **Sair** retorna à interface normal. A lista mostra somente o que pode ser usado naquele momento:
 
-- **No celular:** todos os arquivos de jogo reconhecidos na pasta de ROMs escolhida pelo usuário;
+- **No celular:** todos os arquivos de jogo reconhecidos na pasta de ROMs escolhida pelo usuário; GB, GBC e GBA abrem diretamente pelo BRUM Core, sem importação;
 - **Instalados no computador:** somente jogos cujo estado instalado foi confirmado pelo launcher;
-- CLASSICS locais abrem pelo fluxo configurado do RetroArch;
+- sistemas ainda não integrados abrem pelo fluxo configurado do RetroArch como fallback;
 - jogos do PC usam a solicitação autenticada do B-CARD e informam quando o computador está offline.
 
 Jogos apenas preservados no cache, mas que não estejam instalados, não aparecem no Gaming Mode. A versão atual consegue iniciar o jogo no PC, mas ainda não transmite vídeo, áudio ou controles pela internet.

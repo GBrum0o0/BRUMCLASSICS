@@ -13,6 +13,15 @@ O pacote completo inclui a distribuição oficial RetroArch 1.22.2 para Windows 
 
 Os arquivos de licença e avisos que acompanham a distribuição original são preservados dentro da pasta `RetroArch-Win64`.
 
+## mGBA integrado no iOS
+
+O aplicativo iOS compila e empacota o core Libretro mGBA para executar jogos Game Boy, Game Boy Color e Game Boy Advance diretamente no Gaming Mode. mGBA é distribuído sob a Mozilla Public License 2.0. O build é reproduzível e usa o commit `7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6` do repositório oficial.
+
+- Código-fonte: https://github.com/libretro/mgba/tree/7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6
+- Projeto principal: https://github.com/mgba-emu/mgba
+- Licença MPL 2.0: https://github.com/mgba-emu/mgba/blob/master/LICENSE
+- API Libretro: https://github.com/libretro/libretro-common/blob/master/include/libretro.h
+
 ## Electron, Node.js, Three.js e bibliotecas JavaScript
 
 O executável contém runtimes e dependências de terceiros com licenças próprias. Avisos e licenças empacotados com essas dependências permanecem aplicáveis.

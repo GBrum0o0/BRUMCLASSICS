@@ -131,6 +131,11 @@ actor ROMFolderAccess {
             .appendingPathComponent("RetroArchExports", isDirectory: true)
     }
 
+    private var integratedRoot: URL {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("IntegratedPlay", isDirectory: true)
+    }
+
     var configured: Bool { UserDefaults.standard.data(forKey: bookmarkKey) != nil }
     var displayName: String { UserDefaults.standard.string(forKey: nameKey) ?? "Downloads" }
 
@@ -203,16 +208,45 @@ actor ROMFolderAccess {
         return ticket
     }
 
+    func stageForIntegratedPlay(_ game: ROMFolderGame) throws -> URL {
+        guard let bookmark = UserDefaults.standard.data(forKey: bookmarkKey) else {
+            throw PocketError.message("Selecione novamente a pasta de ROMs.")
+        }
+        var stale = false
+        let root = try URL(resolvingBookmarkData: bookmark, options: [], relativeTo: nil, bookmarkDataIsStale: &stale).standardizedFileURL
+        let accessing = root.startAccessingSecurityScopedResource()
+        defer { if accessing { root.stopAccessingSecurityScopedResource() } }
+        let source = root.appendingPathComponent(game.relativePath).standardizedFileURL
+        let prefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
+        guard source.path.hasPrefix(prefix), source.lastPathComponent == game.filename else {
+            throw PocketError.message("O caminho da ROM não pertence mais à pasta autorizada.")
+        }
+        let values = try source.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+        guard values.isRegularFile == true, values.isSymbolicLink != true, (values.fileSize ?? 0) > 0 else {
+            throw PocketError.message("A ROM não está mais disponível na pasta escolhida.")
+        }
+        try removeExpiredFiles(in: integratedRoot)
+        do {
+            return try ROMExportStager.stage(source: source, filename: game.filename, root: integratedRoot, id: UUID())
+        } catch {
+            throw PocketError.message("Não foi possível preparar o jogo para o BRUM Core. Se ele estiver no iCloud, baixe o arquivo no iPhone e tente novamente.")
+        }
+    }
+
     func finishShare(_ id: UUID) {
         guard let share = activeShares.removeValue(forKey: id) else { return }
         if share.accessing { share.root.stopAccessingSecurityScopedResource() }
     }
 
     private func removeExpiredExports(now: Date = Date()) throws {
+        try removeExpiredFiles(in: exportRoot, now: now)
+    }
+
+    private func removeExpiredFiles(in directory: URL, now: Date = Date()) throws {
         let manager = FileManager.default
-        try manager.createDirectory(at: exportRoot, withIntermediateDirectories: true)
+        try manager.createDirectory(at: directory, withIntermediateDirectories: true)
         let children = try manager.contentsOfDirectory(
-            at: exportRoot,
+            at: directory,
             includingPropertiesForKeys: [.contentModificationDateKey],
             options: [.skipsHiddenFiles]
         )

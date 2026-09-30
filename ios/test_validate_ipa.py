@@ -9,7 +9,7 @@ from validate_ipa import validate_ipa
 
 class PackageValidationTests(unittest.TestCase):
     def fixture(self, folder, *, executable="BRUMCLASSICSMobile", include_binary=True,
-                app="BRUMCLASSICSMobile", cpu=0x0100000C, executable_mode=True):
+                app="BRUMCLASSICSMobile", cpu=0x0100000C, executable_mode=True, include_core=True):
         path = Path(folder) / "test.ipa"
         root = f"Payload/{app}.app/"
         info = {"CFBundleIdentifier": "com.brumclassics.mobile.ios",
@@ -24,6 +24,11 @@ class PackageValidationTests(unittest.TestCase):
                 entry.create_system = 3
                 entry.external_attr = (stat.S_IFREG | (0o755 if executable_mode else 0o644)) << 16
                 archive.writestr(entry, struct.pack("<IIIIIIII", 0xFEEDFACF, cpu, 0, 2, 0, 0, 0, 0))
+            if include_core:
+                core = zipfile.ZipInfo(root + "Frameworks/mgba_libretro_ios.dylib")
+                core.create_system = 3
+                core.external_attr = (stat.S_IFREG | 0o755) << 16
+                archive.writestr(core, struct.pack("<IIIIIIII", 0xFEEDFACF, 0x0100000C, 0, 6, 0, 0, 0, 0))
         return path
 
     def test_valid_package(self):
@@ -59,6 +64,11 @@ class PackageValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             with self.assertRaisesRegex(ValueError, "permission"):
                 validate_ipa(self.fixture(folder, executable_mode=False))
+
+    def test_rejects_missing_integrated_core(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaisesRegex(ValueError, "mGBA core is absent"):
+                validate_ipa(self.fixture(folder, include_core=False))
 
 if __name__ == "__main__":
     unittest.main()

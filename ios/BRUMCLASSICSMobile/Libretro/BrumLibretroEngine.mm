@@ -1,0 +1,563 @@
+#import "BrumLibretroEngine.h"
+#import "BrumLibretroAPI.h"
+
+#import <AudioToolbox/AudioToolbox.h>
+#import <GameController/GameController.h>
+#import <QuartzCore/QuartzCore.h>
+#import <dlfcn.h>
+#import <math.h>
+#import <os/lock.h>
+#import <stdlib.h>
+#import <string.h>
+
+static NSString *const BrumLibretroErrorDomain = @"com.brumclassics.mobile.ios.libretro";
+static const void *BrumHardwareFrameBuffer = (const void *)(intptr_t)-1;
+
+typedef unsigned (*retro_api_version_fn)(void);
+typedef void (*retro_init_fn)(void);
+typedef void (*retro_deinit_fn)(void);
+typedef void (*retro_set_environment_fn)(brum_retro_environment_t);
+typedef void (*retro_set_video_refresh_fn)(brum_retro_video_refresh_t);
+typedef void (*retro_set_audio_sample_fn)(brum_retro_audio_sample_t);
+typedef void (*retro_set_audio_sample_batch_fn)(brum_retro_audio_sample_batch_t);
+typedef void (*retro_set_input_poll_fn)(brum_retro_input_poll_t);
+typedef void (*retro_set_input_state_fn)(brum_retro_input_state_t);
+typedef void (*retro_get_system_info_fn)(brum_retro_system_info *);
+typedef void (*retro_get_system_av_info_fn)(brum_retro_system_av_info *);
+typedef bool (*retro_load_game_fn)(const brum_retro_game_info *);
+typedef void (*retro_unload_game_fn)(void);
+typedef void (*retro_run_fn)(void);
+typedef void (*retro_set_controller_port_device_fn)(unsigned, unsigned);
+typedef void *(*retro_get_memory_data_fn)(unsigned);
+typedef size_t (*retro_get_memory_size_fn)(unsigned);
+
+typedef struct {
+    retro_api_version_fn apiVersion;
+    retro_init_fn initialize;
+    retro_deinit_fn deinitialize;
+    retro_set_environment_fn setEnvironment;
+    retro_set_video_refresh_fn setVideo;
+    retro_set_audio_sample_fn setAudio;
+    retro_set_audio_sample_batch_fn setAudioBatch;
+    retro_set_input_poll_fn setInputPoll;
+    retro_set_input_state_fn setInputState;
+    retro_get_system_info_fn getSystemInfo;
+    retro_get_system_av_info_fn getAVInfo;
+    retro_load_game_fn loadGame;
+    retro_unload_game_fn unloadGame;
+    retro_run_fn run;
+    retro_set_controller_port_device_fn setController;
+    retro_get_memory_data_fn getMemoryData;
+    retro_get_memory_size_fn getMemorySize;
+} BrumRetroFunctions;
+
+@class BrumLibretroViewController;
+static __weak BrumLibretroViewController *BrumCurrentHost;
+
+@interface BrumLibretroViewController () {
+@public
+    void *_coreHandle;
+    BrumRetroFunctions _core;
+    BOOL _coreInitialized;
+    BOOL _gameLoaded;
+    BOOL _stopped;
+    unsigned _pixelFormat;
+    uint32_t _inputMask;
+    CADisplayLink *_displayLink;
+    UIImageView *_screen;
+    UILabel *_statusLabel;
+    NSURL *_romURL;
+    NSData *_romData;
+    NSString *_gameTitle;
+    NSString *_systemDirectory;
+    NSString *_saveDirectory;
+    NSString *_savePath;
+    NSMutableDictionary<NSString *, NSString *> *_variables;
+    BrumEmulatorExitHandler _onExit;
+    NSError *_startupError;
+    AudioQueueRef _audioQueue;
+    int16_t *_audioRing;
+    size_t _audioCapacity;
+    size_t _audioRead;
+    size_t _audioWrite;
+    size_t _audioCount;
+    os_unfair_lock _audioLock;
+}
+
+- (void)closeEmulator;
+- (void)stopCore;
+- (void)persistSaveRAM;
+@end
+
+static void *BrumLoadSymbol(void *handle, const char *name) {
+    dlerror();
+    return dlsym(handle, name);
+}
+
+static bool BrumEnvironment(unsigned command, void *data) {
+    BrumLibretroViewController *host = BrumCurrentHost;
+    if (!host) return false;
+    switch (command) {
+        case BRUM_RETRO_ENVIRONMENT_GET_CAN_DUPE:
+            *(bool *)data = true;
+            return true;
+        case BRUM_RETRO_ENVIRONMENT_SET_PIXEL_FORMAT: {
+            unsigned format = *(unsigned *)data;
+            if (format > BRUM_RETRO_PIXEL_FORMAT_RGB565) return false;
+            host->_pixelFormat = format;
+            return true;
+        }
+        case BRUM_RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY:
+            *(const char **)data = host->_systemDirectory.fileSystemRepresentation;
+            return true;
+        case BRUM_RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY:
+        case BRUM_RETRO_ENVIRONMENT_GET_CORE_ASSETS_DIRECTORY:
+            *(const char **)data = host->_saveDirectory.fileSystemRepresentation;
+            return true;
+        case BRUM_RETRO_ENVIRONMENT_GET_LANGUAGE:
+            *(unsigned *)data = 9; // Portuguese (Brazil)
+            return true;
+        case BRUM_RETRO_ENVIRONMENT_SET_VARIABLES: {
+            const brum_retro_variable *variable = (const brum_retro_variable *)data;
+            while (variable && variable->key) {
+                NSString *key = [NSString stringWithUTF8String:variable->key];
+                NSString *definition = variable->value ? [NSString stringWithUTF8String:variable->value] : @"";
+                NSString *choices = [[definition componentsSeparatedByString:@"; "] lastObject] ?: @"";
+                NSString *value = [[choices componentsSeparatedByString:@"|"] firstObject] ?: @"";
+                if (key.length && value.length) host->_variables[key] = value;
+                variable++;
+            }
+            return true;
+        }
+        case BRUM_RETRO_ENVIRONMENT_GET_VARIABLE: {
+            brum_retro_variable *variable = (brum_retro_variable *)data;
+            if (!variable || !variable->key) return false;
+            NSString *key = [NSString stringWithUTF8String:variable->key];
+            variable->value = [host->_variables[key] UTF8String];
+            return variable->value != NULL;
+        }
+        case BRUM_RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE:
+            *(bool *)data = false;
+            return true;
+        case BRUM_RETRO_ENVIRONMENT_SET_MESSAGE: {
+            const brum_retro_message *message = (const brum_retro_message *)data;
+            if (message && message->msg) {
+                NSString *text = [NSString stringWithUTF8String:message->msg];
+                dispatch_async(dispatch_get_main_queue(), ^{ host->_statusLabel.text = text; });
+            }
+            return true;
+        }
+        case BRUM_RETRO_ENVIRONMENT_SHUTDOWN:
+            dispatch_async(dispatch_get_main_queue(), ^{ [host closeEmulator]; });
+            return true;
+        case BRUM_RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL:
+        case BRUM_RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS:
+        case BRUM_RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static void BrumVideo(const void *data, unsigned width, unsigned height, size_t pitch) {
+    BrumLibretroViewController *host = BrumCurrentHost;
+    if (!host || !data || data == BrumHardwareFrameBuffer || !width || !height) return;
+    NSMutableData *pixels = [NSMutableData dataWithLength:(NSUInteger)width * height * 4];
+    uint32_t *target = (uint32_t *)pixels.mutableBytes;
+    for (unsigned y = 0; y < height; y++) {
+        if (host->_pixelFormat == BRUM_RETRO_PIXEL_FORMAT_XRGB8888) {
+            const uint32_t *source = (const uint32_t *)((const uint8_t *)data + y * pitch);
+            memcpy(target + (size_t)y * width, source, (size_t)width * 4);
+        } else {
+            const uint16_t *source = (const uint16_t *)((const uint8_t *)data + y * pitch);
+            for (unsigned x = 0; x < width; x++) {
+                uint16_t value = source[x];
+                unsigned red, green, blue;
+                if (host->_pixelFormat == BRUM_RETRO_PIXEL_FORMAT_RGB565) {
+                    red = ((value >> 11) & 31) * 255 / 31;
+                    green = ((value >> 5) & 63) * 255 / 63;
+                    blue = (value & 31) * 255 / 31;
+                } else {
+                    red = ((value >> 10) & 31) * 255 / 31;
+                    green = ((value >> 5) & 31) * 255 / 31;
+                    blue = (value & 31) * 255 / 31;
+                }
+                target[(size_t)y * width + x] = (red << 16) | (green << 8) | blue;
+            }
+        }
+    }
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    CGDataProviderRef provider = CGDataProviderCreateWithCFData((__bridge CFDataRef)pixels);
+    CGBitmapInfo bitmap = kCGBitmapByteOrder32Little | kCGImageAlphaNoneSkipFirst;
+    CGImageRef image = CGImageCreate(width, height, 8, 32, (size_t)width * 4, colorSpace, bitmap, provider, NULL, false, kCGRenderingIntentDefault);
+    if (image) {
+        host->_screen.layer.contents = (__bridge id)image;
+        host->_screen.layer.contentsGravity = kCAGravityResizeAspect;
+        CGImageRelease(image);
+    }
+    CGDataProviderRelease(provider);
+    CGColorSpaceRelease(colorSpace);
+}
+
+static void BrumPushAudio(const int16_t *data, size_t frames) {
+    BrumLibretroViewController *host = BrumCurrentHost;
+    if (!host || !host->_audioRing || !data || !frames) return;
+    os_unfair_lock_lock(&host->_audioLock);
+    const size_t samples = frames * 2;
+    for (size_t index = 0; index < samples; index++) {
+        if (host->_audioCount == host->_audioCapacity) {
+            host->_audioRead = (host->_audioRead + 1) % host->_audioCapacity;
+            host->_audioCount--;
+        }
+        host->_audioRing[host->_audioWrite] = data[index];
+        host->_audioWrite = (host->_audioWrite + 1) % host->_audioCapacity;
+        host->_audioCount++;
+    }
+    os_unfair_lock_unlock(&host->_audioLock);
+}
+
+static void BrumAudioSample(int16_t left, int16_t right) {
+    int16_t pair[2] = { left, right };
+    BrumPushAudio(pair, 1);
+}
+
+static size_t BrumAudioBatch(const int16_t *data, size_t frames) {
+    BrumPushAudio(data, frames);
+    return frames;
+}
+
+static void BrumInputPoll(void) {}
+
+static int16_t BrumInputState(unsigned port, unsigned device, unsigned index, unsigned identifier) {
+    BrumLibretroViewController *host = BrumCurrentHost;
+    if (!host || port != 0 || device != BRUM_RETRO_DEVICE_JOYPAD || index != 0 || identifier > 15) return 0;
+    BOOL pressed = (host->_inputMask & (1u << identifier)) != 0;
+    GCExtendedGamepad *gamepad = GCController.controllers.firstObject.extendedGamepad;
+    if (gamepad) {
+        switch (identifier) {
+            case BRUM_RETRO_DEVICE_ID_JOYPAD_UP: pressed |= gamepad.dpad.up.isPressed; break;
+            case BRUM_RETRO_DEVICE_ID_JOYPAD_DOWN: pressed |= gamepad.dpad.down.isPressed; break;
+            case BRUM_RETRO_DEVICE_ID_JOYPAD_LEFT: pressed |= gamepad.dpad.left.isPressed; break;
+            case BRUM_RETRO_DEVICE_ID_JOYPAD_RIGHT: pressed |= gamepad.dpad.right.isPressed; break;
+            case BRUM_RETRO_DEVICE_ID_JOYPAD_A: pressed |= gamepad.buttonA.isPressed; break;
+            case BRUM_RETRO_DEVICE_ID_JOYPAD_B: pressed |= gamepad.buttonB.isPressed; break;
+            case BRUM_RETRO_DEVICE_ID_JOYPAD_START: pressed |= gamepad.buttonMenu.isPressed; break;
+            case BRUM_RETRO_DEVICE_ID_JOYPAD_SELECT:
+                if (@available(iOS 13.0, *)) pressed |= gamepad.buttonOptions.isPressed;
+                break;
+            default: break;
+        }
+    }
+    return pressed ? 1 : 0;
+}
+
+static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueBufferRef buffer) {
+    BrumLibretroViewController *host = (__bridge BrumLibretroViewController *)context;
+    const size_t requested = buffer->mAudioDataBytesCapacity / sizeof(int16_t);
+    int16_t *output = (int16_t *)buffer->mAudioData;
+    os_unfair_lock_lock(&host->_audioLock);
+    size_t written = 0;
+    while (written < requested && host->_audioCount) {
+        output[written++] = host->_audioRing[host->_audioRead];
+        host->_audioRead = (host->_audioRead + 1) % host->_audioCapacity;
+        host->_audioCount--;
+    }
+    os_unfair_lock_unlock(&host->_audioLock);
+    if (written < requested) memset(output + written, 0, (requested - written) * sizeof(int16_t));
+    buffer->mAudioDataByteSize = (UInt32)(requested * sizeof(int16_t));
+    AudioQueueEnqueueBuffer(queue, buffer, 0, NULL);
+}
+
+@implementation BrumLibretroViewController
+
+- (instancetype)initWithROMURL:(NSURL *)romURL title:(NSString *)title onExit:(BrumEmulatorExitHandler)onExit {
+    self = [super initWithNibName:nil bundle:nil];
+    if (!self) return nil;
+    _romURL = romURL;
+    _gameTitle = [title copy];
+    _onExit = [onExit copy];
+    _variables = [NSMutableDictionary dictionary];
+    _pixelFormat = BRUM_RETRO_PIXEL_FORMAT_0RGB1555;
+    _audioLock = OS_UNFAIR_LOCK_INIT;
+    _audioCapacity = 262144;
+    _audioRing = (int16_t *)calloc(_audioCapacity, sizeof(int16_t));
+    NSError *startupError = nil;
+    if (![self prepareDirectories:&startupError] || ![self loadCore:&startupError]) _startupError = startupError;
+    return self;
+}
+
+- (BOOL)prepareDirectories:(NSError **)error {
+    NSURL *support = [[NSFileManager defaultManager] URLForDirectory:NSApplicationSupportDirectory inDomain:NSUserDomainMask appropriateForURL:nil create:YES error:error];
+    if (!support) return NO;
+    NSURL *root = [support URLByAppendingPathComponent:@"IntegratedEmulator" isDirectory:YES];
+    NSURL *system = [root URLByAppendingPathComponent:@"System" isDirectory:YES];
+    NSURL *saves = [root URLByAppendingPathComponent:@"Saves" isDirectory:YES];
+    if (![[NSFileManager defaultManager] createDirectoryAtURL:system withIntermediateDirectories:YES attributes:nil error:error]) return NO;
+    if (![[NSFileManager defaultManager] createDirectoryAtURL:saves withIntermediateDirectories:YES attributes:nil error:error]) return NO;
+    _systemDirectory = system.path;
+    _saveDirectory = saves.path;
+    NSString *saveName = [[_romURL.lastPathComponent stringByDeletingPathExtension] stringByAppendingPathExtension:@"srm"];
+    _savePath = [[saves URLByAppendingPathComponent:saveName] path];
+    return YES;
+}
+
+- (BOOL)loadCore:(NSError **)error {
+    NSString *frameworks = NSBundle.mainBundle.privateFrameworksPath ?: NSBundle.mainBundle.bundlePath;
+    NSString *path = [frameworks stringByAppendingPathComponent:@"mgba_libretro_ios.dylib"];
+    _coreHandle = dlopen(path.fileSystemRepresentation, RTLD_NOW | RTLD_LOCAL);
+    if (!_coreHandle) {
+        if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:1 userInfo:@{NSLocalizedDescriptionKey: @"O núcleo interno mGBA não está presente neste IPA."}];
+        return NO;
+    }
+#define BRUM_LOAD(field, symbol) do { _core.field = (decltype(_core.field))BrumLoadSymbol(_coreHandle, symbol); if (!_core.field) { if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:2 userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Núcleo inválido: falta %s.", symbol]}]; return NO; } } while (0)
+    BRUM_LOAD(apiVersion, "retro_api_version");
+    BRUM_LOAD(initialize, "retro_init");
+    BRUM_LOAD(deinitialize, "retro_deinit");
+    BRUM_LOAD(setEnvironment, "retro_set_environment");
+    BRUM_LOAD(setVideo, "retro_set_video_refresh");
+    BRUM_LOAD(setAudio, "retro_set_audio_sample");
+    BRUM_LOAD(setAudioBatch, "retro_set_audio_sample_batch");
+    BRUM_LOAD(setInputPoll, "retro_set_input_poll");
+    BRUM_LOAD(setInputState, "retro_set_input_state");
+    BRUM_LOAD(getSystemInfo, "retro_get_system_info");
+    BRUM_LOAD(getAVInfo, "retro_get_system_av_info");
+    BRUM_LOAD(loadGame, "retro_load_game");
+    BRUM_LOAD(unloadGame, "retro_unload_game");
+    BRUM_LOAD(run, "retro_run");
+    BRUM_LOAD(setController, "retro_set_controller_port_device");
+    BRUM_LOAD(getMemoryData, "retro_get_memory_data");
+    BRUM_LOAD(getMemorySize, "retro_get_memory_size");
+#undef BRUM_LOAD
+    if (_core.apiVersion() != BRUM_RETRO_API_VERSION) {
+        if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:3 userInfo:@{NSLocalizedDescriptionKey: @"A versão do núcleo não é compatível com este aplicativo."}];
+        return NO;
+    }
+    return YES;
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = UIColor.blackColor;
+    [self buildInterface];
+    if (_startupError) {
+        _statusLabel.text = _startupError.localizedDescription;
+        _statusLabel.textColor = UIColor.systemRedColor;
+        return;
+    }
+    NSError *error = nil;
+    if (![self startCore:&error]) {
+        _statusLabel.text = error.localizedDescription ?: @"Não foi possível iniciar o jogo.";
+        _statusLabel.textColor = UIColor.systemRedColor;
+    } else {
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(applicationWillResignActive:)
+                                                     name:UIApplicationWillResignActiveNotification
+                                                   object:nil];
+    }
+}
+
+- (void)applicationWillResignActive:(NSNotification *)notification {
+    (void)notification;
+    [self persistSaveRAM];
+}
+
+- (void)buildInterface {
+    _screen = [[UIImageView alloc] init];
+    _screen.translatesAutoresizingMaskIntoConstraints = NO;
+    _screen.backgroundColor = [UIColor colorWithWhite:0.02 alpha:1];
+    _screen.layer.magnificationFilter = kCAFilterNearest;
+    [self.view addSubview:_screen];
+
+    UILabel *title = [[UILabel alloc] init];
+    title.translatesAutoresizingMaskIntoConstraints = NO;
+    title.text = _gameTitle;
+    title.textColor = UIColor.whiteColor;
+    title.font = [UIFont systemFontOfSize:14 weight:UIFontWeightBold];
+    [self.view addSubview:title];
+
+    UIButton *close = [self controlButton:@"←  SAIR" identifier:-1];
+    [close addTarget:self action:@selector(closeEmulator) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:close];
+
+    _statusLabel = [[UILabel alloc] init];
+    _statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    _statusLabel.text = @"BRUM CORE · mGBA";
+    _statusLabel.textColor = [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:1];
+    _statusLabel.font = [UIFont monospacedSystemFontOfSize:10 weight:UIFontWeightBold];
+    [self.view addSubview:_statusLabel];
+
+    UIStackView *up = [self directionPad];
+    UIStackView *actions = [self actionPad];
+    UIStackView *menu = [[UIStackView alloc] initWithArrangedSubviews:@[
+        [self controlButton:@"SELECT" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_SELECT],
+        [self controlButton:@"START" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_START]
+    ]];
+    menu.translatesAutoresizingMaskIntoConstraints = NO;
+    menu.axis = UILayoutConstraintAxisHorizontal;
+    menu.spacing = 10;
+    [self.view addSubview:up]; [self.view addSubview:actions]; [self.view addSubview:menu];
+
+    UILayoutGuide *safe = self.view.safeAreaLayoutGuide;
+    [NSLayoutConstraint activateConstraints:@[
+        [close.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:16],
+        [close.topAnchor constraintEqualToAnchor:safe.topAnchor constant:10],
+        [close.widthAnchor constraintEqualToConstant:92], [close.heightAnchor constraintEqualToConstant:38],
+        [title.centerXAnchor constraintEqualToAnchor:safe.centerXAnchor], [title.centerYAnchor constraintEqualToAnchor:close.centerYAnchor],
+        [_statusLabel.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-16], [_statusLabel.centerYAnchor constraintEqualToAnchor:close.centerYAnchor],
+        [_screen.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:16], [_screen.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-16],
+        [_screen.topAnchor constraintEqualToAnchor:close.bottomAnchor constant:8], [_screen.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-12],
+        [up.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:26], [up.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-24],
+        [actions.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-30], [actions.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-36],
+        [menu.centerXAnchor constraintEqualToAnchor:safe.centerXAnchor], [menu.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-16]
+    ]];
+  }
+
+- (UIButton *)controlButton:(NSString *)text identifier:(NSInteger)identifier {
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
+    button.translatesAutoresizingMaskIntoConstraints = NO;
+    button.tag = identifier;
+    [button setTitle:text forState:UIControlStateNormal];
+    [button setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+    button.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightBlack];
+    button.backgroundColor = [UIColor colorWithWhite:0.1 alpha:0.82];
+    button.layer.cornerRadius = 18;
+    button.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.16].CGColor;
+    button.layer.borderWidth = 1;
+    if (identifier >= 0) {
+        [button addTarget:self action:@selector(inputDown:) forControlEvents:UIControlEventTouchDown];
+        [button addTarget:self action:@selector(inputUp:) forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside | UIControlEventTouchCancel];
+    }
+    [button.widthAnchor constraintGreaterThanOrEqualToConstant:54].active = YES;
+    [button.heightAnchor constraintEqualToConstant:44].active = YES;
+    return button;
+}
+
+- (UIStackView *)directionPad {
+    UIButton *up = [self controlButton:@"▲" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_UP];
+    UIButton *down = [self controlButton:@"▼" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_DOWN];
+    UIButton *left = [self controlButton:@"◀" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_LEFT];
+    UIButton *right = [self controlButton:@"▶" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_RIGHT];
+    UIView *blank1 = [[UIView alloc] init]; UIView *blank2 = [[UIView alloc] init]; UIView *blank3 = [[UIView alloc] init]; UIView *blank4 = [[UIView alloc] init]; UIView *center = [[UIView alloc] init];
+    UIStackView *top = [[UIStackView alloc] initWithArrangedSubviews:@[blank1, up, blank2]];
+    UIStackView *middle = [[UIStackView alloc] initWithArrangedSubviews:@[left, center, right]];
+    UIStackView *bottom = [[UIStackView alloc] initWithArrangedSubviews:@[blank3, down, blank4]];
+    for (UIStackView *row in @[top, middle, bottom]) { row.axis = UILayoutConstraintAxisHorizontal; row.distribution = UIStackViewDistributionFillEqually; }
+    UIStackView *pad = [[UIStackView alloc] initWithArrangedSubviews:@[top, middle, bottom]];
+    pad.translatesAutoresizingMaskIntoConstraints = NO; pad.axis = UILayoutConstraintAxisVertical; pad.distribution = UIStackViewDistributionFillEqually;
+    [pad.widthAnchor constraintEqualToConstant:166].active = YES; [pad.heightAnchor constraintEqualToConstant:132].active = YES;
+    return pad;
+}
+
+- (UIStackView *)actionPad {
+    UIButton *b = [self controlButton:@"B" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_B];
+    UIButton *a = [self controlButton:@"A" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_A];
+    b.layer.cornerRadius = 31; a.layer.cornerRadius = 31;
+    [b.widthAnchor constraintEqualToConstant:62].active = YES; [b.heightAnchor constraintEqualToConstant:62].active = YES;
+    [a.widthAnchor constraintEqualToConstant:62].active = YES; [a.heightAnchor constraintEqualToConstant:62].active = YES;
+    UIStackView *pad = [[UIStackView alloc] initWithArrangedSubviews:@[b, a]];
+    pad.translatesAutoresizingMaskIntoConstraints = NO; pad.axis = UILayoutConstraintAxisHorizontal; pad.spacing = 18;
+    return pad;
+}
+
+- (void)inputDown:(UIButton *)sender { if (sender.tag >= 0) _inputMask |= 1u << sender.tag; }
+- (void)inputUp:(UIButton *)sender { if (sender.tag >= 0) _inputMask &= ~(1u << sender.tag); }
+
+- (BOOL)startCore:(NSError **)error {
+    BrumCurrentHost = self;
+    _core.setEnvironment(BrumEnvironment);
+    _core.setVideo(BrumVideo);
+    _core.setAudio(BrumAudioSample);
+    _core.setAudioBatch(BrumAudioBatch);
+    _core.setInputPoll(BrumInputPoll);
+    _core.setInputState(BrumInputState);
+    _core.initialize();
+    _coreInitialized = YES;
+    _core.setController(0, BRUM_RETRO_DEVICE_JOYPAD);
+
+    brum_retro_system_info systemInfo = {};
+    _core.getSystemInfo(&systemInfo);
+    _romData = [NSData dataWithContentsOfURL:_romURL options:NSDataReadingMappedIfSafe error:error];
+    if (!_romData) return NO;
+    brum_retro_game_info gameInfo = {};
+    gameInfo.path = _romURL.path.fileSystemRepresentation;
+    if (!systemInfo.need_fullpath) { gameInfo.data = _romData.bytes; gameInfo.size = _romData.length; }
+    if (!_core.loadGame(&gameInfo)) {
+        if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:4 userInfo:@{NSLocalizedDescriptionKey: @"O núcleo mGBA recusou este arquivo. Confirme que ele é GB, GBC ou GBA válido."}];
+        return NO;
+    }
+    _gameLoaded = YES;
+    [self restoreSaveRAM];
+    brum_retro_system_av_info avInfo = {};
+    _core.getAVInfo(&avInfo);
+    [self startAudio:avInfo.timing.sample_rate];
+    _displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(runFrame)];
+    if (@available(iOS 15.0, *)) {
+        float fps = (float)MAX(30.0, MIN(120.0, avInfo.timing.fps));
+        _displayLink.preferredFrameRateRange = CAFrameRateRangeMake(fps, fps, fps);
+    } else { _displayLink.preferredFramesPerSecond = (NSInteger)llround(avInfo.timing.fps); }
+    [_displayLink addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
+    return YES;
+}
+
+- (void)startAudio:(double)sampleRate {
+    if (sampleRate <= 0) return;
+    AudioStreamBasicDescription format = {};
+    format.mSampleRate = sampleRate;
+    format.mFormatID = kAudioFormatLinearPCM;
+    format.mFormatFlags = kLinearPCMFormatFlagIsSignedInteger | kLinearPCMFormatFlagIsPacked;
+    format.mBytesPerPacket = 4; format.mFramesPerPacket = 1; format.mBytesPerFrame = 4;
+    format.mChannelsPerFrame = 2; format.mBitsPerChannel = 16;
+    if (AudioQueueNewOutput(&format, BrumAudioQueueOutput, (__bridge void *)self, NULL, NULL, 0, &_audioQueue) != noErr) return;
+    for (NSUInteger index = 0; index < 3; index++) {
+        AudioQueueBufferRef buffer = NULL;
+        if (AudioQueueAllocateBuffer(_audioQueue, 8192, &buffer) == noErr) {
+            memset(buffer->mAudioData, 0, 8192); buffer->mAudioDataByteSize = 8192;
+            AudioQueueEnqueueBuffer(_audioQueue, buffer, 0, NULL);
+        }
+    }
+    AudioQueueStart(_audioQueue, NULL);
+}
+
+- (void)runFrame { if (!_stopped && _gameLoaded) _core.run(); }
+
+- (void)restoreSaveRAM {
+    void *memory = _core.getMemoryData(BRUM_RETRO_MEMORY_SAVE_RAM);
+    size_t size = _core.getMemorySize(BRUM_RETRO_MEMORY_SAVE_RAM);
+    NSData *save = [NSData dataWithContentsOfFile:_savePath];
+    if (memory && size && save.length == size) memcpy(memory, save.bytes, size);
+}
+
+- (void)persistSaveRAM {
+    if (!_gameLoaded) return;
+    void *memory = _core.getMemoryData(BRUM_RETRO_MEMORY_SAVE_RAM);
+    size_t size = _core.getMemorySize(BRUM_RETRO_MEMORY_SAVE_RAM);
+    if (memory && size) [[NSData dataWithBytes:memory length:size] writeToFile:_savePath options:NSDataWritingAtomic error:nil];
+}
+
+- (void)closeEmulator {
+    if (_stopped) return;
+    [self stopCore];
+    if (_onExit) _onExit();
+}
+
+- (void)stopCore {
+    if (_stopped) return;
+    _stopped = YES;
+    [_displayLink invalidate]; _displayLink = nil;
+    if (_audioQueue) { AudioQueueStop(_audioQueue, true); AudioQueueDispose(_audioQueue, true); _audioQueue = NULL; }
+    [self persistSaveRAM];
+    if (_gameLoaded) { _core.unloadGame(); _gameLoaded = NO; }
+    if (_coreInitialized) { _core.deinitialize(); _coreInitialized = NO; }
+    if (BrumCurrentHost == self) BrumCurrentHost = nil;
+}
+
+- (void)viewDidDisappear:(BOOL)animated { [super viewDidDisappear:animated]; [self stopCore]; }
+
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [self stopCore];
+    if (_coreHandle) dlclose(_coreHandle);
+    free(_audioRing);
+}
+
+@end

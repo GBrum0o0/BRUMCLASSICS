@@ -97,7 +97,7 @@ actor PocketRAClient {
         var url = URLComponents(string: "https://retroachievements.org/API/API_GetGameInfoAndUserProgress.php")!
         url.queryItems = [URLQueryItem(name: "y", value: key), URLQueryItem(name: "u", value: username), URLQueryItem(name: "g", value: String(gameID))]
         var request = URLRequest(url: url.url!, timeoutInterval: 20)
-        request.setValue("BRUMCLASSICS-iOS/0.12.1", forHTTPHeaderField: "User-Agent")
+        request.setValue("BRUMCLASSICS-iOS/0.13.0", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200, data.count <= 12 * 1024 * 1024 else { throw PocketError.message("RetroAchievements indisponível ou credencial inválida. Tente mais tarde; o progresso salvo foi mantido.") }
         return try PocketProgress.decode(data, username: username, expectedID: gameID)
@@ -261,6 +261,28 @@ actor PocketRAClient {
     }
     private func normalizedLibraryTitle(_ value: String) -> String {
         RetroArchLibraryRules.normalizedTitle(ROMTitleRules.clean(value))
+    }
+    func prepareIntegratedROM(_ rom: ROMFolderGame, launcher: AppStore) async throws -> URL {
+        guard IntegratedEmulatorSupport.supports(rom) else {
+            throw PocketError.message("Este sistema ainda não possui um núcleo integrado. Use o RetroArch enquanto ampliamos o BRUM Core.")
+        }
+        guard var record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }) else {
+            throw PocketError.message("Atualize a pasta de ROMs novamente antes de jogar.")
+        }
+        if record.launcherGameID.isEmpty, let matched = launcherGame(for: rom, launcher: launcher) {
+            record.launcherGameID = matched.id
+            record.title = matched.title
+            await update(record)
+        }
+        let staged = try await romFolder.stageForIntegratedPlay(rom)
+        do { try await runtime.prepare(record, allGames: games) }
+        catch { runtimeStatus = "A sessão será aberta, mas o contador preciso não pôde ser preparado: \(error.localizedDescription)" }
+        try await playSessions.begin(record, integrated: true)
+        await recordLaunch(record, launcher: launcher)
+        return staged
+    }
+    func finishIntegratedPlay(launcher: AppStore) async {
+        await finishPlaySession(launcher: launcher)
     }
     func launchROM(_ rom: ROMFolderGame, launcher: AppStore) async {
         guard var record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }) else {
@@ -445,16 +467,17 @@ actor PocketRAClient {
 struct ClassicsEverywhereView: View {
     @EnvironmentObject private var pocket: PocketClassicsStore
     @EnvironmentObject private var launcher: AppStore
+    @State private var selectedROM: ROMFolderGame?
     private let columns = [GridItem(.adaptive(minimum: 145), spacing: 16)]
     var body: some View {
         ScrollView { LazyVStack(alignment: .leading, spacing: 20) {
-            PageHeader(kicker: "CLASSICS", title: "CLASSICS Everywhere", subtitle: "Seus clássicos no iPhone · com RetroArch")
+            PageHeader(kicker: "CLASSICS", title: "CLASSICS Everywhere", subtitle: "Seus clássicos no iPhone · BRUM Core + compatibilidade")
             HStack {
                 Button("VERIFICAR \(pocket.romFolderName.uppercased())") { Task { await pocket.refreshROMFolder() } }
                     .buttonStyle(PrimaryButtonStyle())
                     .accessibilityIdentifier("rom-folder-refresh")
             }
-            Text("A biblioteca mostra somente arquivos da pasta autorizada. No primeiro uso, o iOS pede que você entregue a ROM ao RetroArch; depois disso, o jogo abre diretamente pela biblioteca dele. Para trocar a pasta, use Perfil → Configurações do app → CLASSICS.").font(.caption).foregroundStyle(BrumTheme.muted)
+            Text("A biblioteca mostra somente arquivos da pasta autorizada. Jogos GB, GBC e GBA abrem diretamente no BRUM Core, sem importação. Outros sistemas usam o RetroArch enquanto recebem suporte interno. Para trocar a pasta, use Perfil → Configurações do app → CLASSICS.").font(.caption).foregroundStyle(BrumTheme.muted)
             if !pocket.romFolderConfigured {
                 Text("Nenhuma pasta autorizada. Abra Perfil → Configurações do app → CLASSICS e selecione uma pasta de ROMs uma vez.").foregroundStyle(BrumTheme.muted)
             } else if pocket.romFolderGames.isEmpty {
@@ -462,13 +485,14 @@ struct ClassicsEverywhereView: View {
             } else {
                 LazyVGrid(columns: columns, spacing: 22) {
                     ForEach(pocket.romFolderGames) { rom in
-                        ROMFolderGameTile(rom: rom, launcherGame: pocket.launcherGame(for: rom, launcher: launcher), retroArchReady: pocket.isImportedIntoRetroArch(rom)) {
-                            Task { await pocket.launchROM(rom, launcher: launcher) }
+                        ROMFolderGameTile(rom: rom, launcherGame: pocket.launcherGame(for: rom, launcher: launcher), retroArchReady: pocket.isImportedIntoRetroArch(rom), integratedReady: IntegratedEmulatorSupport.supports(rom)) {
+                            if IntegratedEmulatorSupport.supports(rom) { selectedROM = rom }
+                            else { Task { await pocket.launchROM(rom, launcher: launcher) } }
                         }
                     }
                 }
             }
-            if pocket.romFolderGames.contains(where: { !pocket.isImportedIntoRetroArch($0) }) {
+            if pocket.romFolderGames.contains(where: { !IntegratedEmulatorSupport.supports($0) && !pocket.isImportedIntoRetroArch($0) }) {
                 BrumSectionLabel(text: "PRIMEIRA IMPORTAÇÃO")
                 Text("O BRUMCLASSICS envia uma cópia temporária autorizada somente uma vez. Depois que o RetroArch receber o arquivo, o vínculo fica salvo e formatos reconhecidos abrem diretamente pelo cartão. Sua ROM original não é movida.")
                     .font(.caption).foregroundStyle(BrumTheme.muted)
@@ -494,6 +518,7 @@ struct ClassicsEverywhereView: View {
                 Task { await pocket.finishROMShare(ticket, completed: completed, error: error) }
             }
         }
+        .fullScreenCover(item: $selectedROM) { IntegratedEmulatorView(rom: $0) }
     }
 }
 
@@ -501,6 +526,7 @@ struct ROMFolderGameTile: View {
     let rom: ROMFolderGame
     let launcherGame: Game?
     let retroArchReady: Bool
+    let integratedReady: Bool
     let play: () -> Void
     @State private var artwork: ROMArtwork?
     @State private var artworkImage: UIImage?
@@ -521,7 +547,7 @@ struct ROMFolderGameTile: View {
                     Text(displayedTitle).font(.system(size: 15, weight: .bold)).foregroundStyle(BrumTheme.text).lineLimit(2).multilineTextAlignment(.leading)
                 }
             }.buttonStyle(.plain).accessibilityLabel("Jogar \(displayedTitle)")
-            Text(retroArchReady ? "JOGAR · RETROARCH" : "PRIMEIRO USO · IMPORTAR")
+            Text(integratedReady ? "JOGAR · BRUM CORE" : retroArchReady ? "JOGAR · RETROARCH" : "PRIMEIRO USO · IMPORTAR")
                 .font(.system(size: 10, weight: .bold)).foregroundStyle(BrumTheme.primary)
         }.task(id: rom.id + (launcherGame?.artworkPath ?? "")) {
             guard launcherGame?.artworkPath.isEmpty != false else { return }
@@ -562,12 +588,22 @@ struct PocketGameView: View {
     let id: UUID
     @State private var raID = ""
     @State private var linkedID = ""
+    @State private var selectedROM: ROMFolderGame?
     private var game: PocketClassic? { pocket.games.first { $0.id == id } }
+    private var integratedROM: ROMFolderGame? {
+        guard let game else { return nil }
+        return pocket.romFolderGames.first {
+            $0.filename.caseInsensitiveCompare(game.filename) == .orderedSame && IntegratedEmulatorSupport.supports($0)
+        }
+    }
     var body: some View {
         ScrollView { VStack(alignment: .leading, spacing: 18) {
             if let game {
                 Text(game.title).font(.largeTitle.bold())
-                if let playable = pocket.retroArchGames.first(where: { $0.filename.caseInsensitiveCompare(game.filename) == .orderedSame }) {
+                if let integratedROM {
+                    Button("JOGAR NO BRUM CORE") { selectedROM = integratedROM }.buttonStyle(PrimaryButtonStyle())
+                    Text("Este arquivo abre dentro do BRUMCLASSICS, sem importação para outro aplicativo.").font(.caption).foregroundStyle(BrumTheme.muted)
+                } else if let playable = pocket.retroArchGames.first(where: { $0.filename.caseInsensitiveCompare(game.filename) == .orderedSame }) {
                     Button("JOGAR") { Task { await pocket.launchRetroArch(playable, launcher: launcher) } }.buttonStyle(PrimaryButtonStyle())
                     Text("O jogo foi confirmado pela biblioteca real do RetroArch. Um toque abre diretamente este título.").font(.caption).foregroundStyle(BrumTheme.muted)
                 } else {
@@ -576,7 +612,10 @@ struct PocketGameView: View {
                 }
                 BrumSectionLabel(text: "HORAS OFFLINE")
                 Text(pocket.runtimeSummary(id)).font(.subheadline)
-                Text("Depois de jogar, use Close Content no RetroArch e volte aqui. Com a pasta de logs autorizada, usamos o tempo preciso do emulador. Sem ela, registramos como contingência o intervalo em que o RetroArch ficou em primeiro plano.").font(.caption).foregroundStyle(BrumTheme.muted)
+                Text(integratedROM == nil
+                     ? "Depois de jogar, use Close Content no RetroArch e volte aqui. Com a pasta de logs autorizada, usamos o tempo preciso do emulador."
+                     : "No BRUM Core, a sessão é medida diretamente enquanto o jogo permanece aberto e é salva ao sair.")
+                    .font(.caption).foregroundStyle(BrumTheme.muted)
                 Button("ATUALIZAR HORAS E CONQUISTAS") { Task { await pocket.sync(launcher: launcher, force: true) } }.disabled(pocket.busy)
                 if pocket.runtimeRecords.first(where: { $0.id == id })?.counterReset == true {
                     Button("REESTABELECER PONTO DE PARTIDA DO LOG") { Task { await pocket.rebaseline(id) } }
@@ -601,6 +640,7 @@ struct PocketGameView: View {
             }
         }.padding(20) }.background(BrumTheme.background.ignoresSafeArea()).navigationTitle("Jogar no iPhone")
         .onAppear { raID = game?.retroAchievementID ?? ""; linkedID = game?.launcherGameID ?? "" }
+        .fullScreenCover(item: $selectedROM) { IntegratedEmulatorView(rom: $0) }
     }
 }
 
@@ -638,11 +678,12 @@ struct PocketSetupView: View {
     @State private var choosingRuntime = false
     var body: some View {
         Form {
-            Section("1 · Instale o emulador") {
+            Section("1 · Emulação no iPhone") {
+                Text("GB, GBC e GBA já abrem dentro do BRUMCLASSICS pelo BRUM Core. Não é necessário instalar nem importar esses jogos no RetroArch.")
                 Link("Baixar RetroArch compatível · Libretro", destination: URL(string: "https://buildbot.libretro.com/nightly/apple/ios-arm64/RetroArch.ipa")!)
                 Button("Abrir RetroArch") { UIApplication.shared.open(URL(string: "retroarch://start")!) { opened in if !opened { Task { @MainActor in feedback = "RetroArch não encontrado. Instale o IPA compatível indicado acima." } } } }
                 Text("Use a edição compatível indicada acima. A versão estável 1.22.2 da App Store abre o emulador, mas ainda não oferece ao BRUMCLASSICS consulta da biblioteca e abertura de um jogo específico.")
-                Text("O jogo roda no RetroArch, não dentro do BRUMCLASSICS. A ROM precisa existir uma vez no iPhone; somente nomes e capas sincronizados não são arquivos jogáveis.")
+                Text("O RetroArch permanece necessário apenas para os sistemas que o BRUM Core ainda não suporta. A ROM precisa existir no iPhone; nomes e capas sincronizados não são arquivos jogáveis.")
             }
             Section("2 · Tela, volume e controles") {
                 Text("No RetroArch: Settings → Video → Scaling → Aspect Ratio: Core provided. Isso preserva a proporção original. Ajuste Integer Scale se preferir pixels inteiros.")

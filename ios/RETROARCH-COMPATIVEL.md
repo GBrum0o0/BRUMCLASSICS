@@ -1,8 +1,8 @@
 # RetroArch compatível com o BRUMCLASSICS
 
-> Documento atualizado para o BRUMCLASSICS MÓVEL 0.12.1; o fluxo do RetroArch permanece igual ao da versão anterior.
+> Documento atualizado para o BRUMCLASSICS MÓVEL 0.13.0. GB, GBC e GBA usam o BRUM Core; este fluxo permanece como fallback para os demais sistemas.
 
-O BRUMCLASSICS MÓVEL 0.8.1 verifica as ROMs da pasta autorizada. No primeiro uso de cada arquivo, **CLASSICS Everywhere** cria uma cópia temporária legível e abre a folha de compartilhamento. Ao concluir a entrega, grava o vínculo local. Nos próximos toques, formatos reconhecidos abrem diretamente a ROM já copiada em `RetroArch/downloads`, sem importar novamente. O jogo é marcado como recente ao abrir; ao retornar, a sessão é encerrada e pode ser vinculada ao CLASSICS correspondente no launcher 1.55.4. A capa recente vem do PC ou do cache local. A ROM original é preservada.
+No BRUMCLASSICS MÓVEL 0.13.0, GB, GBC e GBA abrem diretamente no **BRUM Core** e não usam este procedimento. Para os demais sistemas, **CLASSICS Everywhere** ainda cria uma cópia temporária legível e abre a folha de compartilhamento no primeiro uso. Ao concluir a entrega, grava o vínculo local. Nos próximos toques, formatos reconhecidos abrem diretamente a ROM já copiada em `RetroArch/downloads`, sem importar novamente. A ROM original é preservada.
 
 ## Versão necessária
 
@@ -24,7 +24,7 @@ O binário local foi testado como ZIP/IPA e contém os marcadores de consulta da
 
 ## Uso
 
-1. Instale o RetroArch no iPhone. A versão da App Store recebe a ROM normalmente; use a edição compatível abaixo se quiser consulta da biblioteca e abertura direta pelo cartão.
+1. Para sistemas diferentes de GB, GBC e GBA, instale o RetroArch no iPhone. A versão da App Store recebe a ROM normalmente; use a edição compatível abaixo se quiser consulta da biblioteca e abertura direta pelo cartão.
 2. Em **Perfil → Configurações do app → CLASSICS**, toque **Selecionar pasta de ROMs** e autorize Downloads, iCloud Drive ou outra pasta disponível no app Arquivos.
 3. No BRUMCLASSICS, abra **CLASSICS Everywhere** e toque no jogo. Na primeira vez, escolha **RetroArch** na folha de compartilhamento.
 4. Aguarde o RetroArch receber e importar o arquivo. Se necessário, associe o núcleo correto dentro do emulador.

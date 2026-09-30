@@ -1,6 +1,6 @@
 # BRUMCLASSICS MÓVEL para iOS
 
-Versão 0.12.1: o **Gaming Mode** abre em orientação horizontal e mostra apenas ROMs presentes na pasta autorizada e jogos instalados no computador. A barra inferior respeita a área segura, Estatísticas e Companion voltaram ao menu e o Perfil passou para dentro da Início. Cache offline, conquistas, **Central BRUM**, [horas offline](HORAS-OFFLINE.md), B-CARD e CLASSICS continuam disponíveis. O IPA sem assinatura é anexado à versão `ios-v0.12.1`.
+Versão 0.13.0: jogos GB, GBC e GBA abrem dentro do próprio **Gaming Mode** pelo BRUM Core, sem importar a ROM para o RetroArch. O aplicativo lê a pasta autorizada, prepara uma cópia temporária protegida e oferece vídeo, áudio, controles na tela, controle Bluetooth e save local. Outros sistemas continuam usando o RetroArch como fallback enquanto recebem suporte interno. O IPA sem assinatura é anexado à versão `ios-v0.13.0`.
 
 Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o protocolo local seguro versão 10, mantém o cache anterior para leitura offline e não altera dados fora das ações explícitas do usuário.
 
@@ -17,9 +17,9 @@ Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o protocolo local
 - Atualização em tempo real por WebSocket quando o computador está disponível.
 - BRUMCOMPANION como segunda tela: jogo ativo, anotações editáveis, métricas e BRUMMOMENTS; sem controle remoto.
 - B-CARD separado entre Jogos e CLASSICS, com a preferência Novo jogo / Auto Save / Save Manual nas configurações do app.
-- Horas de CLASSICS no iPhone persistidas offline por logs agregados do RetroArch, sem cronômetro fictício de segundo plano.
+- Horas do BRUM Core medidas diretamente; jogos do fallback RetroArch continuam aceitando logs agregados para medição precisa.
 - Consulta entre aplicativos pela URL `retroarch://library`, com retorno ao BRUMCLASSICS e cache da biblioteca real do emulador. O esquema de URL não autentica o remetente; essa resposta não comprova propriedade ou conquistas.
-- Entrega da ROM ao RetroArch com a permissão do iOS no primeiro uso e abertura posterior pela identidade exata da biblioteca.
+- Abertura interna de GB, GBC e GBA; outros sistemas ainda podem ser entregues ao RetroArch com a permissão do iOS no primeiro uso.
 - Capas locais prioritárias; fallback no catálogo público Libretro da mesma plataforma, com imagens e índices salvos para consulta offline. A busca da capa não estabelece vínculos de conquistas.
 - BRUMMOMENTS com captura da sessão ativa, galeria offline, localização, anotação, categoria e favoritos.
 - Atualização pessoal: verificação automática de versão no Perfil e acesso ao build do GitHub Actions.

@@ -6,6 +6,7 @@ struct GamingModeView: View {
     @EnvironmentObject private var pocket: PocketClassicsStore
     @Binding var selection: Int
     @State private var selectedGame: Game?
+    @State private var selectedROM: ROMFolderGame?
 
     private let columns = [GridItem(.adaptive(minimum: 135), spacing: 16)]
     private var installedGames: [Game] { store.snapshot.games.filter(\.installed).sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending } }
@@ -40,8 +41,12 @@ struct GamingModeView: View {
                             ROMFolderGameTile(
                                 rom: rom,
                                 launcherGame: pocket.launcherGame(for: rom, launcher: store),
-                                retroArchReady: pocket.isImportedIntoRetroArch(rom)
-                            ) { Task { await pocket.launchROM(rom, launcher: store) } }
+                                retroArchReady: pocket.isImportedIntoRetroArch(rom),
+                                integratedReady: IntegratedEmulatorSupport.supports(rom)
+                            ) {
+                                if IntegratedEmulatorSupport.supports(rom) { selectedROM = rom }
+                                else { Task { await pocket.launchROM(rom, launcher: store) } }
+                            }
                         }
                     }
                 }
@@ -73,6 +78,7 @@ struct GamingModeView: View {
             await pocket.refreshROMFolder()
         }
         .fullScreenCover(item: $selectedGame) { GamingGameView(game: $0) }
+        .fullScreenCover(item: $selectedROM) { IntegratedEmulatorView(rom: $0) }
     }
 
     private func gameSection<Content: View>(title: String, count: Int, @ViewBuilder content: () -> Content) -> some View {
