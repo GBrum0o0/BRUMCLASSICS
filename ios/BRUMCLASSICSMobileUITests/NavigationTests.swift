@@ -9,22 +9,26 @@ final class NavigationTests: XCTestCase {
         link.tap()
         XCTAssertTrue(app.buttons["rom-folder-refresh"].waitForExistence(timeout: 5))
         app.navigationBars.buttons.firstMatch.tap()
-        XCTAssertTrue(app.tabBars.buttons["Início"].exists)
+        XCTAssertTrue(app.buttons["main-tab-0"].exists)
     }
-    func testAndroidAlignedTabsAndCompanionWithoutRemoteControls() {
+    func testGamingModeAndCompanionWithoutRemoteControls() {
         let app = XCUIApplication()
         app.launch()
-        XCTAssertTrue(app.tabBars.buttons["Companion"].waitForExistence(timeout: 15))
-        for tab in ["Início", "Biblioteca", "Estatísticas", "Companion", "Perfil"] {
-            let button = app.tabBars.buttons[tab]
-            XCTAssertTrue(button.exists)
-            button.tap()
-            let attachment = XCTAttachment(screenshot: app.screenshot())
-            attachment.name = tab
-            attachment.lifetime = .keepAlways
-            add(attachment)
+        for tab in ["main-tab-0", "main-tab-1", "gaming-mode-tab", "main-tab-3", "main-tab-4"] {
+            XCTAssertTrue(app.buttons[tab].waitForExistence(timeout: 15), "Navegação ausente: \(tab)")
         }
-        app.tabBars.buttons["Companion"].tap()
+
+        app.buttons["gaming-mode-tab"].tap()
+        XCTAssertTrue(app.staticTexts["Sua biblioteca inteira."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Só escolha e jogue."].exists)
+        XCTAssertTrue(app.staticTexts["STREAMING REMOTO"].exists)
+
+        let gamingAttachment = XCTAttachment(screenshot: app.screenshot())
+        gamingAttachment.name = "Gaming Mode"
+        gamingAttachment.lifetime = .keepAlways
+        add(gamingAttachment)
+
+        app.buttons["main-tab-3"].tap()
         XCTAssertTrue(app.staticTexts["Sua segunda tela."].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["DESLIGAR"].exists)
         XCTAssertFalse(app.buttons["SUSPENDER"].exists)
@@ -33,7 +37,7 @@ final class NavigationTests: XCTestCase {
         if !app.buttons["companion-capture"].isHittable { app.swipeUp() }
         XCTAssertTrue(app.buttons["companion-capture"].exists)
         XCTAssertFalse(app.buttons["companion-capture"].isEnabled)
-        app.tabBars.buttons["Perfil"].tap()
+        app.buttons["main-tab-4"].tap()
         app.buttons["mobile-settings-link"].tap()
         if !app.staticTexts["Ao iniciar um clássico"].waitForExistence(timeout: 2) { app.swipeUp() }
         XCTAssertTrue(app.staticTexts["Ao iniciar um clássico"].waitForExistence(timeout: 5))

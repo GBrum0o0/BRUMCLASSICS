@@ -107,6 +107,9 @@ private struct GamingTabBar: View {
             }
             .foregroundStyle(selection == value ? BrumTheme.text : BrumTheme.muted)
             .frame(maxWidth: .infinity).frame(height: 50)
-        }.buttonStyle(.plain)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(title))
+        .accessibilityIdentifier("main-tab-\(value)")
     }
 }
