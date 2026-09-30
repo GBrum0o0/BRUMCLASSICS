@@ -1,9 +1,14 @@
 {
-  "version": "0.12.0",
-  "build": 23,
+  "version": "0.12.1",
+  "build": 24,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.12.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.12.1",
   "notes": [
+    "A barra inferior agora respeita a área segura e não deixa conteúdo vazar por baixo.",
+    "Estatísticas e Companion voltaram ao menu; Perfil e configurações ficam dentro da tela Início.",
+    "B-CARD e CLASSICS Everywhere saíram da Início e continuam acessíveis pelo Perfil.",
+    "Gaming Mode abre diretamente em orientação horizontal e oculta a navegação inferior.",
+    "Gaming Mode mostra somente ROMs encontradas na pasta autorizada e jogos instalados no computador.",
     "Gaming Mode reúne jogos do PC e CLASSICS em uma biblioteca voltada a jogar.",
     "O botão central JOGAR abre uma entrada animada e destaca o último jogo utilizado.",
     "O aplicativo decide entre RetroArch no aparelho e início seguro no computador pelo B-CARD.",
