@@ -65,7 +65,7 @@ private struct BrumLibretroController: UIViewControllerRepresentable {
     let onExit: () -> Void
 
     func makeUIViewController(context: Context) -> UIViewController {
-        BrumLibretroViewController(romURL: romURL, title: title, onExit: onExit)
+        BrumLibretroViewController(romurl: romURL, title: title, onExit: onExit)
     }
 
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
