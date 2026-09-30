@@ -16,6 +16,10 @@ targets:
     platform: iOS
     sources:
       - path: BRUMCLASSICSMobile
+    dependencies:
+      - sdk: AudioToolbox.framework
+      - sdk: GameController.framework
+      - sdk: QuartzCore.framework
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.brumclassics.mobile.ios
