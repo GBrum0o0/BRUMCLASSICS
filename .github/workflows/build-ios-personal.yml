@@ -41,7 +41,12 @@ jobs:
           XCODE_LOG="$RUNNER_TEMP/brumclassics-xcode-simulator.log"
           XCODE_ERRORS="$RUNNER_TEMP/brumclassics-xcode-errors.log"
           set +e
-          xcodebuild -project BRUMCLASSICSMobile.xcodeproj -scheme BRUMCLASSICSMobile -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -derivedDataPath build/Simulator -resultBundlePath build/iOS-Tests.xcresult -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test 2>&1 | tee "$XCODE_LOG"
+          perl -e 'alarm shift; exec @ARGV or die $!' 720 \
+            xcodebuild -project BRUMCLASSICSMobile.xcodeproj -scheme BRUMCLASSICSMobile -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -derivedDataPath build/Simulator \
+            -resultBundlePath build/iOS-Tests.xcresult -parallel-testing-enabled NO \
+            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
+            CODE_SIGNING_ALLOWED=NO test 2>&1 | tee "$XCODE_LOG"
           XCODE_STATUS=${PIPESTATUS[0]}
           set -e
           if [ "$XCODE_STATUS" -ne 0 ]; then
