@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## Android 0.21.0 e iOS 0.12.0 — BRUMCLASSICS Gaming Mode
+
+- A navegação móvel recebe um botão circular central **JOGAR** para entrar no Gaming Mode.
+- Uma entrada animada apresenta a experiência antes de abrir a biblioteca voltada exclusivamente a jogar.
+- Jogos do PC e CLASSICS aparecem juntos, com o último jogo em destaque e identificação clara da rota disponível.
+- CLASSICS locais são preparados para abertura no RetroArch; jogos instalados no computador usam o canal seguro do B-CARD.
+- Estatísticas e BRUMCOMPANION continuam acessíveis sem ocupar a navegação principal.
+- Estados de computador offline, instalação não confirmada e biblioteca vazia são explícitos e não executam ações falsas.
+- Streaming remoto é apresentado como etapa futura; esta versão não afirma transmitir vídeo, áudio ou controles.
+- Android e iOS preservam cache, pareamento, conquistas, horas e protocolo móvel 10.
+
 ## Launcher 1.75.1 — Monitoramento Steam em tempo real
 
 - Downloads iniciados diretamente no cliente Steam agora são descobertos pela pasta `steamapps\\downloading` e pelo manifesto oficial.

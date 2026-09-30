@@ -100,9 +100,12 @@ public final class MainActivity extends Activity {
     private String currentScreen = "home";
     private String detailsReturnScreen = "library";
     private String currentGameId = "";
+    private String gamingGameId = "";
     private String bCardGameId = "";
     private String bCardCategory = "modern";
     private String currentClassicId = "";
+    private String classicsReturnScreen = "home";
+    private String classicDetailsReturnScreen = "classics";
     private boolean launchingClassic;
     private String syncState = "offline";
     private String syncDetail = "Dados locais";
@@ -337,7 +340,17 @@ public final class MainActivity extends Activity {
     }
 
     private void refreshCurrentScreen() {
+        if ("gaming-intro".equals(currentScreen)) return;
         if ("library".equals(currentScreen)) showLibrary();
+        else if ("gaming".equals(currentScreen)) showGamingMode();
+        else if ("gaming-details".equals(currentScreen)) {
+            Game game = gameById(gamingGameId);
+            if (game != null) showGamingGame(game); else showGamingMode();
+        }
+        else if ("gaming-classic-details".equals(currentScreen)) {
+            LocalClassic game = classicsRepository.find(currentClassicId);
+            if (game != null) showGamingClassicGame(game); else showGamingMode();
+        }
         else if ("achievements".equals(currentScreen)) showAchievements();
         else if ("stats".equals(currentScreen)) showStats();
         else if ("companion".equals(currentScreen)) showCompanion();
@@ -372,15 +385,14 @@ public final class MainActivity extends Activity {
 
         LinearLayout nav = row();
         nav.setGravity(Gravity.CENTER);
-        nav.setPadding(dp(8), dp(7), dp(8), dp(9));
+        nav.setPadding(dp(8), dp(7), dp(8), dp(7));
         nav.setBackground(background(SURFACE, 0, LINE, 1));
         nav.addView(navButton("INÍCIO", "home"));
         nav.addView(navButton("BIBLIOTECA", "library"));
+        nav.addView(gamingNavButton());
         nav.addView(navButton("CONQUISTAS", "achievements"));
-        nav.addView(navButton("ESTATÍSTICAS", "stats"));
-        nav.addView(navButton("COMPANION", "companion"));
         nav.addView(navButton("PERFIL", "profile"));
-        shell.addView(nav, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(64)));
+        shell.addView(nav, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(72)));
         return shell;
     }
 
@@ -398,9 +410,29 @@ public final class MainActivity extends Activity {
         return button;
     }
 
+    private View gamingNavButton() {
+        FrameLayout slot = new FrameLayout(this);
+        slot.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1));
+        Button button = button("▶\nJOGAR");
+        button.setTextSize(8);
+        button.setLetterSpacing(.1f);
+        button.setTextColor(BG);
+        button.setGravity(Gravity.CENTER);
+        button.setPadding(dp(4), 0, dp(4), 0);
+        button.setBackground(background(ACCENT, 32, Color.TRANSPARENT, 0));
+        button.setContentDescription("Abrir Gaming Mode");
+        button.setOnClickListener(v -> openGamingMode());
+        button.setTag("gaming");
+        FrameLayout.LayoutParams buttonParams = new FrameLayout.LayoutParams(dp(58), dp(58), Gravity.CENTER);
+        slot.addView(button, buttonParams);
+        navButtons.add(button);
+        return slot;
+    }
+
     private void navigate(String screen) {
         if ("home".equals(screen)) showHome();
         else if ("library".equals(screen)) showLibrary();
+        else if ("gaming".equals(screen)) openGamingMode();
         else if ("achievements".equals(screen)) showAchievements();
         else if ("stats".equals(screen)) showStats();
         else if ("companion".equals(screen)) showCompanion();
@@ -789,9 +821,19 @@ public final class MainActivity extends Activity {
         view.setTranslationY(dp(9));
         view.animate().alpha(1f).translationY(0).setDuration(220).setInterpolator(new DecelerateInterpolator()).start();
         for (Button nav : navButtons) {
-            boolean active = name.equals(nav.getTag());
-            nav.setTextColor(active ? TEXT : MUTED);
-            nav.setBackground(active ? background(Color.argb(13, 157, 255, 59), 3, Color.TRANSPARENT, 0) : null);
+            String tag = String.valueOf(nav.getTag());
+            boolean active = name.equals(tag) || ("gaming".equals(tag) && name.startsWith("gaming"));
+            if ("gaming".equals(tag)) {
+                nav.setTextColor(BG);
+                nav.setBackground(background(ACCENT, 32, Color.TRANSPARENT, 0));
+                nav.setAlpha(active ? 1f : .82f);
+                nav.setScaleX(active ? 1.08f : 1f);
+                nav.setScaleY(active ? 1.08f : 1f);
+            } else {
+                nav.setTextColor(active ? TEXT : MUTED);
+                nav.setBackground(active ? background(Color.argb(13, 157, 255, 59), 3, Color.TRANSPARENT, 0) : null);
+                nav.setAlpha(1f); nav.setScaleX(1f); nav.setScaleY(1f);
+            }
         }
     }
 
@@ -903,7 +945,7 @@ public final class MainActivity extends Activity {
         classicsAccess.addView(classicsCopy, new LinearLayout.LayoutParams(0, -2, 1));
         TextView classicsArrow = text("›", 28, ACCENT, true); classicsArrow.setGravity(Gravity.CENTER);
         classicsAccess.addView(classicsArrow, new LinearLayout.LayoutParams(dp(42), dp(42)));
-        classicsAccess.setOnClickListener(v -> showClassics());
+        classicsAccess.setOnClickListener(v -> { classicsReturnScreen = "home"; showClassics(); });
         page.addView(classicsAccess, margins(-1, 0, -1, 18));
 
         LocalClassic recentClassic = null;
@@ -913,7 +955,7 @@ public final class MainActivity extends Activity {
             LinearLayout recent = column(); recent.setPadding(dp(15), dp(14), dp(15), dp(14)); recent.setBackground(background(SURFACE, 4, LINE, 1));
             recent.addView(eyebrow("ÚLTIMO CLASSIC JOGADO NO CELULAR")); recent.addView(text(recentClassic.title, 17, TEXT, true), margins(-1, 7, -1, 4));
             recent.addView(text(classicPlatform(recentClassic.filename) + " · " + formatClassicTime(recentClassic.creditedSeconds), 8, MUTED, true));
-            recent.setOnClickListener(v -> showClassicDetails(selectedClassic)); page.addView(recent, margins(-1, 0, -1, 18));
+            recent.setOnClickListener(v -> { classicDetailsReturnScreen = "home"; showClassicDetails(selectedClassic); }); page.addView(recent, margins(-1, 0, -1, 18));
         }
 
         if (games.isEmpty()) {
@@ -977,10 +1019,170 @@ public final class MainActivity extends Activity {
         setScreen("home", scroll);
     }
 
+    private void openGamingMode() {
+        LinearLayout intro = column();
+        intro.setGravity(Gravity.CENTER);
+        intro.setPadding(dp(28), dp(28), dp(28), dp(28));
+        intro.setBackgroundColor(Color.rgb(3, 5, 6));
+        ImageView mark = new ImageView(this); mark.setImageResource(com.brumclassics.mobile.R.drawable.ic_launcher);
+        intro.addView(mark, new LinearLayout.LayoutParams(dp(62), dp(62)));
+        TextView title = text("BRUMCLASSICS", 23, TEXT, true); title.setLetterSpacing(.1f); title.setGravity(Gravity.CENTER);
+        intro.addView(title, margins(-1, 18, -1, 5));
+        TextView mode = text("GAMING MODE", 8, ACCENT, true); mode.setLetterSpacing(.28f); mode.setGravity(Gravity.CENTER); intro.addView(mode);
+        TextView promise = text("SEU JOGO.\nSEM ETAPAS.", 25, TEXT, true); promise.setGravity(Gravity.CENTER); promise.setLineSpacing(dp(4), 1f);
+        intro.addView(promise, margins(-1, 42, -1, 0));
+        setScreen("gaming-intro", intro);
+        intro.animate().cancel(); intro.setAlpha(1f); intro.setTranslationY(0f);
+        mark.setScaleX(.84f); mark.setScaleY(.84f); mark.setAlpha(.45f);
+        mark.animate().scaleX(1.08f).scaleY(1.08f).alpha(1f).setDuration(720).setInterpolator(new DecelerateInterpolator()).start();
+        handler.postDelayed(() -> { if ("gaming-intro".equals(currentScreen)) showGamingMode(); }, 1050);
+    }
+
+    private void showGamingMode() {
+        ScrollView scroll = scroll(); LinearLayout page = page(); scroll.addView(page);
+        page.addView(brandHeader("GAMING MODE"));
+        page.addView(text("Sua biblioteca inteira.", 28, TEXT, true), margins(-1, 27, -1, 0));
+        page.addView(text("Só escolha e jogue.", 28, ACCENT, true), margins(-1, 1, -1, 22));
+
+        Game featured = games.isEmpty() ? null : HomeLibrary.lastPlayed(games);
+        if (featured != null) {
+            LinearLayout hero = row(); hero.setGravity(Gravity.CENTER_VERTICAL); hero.setPadding(dp(14), dp(14), dp(14), dp(14));
+            hero.setBackground(background(Color.rgb(13, 31, 25), 10, Color.argb(90, 157, 255, 59), 1));
+            hero.addView(cover(featured, 108, 152));
+            LinearLayout copy = column(); copy.setPadding(dp(15), 0, 0, 0); copy.addView(eyebrow("CONTINUE DE ONDE PAROU"));
+            copy.addView(text(featured.title, 20, TEXT, true), margins(-1, 8, -1, 5));
+            String route = localClassicFor(featured) != null ? "CLASSICS · PRONTO NESTE APARELHO" : featured.installed ? "PC EM CASA · PRONTO PARA INICIAR" : "BIBLIOTECA PRESERVADA";
+            copy.addView(text(route, 7, MUTED, true));
+            TextView action = text("CONTINUAR", 8, BG, true); action.setGravity(Gravity.CENTER); action.setBackground(background(ACCENT, 18, Color.TRANSPARENT, 0));
+            copy.addView(action, margins(112, 15, -1, 0, 36)); hero.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+            hero.setOnClickListener(v -> openGamingGame(featured)); page.addView(hero);
+        }
+
+        page.addView(sectionHeading("ESCOLHA UM JOGO", "PC + CLASSICS", null), margins(-1, 29, -1, 13));
+        HorizontalScrollView libraryScroll = new HorizontalScrollView(this); libraryScroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout shelf = row(); int added = 0;
+        for (Game game : games) {
+            if (added++ >= 18) break;
+            shelf.addView(gamingGameCard(game), margins(138, 0, 12, 0));
+        }
+        for (LocalClassic classic : classicsRepository.all()) {
+            if (added++ >= 24 || launcherGameFor(classic) != null) continue;
+            shelf.addView(gamingClassicCard(classic), margins(138, 0, 12, 0));
+        }
+        if (shelf.getChildCount() == 0) {
+            LinearLayout empty = column(); empty.setPadding(dp(16), dp(20), dp(16), dp(20)); empty.setBackground(background(SURFACE, 6, LINE, 1));
+            empty.addView(text("BIBLIOTECA VAZIA", 11, TEXT, true)); empty.addView(text("Sincronize o launcher ou configure uma pasta de ROMs.", 9, MUTED, false), margins(-1, 7, -1, 0));
+            page.addView(empty);
+        } else { libraryScroll.addView(shelf); page.addView(libraryScroll); }
+
+        page.addView(sectionHeading("SEUS MODOS DE JOGAR", "", null), margins(-1, 30, -1, 12));
+        page.addView(gamingRouteRow("◆", "JOGAR NESTE APARELHO", "CLASSICS preparados para RetroArch", classicsRepository.all().isEmpty() ? "CONFIGURAR" : "PRONTO", v -> { classicsReturnScreen = "gaming"; showClassics(); }));
+        page.addView(gamingRouteRow("▣", "INICIAR NO COMPUTADOR", "Canal seguro do B-CARD", "connected".equals(syncState) ? "CONECTADO" : "OFFLINE", v -> showBCardLibrary()), margins(-1, 7, -1, 0));
+        page.addView(gamingRouteRow("▥", "ESTATÍSTICAS", "Tempo, plataformas e progresso", "ABRIR", v -> showStats()), margins(-1, 7, -1, 0));
+        page.addView(gamingRouteRow("●", "BRUMCOMPANION", "Anotações e desempenho da sessão", "ABRIR", v -> showCompanion()), margins(-1, 7, -1, 0));
+
+        LinearLayout streaming = column(); streaming.setPadding(dp(16), dp(15), dp(16), dp(15)); streaming.setBackground(background(SURFACE, 7, LINE, 1));
+        LinearLayout streamingHead = row(); streamingHead.setGravity(Gravity.CENTER_VERTICAL); streamingHead.addView(eyebrow("STREAMING REMOTO"), new LinearLayout.LayoutParams(0, -2, 1));
+        streamingHead.addView(text("EM DESENVOLVIMENTO", 7, Color.rgb(255, 166, 58), true)); streaming.addView(streamingHead);
+        streaming.addView(text("O Gaming Mode já inicia jogos no PC. A transmissão de vídeo, áudio e controles pela internet ainda não está disponível nesta versão.", 9, MUTED, false), margins(-1, 9, -1, 0));
+        streaming.setOnClickListener(v -> showStreamingRoadmap()); page.addView(streaming, margins(-1, 24, -1, 30));
+        setScreen("gaming", scroll);
+    }
+
+    private View gamingGameCard(Game game) {
+        LinearLayout card = column(); card.addView(cover(game, 138, 193));
+        card.addView(text(isClassicGame(game) ? "CLASSICS" : game.platform.toUpperCase(Locale.ROOT), 7, ACCENT, true), margins(-1, 9, -1, 3));
+        TextView title = text(game.title, 11, TEXT, true); title.setMaxLines(2); card.addView(title);
+        card.addView(text(localClassicFor(game) != null ? "NO APARELHO" : game.installed ? "PC PRONTO" : "NA BIBLIOTECA", 7, MUTED, true), margins(-1, 5, -1, 0));
+        card.setOnClickListener(v -> openGamingGame(game)); card.setFocusable(true); return card;
+    }
+
+    private View gamingClassicCard(LocalClassic game) {
+        LinearLayout card = column(); card.addView(localClassicArtwork(game, 193), new LinearLayout.LayoutParams(dp(138), dp(193)));
+        card.addView(text("CLASSICS", 7, ACCENT, true), margins(-1, 9, -1, 3)); TextView title = text(game.title, 11, TEXT, true); title.setMaxLines(2); card.addView(title);
+        card.addView(text("NO APARELHO", 7, MUTED, true), margins(-1, 5, -1, 0));
+        card.setOnClickListener(v -> showGamingClassicGame(game)); card.setFocusable(true); return card;
+    }
+
+    private View gamingRouteRow(String icon, String title, String detail, String status, View.OnClickListener listener) {
+        LinearLayout item = row(); item.setGravity(Gravity.CENTER_VERTICAL); item.setPadding(dp(15), dp(14), dp(15), dp(14)); item.setBackground(background(SURFACE, 6, LINE, 1));
+        TextView glyph = text(icon, 19, ACCENT, true); glyph.setGravity(Gravity.CENTER); item.addView(glyph, new LinearLayout.LayoutParams(dp(36), dp(40)));
+        LinearLayout copy = column(); copy.setPadding(dp(10), 0, dp(8), 0); copy.addView(text(title, 11, TEXT, true)); copy.addView(text(detail, 8, MUTED, false), margins(-1, 4, -1, 0)); item.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        item.addView(text(status, 7, ACCENT, true)); item.setOnClickListener(listener); item.setFocusable(true); return item;
+    }
+
+    private void openGamingGame(Game game) {
+        LocalClassic local = localClassicFor(game);
+        if (local != null) { showGamingClassicGame(local); return; }
+        showGamingGame(game);
+    }
+
+    private void showGamingClassicGame(LocalClassic game) {
+        currentClassicId = game.id; ScrollView scroll = scroll(); LinearLayout page = page(); scroll.addView(page);
+        page.addView(backHeader("GAMING MODE", this::showGamingMode)); Game launcherGame = launcherGameFor(game);
+        LinearLayout.LayoutParams coverParams = margins(224, 22, -1, 0, 314); coverParams.gravity = Gravity.CENTER_HORIZONTAL;
+        if (launcherGame != null) page.addView(cover(launcherGame, 224, 314), coverParams); else page.addView(localClassicArtwork(game, 314), coverParams);
+        TextView route = eyebrow("CLASSICS · PRONTO NESTE APARELHO"); route.setGravity(Gravity.CENTER); page.addView(route, margins(-1, 20, -1, 8));
+        TextView title = text(game.title, 28, TEXT, true); title.setGravity(Gravity.CENTER); page.addView(title);
+        page.addView(text("Sistema e controles serão preparados automaticamente.", 9, MUTED, false), margins(-1, 10, -1, 18));
+        Button play = primaryButton("JOGAR"); play.setOnClickListener(v -> launchLocalClassic(game)); page.addView(play, new LinearLayout.LayoutParams(-1, dp(50)));
+        LinearLayout ready = column(); ready.setPadding(dp(15), dp(15), dp(15), dp(15)); ready.setBackground(background(SURFACE, 7, LINE, 1));
+        ready.addView(eyebrow("PREPARAÇÃO AUTOMÁTICA")); ready.addView(text("✓ Jogo localizado\n✓ Sistema identificado\n✓ Controles encaminhados ao emulador", 9, TEXT, false), margins(-1, 9, -1, 0));
+        page.addView(ready, margins(-1, 22, -1, 0));
+        Button details = button("DETALHES, HORAS E CONQUISTAS"); details.setTextColor(ACCENT); details.setBackground(background(SURFACE, 5, ACCENT, 1));
+        details.setOnClickListener(v -> { classicDetailsReturnScreen = "gaming"; showClassicDetails(game); }); page.addView(details, margins(-1, 10, -1, 30, 46));
+        setScreen("gaming-classic-details", scroll);
+    }
+
+    private void showGamingGame(Game game) {
+        gamingGameId = game.id; ScrollView scroll = scroll(); LinearLayout page = page(); scroll.addView(page);
+        page.addView(backHeader("GAMING MODE", this::showGamingMode));
+        LinearLayout.LayoutParams coverParams = margins(224, 22, -1, 0, 314); coverParams.gravity = Gravity.CENTER_HORIZONTAL; page.addView(cover(game, 224, 314), coverParams);
+        TextView route = eyebrow("PC · CANAL SEGURO"); route.setGravity(Gravity.CENTER); page.addView(route, margins(-1, 20, -1, 8));
+        TextView title = text(game.title, 28, TEXT, true); title.setGravity(Gravity.CENTER); page.addView(title);
+        if (!game.description.trim().isEmpty()) page.addView(text(game.description, 10, MUTED, false), margins(-1, 11, -1, 0));
+        TextView launchState = text(game.installed ? ("connected".equals(syncState) ? "PRONTO PARA INICIAR NO COMPUTADOR" : "COMPUTADOR FORA DE ALCANCE") : "INSTALAÇÃO NÃO CONFIRMADA", 8, game.installed && "connected".equals(syncState) ? ACCENT : MUTED, true);
+        launchState.setGravity(Gravity.CENTER); page.addView(launchState, margins(-1, 20, -1, 9));
+        Button play = primaryButton(game.installed ? "INICIAR NO COMPUTADOR" : "INSTALAÇÃO NÃO CONFIRMADA");
+        play.setEnabled(game.installed && "connected".equals(syncState));
+        play.setAlpha(play.isEnabled() ? 1f : .42f);
+        play.setOnClickListener(v -> {
+            play.setEnabled(false); play.setText("CONECTANDO..."); launchState.setText("VALIDANDO O JOGO E ENVIANDO O COMANDO");
+            bridgeClient.launchBCard(game, "new", new BridgeClient.BCardCallback() {
+                @Override public void onResult(org.json.JSONObject result) { launchState.setText("JOGO INICIADO NO COMPUTADOR"); launchState.setTextColor(ACCENT); play.setText("INICIADO"); bridgeClient.fetchSnapshot(); }
+                @Override public void onError(String safeMessage) { launchState.setText(safeMessage.toUpperCase(Locale.ROOT)); launchState.setTextColor(Color.rgb(255, 118, 118)); play.setText("TENTAR NOVAMENTE"); play.setEnabled(true); }
+            });
+        }); page.addView(play, new LinearLayout.LayoutParams(-1, dp(50)));
+
+        LinearLayout streaming = column(); streaming.setPadding(dp(15), dp(15), dp(15), dp(15)); streaming.setBackground(background(SURFACE, 7, LINE, 1));
+        streaming.addView(eyebrow("STREAMING REMOTO · EM DESENVOLVIMENTO")); streaming.addView(text("Esta versão inicia o jogo no computador, mas ainda não transmite vídeo, áudio ou controles para o celular.", 9, MUTED, false), margins(-1, 8, -1, 0));
+        streaming.setOnClickListener(v -> showStreamingRoadmap()); page.addView(streaming, margins(-1, 23, -1, 0));
+        Button details = button("VER PERFIL COMPLETO DO JOGO"); details.setTextColor(ACCENT); details.setBackground(background(SURFACE, 5, ACCENT, 1));
+        details.setOnClickListener(v -> { detailsReturnScreen = "gaming"; showDetails(game); }); page.addView(details, margins(-1, 10, -1, 30, 46));
+        setScreen("gaming-details", scroll);
+    }
+
+    private LocalClassic localClassicFor(Game game) {
+        if (game == null || !isClassicGame(game)) return null;
+        String wanted = ClassicsRules.normalizedTitle(game.title); LocalClassic match = null; int matches = 0;
+        for (LocalClassic local : classicsRepository.all()) {
+            if (!local.launcherGameId.isEmpty() && local.launcherGameId.equals(game.id)) return local;
+            if (ClassicsRules.normalizedTitle(local.title).equals(wanted)) { match = local; matches++; }
+        }
+        return matches == 1 ? match : null;
+    }
+
+    private void showStreamingRoadmap() {
+        new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+            .setTitle("STREAMING REMOTO")
+            .setMessage("O início remoto pelo B-CARD já está disponível. Vídeo, áudio, controles pela internet, pareamento externo e retomada de sessão exigem um serviço de streaming no PC e serão implementados em uma etapa própria.")
+            .setPositiveButton("ENTENDI", null).show();
+    }
+
     private void showClassics() {
         LinearLayout root = column(); root.setBackgroundColor(BG);
         LinearLayout header = page(); header.setPadding(dp(20), dp(18), dp(20), dp(12));
-        header.addView(backHeader("CLASSICS EVERYWHERE", this::showHome));
+        header.addView(backHeader("CLASSICS EVERYWHERE", () -> navigate(classicsReturnScreen)));
         header.addView(text("Seus clássicos no Android", 26, TEXT, true), margins(-1, 20, -1, 5));
         header.addView(text("ROMs da pasta autorizada, abertas diretamente no RetroArch.", 10, MUTED, false));
         Button refresh = primaryButton(classicsRepository.romFolderConfigured() ? "VERIFICAR " + classicsRepository.romFolderName().toUpperCase(Locale.ROOT) : "SELECIONAR PASTA DE ROMS");
@@ -1020,7 +1222,7 @@ public final class MainActivity extends Activity {
                 card.addView(text(game.title, 12, TEXT, true));
                 String progress = game.achievements.isEmpty() ? "CONQUISTAS NÃO CONSULTADAS" : game.unlockedCount() + "/" + game.achievements.size() + " · " + game.progressPercent() + "%";
                 card.addView(text(progress, 7, MUTED, true), margins(-1, 4, -1, 0));
-                card.setOnClickListener(v -> showClassicDetails(game)); return card;
+                card.setOnClickListener(v -> { classicDetailsReturnScreen = "classics"; showClassicDetails(game); }); return card;
             }
         });
         root.addView(grid, new LinearLayout.LayoutParams(-1, 0, 1)); setScreen("classics", root);
@@ -1028,7 +1230,7 @@ public final class MainActivity extends Activity {
 
     private void showClassicDetails(LocalClassic game) {
         currentClassicId = game.id; ScrollView scroll = scroll(); LinearLayout page = page(); scroll.addView(page);
-        page.addView(backHeader("CLASSICS EVERYWHERE", this::showClassics)); Game launcherGame = launcherGameFor(game);
+        page.addView(backHeader("CLASSICS EVERYWHERE", () -> navigate(classicDetailsReturnScreen))); Game launcherGame = launcherGameFor(game);
         if (launcherGame != null) {
             LinearLayout.LayoutParams coverLp = margins(210, 25, -1, 0, 294); coverLp.gravity = Gravity.CENTER_HORIZONTAL;
             page.addView(cover(launcherGame, 210, 294), coverLp);
@@ -1800,7 +2002,7 @@ public final class MainActivity extends Activity {
                 if (!"https".equalsIgnoreCase(url.getProtocol()) || !(host.endsWith("steamstatic.com") || host.endsWith("akamaihd.net"))) return;
                 connection = (HttpURLConnection) url.openConnection();
                 connection.setConnectTimeout(6000); connection.setReadTimeout(8000); connection.setInstanceFollowRedirects(false);
-                connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android/0.20.0");
+                connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android/0.21.0");
                 if (connection.getResponseCode() != 200 || connection.getContentLengthLong() > 2 * 1024 * 1024) return;
                 byte[] buffer = new byte[8192]; int read; int total = 0;
                 ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -2017,8 +2219,12 @@ public final class MainActivity extends Activity {
         } else if ("bcard-list".equals(currentScreen)) {
             showHome();
         } else if ("classic-details".equals(currentScreen)) {
-            showClassics();
+            navigate(classicDetailsReturnScreen);
         } else if ("classics".equals(currentScreen)) {
+            navigate(classicsReturnScreen);
+        } else if ("gaming-details".equals(currentScreen) || "gaming-classic-details".equals(currentScreen)) {
+            showGamingMode();
+        } else if (currentScreen.startsWith("gaming")) {
             showHome();
         } else if ("classic-settings".equals(currentScreen)) {
             showProfile();

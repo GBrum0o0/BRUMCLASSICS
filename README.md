@@ -10,8 +10,8 @@
 
 <p align="center">
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.75.1"><strong>Windows 1.75.1</strong></a> ·
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.20.0"><strong>Android 0.20.0</strong></a> ·
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.11.0"><strong>iOS 0.11.0</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.21.0"><strong>Android 0.21.0</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.12.0"><strong>iOS 0.12.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
   <a href="PRIVACY.md">Privacidade</a> ·
   <a href="SECURITY.md">Segurança</a>
@@ -63,6 +63,8 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - BRUMWORLD: revista interativa com 48 páginas na proporção real A4 e 43 guias baseados em capturas verdadeiras do launcher e do Android. Cada imagem ocupa toda a largura, mostra a área relevante ampliada e pode ser aberta em tela cheia.
 - Aplicativo Android com biblioteca offline, capas, estatísticas e BRUMCOMPANION.
 - Aplicativo iOS pessoal em SwiftUI, com o mesmo cache offline, B-CARD e BRUMCOMPANION, preparado para sideload.
+- Gaming Mode móvel com botão central JOGAR, entrada animada, último jogo em destaque e biblioteca unificada de PC e CLASSICS.
+- Rota automática para RetroArch no aparelho ou início seguro no computador pelo B-CARD; streaming remoto permanece identificado como desenvolvimento futuro.
 - Central BRUM sincronizada com iPhone e Android, limitada ao perfil ativo e sem enviar credenciais ou caminhos locais.
 - B-CARD lista jogos instalados no celular e permite iniciar no computador com um gesto autenticado para cima.
 - BRUMCOMPANION identifica o jogo ativo e permite consultar ou editar Onde parei, Objetivos, Dicas e Comandos no celular.
@@ -79,12 +81,12 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
 | Windows | 1.75.1 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.75.1) |
-| Android | 0.20.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.20.0) · [Guia](docs/MOVEL.md) |
-| iOS pessoal | 0.11.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.11.0) · [Guia](ios/README-IOS.md) |
+| Android | 0.21.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.21.0) · [Guia](docs/MOVEL.md) |
+| iOS pessoal | 0.12.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.12.0) · [Guia](ios/README-IOS.md) |
 
 Os hashes SHA-256 acompanham os arquivos publicados. O GitHub hospeda executáveis, APKs e IPAs somente em Releases; esses binários não entram no histórico do repositório.
 
-A versão pessoal para iPhone é compilada separadamente em **Actions → Build iOS pessoal**. O artefato contém um IPA sem assinatura para instalação com AltStore ou Sideloadly. No iOS 0.11.0, a tela inicial, o cache offline, o diagnóstico e a resolução de conflitos usam o mesmo estado transparente de sincronização do Android 0.20.0. Consulte [as instruções do iOS](ios/README-IOS.md) e o [guia do RetroArch compatível](ios/RETROARCH-COMPATIVEL.md).
+A versão pessoal para iPhone é compilada separadamente em **Actions → Build iOS pessoal**. O artefato contém um IPA sem assinatura para instalação com AltStore ou Sideloadly. Android 0.21.0 e iOS 0.12.0 introduzem o Gaming Mode sem remover cache offline, diagnóstico ou resolução de conflitos. Consulte [as instruções do iOS](ios/README-IOS.md) e o [guia do RetroArch compatível](ios/RETROARCH-COMPATIVEL.md).
 
 ## Versões atuais
 
@@ -120,10 +122,10 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 - **Launcher 1.59.0:** sincronização autenticada da Central BRUM com iPhone e Android.
 - **Launcher 1.58.0:** Central de Notificações, backup completo e seletivo de perfil, saves e mídias, além de recuperação de encerramentos inesperados.
 - **Launcher 1.57.0:** diagnósticos de sessões e RetroAchievements, calibração de controles e Saúde da Biblioteca.
-- **Android 0.20.0:** Início completo, estado offline transparente, diagnóstico, cache configurável e conflitos comparáveis.
-- **iOS 0.11.0:** paridade com Android, sessão ativa, conquistas recentes, diagnóstico e capas otimizadas.
+- **Android 0.21.0:** Gaming Mode, botão central JOGAR e biblioteca unificada com rotas para CLASSICS e PC.
+- **iOS 0.12.0:** Gaming Mode em SwiftUI, entrada animada e decisão entre RetroArch e B-CARD.
 
-Veja o [histórico completo](CHANGELOG.md) e as [notas do Android 0.20.0](releases/android-v0.20.0/RELEASE-NOTES.md).
+Veja o [histórico completo](CHANGELOG.md) e as [notas do Android 0.21.0](releases/android-v0.21.0/RELEASE-NOTES.md).
 
 Consulte também o guia de [Conexões e origem dos dados](docs/CONEXOES.md), com os estados exibidos, o significado de cada origem e as limitações reais por plataforma.
 

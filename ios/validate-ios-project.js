@@ -13,6 +13,7 @@ const required = [
   'BRUMCLASSICSMobile/BRUMCLASSICSMobileApp.swift', 'BRUMCLASSICSMobile/AppStore.swift',
   'BRUMCLASSICSMobile/BridgeClient.swift', 'BRUMCLASSICSMobile/Models.swift',
   'BRUMCLASSICSMobile/NotificationsView.swift',
+  'BRUMCLASSICSMobile/GamingModeView.swift',
   'BRUMCLASSICSMobile/PersonalUpdateService.swift',
   'BRUMCLASSICSMobile/ProfileView.swift', 'BRUMCLASSICSMobile/BCardView.swift',
   'BRUMCLASSICSMobile/ROMFolderLibrary.swift',
@@ -66,6 +67,10 @@ if (bcardView.split('private func send')[1].includes('offset = 0')) throw new Er
 for (const marker of ['ClassicsEverywhereView', 'PocketSetupView', 'PocketRules.launchURL', '/v1/classics/achievements/sync', 'API_GetGameInfoAndUserProgress.php']) if (!source.includes(marker)) throw new Error(`CLASSICS iPhone incompleto: ${marker}`);
 if (!source.includes('companion-capture') || !source.includes('MobileSettingsView')) throw new Error('Captura ou configurações móveis ausentes.');
 for (const marker of ['MobileNotificationSnapshot', 'NotificationsView', 'notifications_changed', 'markAllNotificationsRead']) if (!source.includes(marker)) throw new Error(`Central BRUM incompleta: ${marker}`);
+for (const marker of ['struct GamingModeView', 'GamingTabBar(selection:', 'Só escolha e jogue.', 'STREAMING REMOTO', 'EM DESENVOLVIMENTO']) {
+  if (!source.includes(marker)) throw new Error(`Gaming Mode incompleto: ${marker}`);
+}
+if (!source.includes('pocket.launchRetroArch(localClassic, launcher: store)') || !source.includes('store.launchBCard(game)')) throw new Error('Gaming Mode não decide entre execução local e computador.');
 
 if (!source.includes('SecureStore.write')) throw new Error('Token não está protegido pelo Keychain.');
 if (!source.includes('SHA256.hash(data: data)')) throw new Error('Certificate pinning ausente.');

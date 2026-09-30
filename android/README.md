@@ -1,6 +1,6 @@
 # BRUMCLASSICS MÓVEL para Android
 
-Cliente Android nativo complementar ao BRUMCLASSICS. A versão atual é a **0.20.0** (`versionCode 28`) e requer Android 8.0/API 26 ou superior.
+Cliente Android nativo complementar ao BRUMCLASSICS. A versão atual é a **0.21.0** (`versionCode 29`) e requer Android 8.0/API 26 ou superior.
 
 Em jogos cuja conexão não oferece leitura oficial completa, a aba **Conquistas** pesquisa jogos e mostra imagem, título e descrição do catálogo carregado pelo launcher. Toque em um item para marcar ou desfazer o progresso manual. O launcher 1.62.0 mantém esses registros por perfil e protege confirmações oficiais.
 
@@ -15,6 +15,8 @@ Em jogos cuja conexão não oferece leitura oficial completa, a aba **Conquistas
 - Abertura no RetroArch, capa local, jogo recente e contador de horas persistente.
 - Consulta oficial do RetroAchievements, com usuário e Web API Key protegidos pelo Android Keystore.
 - Sincronização idempotente de horas e conquistas vinculadas quando o computador volta à mesma rede.
+- **Gaming Mode** com entrada animada, botão central JOGAR e biblioteca unificada de jogos do PC e CLASSICS.
+- Roteamento automático para RetroArch no aparelho ou início seguro no computador pelo B-CARD.
 
 ROMs, BIOS, saves, núcleos e credenciais não fazem parte deste repositório nem do APK.
 
@@ -38,4 +40,4 @@ O APK publicado em Releases é assinado separadamente com a identidade usada nas
 
 O workflow `Android CI` compila o aplicativo e executa os testes de contrato sem depender de um aparelho. A abertura do RetroArch, o provedor de documentos e a leitura dos logs `.lrtl` também devem ser confirmados em um Android físico.
 
-Veja o [guia de uso](../docs/MOVEL.md), as [notas da versão](../releases/android-v0.20.0/RELEASE-NOTES.md) e a [validação](../releases/android-v0.20.0/VALIDACAO.md).
+Veja o [guia de uso](../docs/MOVEL.md), as [notas da versão](../releases/android-v0.21.0/RELEASE-NOTES.md) e a [validação](../releases/android-v0.21.0/VALIDACAO.md).

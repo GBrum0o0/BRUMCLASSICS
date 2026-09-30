@@ -25,6 +25,19 @@ A tela Início destaca o último jogo, Favoritos, Quero jogar e Minha jornada. D
 
 Anotações e Quero jogar editados offline entram em uma fila. Ao retornar à rede com o launcher aberto, as alterações são enviadas. Se os dois aparelhos alterarem o mesmo campo, escolha qual versão preservar; não é necessário limpar o banco.
 
+## Gaming Mode
+
+O botão circular **JOGAR**, no centro da navegação inferior, abre uma experiência dedicada a jogos. A tela reúne a biblioteca do computador e os CLASSICS disponíveis no aparelho, destaca o último jogo utilizado e escolhe a rota adequada:
+
+- CLASSICS já reconhecido no celular: abre no RetroArch instalado, com sistema e controles encaminhados automaticamente quando a plataforma é identificável;
+- jogo instalado no computador: envia uma solicitação autenticada pelo canal do B-CARD;
+- jogo preservado na biblioteca sem instalação confirmada: continua visível, mas não oferece uma execução falsa;
+- computador desconectado: mantém a biblioteca offline e explica que é necessário reencontrar o launcher.
+
+O Gaming Mode também dá acesso a Estatísticas e BRUMCOMPANION sem aumentar o número de itens na barra inferior. A animação de entrada é visual e não interrompe a sincronização.
+
+**Streaming remoto** aparece identificado como **Em desenvolvimento**. A versão atual consegue iniciar o jogo no PC, mas ainda não transmite vídeo, áudio ou controles pela internet. Essa indicação evita confundir início remoto com uma sessão de streaming pronta.
+
 ## Central BRUM
 
 Com o launcher 1.59.0, **Notificações** na tela Início reúne conquistas, sessões, saves, instalações, atualizações e avisos do sistema. O contador mostra somente os itens não lidos do perfil ativo. Toque em um aviso para marcá-lo como lido e abrir o jogo relacionado, ou use **Marcar todas**. A leitura exige conexão; o último histórico sincronizado continua visível offline.

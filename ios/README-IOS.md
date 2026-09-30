@@ -1,6 +1,6 @@
 # BRUMCLASSICS MÓVEL para iOS
 
-Versão 0.11.0: Início, sincronização e cache offline foram redesenhados para mostrar sessão ativa, conquistas recentes, fila pendente e última sincronização sem ambiguidade. Há diagnóstico guiado, comparação visual de conflitos e escolha do conteúdo offline. Conquistas, **Central BRUM**, [RetroArch](RETROARCH-COMPATIVEL.md), [horas offline](HORAS-OFFLINE.md), B-CARD e BRUMCOMPANION continuam disponíveis. O IPA sem assinatura é anexado à versão `ios-v0.11.0`.
+Versão 0.12.0: o novo **Gaming Mode** reúne jogos do PC e CLASSICS atrás do botão central JOGAR. A entrada animada leva à biblioteca unificada e decide entre RetroArch no aparelho e início seguro no computador pelo B-CARD. Início, cache offline, conquistas, **Central BRUM**, [horas offline](HORAS-OFFLINE.md) e BRUMCOMPANION continuam disponíveis. O IPA sem assinatura é anexado à versão `ios-v0.12.0`.
 
 Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o protocolo local seguro versão 10, mantém o cache anterior para leitura offline e não altera dados fora das ações explícitas do usuário.
 
@@ -23,6 +23,9 @@ Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o protocolo local
 - Capas locais prioritárias; fallback no catálogo público Libretro da mesma plataforma, com imagens e índices salvos para consulta offline. A busca da capa não estabelece vínculos de conquistas.
 - BRUMMOMENTS com captura da sessão ativa, galeria offline, localização, anotação, categoria e favoritos.
 - Atualização pessoal: verificação automática de versão no Perfil e acesso ao build do GitHub Actions.
+- Gaming Mode com destaque do último jogo, biblioteca unificada e detalhes focados em jogar.
+- Botão central JOGAR e rotas automáticas para CLASSICS local ou jogo de PC.
+- Streaming remoto mostrado como recurso futuro, sem simular vídeo, áudio ou controles inexistentes.
 
 ## Abrir e compilar no macOS
 

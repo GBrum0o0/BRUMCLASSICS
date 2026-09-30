@@ -1,9 +1,14 @@
 {
-  "version": "0.11.0",
-  "build": 22,
+  "version": "0.12.0",
+  "build": 23,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.11.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.12.0",
   "notes": [
+    "Gaming Mode reúne jogos do PC e CLASSICS em uma biblioteca voltada a jogar.",
+    "O botão central JOGAR abre uma entrada animada e destaca o último jogo utilizado.",
+    "O aplicativo decide entre RetroArch no aparelho e início seguro no computador pelo B-CARD.",
+    "Estatísticas e BRUMCOMPANION permanecem disponíveis dentro do Gaming Mode.",
+    "Streaming remoto aparece como recurso em desenvolvimento e não simula uma conexão inexistente.",
     "A tela inicial mostra último jogo, sessão ativa, continuar, conquistas recentes e Quero jogar.",
     "O estado da sincronização distingue cache local, fila pendente, última sincronização e reconexão automática.",
     "Novo diagnóstico explica rede, pareamento, certificado e computador indisponível sem logs técnicos.",
