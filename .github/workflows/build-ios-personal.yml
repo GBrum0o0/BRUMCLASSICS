@@ -39,12 +39,15 @@ jobs:
           set -euo pipefail
           SIMULATOR_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for devices in d["devices"].values() for x in devices if "iPhone" in x["name"] and x.get("isAvailable")))')
           if ! xcodebuild -project BRUMCLASSICSMobile.xcodeproj -scheme BRUMCLASSICSMobile -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -derivedDataPath build/Simulator -resultBundlePath build/iOS-Tests.xcresult -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test 2>&1 | tee build/xcode-simulator.log; then
-            SUMMARY=$(grep -E '(^|[[:space:]])(error:|fatal error:)|Test Case.*failed|Testing failed:' build/xcode-simulator.log | tail -n 30 || true)
-            if [ -z "$SUMMARY" ]; then SUMMARY=$(tail -n 80 build/xcode-simulator.log); fi
-            SUMMARY=${SUMMARY//'%'/'%25'}
-            SUMMARY=${SUMMARY//$'\r'/'%0D'}
-            SUMMARY=${SUMMARY//$'\n'/'%0A'}
-            echo "::error title=Xcode simulator build failed::$SUMMARY"
+            grep -E '(^|[[:space:]])(error:|fatal error:)|Test Case.*failed|Testing failed:' build/xcode-simulator.log \
+              | tail -n 20 > build/xcode-errors.log || true
+            if [ ! -s build/xcode-errors.log ]; then tail -n 20 build/xcode-simulator.log > build/xcode-errors.log; fi
+            while IFS= read -r LINE; do
+              LINE=$(printf '%s' "$LINE" | sed -E $'s/\x1B\\[[0-9;]*[mK]//g' | cut -c1-1800)
+              LINE=${LINE//'%'/'%25'}
+              LINE=${LINE//$'\r'/'%0D'}
+              echo "::error title=Xcode::$LINE"
+            done < build/xcode-errors.log
             exit 1
           fi
 
