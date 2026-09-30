@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Color;
@@ -28,6 +29,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.WindowInsets;
 import android.window.OnBackInvokedDispatcher;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.Button;
@@ -91,6 +93,7 @@ public final class MainActivity extends Activity {
     private final ExecutorService modelExecutor = Executors.newSingleThreadExecutor();
     private final List<Button> navButtons = new ArrayList<>();
     private FrameLayout content;
+    private LinearLayout bottomNavigation;
     private GameRepository repository;
     private MomentRepository momentRepository;
     private ClassicsRepository classicsRepository;
@@ -137,6 +140,7 @@ public final class MainActivity extends Activity {
     };
     private org.json.JSONObject experience = new org.json.JSONObject();
     private long lastRootBackAt = 0L;
+    private boolean gamingOrientationLocked;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -377,22 +381,49 @@ public final class MainActivity extends Activity {
     private View buildShell() {
         LinearLayout shell = column();
         shell.setBackgroundColor(BG);
-        shell.setFitsSystemWindows(true);
+        shell.setFitsSystemWindows(false);
 
         content = new FrameLayout(this);
         content.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
         shell.addView(content);
 
-        LinearLayout nav = row();
-        nav.setGravity(Gravity.CENTER);
-        nav.setPadding(dp(8), dp(7), dp(8), dp(7));
-        nav.setBackground(background(SURFACE, 0, LINE, 1));
-        nav.addView(navButton("INÍCIO", "home"));
-        nav.addView(navButton("BIBLIOTECA", "library"));
-        nav.addView(gamingNavButton());
-        nav.addView(navButton("CONQUISTAS", "achievements"));
-        nav.addView(navButton("PERFIL", "profile"));
-        shell.addView(nav, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(72)));
+        bottomNavigation = row();
+        bottomNavigation.setGravity(Gravity.CENTER);
+        bottomNavigation.setPadding(dp(8), dp(7), dp(8), dp(7));
+        bottomNavigation.setBackground(background(SURFACE, 0, LINE, 1));
+        bottomNavigation.addView(navButton("INÍCIO", "home"));
+        bottomNavigation.addView(navButton("BIBLIOTECA", "library"));
+        bottomNavigation.addView(gamingNavButton());
+        bottomNavigation.addView(navButton("ESTATÍSTICAS", "stats"));
+        bottomNavigation.addView(navButton("COMPANION", "companion"));
+        shell.addView(bottomNavigation, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(72)));
+        shell.setOnApplyWindowInsetsListener((view, insets) -> {
+            int top;
+            int bottom;
+            int left;
+            int right;
+            if (Build.VERSION.SDK_INT >= 30) {
+                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                top = bars.top;
+                bottom = bars.bottom;
+                left = bars.left;
+                right = bars.right;
+            } else {
+                top = insets.getSystemWindowInsetTop();
+                bottom = insets.getSystemWindowInsetBottom();
+                left = insets.getSystemWindowInsetLeft();
+                right = insets.getSystemWindowInsetRight();
+            }
+            view.setPadding(left, top, right, 0);
+            bottomNavigation.setPadding(dp(8), dp(7), dp(8), dp(7) + bottom);
+            ViewGroup.LayoutParams params = bottomNavigation.getLayoutParams();
+            int wantedHeight = dp(72) + bottom;
+            if (params.height != wantedHeight) {
+                params.height = wantedHeight;
+                bottomNavigation.setLayoutParams(params);
+            }
+            return insets;
+        });
         return shell;
     }
 
@@ -815,6 +846,12 @@ public final class MainActivity extends Activity {
 
     private void setScreen(String name, View view) {
         currentScreen = name;
+        boolean gamingScreen = name.startsWith("gaming");
+        if (bottomNavigation != null) bottomNavigation.setVisibility(gamingScreen ? View.GONE : View.VISIBLE);
+        if (!gamingScreen && gamingOrientationLocked) {
+            gamingOrientationLocked = false;
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        }
         content.removeAllViews();
         content.addView(view, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         view.setAlpha(0f);
@@ -898,6 +935,21 @@ public final class MainActivity extends Activity {
         notificationsAccess.setOnClickListener(v -> showNotifications());
         page.addView(notificationsAccess, margins(-1, 0, -1, 18));
 
+        LinearLayout profileAccess = row();
+        profileAccess.setGravity(Gravity.CENTER_VERTICAL);
+        profileAccess.setPadding(dp(16), dp(14), dp(14), dp(14));
+        profileAccess.setBackground(background(SURFACE, 5, LINE, 1));
+        LinearLayout profileCopy = column();
+        profileCopy.addView(text("PERFIL E CONFIGURAÇÕES", 15, TEXT, true));
+        profileCopy.addView(text("Conta local, pareamento, CLASSICS e preferências", 9, MUTED, false), margins(-1, 5, -1, 0));
+        profileAccess.addView(profileCopy, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView profileArrow = text("›", 28, ACCENT, true);
+        profileArrow.setGravity(Gravity.CENTER);
+        profileAccess.addView(profileArrow, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        profileAccess.setOnClickListener(v -> showProfile());
+        profileAccess.setContentDescription("Abrir perfil e configurações");
+        page.addView(profileAccess, margins(-1, 0, -1, 18));
+
         if (!repository.isSynchronizedLibrary()) {
             LinearLayout demo = column();
             demo.setPadding(dp(14), dp(12), dp(14), dp(12));
@@ -917,36 +969,6 @@ public final class MainActivity extends Activity {
             active.setOnClickListener(v -> showCompanion());
             page.addView(active, margins(-1, 0, -1, 18));
         }
-
-        LinearLayout bCardAccess = row();
-        bCardAccess.setGravity(Gravity.CENTER_VERTICAL);
-        bCardAccess.setPadding(dp(16), dp(14), dp(14), dp(14));
-        bCardAccess.setBackground(background(Color.argb(24, 157, 255, 59), 5, Color.argb(90, 157, 255, 59), 1));
-        LinearLayout bCardCopy = column();
-        TextView bCardTitle = text("B-CARD", 15, TEXT, true);
-        bCardTitle.setLetterSpacing(.12f);
-        bCardCopy.addView(bCardTitle);
-        bCardCopy.addView(text("Envie um jogo instalado para o computador.", 9, MUTED, false), margins(-1, 5, -1, 0));
-        bCardAccess.addView(bCardCopy, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView bCardArrow = text("↑", 26, ACCENT, true);
-        bCardArrow.setGravity(Gravity.CENTER);
-        bCardAccess.addView(bCardArrow, new LinearLayout.LayoutParams(dp(42), dp(42)));
-        bCardAccess.setOnClickListener(v -> showBCardLibrary());
-        bCardAccess.setFocusable(true);
-        page.addView(bCardAccess, margins(-1, 0, -1, 18));
-
-        LinearLayout classicsAccess = row();
-        classicsAccess.setGravity(Gravity.CENTER_VERTICAL);
-        classicsAccess.setPadding(dp(16), dp(14), dp(14), dp(14));
-        classicsAccess.setBackground(background(SURFACE, 5, LINE, 1));
-        LinearLayout classicsCopy = column();
-        classicsCopy.addView(text("CLASSICS Everywhere", 15, TEXT, true));
-        classicsCopy.addView(text("Suas ROMs locais · jogar no RetroArch", 9, MUTED, false), margins(-1, 5, -1, 0));
-        classicsAccess.addView(classicsCopy, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView classicsArrow = text("›", 28, ACCENT, true); classicsArrow.setGravity(Gravity.CENTER);
-        classicsAccess.addView(classicsArrow, new LinearLayout.LayoutParams(dp(42), dp(42)));
-        classicsAccess.setOnClickListener(v -> { classicsReturnScreen = "home"; showClassics(); });
-        page.addView(classicsAccess, margins(-1, 0, -1, 18));
 
         LocalClassic recentClassic = null;
         for (LocalClassic item : classicsRepository.all()) if (item.lastPlayedAt > 0 && (recentClassic == null || item.lastPlayedAt > recentClassic.lastPlayedAt)) recentClassic = item;
@@ -1020,81 +1042,60 @@ public final class MainActivity extends Activity {
     }
 
     private void openGamingMode() {
-        LinearLayout intro = column();
-        intro.setGravity(Gravity.CENTER);
-        intro.setPadding(dp(28), dp(28), dp(28), dp(28));
-        intro.setBackgroundColor(Color.rgb(3, 5, 6));
-        ImageView mark = new ImageView(this); mark.setImageResource(com.brumclassics.mobile.R.drawable.ic_launcher);
-        intro.addView(mark, new LinearLayout.LayoutParams(dp(62), dp(62)));
-        TextView title = text("BRUMCLASSICS", 23, TEXT, true); title.setLetterSpacing(.1f); title.setGravity(Gravity.CENTER);
-        intro.addView(title, margins(-1, 18, -1, 5));
-        TextView mode = text("GAMING MODE", 8, ACCENT, true); mode.setLetterSpacing(.28f); mode.setGravity(Gravity.CENTER); intro.addView(mode);
-        TextView promise = text("SEU JOGO.\nSEM ETAPAS.", 25, TEXT, true); promise.setGravity(Gravity.CENTER); promise.setLineSpacing(dp(4), 1f);
-        intro.addView(promise, margins(-1, 42, -1, 0));
-        setScreen("gaming-intro", intro);
-        intro.animate().cancel(); intro.setAlpha(1f); intro.setTranslationY(0f);
-        mark.setScaleX(.84f); mark.setScaleY(.84f); mark.setAlpha(.45f);
-        mark.animate().scaleX(1.08f).scaleY(1.08f).alpha(1f).setDuration(720).setInterpolator(new DecelerateInterpolator()).start();
-        handler.postDelayed(() -> { if ("gaming-intro".equals(currentScreen)) showGamingMode(); }, 1050);
+        gamingOrientationLocked = true;
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+        showGamingMode();
     }
 
     private void showGamingMode() {
         ScrollView scroll = scroll(); LinearLayout page = page(); scroll.addView(page);
-        page.addView(brandHeader("GAMING MODE"));
-        page.addView(text("Sua biblioteca inteira.", 28, TEXT, true), margins(-1, 27, -1, 0));
-        page.addView(text("Só escolha e jogue.", 28, ACCENT, true), margins(-1, 1, -1, 22));
+        LinearLayout header = row(); header.setGravity(Gravity.CENTER_VERTICAL);
+        Button exit = button("←  SAIR"); exit.setTextSize(9); exit.setTextColor(TEXT); exit.setBackground(background(SURFACE, 22, LINE, 1));
+        exit.setContentDescription("Sair do Gaming Mode");
+        exit.setOnClickListener(v -> showHome()); header.addView(exit, new LinearLayout.LayoutParams(dp(94), dp(42)));
+        LinearLayout title = column(); title.setPadding(dp(16), 0, 0, 0); title.addView(eyebrow("BRUMCLASSICS · GAMING MODE"));
+        title.addView(text("Prontos para jogar", 25, TEXT, true), margins(-1, 3, -1, 0)); header.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
+        header.addView(text("connected".equals(syncState) ? "● PC CONECTADO" : "○ PC OFFLINE", 8, "connected".equals(syncState) ? ACCENT : MUTED, true));
+        page.addView(header);
 
-        Game featured = games.isEmpty() ? null : HomeLibrary.lastPlayed(games);
-        if (featured != null) {
-            LinearLayout hero = row(); hero.setGravity(Gravity.CENTER_VERTICAL); hero.setPadding(dp(14), dp(14), dp(14), dp(14));
-            hero.setBackground(background(Color.rgb(13, 31, 25), 10, Color.argb(90, 157, 255, 59), 1));
-            hero.addView(cover(featured, 108, 152));
-            LinearLayout copy = column(); copy.setPadding(dp(15), 0, 0, 0); copy.addView(eyebrow("CONTINUE DE ONDE PAROU"));
-            copy.addView(text(featured.title, 20, TEXT, true), margins(-1, 8, -1, 5));
-            String route = localClassicFor(featured) != null ? "CLASSICS · PRONTO NESTE APARELHO" : featured.installed ? "PC EM CASA · PRONTO PARA INICIAR" : "BIBLIOTECA PRESERVADA";
-            copy.addView(text(route, 7, MUTED, true));
-            TextView action = text("CONTINUAR", 8, BG, true); action.setGravity(Gravity.CENTER); action.setBackground(background(ACCENT, 18, Color.TRANSPARENT, 0));
-            copy.addView(action, margins(112, 15, -1, 0, 36)); hero.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
-            hero.setOnClickListener(v -> openGamingGame(featured)); page.addView(hero);
+        List<LocalClassic> localGames = new ArrayList<>(classicsRepository.all());
+        List<Game> installedGames = new ArrayList<>();
+        for (Game game : games) if (game.installed) installedGames.add(game);
+        localGames.sort((left, right) -> left.title.compareToIgnoreCase(right.title));
+        installedGames.sort((left, right) -> left.title.compareToIgnoreCase(right.title));
+
+        if (!localGames.isEmpty()) {
+            page.addView(sectionHeading("NO CELULAR", localGames.size() + " JOGOS", null), margins(-1, 24, -1, 12));
+            HorizontalScrollView localScroll = new HorizontalScrollView(this); localScroll.setHorizontalScrollBarEnabled(false);
+            LinearLayout localShelf = row();
+            for (LocalClassic game : localGames) localShelf.addView(gamingClassicCard(game), margins(138, 0, 12, 0));
+            localScroll.addView(localShelf); page.addView(localScroll);
         }
 
-        page.addView(sectionHeading("ESCOLHA UM JOGO", "PC + CLASSICS", null), margins(-1, 29, -1, 13));
-        HorizontalScrollView libraryScroll = new HorizontalScrollView(this); libraryScroll.setHorizontalScrollBarEnabled(false);
-        LinearLayout shelf = row(); int added = 0;
-        for (Game game : games) {
-            if (added++ >= 18) break;
-            shelf.addView(gamingGameCard(game), margins(138, 0, 12, 0));
+        if (!installedGames.isEmpty()) {
+            page.addView(sectionHeading("INSTALADOS NO COMPUTADOR", installedGames.size() + " JOGOS", null), margins(-1, localGames.isEmpty() ? 24 : 28, -1, 12));
+            HorizontalScrollView pcScroll = new HorizontalScrollView(this); pcScroll.setHorizontalScrollBarEnabled(false);
+            LinearLayout pcShelf = row();
+            for (Game game : installedGames) pcShelf.addView(gamingGameCard(game), margins(138, 0, 12, 0));
+            pcScroll.addView(pcShelf); page.addView(pcScroll);
         }
-        for (LocalClassic classic : classicsRepository.all()) {
-            if (added++ >= 24 || launcherGameFor(classic) != null) continue;
-            shelf.addView(gamingClassicCard(classic), margins(138, 0, 12, 0));
+
+        if (localGames.isEmpty() && installedGames.isEmpty()) {
+            LinearLayout empty = column(); empty.setPadding(dp(20), dp(24), dp(20), dp(24)); empty.setBackground(background(SURFACE, 8, LINE, 1));
+            empty.addView(text("NENHUM JOGO PRONTO", 13, TEXT, true));
+            empty.addView(text("Escolha uma pasta de ROMs no Perfil ou instale um jogo no computador.", 10, MUTED, false), margins(-1, 8, -1, 0));
+            page.addView(empty, margins(-1, 28, -1, 0));
         }
-        if (shelf.getChildCount() == 0) {
-            LinearLayout empty = column(); empty.setPadding(dp(16), dp(20), dp(16), dp(20)); empty.setBackground(background(SURFACE, 6, LINE, 1));
-            empty.addView(text("BIBLIOTECA VAZIA", 11, TEXT, true)); empty.addView(text("Sincronize o launcher ou configure uma pasta de ROMs.", 9, MUTED, false), margins(-1, 7, -1, 0));
-            page.addView(empty);
-        } else { libraryScroll.addView(shelf); page.addView(libraryScroll); }
-
-        page.addView(sectionHeading("SEUS MODOS DE JOGAR", "", null), margins(-1, 30, -1, 12));
-        page.addView(gamingRouteRow("◆", "JOGAR NESTE APARELHO", "CLASSICS preparados para RetroArch", classicsRepository.all().isEmpty() ? "CONFIGURAR" : "PRONTO", v -> { classicsReturnScreen = "gaming"; showClassics(); }));
-        page.addView(gamingRouteRow("▣", "INICIAR NO COMPUTADOR", "Canal seguro do B-CARD", "connected".equals(syncState) ? "CONECTADO" : "OFFLINE", v -> showBCardLibrary()), margins(-1, 7, -1, 0));
-        page.addView(gamingRouteRow("▥", "ESTATÍSTICAS", "Tempo, plataformas e progresso", "ABRIR", v -> showStats()), margins(-1, 7, -1, 0));
-        page.addView(gamingRouteRow("●", "BRUMCOMPANION", "Anotações e desempenho da sessão", "ABRIR", v -> showCompanion()), margins(-1, 7, -1, 0));
-
-        LinearLayout streaming = column(); streaming.setPadding(dp(16), dp(15), dp(16), dp(15)); streaming.setBackground(background(SURFACE, 7, LINE, 1));
-        LinearLayout streamingHead = row(); streamingHead.setGravity(Gravity.CENTER_VERTICAL); streamingHead.addView(eyebrow("STREAMING REMOTO"), new LinearLayout.LayoutParams(0, -2, 1));
-        streamingHead.addView(text("EM DESENVOLVIMENTO", 7, Color.rgb(255, 166, 58), true)); streaming.addView(streamingHead);
-        streaming.addView(text("O Gaming Mode já inicia jogos no PC. A transmissão de vídeo, áudio e controles pela internet ainda não está disponível nesta versão.", 9, MUTED, false), margins(-1, 9, -1, 0));
-        streaming.setOnClickListener(v -> showStreamingRoadmap()); page.addView(streaming, margins(-1, 24, -1, 30));
+        page.addView(space(22));
         setScreen("gaming", scroll);
     }
 
     private View gamingGameCard(Game game) {
         LinearLayout card = column(); card.addView(cover(game, 138, 193));
-        card.addView(text(isClassicGame(game) ? "CLASSICS" : game.platform.toUpperCase(Locale.ROOT), 7, ACCENT, true), margins(-1, 9, -1, 3));
+        card.addView(text(game.platform.toUpperCase(Locale.ROOT), 7, ACCENT, true), margins(-1, 9, -1, 3));
         TextView title = text(game.title, 11, TEXT, true); title.setMaxLines(2); card.addView(title);
-        card.addView(text(localClassicFor(game) != null ? "NO APARELHO" : game.installed ? "PC PRONTO" : "NA BIBLIOTECA", 7, MUTED, true), margins(-1, 5, -1, 0));
-        card.setOnClickListener(v -> openGamingGame(game)); card.setFocusable(true); return card;
+        card.addView(text("NO COMPUTADOR", 7, MUTED, true), margins(-1, 5, -1, 0));
+        card.setOnClickListener(v -> showGamingGame(game)); card.setFocusable(true); return card;
     }
 
     private View gamingClassicCard(LocalClassic game) {
@@ -2087,6 +2088,18 @@ public final class MainActivity extends Activity {
             local.addView(metricCard(formatClassicTime(localSeconds), "TEMPO LOCAL"), weightedMargins(6, 0, 0, 0));
             page.addView(local);
         }
+
+        LinearLayout achievementsAccess = row();
+        achievementsAccess.setGravity(Gravity.CENTER_VERTICAL);
+        achievementsAccess.setPadding(dp(15), dp(14), dp(15), dp(14));
+        achievementsAccess.setBackground(background(SURFACE, 6, LINE, 1));
+        LinearLayout achievementsCopy = column();
+        achievementsCopy.addView(text("CONQUISTAS", 13, TEXT, true));
+        achievementsCopy.addView(text("Pesquisar jogos, progresso e catálogos manuais", 8, MUTED, false), margins(-1, 5, -1, 0));
+        achievementsAccess.addView(achievementsCopy, new LinearLayout.LayoutParams(0, -2, 1));
+        achievementsAccess.addView(text("ABRIR  ›", 8, ACCENT, true));
+        achievementsAccess.setOnClickListener(v -> showAchievements());
+        page.addView(achievementsAccess, margins(-1, 28, -1, 0));
 
         org.json.JSONObject sessionSummary = experience.optJSONObject("sessions") == null ? new org.json.JSONObject() : experience.optJSONObject("sessions").optJSONObject("summary");
         org.json.JSONObject achievementSummary = experience.optJSONObject("achievements") == null ? new org.json.JSONObject() : experience.optJSONObject("achievements");

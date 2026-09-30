@@ -63,8 +63,8 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - BRUMWORLD: revista interativa com 48 páginas na proporção real A4 e 43 guias baseados em capturas verdadeiras do launcher e do Android. Cada imagem ocupa toda a largura, mostra a área relevante ampliada e pode ser aberta em tela cheia.
 - Aplicativo Android com biblioteca offline, capas, estatísticas e BRUMCOMPANION.
 - Aplicativo iOS pessoal em SwiftUI, com o mesmo cache offline, B-CARD e BRUMCOMPANION, preparado para sideload.
-- Gaming Mode móvel com botão central JOGAR, entrada animada, último jogo em destaque e biblioteca unificada de PC e CLASSICS.
-- Rota automática para RetroArch no aparelho ou início seguro no computador pelo B-CARD; streaming remoto permanece identificado como desenvolvimento futuro.
+- Gaming Mode móvel horizontal com botão central JOGAR e listas separadas de ROMs presentes no celular e jogos instalados no computador.
+- Rota automática para RetroArch no aparelho ou início seguro no computador pelo B-CARD; jogos não instalados ficam fora desse modo.
 - Central BRUM sincronizada com iPhone e Android, limitada ao perfil ativo e sem enviar credenciais ou caminhos locais.
 - B-CARD lista jogos instalados no celular e permite iniciar no computador com um gesto autenticado para cima.
 - BRUMCOMPANION identifica o jogo ativo e permite consultar ou editar Onde parei, Objetivos, Dicas e Comandos no celular.

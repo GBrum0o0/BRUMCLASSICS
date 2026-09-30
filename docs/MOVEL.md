@@ -21,22 +21,20 @@ O código expira. Se expirar, gere outro. Não desative a validação do certifi
 
 ## Início, biblioteca e uso offline
 
-A tela Início destaca o último jogo, Favoritos, Quero jogar e Minha jornada. Depois de sincronizadas, biblioteca, capas, conquistas, estatísticas e anotações permanecem no celular. Fora da rede, mostram a última cópia recebida, não dados em tempo real. Itens ainda não baixados podem ficar indisponíveis offline.
+A tela Início destaca o último jogo, Favoritos, Quero jogar e Minha jornada. Perfil e configurações ficam dentro da Início; B-CARD e CLASSICS Everywhere continuam disponíveis pelo Perfil, sem ocupar a tela principal. A barra inferior contém Início, Biblioteca, JOGAR, Estatísticas e Companion e respeita a área segura do aparelho. Depois de sincronizadas, biblioteca, capas, conquistas, estatísticas e anotações permanecem no celular. Fora da rede, mostram a última cópia recebida, não dados em tempo real. Itens ainda não baixados podem ficar indisponíveis offline.
 
 Anotações e Quero jogar editados offline entram em uma fila. Ao retornar à rede com o launcher aberto, as alterações são enviadas. Se os dois aparelhos alterarem o mesmo campo, escolha qual versão preservar; não é necessário limpar o banco.
 
 ## Gaming Mode
 
-O botão circular **JOGAR**, no centro da navegação inferior, abre uma experiência dedicada a jogos. A tela reúne a biblioteca do computador e os CLASSICS disponíveis no aparelho, destaca o último jogo utilizado e escolhe a rota adequada:
+O botão circular **JOGAR**, no centro da navegação inferior, abre uma tela simples em orientação horizontal. Durante o Gaming Mode, a navegação inferior fica oculta e um botão **Sair** retorna à interface normal. A lista mostra somente o que pode ser usado naquele momento:
 
-- CLASSICS já reconhecido no celular: abre no RetroArch instalado, com sistema e controles encaminhados automaticamente quando a plataforma é identificável;
-- jogo instalado no computador: envia uma solicitação autenticada pelo canal do B-CARD;
-- jogo preservado na biblioteca sem instalação confirmada: continua visível, mas não oferece uma execução falsa;
-- computador desconectado: mantém a biblioteca offline e explica que é necessário reencontrar o launcher.
+- **No celular:** todos os arquivos de jogo reconhecidos na pasta de ROMs escolhida pelo usuário;
+- **Instalados no computador:** somente jogos cujo estado instalado foi confirmado pelo launcher;
+- CLASSICS locais abrem pelo fluxo configurado do RetroArch;
+- jogos do PC usam a solicitação autenticada do B-CARD e informam quando o computador está offline.
 
-O Gaming Mode também dá acesso a Estatísticas e BRUMCOMPANION sem aumentar o número de itens na barra inferior. A animação de entrada é visual e não interrompe a sincronização.
-
-**Streaming remoto** aparece identificado como **Em desenvolvimento**. A versão atual consegue iniciar o jogo no PC, mas ainda não transmite vídeo, áudio ou controles pela internet. Essa indicação evita confundir início remoto com uma sessão de streaming pronta.
+Jogos apenas preservados no cache, mas que não estejam instalados, não aparecem no Gaming Mode. A versão atual consegue iniciar o jogo no PC, mas ainda não transmite vídeo, áudio ou controles pela internet.
 
 ## Central BRUM
 
@@ -46,7 +44,7 @@ Com o launcher 1.59.0, **Notificações** na tela Início reúne conquistas, ses
 
 Escolha a aba **JOGOS** ou **CLASSICS**. A contagem e a grade de cada aba incluem somente os instalados daquela categoria. A classificação é a mesma do launcher, inclusive após uma correção manual de seção; trocar abas não altera os jogos ou seus saves.
 
-Na tela Início, abra **B-CARD** para ver somente jogos cuja instalação foi confirmada pelo launcher. Toque em um jogo, arraste o cartão para cima e solte para enviar a solicitação autenticada ao computador. O launcher valida novamente a identidade e o estado do jogo antes de abrir. Em CLASSICS, escolha Novo jogo, autosave ou save manual. O gesto exige que o computador pareado esteja ligado e na mesma rede; nenhuma execução fica pendente para depois.
+Em **Início → Perfil e configurações**, abra **B-CARD** para ver somente jogos cuja instalação foi confirmada pelo launcher. Toque em um jogo, arraste o cartão para cima e solte para enviar a solicitação autenticada ao computador. O launcher valida novamente a identidade e o estado do jogo antes de abrir. Em CLASSICS, escolha Novo jogo, autosave ou save manual. O gesto exige que o computador pareado esteja ligado e na mesma rede; nenhuma execução fica pendente para depois.
 
 ## BRUMCOMPANION
 

@@ -61,14 +61,16 @@ struct RootView: View {
         ZStack {
             switch selection {
             case 1: NavigationStack { LibraryView() }
-            case 2: NavigationStack { GamingModeView() }
-            case 3: NavigationStack { CompanionView() }
-            case 4: NavigationStack { ProfileView() }
+            case 2: NavigationStack { GamingModeView(selection: $selection) }
+            case 3: NavigationStack { StatsView() }
+            case 4: NavigationStack { CompanionView() }
             default: NavigationStack { HomeView(selection: $selection) }
             }
         }
         .background(BrumTheme.background.ignoresSafeArea())
-        .safeAreaInset(edge: .bottom, spacing: 0) { GamingTabBar(selection: $selection) }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if selection != 2 { GamingTabBar(selection: $selection) }
+        }
         .sheet(item: $store.selectedGame) { GameDetailView(game: $0) }
         .alert("BRUMCLASSICS", isPresented: Binding(get: { store.message != nil }, set: { if !$0 { store.message = nil } })) { Button("OK") { store.message = nil } } message: { Text(store.message ?? "") }
         .alert("CLASSICS", isPresented: Binding(get: { pocket.message != nil }, set: { if !$0 { pocket.message = nil } })) { Button("OK") { pocket.message = nil } } message: { Text(pocket.message ?? "") }
@@ -92,11 +94,11 @@ private struct GamingTabBar: View {
                     Text("JOGAR").font(.system(size: 9, weight: .black)).tracking(1).foregroundStyle(BrumTheme.primary)
                 }.offset(y: -14).frame(maxWidth: .infinity)
             }.buttonStyle(.plain).accessibilityLabel("Abrir Gaming Mode").accessibilityIdentifier("gaming-mode-tab")
-            tab(3, "Companion", "note.text")
-            tab(4, "Perfil", "person.crop.circle.fill")
+            tab(3, "Estatísticas", "chart.bar.fill")
+            tab(4, "Companion", "note.text")
         }
-        .padding(.horizontal, 8).padding(.top, 9).padding(.bottom, 3)
-        .background(BrumTheme.deepBackground.overlay(alignment: .top) { Rectangle().fill(BrumTheme.line).frame(height: 1) })
+        .padding(.horizontal, 8).padding(.top, 9).padding(.bottom, 7)
+        .background(BrumTheme.deepBackground.ignoresSafeArea(edges: .bottom).overlay(alignment: .top) { Rectangle().fill(BrumTheme.line).frame(height: 1) })
     }
 
     private func tab(_ value: Int, _ title: String, _ icon: String) -> some View {

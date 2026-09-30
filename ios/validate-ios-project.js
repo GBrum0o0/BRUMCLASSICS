@@ -67,10 +67,13 @@ if (bcardView.split('private func send')[1].includes('offset = 0')) throw new Er
 for (const marker of ['ClassicsEverywhereView', 'PocketSetupView', 'PocketRules.launchURL', '/v1/classics/achievements/sync', 'API_GetGameInfoAndUserProgress.php']) if (!source.includes(marker)) throw new Error(`CLASSICS iPhone incompleto: ${marker}`);
 if (!source.includes('companion-capture') || !source.includes('MobileSettingsView')) throw new Error('Captura ou configurações móveis ausentes.');
 for (const marker of ['MobileNotificationSnapshot', 'NotificationsView', 'notifications_changed', 'markAllNotificationsRead']) if (!source.includes(marker)) throw new Error(`Central BRUM incompleta: ${marker}`);
-for (const marker of ['struct GamingModeView', 'GamingTabBar(selection:', 'Só escolha e jogue.', 'STREAMING REMOTO', 'EM DESENVOLVIMENTO']) {
+for (const marker of ['struct GamingModeView', 'GamingTabBar(selection:', 'Prontos para jogar', 'filter(\\.installed)', 'pocket.romFolderGames', 'GamingOrientation.request(.landscape)', 'selection != 2']) {
   if (!source.includes(marker)) throw new Error(`Gaming Mode incompleto: ${marker}`);
 }
-if (!source.includes('pocket.launchRetroArch(localClassic, launcher: store)') || !source.includes('store.launchBCard(game)')) throw new Error('Gaming Mode não decide entre execução local e computador.');
+if (!source.includes('pocket.launchROM(rom, launcher: store)') || !source.includes('store.launchBCard(game)')) throw new Error('Gaming Mode não decide entre execução local e computador.');
+const homeSource = fs.readFileSync(path.join(app, 'HomeView.swift'), 'utf8');
+if (homeSource.includes('classics-everywhere-link') || homeSource.includes('NavigationLink { BCardLibraryView()')) throw new Error('Início ainda expõe atalhos removidos de B-CARD ou CLASSICS Everywhere.');
+if (!homeSource.includes('profile-home-link')) throw new Error('Perfil precisa estar acessível pelo Início.');
 
 if (!source.includes('SecureStore.write')) throw new Error('Token não está protegido pelo Keychain.');
 if (!source.includes('SHA256.hash(data: data)')) throw new Error('Certificate pinning ausente.');

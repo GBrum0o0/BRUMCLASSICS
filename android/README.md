@@ -15,8 +15,10 @@ Em jogos cuja conexão não oferece leitura oficial completa, a aba **Conquistas
 - Abertura no RetroArch, capa local, jogo recente e contador de horas persistente.
 - Consulta oficial do RetroAchievements, com usuário e Web API Key protegidos pelo Android Keystore.
 - Sincronização idempotente de horas e conquistas vinculadas quando o computador volta à mesma rede.
-- **Gaming Mode** com entrada animada, botão central JOGAR e biblioteca unificada de jogos do PC e CLASSICS.
+- **Gaming Mode** horizontal e direto, aberto pelo botão central JOGAR, sem manter a barra inferior sobre o jogo.
+- Duas listas objetivas: ROMs encontradas na pasta autorizada do celular e jogos com instalação confirmada no computador.
 - Roteamento automático para RetroArch no aparelho ou início seguro no computador pelo B-CARD.
+- Navegação inferior com Início, Biblioteca, JOGAR, Estatísticas e Companion; Perfil fica dentro da Início.
 
 ROMs, BIOS, saves, núcleos e credenciais não fazem parte deste repositório nem do APK.
 

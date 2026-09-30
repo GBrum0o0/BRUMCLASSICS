@@ -29,16 +29,17 @@ struct HomeView: View {
                 NavigationLink { NotificationsView() } label: {
                     SettingsRow(icon: "bell.fill", title: "NOTIFICAÇÕES", detail: notificationDetail)
                 }
+                NavigationLink { ProfileView() } label: {
+                    SettingsRow(icon: "person.crop.circle.fill", title: "PERFIL E CONFIGURAÇÕES", detail: "Pareamento, CLASSICS e preferências do aplicativo")
+                }.accessibilityIdentifier("profile-home-link")
                 if let active = store.activeGame, store.connection == .online {
-                    Button { selection = 3 } label: { CompanionCard(game: active) }.buttonStyle(.plain)
+                    Button { selection = 4 } label: { CompanionCard(game: active) }.buttonStyle(.plain)
                 }
                 if showPocketAsLatest, let lastPocketGame {
                     NavigationLink { PocketGameView(id: lastPocketGame.id) } label: {
                         PocketFeaturedGameCard(game: lastPocketGame, launcherGame: store.snapshot.games.first { $0.id == lastPocketGame.launcherGameID })
                     }.buttonStyle(.plain)
                 } else if let lastPlayed { FeaturedGameCard(game: lastPlayed) }
-                NavigationLink { BCardLibraryView() } label: { SettingsRow(icon: "rectangle.portrait.on.rectangle.portrait", title: "B-CARD", detail: "Seus jogos instalados · Jogos e CLASSICS") }
-                NavigationLink { ClassicsEverywhereView() } label: { SettingsRow(icon: "gamecontroller", title: "CLASSICS Everywhere", detail: "Suas ROMs locais · toque para jogar") }.accessibilityIdentifier("classics-everywhere-link")
                 RecentAchievementsStrip(items: Array(store.snapshot.recentAchievements.prefix(8)))
                 GameStrip(title: "FAVORITOS", games: favorites, empty: "Marque jogos como favoritos no launcher ou no perfil do jogo.")
                 GameStrip(title: "QUERO JOGAR", games: wantToPlay, empty: "Sua lista Quero jogar aparecerá aqui.")
