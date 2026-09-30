@@ -147,9 +147,10 @@ static bool BrumEnvironment(unsigned command, void *data) {
             }
             return true;
         }
-        case BRUM_RETRO_ENVIRONMENT_SHUTDOWN:
+        case BRUM_RETRO_ENVIRONMENT_SHUTDOWN: {
             dispatch_async(dispatch_get_main_queue(), ^{ [host closeEmulator]; });
             return true;
+        }
         case BRUM_RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL:
         case BRUM_RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS:
         case BRUM_RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME:
