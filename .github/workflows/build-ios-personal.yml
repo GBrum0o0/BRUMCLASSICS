@@ -38,17 +38,23 @@ jobs:
         run: |
           set -euo pipefail
           SIMULATOR_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for devices in d["devices"].values() for x in devices if "iPhone" in x["name"] and x.get("isAvailable")))')
-          if ! xcodebuild -project BRUMCLASSICSMobile.xcodeproj -scheme BRUMCLASSICSMobile -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -derivedDataPath build/Simulator -resultBundlePath build/iOS-Tests.xcresult -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test 2>&1 | tee build/xcode-simulator.log; then
-            grep -E '(^|[[:space:]])(error:|fatal error:)|Test Case.*failed|Testing failed:' build/xcode-simulator.log \
-              | tail -n 20 > build/xcode-errors.log || true
-            if [ ! -s build/xcode-errors.log ]; then tail -n 20 build/xcode-simulator.log > build/xcode-errors.log; fi
+          XCODE_LOG="$RUNNER_TEMP/brumclassics-xcode-simulator.log"
+          XCODE_ERRORS="$RUNNER_TEMP/brumclassics-xcode-errors.log"
+          set +e
+          xcodebuild -project BRUMCLASSICSMobile.xcodeproj -scheme BRUMCLASSICSMobile -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -derivedDataPath build/Simulator -resultBundlePath build/iOS-Tests.xcresult -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test 2>&1 | tee "$XCODE_LOG"
+          XCODE_STATUS=${PIPESTATUS[0]}
+          set -e
+          if [ "$XCODE_STATUS" -ne 0 ]; then
+            grep -E '(^|[[:space:]])(error:|fatal error:)|Test Case.*failed|Testing failed:' "$XCODE_LOG" \
+              | tail -n 20 > "$XCODE_ERRORS" || true
+            if [ ! -s "$XCODE_ERRORS" ]; then tail -n 20 "$XCODE_LOG" > "$XCODE_ERRORS"; fi
             while IFS= read -r LINE; do
               LINE=$(printf '%s' "$LINE" | sed -E $'s/\x1B\\[[0-9;]*[mK]//g' | cut -c1-1800)
               LINE=${LINE//'%'/'%25'}
               LINE=${LINE//$'\r'/'%0D'}
               echo "::error title=Xcode::$LINE"
-            done < build/xcode-errors.log
-            exit 1
+            done < "$XCODE_ERRORS"
+            exit "$XCODE_STATUS"
           fi
 
       - name: Guardar resultados dos testes
