@@ -20,6 +20,7 @@ struct IntegratedEmulatorView: View {
     @State private var stagedURL: URL?
     @State private var failure = ""
     @State private var finishing = false
+    @State private var choosingROMFolder = false
 
     var body: some View {
         ZStack {
@@ -33,6 +34,8 @@ struct IntegratedEmulatorView: View {
                     Text("NÃO FOI POSSÍVEL INICIAR").font(.headline.bold()).foregroundStyle(.white)
                     Text(failure).font(.subheadline).multilineTextAlignment(.center).foregroundStyle(.white.opacity(0.7)).frame(maxWidth: 520)
                     Button("VOLTAR") { dismiss() }.buttonStyle(PrimaryButtonStyle()).frame(maxWidth: 240)
+                    Button("REAUTORIZAR PASTA") { choosingROMFolder = true }
+                        .font(.caption.bold()).foregroundStyle(BrumTheme.primary)
                 }.padding(30)
             } else {
                 VStack(spacing: 14) {
@@ -43,10 +46,24 @@ struct IntegratedEmulatorView: View {
                 }
             }
         }
-        .task {
-            do { stagedURL = try await pocket.prepareIntegratedROM(rom, launcher: launcher) }
-            catch { failure = error.localizedDescription }
+        .task { await prepare() }
+        .fileImporter(isPresented: $choosingROMFolder, allowedContentTypes: [.folder]) { result in
+            switch result {
+            case .success(let folder):
+                Task {
+                    await pocket.configureROMFolder(folder)
+                    await prepare()
+                }
+            case .failure(let error): failure = error.localizedDescription
+            }
         }
+    }
+
+    private func prepare() async {
+        failure = ""
+        stagedURL = nil
+        do { stagedURL = try await pocket.prepareIntegratedROM(rom, launcher: launcher) }
+        catch { failure = error.localizedDescription }
     }
 
     private func finish() {

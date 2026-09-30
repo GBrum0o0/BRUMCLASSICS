@@ -21,6 +21,22 @@ struct ROMShareTicket: Identifiable, Equatable {
     let filename: String
 }
 
+enum CoordinatedFileAccess {
+    static func read<T>(_ url: URL, accessor: (URL) throws -> T) throws -> T {
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        var coordinationError: NSError?
+        var result: Result<T, Error>?
+        coordinator.coordinate(readingItemAt: url, options: .withoutChanges, error: &coordinationError) { coordinatedURL in
+            result = Result { try accessor(coordinatedURL) }
+        }
+        if let coordinationError { throw coordinationError }
+        guard let result else {
+            throw PocketError.message("O provedor de arquivos não entregou acesso ao item selecionado.")
+        }
+        return try result.get()
+    }
+}
+
 enum ROMTitleRules {
     static func clean(_ value: String) -> String {
         value
@@ -66,6 +82,12 @@ enum ROMFolderScanner {
     static let maximumFiles = 10_000
 
     static func scan(_ root: URL, allowedExtensions: Set<String> = PocketRules.extensions) throws -> ROMFolderScan {
+        try CoordinatedFileAccess.read(root) { coordinatedRoot in
+            try scanContents(coordinatedRoot, allowedExtensions: allowedExtensions)
+        }
+    }
+
+    private static func scanContents(_ root: URL, allowedExtensions: Set<String>) throws -> ROMFolderScan {
         let root = root.standardizedFileURL
         let keys: [URLResourceKey] = [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]
         guard let enumerator = FileManager.default.enumerator(
@@ -109,7 +131,13 @@ enum ROMExportStager {
         var destination = directory.appendingPathComponent(filename, isDirectory: false)
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            try FileManager.default.copyItem(at: source, to: destination)
+            try CoordinatedFileAccess.read(source) { coordinatedSource in
+                let values = try coordinatedSource.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+                guard values.isRegularFile == true, values.isSymbolicLink != true, (values.fileSize ?? 0) > 0 else {
+                    throw PocketError.message("A ROM não está mais disponível na pasta escolhida.")
+                }
+                try FileManager.default.copyItem(at: coordinatedSource, to: destination)
+            }
             var values = URLResourceValues()
             values.isExcludedFromBackup = true
             try? destination.setResourceValues(values)
@@ -178,16 +206,6 @@ actor ROMFolderAccess {
             if accessing { root.stopAccessingSecurityScopedResource() }
             throw PocketError.message("O caminho da ROM não pertence mais à pasta autorizada.")
         }
-        let values: URLResourceValues
-        do { values = try file.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]) }
-        catch {
-            if accessing { root.stopAccessingSecurityScopedResource() }
-            throw error
-        }
-        guard values.isRegularFile == true, values.isSymbolicLink != true, (values.fileSize ?? 0) > 0 else {
-            if accessing { root.stopAccessingSecurityScopedResource() }
-            throw PocketError.message("A ROM não está mais disponível na pasta escolhida.")
-        }
         // A security-scoped permission belongs only to BRUMCLASSICS. Passing the
         // provider URL directly makes another app receive a path it cannot read.
         // Stage a private copy first so UIActivityViewController can vend a normal
@@ -196,6 +214,10 @@ actor ROMFolderAccess {
         let exportDirectory = exportRoot.appendingPathComponent(shareID.uuidString, isDirectory: true)
         let exportedFile: URL
         do {
+            if stale {
+                let refreshed = try root.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
+                UserDefaults.standard.set(refreshed, forKey: bookmarkKey)
+            }
             try removeExpiredExports()
             exportedFile = try ROMExportStager.stage(source: file, filename: game.filename, root: exportRoot, id: shareID)
         } catch {
@@ -221,15 +243,15 @@ actor ROMFolderAccess {
         guard source.path.hasPrefix(prefix), source.lastPathComponent == game.filename else {
             throw PocketError.message("O caminho da ROM não pertence mais à pasta autorizada.")
         }
-        let values = try source.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
-        guard values.isRegularFile == true, values.isSymbolicLink != true, (values.fileSize ?? 0) > 0 else {
-            throw PocketError.message("A ROM não está mais disponível na pasta escolhida.")
-        }
         try removeExpiredFiles(in: integratedRoot)
         do {
+            if stale {
+                let refreshed = try root.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
+                UserDefaults.standard.set(refreshed, forKey: bookmarkKey)
+            }
             return try ROMExportStager.stage(source: source, filename: game.filename, root: integratedRoot, id: UUID())
         } catch {
-            throw PocketError.message("Não foi possível preparar o jogo para o BRUM Core. Se ele estiver no iCloud, baixe o arquivo no iPhone e tente novamente.")
+            throw PocketError.message("O iOS não liberou a leitura desta ROM. Se ela estiver no iCloud, baixe-a no iPhone. Se já estiver local, reautorize a pasta em Perfil → Configurações do app → CLASSICS.")
         }
     }
 

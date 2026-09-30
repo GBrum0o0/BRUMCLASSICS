@@ -79,6 +79,9 @@ if (!source.includes('pocket.launchROM(rom, launcher: store)') || !source.includ
 for (const marker of ['IntegratedEmulatorSupport.supports', 'prepareIntegratedROM', 'stageForIntegratedPlay', 'JOGAR · BRUM CORE', 'finishIntegratedPlay']) {
   if (!source.includes(marker)) throw new Error(`Emulação integrada incompleta: ${marker}`);
 }
+for (const marker of ['CoordinatedFileAccess', 'NSFileCoordinator', 'REAUTORIZAR PASTA']) {
+  if (!source.includes(marker)) throw new Error(`Acesso coordenado às ROMs incompleto: ${marker}`);
+}
 const homeSource = fs.readFileSync(path.join(app, 'HomeView.swift'), 'utf8');
 if (homeSource.includes('classics-everywhere-link') || homeSource.includes('NavigationLink { BCardLibraryView()')) throw new Error('Início ainda expõe atalhos removidos de B-CARD ou CLASSICS Everywhere.');
 if (!homeSource.includes('profile-home-link')) throw new Error('Perfil precisa estar acessível pelo Início.');

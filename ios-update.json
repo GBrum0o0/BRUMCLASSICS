@@ -1,9 +1,12 @@
 {
-  "version": "0.13.0",
-  "build": 25,
+  "version": "0.13.1",
+  "build": 26,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.13.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.13.1",
   "notes": [
+    "Corrige a permissão ao abrir ROMs de pastas autorizadas, iCloud Drive e outros provedores no BRUM Core.",
+    "A leitura agora usa NSFileCoordinator, conforme o fluxo exigido pelo seletor de documentos do iOS.",
+    "A tela de erro permite reautorizar a pasta de ROMs sem procurar a opção nas configurações.",
     "GB, GBC e GBA agora abrem dentro do BRUMCLASSICS pelo BRUM Core.",
     "Esses sistemas não precisam mais importar a ROM para o RetroArch.",
     "O núcleo mGBA vem incluído no IPA com controles virtuais, controle Bluetooth, áudio, vídeo e saves locais.",
