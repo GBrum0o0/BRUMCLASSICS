@@ -100,6 +100,9 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     NSString *_emulatedSystemID;
     NSString *_contentSHA256;
     NSString *_coreID;
+    NSString *_coreVersion;
+    NSString *_coreDisplayName;
+    NSString *_coreLibraryName;
     NSString *_saveIdentifier;
     NSString *_legacySaveBasename;
     NSMutableDictionary<NSString *, NSString *> *_variables;
@@ -312,6 +315,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
                       systemID:(NSString *)systemID
                  contentSHA256:(NSString *)contentSHA256
                         coreID:(NSString *)coreID
+                    coreVersion:(NSString *)coreVersion
+                coreDisplayName:(NSString *)coreDisplayName
+                coreLibraryName:(NSString *)coreLibraryName
                 saveIdentifier:(NSString *)saveIdentifier
             legacySaveBasename:(NSString *)legacySaveBasename
                         onExit:(BrumEmulatorExitHandler)onExit {
@@ -323,6 +329,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _emulatedSystemID = [systemID copy];
     _contentSHA256 = [contentSHA256 copy];
     _coreID = [coreID copy];
+    _coreVersion = [coreVersion copy];
+    _coreDisplayName = [coreDisplayName copy];
+    _coreLibraryName = [coreLibraryName copy];
     _saveIdentifier = [saveIdentifier copy];
     _legacySaveBasename = [legacySaveBasename copy];
     _onExit = [onExit copy];
@@ -365,10 +374,10 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 
 - (BOOL)loadCore:(NSError **)error {
     NSString *frameworks = NSBundle.mainBundle.privateFrameworksPath ?: NSBundle.mainBundle.bundlePath;
-    NSString *path = [frameworks stringByAppendingPathComponent:@"mgba_libretro_ios.dylib"];
+    NSString *path = [frameworks stringByAppendingPathComponent:_coreLibraryName];
     _coreHandle = dlopen(path.fileSystemRepresentation, RTLD_NOW | RTLD_LOCAL);
     if (!_coreHandle) {
-        if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:1 userInfo:@{NSLocalizedDescriptionKey: @"O núcleo interno mGBA não está presente neste IPA."}];
+        if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:1 userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"O núcleo interno %@ não está presente neste IPA.", _coreDisplayName]}];
         return NO;
     }
 #define BRUM_LOAD(field, symbol) do { _core.field = (decltype(_core.field))BrumLoadSymbol(_coreHandle, symbol); if (!_core.field) { if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:2 userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Núcleo inválido: falta %s.", symbol]}]; return NO; } } while (0)
@@ -471,7 +480,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 
     _statusLabel = [[UILabel alloc] init];
     _statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    _statusLabel.text = @"BRUM CORE · mGBA";
+    _statusLabel.text = [NSString stringWithFormat:@"BRUM CORE · %@", _coreDisplayName];
     _statusLabel.textColor = [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:1];
     _statusLabel.font = [UIFont monospacedSystemFontOfSize:10 weight:UIFontWeightBold];
     [self.view addSubview:_statusLabel];
@@ -575,7 +584,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _fastForwardButton.layer.borderColor = (_fastForwardEnabled ? accent : [UIColor colorWithWhite:1 alpha:0.16]).CGColor;
     _fastForwardButton.accessibilityValue = _fastForwardEnabled ? @"Ativado" : @"Desativado";
     _fastForwardButton.accessibilityTraits = _fastForwardEnabled ? UIAccessibilityTraitButton | UIAccessibilityTraitSelected : UIAccessibilityTraitButton;
-    _statusLabel.text = _fastForwardEnabled ? @"AVANÇO RÁPIDO · 5×" : @"BRUM CORE · mGBA";
+    _statusLabel.text = _fastForwardEnabled ? @"AVANÇO RÁPIDO · 5×" : [NSString stringWithFormat:@"BRUM CORE · %@", _coreDisplayName];
 }
 
 - (void)toggleDisplayMode {
@@ -630,7 +639,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     }
     NSDictionary *metadata = @{
         @"schemaVersion": @1, @"canonicalGameID": _canonicalGameID, @"systemID": _emulatedSystemID, @"coreID": _coreID,
-        @"coreVersion": @"7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6", @"slot": @(slot),
+        @"coreVersion": _coreVersion, @"slot": @(slot),
         @"sizeBytes": @(size), @"updatedAt": [NSISO8601DateFormatter stringFromDate:NSDate.date timeZone:[NSTimeZone timeZoneForSecondsFromGMT:0] formatOptions:NSISO8601DateFormatWithInternetDateTime]
     };
     NSData *json = [NSJSONSerialization dataWithJSONObject:metadata options:NSJSONWritingSortedKeys error:nil];
@@ -648,7 +657,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     BOOL compatible = [metadata isKindOfClass:NSDictionary.class] && [metadata[@"schemaVersion"] integerValue] == 1 &&
         [metadata[@"slot"] integerValue] == slot && [metadata[@"canonicalGameID"] isEqualToString:_canonicalGameID] &&
         [metadata[@"systemID"] isEqualToString:_emulatedSystemID] && [metadata[@"coreID"] isEqualToString:_coreID] &&
-        [metadata[@"coreVersion"] isEqualToString:@"7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6"];
+        [metadata[@"coreVersion"] isEqualToString:_coreVersion];
     NSData *state = compatible ? [NSData dataWithContentsOfFile:path] : nil;
     size_t expected = _core.serializeSize();
     if (!state || !expected || state.length != expected || [metadata[@"sizeBytes"] unsignedLongLongValue] != state.length || !_core.unserialize(state.bytes, state.length)) {
@@ -665,7 +674,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         BrumLibretroViewController *strongSelf = weakSelf;
         if (!strongSelf || strongSelf->_stopped) return;
-        strongSelf->_statusLabel.text = strongSelf->_fastForwardEnabled ? @"AVANÇO RÁPIDO · 5×" : @"BRUM CORE · mGBA";
+        strongSelf->_statusLabel.text = strongSelf->_fastForwardEnabled ? @"AVANÇO RÁPIDO · 5×" : [NSString stringWithFormat:@"BRUM CORE · %@", strongSelf->_coreDisplayName];
         strongSelf->_statusLabel.textColor = [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:1];
     });
 }
@@ -690,7 +699,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     gameInfo.path = _romURL.path.fileSystemRepresentation;
     if (!systemInfo.need_fullpath) { gameInfo.data = _romData.bytes; gameInfo.size = _romData.length; }
     if (!_core.loadGame(&gameInfo)) {
-        if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:4 userInfo:@{NSLocalizedDescriptionKey: @"O núcleo mGBA recusou este arquivo. Confirme que ele é GB, GBC ou GBA válido."}];
+        if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:4 userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"O núcleo %@ recusou este arquivo. Confirme que a ROM é válida para %@.", _coreDisplayName, _emulatedSystemID.uppercaseString]}];
         return NO;
     }
     _gameLoaded = YES;
@@ -777,6 +786,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         @"canonicalGameID": _canonicalGameID,
         @"systemID": _emulatedSystemID,
         @"coreID": _coreID,
+        @"coreVersion": _coreVersion,
         @"slot": @"battery",
         @"generation": @(generation),
         @"payloadSHA256": payloadHash,

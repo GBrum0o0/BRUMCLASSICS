@@ -1261,15 +1261,16 @@ public final class MainActivity extends Activity {
             LinearLayout.LayoutParams coverLp = margins(210, 25, -1, 0, 294); coverLp.gravity = Gravity.CENTER_HORIZONTAL;
             page.addView(localClassicArtwork(game, 294), coverLp);
         }
-        TextView platform = eyebrow(classicPlatform(game.filename) + " · RETROARCH"); platform.setGravity(Gravity.CENTER);
+        CoreRegistry.Descriptor integratedCore = CoreRegistry.integratedCore(game.systemId, game.filename);
+        TextView platform = eyebrow(classicPlatform(game.filename) + (integratedCore == null ? " · RETROARCH" : " · BRUM CORE · " + integratedCore.displayName.toUpperCase(Locale.ROOT))); platform.setGravity(Gravity.CENTER);
         page.addView(platform, margins(-1, launcherGame == null ? 28 : 20, -1, 8));
         TextView title = text(game.title, 27, TEXT, true); title.setGravity(Gravity.CENTER); page.addView(title);
         page.addView(text(game.filename, 8, MUTED, false), margins(-1, 7, -1, 20));
 
-        boolean integrated = CoreRegistry.supportsIntegrated(game.systemId, game.filename);
+        boolean integrated = integratedCore != null;
         Button play = primaryButton(integrated ? "JOGAR · BRUM CORE" : "JOGAR NO RETROARCH"); play.setOnClickListener(v -> launchLocalClassic(game));
         page.addView(play, new LinearLayout.LayoutParams(-1, dp(50)));
-        page.addView(text(integrated ? "Este jogo roda dentro do BRUMCLASSICS, com save local, tela cheia e avanço rápido." : "O jogo roda no RetroArch. Instale o núcleo correspondente antes do primeiro uso.", 8, MUTED, false), margins(-1, 8, -1, 0));
+        page.addView(text(integrated ? "Este jogo roda dentro do BRUMCLASSICS com " + integratedCore.displayName + ", save local, tela cheia e avanço rápido." : "Este sistema ainda usa o RetroArch porque não possui um núcleo interno aprovado e compatível.", 8, MUTED, false), margins(-1, 8, -1, 0));
 
         page.addView(sectionHeading("HORAS NO ANDROID", "ATUALIZAR", v -> syncClassic(game, true)), margins(-1, 28, -1, 10));
         long pending = Math.max(0L, game.creditedSeconds - Math.max(0L, game.acknowledgedSeconds));
@@ -2044,7 +2045,7 @@ public final class MainActivity extends Activity {
                 if (!"https".equalsIgnoreCase(url.getProtocol()) || !(host.endsWith("steamstatic.com") || host.endsWith("akamaihd.net"))) return;
                 connection = (HttpURLConnection) url.openConnection();
                 connection.setConnectTimeout(6000); connection.setReadTimeout(8000); connection.setInstanceFollowRedirects(false);
-                connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android/0.22.1");
+                connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android/0.22.2");
                 if (connection.getResponseCode() != 200 || connection.getContentLengthLong() > 2 * 1024 * 1024) return;
                 byte[] buffer = new byte[8192]; int read; int total = 0;
                 ByteArrayOutputStream output = new ByteArrayOutputStream();

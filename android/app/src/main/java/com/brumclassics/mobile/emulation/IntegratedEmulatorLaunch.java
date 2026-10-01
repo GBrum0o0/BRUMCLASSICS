@@ -9,13 +9,17 @@ public final class IntegratedEmulatorLaunch {
     public final String systemId;
     public final String contentSha256;
     public final String coreId;
+    public final String coreDisplayName;
+    public final String coreVersion;
+    public final String coreLibraryName;
     public final File romFile;
     public final File saveFile;
     public final File manifestFile;
     public final File systemDirectory;
 
     public IntegratedEmulatorLaunch(String gameId, String title, String canonicalGameId, String systemId,
-                                    String contentSha256, String coreId, File romFile, File saveFile,
+                                    String contentSha256, String coreId, String coreDisplayName,
+                                    String coreVersion, String coreLibraryName, File romFile, File saveFile,
                                     File manifestFile, File systemDirectory) {
         this.gameId = gameId;
         this.title = title;
@@ -23,6 +27,9 @@ public final class IntegratedEmulatorLaunch {
         this.systemId = systemId;
         this.contentSha256 = contentSha256;
         this.coreId = coreId;
+        this.coreDisplayName = coreDisplayName;
+        this.coreVersion = coreVersion;
+        this.coreLibraryName = coreLibraryName;
         this.romFile = romFile;
         this.saveFile = saveFile;
         this.manifestFile = manifestFile;

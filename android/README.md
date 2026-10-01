@@ -1,6 +1,6 @@
 # BRUMCLASSICS MÓVEL para Android
 
-Cliente Android nativo complementar ao BRUMCLASSICS. A versão atual é a **0.22.1** (`versionCode 32`) e requer Android 8.0/API 26 ou superior.
+Cliente Android nativo complementar ao BRUMCLASSICS. A versão atual é a **0.22.2** (`versionCode 33`) e requer Android 8.0/API 26 ou superior.
 
 Em jogos cuja conexão não oferece leitura oficial completa, a aba **Conquistas** pesquisa jogos e mostra imagem, título e descrição do catálogo carregado pelo launcher. Toque em um item para marcar ou desfazer o progresso manual. O launcher 1.62.0 mantém esses registros por perfil e protege confirmações oficiais.
 
@@ -14,6 +14,7 @@ Em jogos cuja conexão não oferece leitura oficial completa, a aba **Conquistas
 - **CLASSICS Everywhere** com pasta de ROMs autorizada pelo seletor nativo do Android.
 - BRUM Core integrado para GB, GBC e GBA; RetroArch permanece como fallback para os demais sistemas.
 - Três slots de estado rápido locais por jogo, separados do save normal e protegidos por identidade de ROM e núcleo.
+- Registro multicore com seleção dinâmica de biblioteca, nome, versão e licença; jogos sem núcleo interno aprovado permanecem no RetroArch.
 - Consulta oficial do RetroAchievements, com usuário e Web API Key protegidos pelo Android Keystore.
 - Sincronização idempotente de horas e conquistas vinculadas quando o computador volta à mesma rede.
 - **Gaming Mode** horizontal e direto, aberto pelo botão central JOGAR, sem manter a barra inferior sobre o jogo.
@@ -48,4 +49,4 @@ O workflow `Android CI` compila o aplicativo e executa os testes de contrato sem
 
 GB, GBC e GBA agora rodam diretamente no **BRUM Core**, com mGBA integrado, tela horizontal, controles virtuais e Bluetooth, save local e avanço rápido 5×. Os demais sistemas continuam usando o RetroArch como fallback.
 
-Veja o [guia de uso](../docs/MOVEL.md), as [notas da versão](../releases/android-v0.22.1/RELEASE-NOTES.md) e a [validação](../releases/android-v0.22.1/VALIDACAO.md).
+Veja o [guia de uso](../docs/MOVEL.md), a [política de cores](../docs/CORES-INTEGRADOS.md), as [notas da versão](../releases/android-v0.22.2/RELEASE-NOTES.md) e a [validação](../releases/android-v0.22.2/VALIDACAO.md).

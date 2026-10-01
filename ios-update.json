@@ -1,9 +1,12 @@
 {
-  "version": "0.13.6",
-  "build": 31,
+  "version": "0.13.7",
+  "build": 32,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.13.6",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.13.7",
   "notes": [
+    "O BRUM Core agora seleciona dinamicamente a biblioteca, o nome, a versão e a licença de cada núcleo integrado.",
+    "Saves normais e estados rápidos registram a versão real do núcleo para preparar novos sistemas sem quebrar compatibilidade.",
+    "Jogos sem núcleo interno aprovado continuam claramente no RetroArch, sem simular suporte dentro do aplicativo.",
     "O BRUM Core agora oferece três slots de estado rápido por jogo, separados do save normal.",
     "Cada slot é identificado pelo conteúdo da ROM e registra a versão exata do núcleo para detectar incompatibilidades.",
     "Gaming Mode agora identifica GB, GBC e GBA pelo conteúdo da ROM, sem depender do nome ou da pasta.",

@@ -830,7 +830,7 @@ public final class BridgeClient {
         connection.setReadTimeout(12000);
         connection.setUseCaches(false);
         connection.setRequestProperty("Accept", "application/json");
-        connection.setRequestProperty("User-Agent", "BRUMCLASSICS-MOVEL/0.22.1 Android");
+        connection.setRequestProperty("User-Agent", "BRUMCLASSICS-MOVEL/0.22.2 Android");
         if (authenticated) connection.setRequestProperty("Authorization", "Bearer " + preferences.getString("token", ""));
     }
 

@@ -42,7 +42,7 @@ struct GamingModeView: View {
                                 rom: rom,
                                 launcherGame: pocket.launcherGame(for: rom, launcher: store),
                                 retroArchReady: pocket.isImportedIntoRetroArch(rom),
-                                integratedReady: IntegratedEmulatorSupport.supports(rom)
+                                integratedCoreName: IntegratedEmulatorSupport.core(for: rom)?.displayName
                             ) {
                                 if IntegratedEmulatorSupport.supports(rom) { selectedROM = rom }
                                 else { Task { await pocket.launchROM(rom, launcher: store) } }

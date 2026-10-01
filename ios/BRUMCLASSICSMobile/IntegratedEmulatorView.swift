@@ -1,14 +1,23 @@
 import SwiftUI
 
 enum IntegratedEmulatorSupport {
-    static let supportedExtensions: Set<String> = ["gb", "gbc", "gba"]
-
     static func supports(_ rom: ROMFolderGame) -> Bool {
-        supportedExtensions.contains((rom.filename as NSString).pathExtension.lowercased())
+        core(for: rom) != nil
+    }
+
+    static func core(for rom: ROMFolderGame) -> CoreDescriptor? {
+        let system: EmulatedSystemID?
+        switch (rom.filename as NSString).pathExtension.lowercased() {
+        case "gb": system = .gameBoy
+        case "gbc": system = .gameBoyColor
+        case "gba": system = .gameBoyAdvance
+        default: system = nil
+        }
+        return system.flatMap(CoreRegistry.core(for:))
     }
 
     static func routeLabel(_ rom: ROMFolderGame) -> String {
-        supports(rom) ? "JOGAR · BRUM CORE" : "JOGAR · RETROARCH"
+        core(for: rom).map { "JOGAR · BRUM CORE · \($0.displayName.uppercased())" } ?? "JOGAR · RETROARCH"
     }
 }
 
@@ -98,6 +107,9 @@ private struct BrumLibretroController: UIViewControllerRepresentable {
             systemID: launch.identity.systemID.rawValue,
             contentSHA256: launch.identity.contentSHA256,
             coreID: launch.core.id,
+            coreVersion: launch.core.version,
+            coreDisplayName: launch.core.displayName,
+            coreLibraryName: launch.core.libraryName,
             saveIdentifier: launch.saveIdentifier,
             legacySaveBasename: launch.legacySaveBasename,
             onExit: onExit

@@ -44,6 +44,8 @@ public final class IntegratedEmulatorActivity extends Activity {
         intent.putExtra("gameId", launch.gameId); intent.putExtra("title", launch.title);
         intent.putExtra("canonicalGameId", launch.canonicalGameId); intent.putExtra("systemId", launch.systemId);
         intent.putExtra("contentSha256", launch.contentSha256); intent.putExtra("coreId", launch.coreId);
+        intent.putExtra("coreDisplayName", launch.coreDisplayName); intent.putExtra("coreVersion", launch.coreVersion);
+        intent.putExtra("coreLibraryName", launch.coreLibraryName);
         intent.putExtra("romFile", launch.romFile.getAbsolutePath()); intent.putExtra("saveFile", launch.saveFile.getAbsolutePath());
         intent.putExtra("manifestFile", launch.manifestFile.getAbsolutePath()); intent.putExtra("systemDirectory", launch.systemDirectory.getAbsolutePath());
         return intent;
@@ -55,8 +57,8 @@ public final class IntegratedEmulatorActivity extends Activity {
         hideSystemUI();
         launch = readLaunch(getIntent());
         try {
-            String corePath = getApplicationInfo().nativeLibraryDir + "/libmgba_libretro.so";
-            if (!new File(corePath).isFile()) throw new IllegalStateException("O núcleo mGBA não está presente nesta instalação.");
+            String corePath = getApplicationInfo().nativeLibraryDir + "/" + launch.coreLibraryName;
+            if (!new File(corePath).isFile()) throw new IllegalStateException("O núcleo " + launch.coreDisplayName + " não está presente nesta instalação.");
             BrumCoreBridge bridge = new BrumCoreBridge(corePath, launch);
             emulatorView = new BrumCoreView(this, bridge);
             setContentView(buildInterface());
@@ -138,7 +140,7 @@ public final class IntegratedEmulatorActivity extends Activity {
         FrameLayout.LayoutParams selectParams = frame(82, 40, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL); selectParams.setMargins(0, 0, dp(47), dp(18)); root.addView(select, selectParams);
         FrameLayout.LayoutParams startParams = frame(82, 40, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL); startParams.setMargins(dp(47), 0, 0, dp(18)); root.addView(start, startParams);
 
-        TextView status = label("BRUM CORE · mGBA · " + launch.systemId.toUpperCase(), 9, ACCENT, true);
+        TextView status = label("BRUM CORE · " + launch.coreDisplayName + " · " + launch.systemId.toUpperCase(), 9, ACCENT, true);
         FrameLayout.LayoutParams statusParams = frame(260, 28, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL); statusParams.bottomMargin = dp(65); root.addView(status, statusParams);
         return root;
     }
@@ -228,6 +230,7 @@ public final class IntegratedEmulatorActivity extends Activity {
     private IntegratedEmulatorLaunch readLaunch(Intent intent) {
         return new IntegratedEmulatorLaunch(intent.getStringExtra("gameId"), intent.getStringExtra("title"), intent.getStringExtra("canonicalGameId"),
             intent.getStringExtra("systemId"), intent.getStringExtra("contentSha256"), intent.getStringExtra("coreId"),
+            intent.getStringExtra("coreDisplayName"), intent.getStringExtra("coreVersion"), intent.getStringExtra("coreLibraryName"),
             new File(intent.getStringExtra("romFile")), new File(intent.getStringExtra("saveFile")),
             new File(intent.getStringExtra("manifestFile")), new File(intent.getStringExtra("systemDirectory")));
     }

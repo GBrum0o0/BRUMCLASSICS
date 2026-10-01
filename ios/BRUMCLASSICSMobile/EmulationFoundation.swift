@@ -29,6 +29,7 @@ struct CoreDescriptor: Codable, Equatable, Sendable {
     let displayName: String
     let version: String
     let license: String
+    let libraryName: String
     let supportedSystems: Set<EmulatedSystemID>
 }
 
@@ -38,6 +39,7 @@ enum CoreRegistry {
         displayName: "mGBA",
         version: "7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6",
         license: "MPL-2.0",
+        libraryName: "mgba_libretro_ios.dylib",
         supportedSystems: [.gameBoy, .gameBoyColor, .gameBoyAdvance]
     )
 

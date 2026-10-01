@@ -97,7 +97,7 @@ actor PocketRAClient {
         var url = URLComponents(string: "https://retroachievements.org/API/API_GetGameInfoAndUserProgress.php")!
         url.queryItems = [URLQueryItem(name: "y", value: key), URLQueryItem(name: "u", value: username), URLQueryItem(name: "g", value: String(gameID))]
         var request = URLRequest(url: url.url!, timeoutInterval: 20)
-        request.setValue("BRUMCLASSICS-iOS/0.13.6", forHTTPHeaderField: "User-Agent")
+        request.setValue("BRUMCLASSICS-iOS/0.13.7", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200, data.count <= 12 * 1024 * 1024 else { throw PocketError.message("RetroAchievements indisponível ou credencial inválida. Tente mais tarde; o progresso salvo foi mantido.") }
         return try PocketProgress.decode(data, username: username, expectedID: gameID)
@@ -487,7 +487,7 @@ struct ClassicsEverywhereView: View {
             } else {
                 LazyVGrid(columns: columns, spacing: 22) {
                     ForEach(pocket.romFolderGames) { rom in
-                        ROMFolderGameTile(rom: rom, launcherGame: pocket.launcherGame(for: rom, launcher: launcher), retroArchReady: pocket.isImportedIntoRetroArch(rom), integratedReady: IntegratedEmulatorSupport.supports(rom)) {
+                        ROMFolderGameTile(rom: rom, launcherGame: pocket.launcherGame(for: rom, launcher: launcher), retroArchReady: pocket.isImportedIntoRetroArch(rom), integratedCoreName: IntegratedEmulatorSupport.core(for: rom)?.displayName) {
                             if IntegratedEmulatorSupport.supports(rom) { selectedROM = rom }
                             else { Task { await pocket.launchROM(rom, launcher: launcher) } }
                         }
@@ -528,7 +528,7 @@ struct ROMFolderGameTile: View {
     let rom: ROMFolderGame
     let launcherGame: Game?
     let retroArchReady: Bool
-    let integratedReady: Bool
+    let integratedCoreName: String?
     let play: () -> Void
     @State private var artwork: ROMArtwork?
     @State private var artworkImage: UIImage?
@@ -549,7 +549,7 @@ struct ROMFolderGameTile: View {
                     Text(displayedTitle).font(.system(size: 15, weight: .bold)).foregroundStyle(BrumTheme.text).lineLimit(2).multilineTextAlignment(.leading)
                 }
             }.buttonStyle(.plain).accessibilityLabel("Jogar \(displayedTitle)")
-            Text(integratedReady ? "JOGAR · BRUM CORE" : retroArchReady ? "JOGAR · RETROARCH" : "PRIMEIRO USO · IMPORTAR")
+            Text(integratedCoreName.map { "JOGAR · BRUM CORE · \($0.uppercased())" } ?? (retroArchReady ? "JOGAR · RETROARCH" : "PRIMEIRO USO · IMPORTAR"))
                 .font(.system(size: 10, weight: .bold)).foregroundStyle(BrumTheme.primary)
         }.task(id: rom.id + (launcherGame?.artworkPath ?? "")) {
             guard launcherGame?.artworkPath.isEmpty != false else { return }

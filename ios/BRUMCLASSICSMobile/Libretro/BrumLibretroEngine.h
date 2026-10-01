@@ -12,6 +12,9 @@ typedef void (^BrumEmulatorExitHandler)(void);
                       systemID:(NSString *)systemID
                  contentSHA256:(NSString *)contentSHA256
                         coreID:(NSString *)coreID
+                    coreVersion:(NSString *)coreVersion
+                coreDisplayName:(NSString *)coreDisplayName
+                coreLibraryName:(NSString *)coreLibraryName
                 saveIdentifier:(NSString *)saveIdentifier
             legacySaveBasename:(NSString *)legacySaveBasename
                         onExit:(BrumEmulatorExitHandler)onExit NS_DESIGNATED_INITIALIZER;

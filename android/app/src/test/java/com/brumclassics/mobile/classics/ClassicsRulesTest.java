@@ -19,6 +19,8 @@ public final class ClassicsRulesTest {
         if (!first.canonicalGameId().equals(second.canonicalGameId())) throw new AssertionError("ID mudou após renomear a ROM");
         if (!"mgba".equals(CoreRegistry.retroArchCore(first.systemId, "renamed.gb"))) throw new AssertionError("Core incorreto");
         if (!CoreRegistry.supportsIntegrated("gba", "renamed.gba")) throw new AssertionError("GBA deveria usar o BRUM Core");
+        if (!"libmgba_libretro.so".equals(CoreRegistry.integratedCore("gba", "renamed.gba").androidLibraryName)) throw new AssertionError("Biblioteca integrada incorreta");
+        if (CoreRegistry.integratedCore("nes", "game.nes") != null) throw new AssertionError("NES sem core aprovado não pode ser marcado como integrado");
         if (CoreRegistry.supportsIntegrated("sfc", "game.sfc")) throw new AssertionError("SNES ainda deve usar o fallback");
         SaveManifest manifest = SaveManifest.next(null, first, "mgba", "save-a", 32, 1000, "phone");
         SaveManifest same = SaveManifest.next(manifest, first, "mgba", "save-a", 32, 2000, "phone");

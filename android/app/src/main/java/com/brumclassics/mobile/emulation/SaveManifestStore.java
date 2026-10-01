@@ -32,6 +32,7 @@ final class SaveManifestStore {
         manifest.put("canonicalGameID", launch.canonicalGameId);
         manifest.put("systemID", launch.systemId);
         manifest.put("coreID", launch.coreId);
+        manifest.put("coreVersion", launch.coreVersion);
         manifest.put("slot", "battery");
         manifest.put("generation", generation);
         manifest.put("payloadSHA256", payloadHash);

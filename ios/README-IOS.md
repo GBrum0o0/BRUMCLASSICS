@@ -1,6 +1,6 @@
 # BRUMCLASSICS MÓVEL para iOS
 
-Versão 0.13.6: o BRUM Core oferece três slots de estado rápido por jogo, separados do save normal e vinculados à identidade da ROM e à versão do núcleo. GB, GBC e GBA continuam em tela horizontal, com avanço rápido em 5×, controles virtuais e Bluetooth. Outros sistemas permanecem no RetroArch enquanto recebem suporte interno. O IPA sem assinatura é anexado à versão `ios-v0.13.6`.
+Versão 0.13.7: o host do BRUM Core passa a selecionar dinamicamente a biblioteca, o nome e a versão do núcleo. Saves e slots registram essa versão real, preparando a inclusão segura de novos sistemas. GB, GBC e GBA continuam no mGBA; outros sistemas permanecem claramente no RetroArch até receberem um núcleo aprovado. O IPA sem assinatura é anexado à versão `ios-v0.13.7`.
 
 Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o protocolo local seguro versão 10, mantém o cache anterior para leitura offline e não altera dados fora das ações explícitas do usuário.
 
@@ -21,6 +21,7 @@ Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o protocolo local
 - Consulta entre aplicativos pela URL `retroarch://library`, com retorno ao BRUMCLASSICS e cache da biblioteca real do emulador. O esquema de URL não autentica o remetente; essa resposta não comprova propriedade ou conquistas.
 - Abertura interna de GB, GBC e GBA; outros sistemas ainda podem ser entregues ao RetroArch com a permissão do iOS no primeiro uso.
 - Três slots locais para salvar ou retomar instantaneamente uma sessão no BRUM Core, sem substituir o save normal do jogo.
+- Registro multicore compartilhado pela preparação, interface, saves e estados rápidos, sem caminhos fixos para mGBA no host.
 - Capas locais prioritárias; fallback no catálogo público Libretro da mesma plataforma, com imagens e índices salvos para consulta offline. A busca da capa não estabelece vínculos de conquistas.
 - BRUMMOMENTS com captura da sessão ativa, galeria offline, localização, anotação, categoria e favoritos.
 - Atualização pessoal: verificação automática de versão no Perfil e acesso ao build do GitHub Actions.

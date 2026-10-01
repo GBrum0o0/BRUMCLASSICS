@@ -130,6 +130,8 @@ public final class ClassicsRepository {
         if (!CoreRegistry.supportsIntegrated(stored.systemId, stored.filename)) {
             throw new IllegalStateException("Este sistema ainda usa o RetroArch no Android.");
         }
+        CoreRegistry.Descriptor core = CoreRegistry.integratedCore(stored.systemId, stored.filename);
+        if (core == null) throw new IllegalStateException("Nenhum núcleo integrado aprovado está disponível para este sistema.");
 
         String extension = ClassicsRules.extension(stored.filename);
         File playDirectory = new File(context.getCacheDir(), "integrated-play");
@@ -162,7 +164,8 @@ public final class ClassicsRepository {
         save();
         return new IntegratedEmulatorLaunch(
             stored.id, stored.title, stored.canonicalGameId, stored.systemId, stored.contentSha256,
-            "mgba", rom, new File(saveDirectory, stored.contentSha256 + ".srm"),
+            core.id, core.displayName, core.version, core.androidLibraryName,
+            rom, new File(saveDirectory, stored.contentSha256 + ".srm"),
             new File(saveDirectory, stored.contentSha256 + ".save.json"), systemDirectory
         );
     }

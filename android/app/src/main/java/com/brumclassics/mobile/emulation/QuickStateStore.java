@@ -12,8 +12,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 
 final class QuickStateStore {
-    private static final String CORE_VERSION = "7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6";
-
     private QuickStateStore() {}
 
     static void update(IntegratedEmulatorLaunch launch, int slot, File state) throws Exception {
@@ -22,7 +20,7 @@ final class QuickStateStore {
         metadata.put("canonicalGameID", launch.canonicalGameId);
         metadata.put("systemID", launch.systemId);
         metadata.put("coreID", launch.coreId);
-        metadata.put("coreVersion", CORE_VERSION);
+        metadata.put("coreVersion", launch.coreVersion);
         metadata.put("slot", slot);
         metadata.put("sizeBytes", state.length());
         metadata.put("updatedAt", Instant.now().toString());
@@ -50,7 +48,7 @@ final class QuickStateStore {
             return metadata.optInt("schemaVersion") == 1 && metadata.optInt("slot") == slot &&
                 launch.canonicalGameId.equals(metadata.optString("canonicalGameID")) &&
                 launch.systemId.equals(metadata.optString("systemID")) && launch.coreId.equals(metadata.optString("coreID")) &&
-                CORE_VERSION.equals(metadata.optString("coreVersion")) && metadata.optLong("sizeBytes") == state.length();
+                launch.coreVersion.equals(metadata.optString("coreVersion")) && metadata.optLong("sizeBytes") == state.length();
         } catch (Exception ignored) { return false; }
     }
 }

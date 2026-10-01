@@ -30,6 +30,8 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(detected?.system, .gameBoyAdvance)
         XCTAssertEqual(detected?.source, .extensionFallback)
         XCTAssertEqual(CoreRegistry.core(for: .gameBoyAdvance)?.id, "mgba")
+        XCTAssertEqual(CoreRegistry.core(for: .gameBoyAdvance)?.libraryName, "mgba_libretro_ios.dylib")
+        XCTAssertEqual(CoreRegistry.core(for: .gameBoyAdvance)?.license, "MPL-2.0")
     }
 
     func testSaveManifestOnlyAdvancesGenerationWhenPayloadChanges() {
@@ -163,6 +165,7 @@ final class PocketTests: XCTestCase {
         XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Tetris.gb", filename: "Tetris.gb", title: "Tetris", fileSize: 1)))
         XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Zelda.gbc", filename: "Zelda.gbc", title: "Zelda", fileSize: 1)))
         XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "Mario.sfc", filename: "Mario.sfc", title: "Mario", fileSize: 1)))
+        XCTAssertEqual(IntegratedEmulatorSupport.routeLabel(.init(relativePath: "Pokemon.gba", filename: "Pokemon.gba", title: "Pokemon", fileSize: 1)), "JOGAR · BRUM CORE · MGBA")
     }
     func testROMArtworkMatchesSceneNameWithinPlatformAndKeepsOtherGamesOut() {
         let paths = ["Named_Boxarts/Pokemon - FireRed Version (USA, Europe).png", "Named_Boxarts/Pokemon - LeafGreen Version (USA).png", "Named_Snaps/Pokemon - FireRed Version (USA, Europe).png"]
