@@ -21,13 +21,23 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: gradle
-      - name: Install Android SDK 36
+      - name: Install Android SDK 36 and native toolchain
         run: |
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -path '*/bin/sdkmanager' | sort -V | tail -1)
-          yes | "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0"
+          yes | "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0" "ndk;27.0.12077973" "cmake;3.22.1"
+      - name: Fetch pinned mGBA core
+        run: |
+          git clone --filter=blob:none https://github.com/libretro/mgba.git android/app/src/main/cpp/vendor/mgba
+          git -C android/app/src/main/cpp/vendor/mgba checkout --detach 7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6
+          test "$(git -C android/app/src/main/cpp/vendor/mgba rev-parse HEAD)" = "7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6"
       - name: Compile Android application
         working-directory: android
         run: ./gradlew :app:assembleDebug --no-daemon
+      - name: Verify integrated native core
+        shell: bash
+        run: |
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libbrumcore.so'
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libmgba_libretro.so'
       - name: Run contract tests
         shell: bash
         run: |
@@ -55,3 +65,9 @@ jobs:
             com.brumclassics.mobile.sync.MobileSyncStateTest; do
             java -cp "$RUNNER_TEMP/brum-tests" "$test"
           done
+      - name: Store Android build
+        uses: actions/upload-artifact@v4
+        with:
+          name: BRUMCLASSICS-MOVEL-ANDROID-NATIVE
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14

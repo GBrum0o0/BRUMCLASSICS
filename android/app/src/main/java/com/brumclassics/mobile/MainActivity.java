@@ -61,6 +61,8 @@ import com.brumclassics.mobile.classics.CoreRegistry;
 import com.brumclassics.mobile.classics.LocalClassic;
 import com.brumclassics.mobile.classics.LocalArtworkClient;
 import com.brumclassics.mobile.classics.RetroAchievementsClient;
+import com.brumclassics.mobile.emulation.IntegratedEmulatorActivity;
+import com.brumclassics.mobile.emulation.IntegratedEmulatorLaunch;
 import com.brumclassics.mobile.sync.BridgeClient;
 import com.brumclassics.mobile.sync.MobileSyncState;
 import com.brumclassics.mobile.update.MobileUpdateManager;
@@ -82,6 +84,7 @@ import java.net.URL;
 public final class MainActivity extends Activity {
     private static final int REQUEST_ROM_TREE = 7301;
     private static final int REQUEST_RUNTIME_TREE = 7302;
+    private static final int REQUEST_INTEGRATED_EMULATOR = 7303;
     private static final int BG = Color.rgb(9, 10, 12);
     private static final int SURFACE = Color.rgb(17, 19, 23);
     private static final int RAISED = Color.rgb(23, 26, 31);
@@ -291,6 +294,24 @@ public final class MainActivity extends Activity {
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_INTEGRATED_EMULATOR) {
+            if (resultCode == RESULT_OK && data != null) {
+                String gameId = data.getStringExtra(IntegratedEmulatorActivity.RESULT_GAME_ID);
+                long elapsed = data.getLongExtra(IntegratedEmulatorActivity.RESULT_ELAPSED_SECONDS, 0L);
+                modelExecutor.execute(() -> {
+                    try {
+                        ClassicsRepository.SessionResult result = classicsRepository.finishIntegratedSession(gameId, elapsed);
+                        if (result != null) handler.post(() -> {
+                            LocalClassic game = classicsRepository.find(result.gameId);
+                            Toast.makeText(this, "Sessão BRUM Core · " + Math.max(0, result.addedSeconds / 60) + " min", Toast.LENGTH_LONG).show();
+                            if (game != null) syncClassic(game, false);
+                            refreshCurrentScreen();
+                        });
+                    } catch (Exception error) { handler.post(() -> Toast.makeText(this, error.getMessage(), Toast.LENGTH_LONG).show()); }
+                });
+            }
+            return;
+        }
         if ((requestCode != REQUEST_ROM_TREE && requestCode != REQUEST_RUNTIME_TREE) || resultCode != RESULT_OK || data == null || data.getData() == null) return;
         Uri tree = data.getData();
         modelExecutor.execute(() -> {
@@ -1129,7 +1150,7 @@ public final class MainActivity extends Activity {
         page.addView(text("Sistema e controles serão preparados automaticamente.", 9, MUTED, false), margins(-1, 10, -1, 18));
         Button play = primaryButton("JOGAR"); play.setOnClickListener(v -> launchLocalClassic(game)); page.addView(play, new LinearLayout.LayoutParams(-1, dp(50)));
         LinearLayout ready = column(); ready.setPadding(dp(15), dp(15), dp(15), dp(15)); ready.setBackground(background(SURFACE, 7, LINE, 1));
-        ready.addView(eyebrow("PREPARAÇÃO AUTOMÁTICA")); ready.addView(text("✓ Jogo localizado\n✓ Sistema identificado\n✓ Controles encaminhados ao emulador", 9, TEXT, false), margins(-1, 9, -1, 0));
+        ready.addView(eyebrow("PREPARAÇÃO AUTOMÁTICA")); ready.addView(text("✓ Jogo localizado\n✓ Sistema identificado\n✓ BRUM Core ou fallback escolhido automaticamente", 9, TEXT, false), margins(-1, 9, -1, 0));
         page.addView(ready, margins(-1, 22, -1, 0));
         Button details = button("DETALHES, HORAS E CONQUISTAS"); details.setTextColor(ACCENT); details.setBackground(background(SURFACE, 5, ACCENT, 1));
         details.setOnClickListener(v -> { classicDetailsReturnScreen = "gaming"; showClassicDetails(game); }); page.addView(details, margins(-1, 10, -1, 30, 46));
@@ -1186,7 +1207,7 @@ public final class MainActivity extends Activity {
         LinearLayout header = page(); header.setPadding(dp(20), dp(18), dp(20), dp(12));
         header.addView(backHeader("CLASSICS EVERYWHERE", () -> navigate(classicsReturnScreen)));
         header.addView(text("Seus clássicos no Android", 26, TEXT, true), margins(-1, 20, -1, 5));
-        header.addView(text("ROMs da pasta autorizada, abertas diretamente no RetroArch.", 10, MUTED, false));
+        header.addView(text("GB, GBC e GBA abrem no BRUM Core. Outros sistemas usam o RetroArch.", 10, MUTED, false));
         Button refresh = primaryButton(classicsRepository.romFolderConfigured() ? "VERIFICAR " + classicsRepository.romFolderName().toUpperCase(Locale.ROOT) : "SELECIONAR PASTA DE ROMS");
         refresh.setOnClickListener(v -> {
             if (!classicsRepository.romFolderConfigured()) { chooseTree(REQUEST_ROM_TREE); return; }
@@ -1245,9 +1266,10 @@ public final class MainActivity extends Activity {
         TextView title = text(game.title, 27, TEXT, true); title.setGravity(Gravity.CENTER); page.addView(title);
         page.addView(text(game.filename, 8, MUTED, false), margins(-1, 7, -1, 20));
 
-        Button play = primaryButton("JOGAR NO RETROARCH"); play.setOnClickListener(v -> launchLocalClassic(game));
+        boolean integrated = CoreRegistry.supportsIntegrated(game.systemId, game.filename);
+        Button play = primaryButton(integrated ? "JOGAR · BRUM CORE" : "JOGAR NO RETROARCH"); play.setOnClickListener(v -> launchLocalClassic(game));
         page.addView(play, new LinearLayout.LayoutParams(-1, dp(50)));
-        page.addView(text("O jogo roda no RetroArch. Instale o núcleo correspondente antes do primeiro uso.", 8, MUTED, false), margins(-1, 8, -1, 0));
+        page.addView(text(integrated ? "Este jogo roda dentro do BRUMCLASSICS, com save local, tela cheia e avanço rápido." : "O jogo roda no RetroArch. Instale o núcleo correspondente antes do primeiro uso.", 8, MUTED, false), margins(-1, 8, -1, 0));
 
         page.addView(sectionHeading("HORAS NO ANDROID", "ATUALIZAR", v -> syncClassic(game, true)), margins(-1, 28, -1, 10));
         long pending = Math.max(0L, game.creditedSeconds - Math.max(0L, game.acknowledgedSeconds));
@@ -1362,6 +1384,7 @@ public final class MainActivity extends Activity {
         Game launcherGame = launcherGameFor(game);
         try { if (game.launcherGameId.isEmpty() && launcherGame != null) classicsRepository.updateLinks(game.id, game.raGameId, launcherGame.id); }
         catch (Exception ignored) {}
+        if (CoreRegistry.supportsIntegrated(game.systemId, game.filename)) { startIntegratedClassic(game); return; }
         List<String> packages = installedRetroArchPackages();
         if (packages.isEmpty()) { new AlertDialog.Builder(this).setTitle("RetroArch não encontrado").setMessage("Instale o RetroArch oficial e tente novamente.").setPositiveButton("ABRIR SITE", (d, w) -> startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.retroarch.com/?page=platforms")))).setNegativeButton("CANCELAR", null).show(); return; }
         String preferred = getSharedPreferences("brum_classics_android", MODE_PRIVATE).getString("retroarch_package", "");
@@ -1369,6 +1392,18 @@ public final class MainActivity extends Activity {
         if (packages.size() == 1) { getSharedPreferences("brum_classics_android", MODE_PRIVATE).edit().putString("retroarch_package", packages.get(0)).apply(); startRetroArch(game, packages.get(0)); return; }
         String[] labels = new String[packages.size()]; for (int i = 0; i < packages.size(); i++) labels[i] = retroArchLabel(packages.get(i));
         new AlertDialog.Builder(this).setTitle("ESCOLHA O RETROARCH").setItems(labels, (d, which) -> { String selected = packages.get(which); getSharedPreferences("brum_classics_android", MODE_PRIVATE).edit().putString("retroarch_package", selected).apply(); startRetroArch(game, selected); }).show();
+    }
+
+    private void startIntegratedClassic(LocalClassic game) {
+        Toast.makeText(this, "Preparando BRUM Core…", Toast.LENGTH_SHORT).show();
+        modelExecutor.execute(() -> {
+            try {
+                IntegratedEmulatorLaunch launch = classicsRepository.prepareIntegratedLaunch(game);
+                handler.post(() -> startActivityForResult(IntegratedEmulatorActivity.intent(this, launch), REQUEST_INTEGRATED_EMULATOR));
+            } catch (Exception error) {
+                handler.post(() -> Toast.makeText(this, "Não foi possível iniciar: " + error.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        });
     }
 
     private void startRetroArch(LocalClassic game, String packageName) {
@@ -2009,7 +2044,7 @@ public final class MainActivity extends Activity {
                 if (!"https".equalsIgnoreCase(url.getProtocol()) || !(host.endsWith("steamstatic.com") || host.endsWith("akamaihd.net"))) return;
                 connection = (HttpURLConnection) url.openConnection();
                 connection.setConnectTimeout(6000); connection.setReadTimeout(8000); connection.setInstanceFollowRedirects(false);
-                connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android/0.21.1");
+                connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android/0.22.0");
                 if (connection.getResponseCode() != 200 || connection.getContentLengthLong() > 2 * 1024 * 1024) return;
                 byte[] buffer = new byte[8192]; int read; int total = 0;
                 ByteArrayOutputStream output = new ByteArrayOutputStream();

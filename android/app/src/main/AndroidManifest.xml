@@ -38,5 +38,11 @@
                 <data android:scheme="brumclassics" android:host="pair" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".emulation.IntegratedEmulatorActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:screenOrientation="sensorLandscape"
+            android:exported="false"
+            android:theme="@style/AppTheme" />
     </application>
 </manifest>

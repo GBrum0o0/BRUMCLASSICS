@@ -34,10 +34,11 @@ Na primeira execução, se existir o save legado baseado em nome, ele é copiado
 
 ## Próximas etapas
 
-1. Runtime Libretro integrado no Android usando o mesmo descritor.
-2. Slots manuais e estados rápidos separados do save de bateria.
-3. Sincronização de saves com comparação de geração e resolução explícita de conflitos.
-4. Sessão remota do PC com autenticação por dispositivo e transporte criptografado.
-5. RetroAchievements ligado ao ID do conteúdo, sem depender do nome do arquivo.
+O runtime Libretro integrado já está presente no Android para GB, GBC e GBA. Ele usa o mesmo ID canônico, core mGBA fixado e manifesto de save do iOS.
+
+1. Slots manuais e estados rápidos separados do save de bateria.
+2. Sincronização de saves com comparação de geração e resolução explícita de conflitos.
+3. Sessão remota do PC com autenticação por dispositivo e transporte criptografado.
+4. RetroAchievements ligado ao ID do conteúdo, sem depender do nome do arquivo.
 
 ROMs, BIOS e conteúdo protegido não fazem parte do aplicativo. Cada core só entra no produto depois de revisão técnica e de licença.

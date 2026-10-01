@@ -18,6 +18,8 @@ public final class ClassicsRulesTest {
         if (!"gba".equals(first.systemId) || !"header".equals(first.detectionSource)) throw new AssertionError("Cabeçalho GBA não detectado");
         if (!first.canonicalGameId().equals(second.canonicalGameId())) throw new AssertionError("ID mudou após renomear a ROM");
         if (!"mgba".equals(CoreRegistry.retroArchCore(first.systemId, "renamed.gb"))) throw new AssertionError("Core incorreto");
+        if (!CoreRegistry.supportsIntegrated("gba", "renamed.gba")) throw new AssertionError("GBA deveria usar o BRUM Core");
+        if (CoreRegistry.supportsIntegrated("sfc", "game.sfc")) throw new AssertionError("SNES ainda deve usar o fallback");
         SaveManifest manifest = SaveManifest.next(null, first, "mgba", "save-a", 32, 1000, "phone");
         SaveManifest same = SaveManifest.next(manifest, first, "mgba", "save-a", 32, 2000, "phone");
         SaveManifest changed = SaveManifest.next(same, first, "mgba", "save-b", 32, 3000, "phone");

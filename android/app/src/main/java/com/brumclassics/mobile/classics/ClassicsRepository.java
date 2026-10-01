@@ -9,6 +9,8 @@ import android.net.Uri;
 import android.provider.DocumentsContract;
 import android.util.AtomicFile;
 
+import com.brumclassics.mobile.emulation.IntegratedEmulatorLaunch;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -111,18 +113,7 @@ public final class ClassicsRepository {
 
     public synchronized void prepareLaunch(LocalClassic game) throws Exception {
         LocalClassic stored = find(game.id); if (stored == null) throw new IllegalStateException("Atualize a pasta de ROMs antes de jogar.");
-        if (stored.canonicalGameId.isEmpty() || stored.contentSha256.isEmpty()) {
-            EmulationIdentity identity;
-            try (InputStream input = resolver.openInputStream(Uri.parse(stored.uri))) {
-                if (input == null) throw new IllegalStateException("O Android não liberou a leitura desta ROM.");
-                identity = EmulationIdentity.inspect(input, stored.filename);
-            }
-            stored.systemId = identity.systemId;
-            stored.contentSha256 = identity.contentSha256;
-            stored.canonicalGameId = identity.canonicalGameId();
-            String resolvedCore = CoreRegistry.retroArchCore(stored.systemId, stored.filename);
-            stored.coreId = resolvedCore == null ? "" : resolvedCore;
-        }
+        ensureIdentity(stored);
         ensureUniqueLogName(stored);
         if (stored.streamId == null || stored.streamId.isEmpty()) stored.streamId = java.util.UUID.randomUUID().toString();
         if (runtimeFolderConfigured() && stored.lastObservedSeconds == 0 && stored.creditedSeconds == 0 && !stored.counterReset) {
@@ -130,6 +121,73 @@ public final class ClassicsRepository {
         }
         stored.lastPlayedAt = System.currentTimeMillis(); save();
         preferences.edit().putString("active_game", stored.id).putLong("active_launched", stored.lastPlayedAt).putLong("active_backgrounded", 0).commit();
+    }
+
+    public synchronized IntegratedEmulatorLaunch prepareIntegratedLaunch(LocalClassic game) throws Exception {
+        LocalClassic stored = find(game.id);
+        if (stored == null) throw new IllegalStateException("Atualize a pasta de ROMs antes de jogar.");
+        ensureIdentity(stored);
+        if (!CoreRegistry.supportsIntegrated(stored.systemId, stored.filename)) {
+            throw new IllegalStateException("Este sistema ainda usa o RetroArch no Android.");
+        }
+
+        String extension = ClassicsRules.extension(stored.filename);
+        File playDirectory = new File(context.getCacheDir(), "integrated-play");
+        File rom = new File(playDirectory, stored.contentSha256 + "." + extension);
+        if (!playDirectory.isDirectory() && !playDirectory.mkdirs()) throw new IllegalStateException("Não foi possível preparar a área privada da ROM.");
+        if (!rom.isFile() || rom.length() != stored.fileSize) {
+            File temporary = new File(playDirectory, stored.contentSha256 + ".tmp");
+            try (InputStream input = resolver.openInputStream(Uri.parse(stored.uri)); FileOutputStream output = new FileOutputStream(temporary)) {
+                if (input == null) throw new IllegalStateException("O Android não liberou a leitura desta ROM.");
+                byte[] buffer = new byte[1024 * 1024]; int read; long total = 0;
+                while ((read = input.read(buffer)) >= 0) {
+                    if (read == 0) continue;
+                    total += read;
+                    if (total > MAX_ROM_BYTES) throw new IllegalStateException("A ROM ultrapassa o limite seguro do aplicativo.");
+                    output.write(buffer, 0, read);
+                }
+                output.getFD().sync();
+            } catch (Exception error) { temporary.delete(); throw error; }
+            if (rom.exists() && !rom.delete()) { temporary.delete(); throw new IllegalStateException("Não foi possível substituir a cópia temporária da ROM."); }
+            if (!temporary.renameTo(rom)) { temporary.delete(); throw new IllegalStateException("Não foi possível concluir a cópia protegida da ROM."); }
+        }
+
+        File root = new File(context.getFilesDir(), "integrated-emulator");
+        File systemDirectory = new File(root, "system");
+        File saveDirectory = new File(new File(root, "saves"), stored.systemId);
+        if ((!systemDirectory.isDirectory() && !systemDirectory.mkdirs()) || (!saveDirectory.isDirectory() && !saveDirectory.mkdirs())) {
+            throw new IllegalStateException("Não foi possível criar a pasta segura de saves.");
+        }
+        stored.lastPlayedAt = System.currentTimeMillis();
+        save();
+        return new IntegratedEmulatorLaunch(
+            stored.id, stored.title, stored.canonicalGameId, stored.systemId, stored.contentSha256,
+            "mgba", rom, new File(saveDirectory, stored.contentSha256 + ".srm"),
+            new File(saveDirectory, stored.contentSha256 + ".save.json"), systemDirectory
+        );
+    }
+
+    public synchronized SessionResult finishIntegratedSession(String gameId, long elapsedSeconds) throws Exception {
+        LocalClassic game = find(gameId);
+        if (game == null) return null;
+        long added = Math.max(0L, Math.min(MAX_SESSION_SECONDS, elapsedSeconds));
+        game.creditedSeconds += added;
+        save();
+        return new SessionResult(game.id, added, "BRUM Core");
+    }
+
+    private void ensureIdentity(LocalClassic stored) throws Exception {
+        if (!stored.canonicalGameId.isEmpty() && !stored.contentSha256.isEmpty() && !stored.systemId.isEmpty()) return;
+        EmulationIdentity identity;
+        try (InputStream input = resolver.openInputStream(Uri.parse(stored.uri))) {
+            if (input == null) throw new IllegalStateException("O Android não liberou a leitura desta ROM.");
+            identity = EmulationIdentity.inspect(input, stored.filename);
+        }
+        stored.systemId = identity.systemId;
+        stored.contentSha256 = identity.contentSha256;
+        stored.canonicalGameId = identity.canonicalGameId();
+        String resolvedCore = CoreRegistry.retroArchCore(stored.systemId, stored.filename);
+        stored.coreId = resolvedCore == null ? "" : resolvedCore;
     }
 
     public void markSessionBackgrounded() {

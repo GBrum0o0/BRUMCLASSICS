@@ -1,0 +1,14 @@
+BRUMCLASSICS MÓVEL — COMPONENTES DE TERCEIROS
+
+mGBA Libretro core
+Copyright © mGBA authors and contributors.
+License: Mozilla Public License 2.0 (MPL-2.0)
+Pinned source revision: 7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6
+Source: https://github.com/libretro/mgba
+License text: https://www.mozilla.org/MPL/2.0/
+
+Libretro API
+License: MIT
+Source: https://github.com/libretro/libretro-common/blob/master/include/libretro.h
+
+ROMs, BIOS files and commercial game content are not distributed with this application.

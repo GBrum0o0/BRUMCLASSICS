@@ -18,4 +18,9 @@ public final class CoreRegistry {
         if ("pce".equals(extension)) return "mednafen_pce_fast";
         return null;
     }
+
+    public static boolean supportsIntegrated(String systemId, String filename) {
+        String resolved = systemId == null || systemId.isEmpty() ? ClassicsRules.extension(filename) : systemId;
+        return "gb".equals(resolved) || "gbc".equals(resolved) || "gba".equals(resolved);
+    }
 }

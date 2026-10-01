@@ -31,6 +31,8 @@ ios/build/
 android/.gradle/
 android/build/
 android/app/build/
+android/app/.cxx/
+android/app/src/main/cpp/vendor/
 android/release-*/
 android/local.properties
 __pycache__/
