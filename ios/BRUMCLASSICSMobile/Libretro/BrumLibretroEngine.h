@@ -8,6 +8,12 @@ typedef void (^BrumEmulatorExitHandler)(void);
 
 - (instancetype)initWithROMURL:(NSURL *)romURL
                          title:(NSString *)title
+               canonicalGameID:(NSString *)canonicalGameID
+                      systemID:(NSString *)systemID
+                 contentSHA256:(NSString *)contentSHA256
+                        coreID:(NSString *)coreID
+                saveIdentifier:(NSString *)saveIdentifier
+            legacySaveBasename:(NSString *)legacySaveBasename
                         onExit:(BrumEmulatorExitHandler)onExit NS_DESIGNATED_INITIALIZER;
 
 - (instancetype)initWithNibName:(nullable NSString *)nibNameOrNil

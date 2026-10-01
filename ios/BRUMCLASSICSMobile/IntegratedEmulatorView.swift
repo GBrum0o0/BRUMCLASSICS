@@ -18,7 +18,7 @@ struct IntegratedEmulatorView: View {
     @Environment(\.dismiss) private var dismiss
     let rom: ROMFolderGame
     let returnsToPortrait: Bool
-    @State private var stagedURL: URL?
+    @State private var launch: EmulationLaunchDescriptor?
     @State private var failure = ""
     @State private var finishing = false
     @State private var choosingROMFolder = false
@@ -31,8 +31,8 @@ struct IntegratedEmulatorView: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            if let stagedURL {
-                BrumLibretroController(romURL: stagedURL, title: rom.title, onExit: finish)
+            if let launch {
+                BrumLibretroController(launch: launch, onExit: finish)
                     .ignoresSafeArea()
             } else if !failure.isEmpty {
                 VStack(spacing: 18) {
@@ -71,8 +71,8 @@ struct IntegratedEmulatorView: View {
 
     private func prepare() async {
         failure = ""
-        stagedURL = nil
-        do { stagedURL = try await pocket.prepareIntegratedROM(rom, launcher: launcher) }
+        launch = nil
+        do { launch = try await pocket.prepareIntegratedROM(rom, launcher: launcher) }
         catch { failure = error.localizedDescription }
     }
 
@@ -87,12 +87,21 @@ struct IntegratedEmulatorView: View {
 }
 
 private struct BrumLibretroController: UIViewControllerRepresentable {
-    let romURL: URL
-    let title: String
+    let launch: EmulationLaunchDescriptor
     let onExit: () -> Void
 
     func makeUIViewController(context: Context) -> UIViewController {
-        BrumLibretroViewController(romurl: romURL, title: title, onExit: onExit)
+        BrumLibretroViewController(
+            romurl: launch.romURL,
+            title: launch.title,
+            canonicalGameID: launch.identity.canonicalGameID,
+            systemID: launch.identity.systemID.rawValue,
+            contentSHA256: launch.identity.contentSHA256,
+            coreID: launch.core.id,
+            saveIdentifier: launch.saveIdentifier,
+            legacySaveBasename: launch.legacySaveBasename,
+            onExit: onExit
+        )
     }
 
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}

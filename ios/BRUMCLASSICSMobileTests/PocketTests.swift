@@ -2,6 +2,47 @@ import XCTest
 @testable import BRUMCLASSICSMobile
 
 final class PocketTests: XCTestCase {
+    func testEmulationIdentityUsesHeaderAndContentInsteadOfFilename() throws {
+        var bytes = [UInt8](repeating: 0, count: 512)
+        let logo: [UInt8] = [
+            0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D,
+            0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99,
+            0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E
+        ]
+        bytes.replaceSubrange(0x104...0x133, with: logo)
+        bytes[0x143] = 0x80
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = root.appendingPathComponent("renamed-one.gb")
+        let second = root.appendingPathComponent("another-name.gba")
+        try Data(bytes).write(to: first); try Data(bytes).write(to: second)
+
+        let a = try ROMContentInspector.inspect(url: first, filename: first.lastPathComponent)
+        let b = try ROMContentInspector.inspect(url: second, filename: second.lastPathComponent)
+        XCTAssertEqual(a.systemID, .gameBoyColor)
+        XCTAssertEqual(a.detectionSource, .header)
+        XCTAssertEqual(a.canonicalGameID, b.canonicalGameID)
+    }
+
+    func testEmulationIdentityFallsBackToExtensionForSyntheticGBA() throws {
+        let detected = ROMContentInspector.detectSystem(header: Data([1, 2, 3]), filename: "sample.gba")
+        XCTAssertEqual(detected?.system, .gameBoyAdvance)
+        XCTAssertEqual(detected?.source, .extensionFallback)
+        XCTAssertEqual(CoreRegistry.core(for: .gameBoyAdvance)?.id, "mgba")
+    }
+
+    func testSaveManifestOnlyAdvancesGenerationWhenPayloadChanges() {
+        let identity = CanonicalGameIdentity(systemID: .gameBoyAdvance, contentSHA256: String(repeating: "a", count: 64), detectionSource: .header)
+        let first = SaveManifest.next(previous: nil, identity: identity, coreID: "mgba", payloadSHA256: "one", sizeBytes: 32, deviceID: "phone")
+        let unchanged = SaveManifest.next(previous: first, identity: identity, coreID: "mgba", payloadSHA256: "one", sizeBytes: 32, deviceID: "phone")
+        let changed = SaveManifest.next(previous: unchanged, identity: identity, coreID: "mgba", payloadSHA256: "two", sizeBytes: 32, deviceID: "phone")
+        XCTAssertEqual(first.generation, 1)
+        XCTAssertEqual(unchanged.generation, 1)
+        XCTAssertEqual(changed.generation, 2)
+        XCTAssertEqual(first.canonicalGameID, identity.canonicalGameID)
+    }
+
     func testOlderPocketCatalogWithoutLastPlayedDateStillDecodes() throws {
         let json = #"{"id":"00000000-0000-0000-0000-000000000001","title":"Game","filename":"game.gba","retroAchievementID":"","launcherGameID":"","importedIntoRetroArch":true}"#
         let game = try JSONDecoder().decode(PocketClassic.self, from: Data(json.utf8))

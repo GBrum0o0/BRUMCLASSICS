@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.75.1"><strong>Windows 1.75.1</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.21.0"><strong>Android 0.21.0</strong></a> ·
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.13.4"><strong>iOS 0.13.4</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.13.5"><strong>iOS 0.13.5</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
   <a href="PRIVACY.md">Privacidade</a> ·
   <a href="SECURITY.md">Segurança</a>
@@ -82,7 +82,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 | --- | ---: | --- |
 | Windows | 1.75.1 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.75.1) |
 | Android | 0.21.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.21.0) · [Guia](docs/MOVEL.md) |
-| iOS pessoal | 0.13.4 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.13.4) · [Guia](ios/README-IOS.md) |
+| iOS pessoal | 0.13.5 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.13.5) · [Guia](ios/README-IOS.md) |
 
 Os hashes SHA-256 acompanham os arquivos publicados. O GitHub hospeda executáveis, APKs e IPAs somente em Releases; esses binários não entram no histórico do repositório.
 

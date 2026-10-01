@@ -13,6 +13,10 @@ public final class LocalClassic {
     public String filename;
     public String title;
     public long fileSize;
+    public String canonicalGameId = "";
+    public String contentSha256 = "";
+    public String systemId = "";
+    public String coreId = "";
     public String launcherGameId = "";
     public int raGameId;
     public long lastPlayedAt;
@@ -72,6 +76,8 @@ public final class LocalClassic {
         JSONObject result = new JSONObject();
         result.put("id", id); result.put("uri", uri); result.put("relativePath", relativePath);
         result.put("filename", filename); result.put("title", title); result.put("fileSize", fileSize);
+        result.put("canonicalGameId", canonicalGameId); result.put("contentSha256", contentSha256);
+        result.put("systemId", systemId); result.put("coreId", coreId);
         result.put("launcherGameId", launcherGameId); result.put("raGameId", raGameId); result.put("lastPlayedAt", lastPlayedAt);
         result.put("progressTitle", progressTitle); result.put("progressUsername", progressUsername); result.put("progressUpdatedAt", progressUpdatedAt);
         JSONArray rows = new JSONArray(); for (Achievement achievement : achievements) rows.put(achievement.toJson()); result.put("achievements", rows);
@@ -85,6 +91,8 @@ public final class LocalClassic {
         LocalClassic game = new LocalClassic(item.optString("id"), item.optString("uri"), item.optString("relativePath"),
             item.optString("filename"), item.optString("title"), Math.max(0L, item.optLong("fileSize")));
         game.launcherGameId = item.optString("launcherGameId"); game.raGameId = Math.max(0, item.optInt("raGameId"));
+        game.canonicalGameId = item.optString("canonicalGameId"); game.contentSha256 = item.optString("contentSha256");
+        game.systemId = item.optString("systemId"); game.coreId = item.optString("coreId");
         game.lastPlayedAt = Math.max(0L, item.optLong("lastPlayedAt")); game.progressTitle = item.optString("progressTitle");
         game.progressUsername = item.optString("progressUsername"); game.progressUpdatedAt = Math.max(0L, item.optLong("progressUpdatedAt"));
         JSONArray rows = item.optJSONArray("achievements");

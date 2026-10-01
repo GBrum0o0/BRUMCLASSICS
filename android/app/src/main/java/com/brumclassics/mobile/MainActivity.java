@@ -57,6 +57,7 @@ import com.brumclassics.mobile.model.Moment;
 import com.brumclassics.mobile.model.PerformanceLiveState;
 import com.brumclassics.mobile.classics.ClassicsRepository;
 import com.brumclassics.mobile.classics.ClassicsRules;
+import com.brumclassics.mobile.classics.CoreRegistry;
 import com.brumclassics.mobile.classics.LocalClassic;
 import com.brumclassics.mobile.classics.LocalArtworkClient;
 import com.brumclassics.mobile.classics.RetroAchievementsClient;
@@ -1371,23 +1372,28 @@ public final class MainActivity extends Activity {
     }
 
     private void startRetroArch(LocalClassic game, String packageName) {
+        new Thread(() -> {
+            try {
+                classicsRepository.prepareLaunch(game);
+                runOnUiThread(() -> startPreparedRetroArch(game, packageName));
+            } catch (Exception error) {
+                classicsRepository.cancelSession();
+                runOnUiThread(() -> Toast.makeText(this, "Não foi possível preparar a ROM: " + error.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        }, "brum-rom-identity").start();
+    }
+
+    private void startPreparedRetroArch(LocalClassic game, String packageName) {
         try {
-            classicsRepository.prepareLaunch(game); Uri rom = Uri.parse(game.uri); String core = defaultCore(game.filename);
+            LocalClassic prepared = classicsRepository.find(game.id);
+            if (prepared == null) throw new IllegalStateException("O jogo não está mais na biblioteca local.");
+            Uri rom = Uri.parse(prepared.uri); String core = CoreRegistry.retroArchCore(prepared.systemId, prepared.filename);
             if (core == null) { classicsRepository.cancelSession(); Toast.makeText(this, "Formato ambíguo: abra esta ROM pelo Load Content do RetroArch.", Toast.LENGTH_LONG).show(); openRetroArchMenu(packageName); return; }
             Intent intent = new Intent(); intent.setComponent(new ComponentName(packageName, "com.retroarch.browser.retroactivity.RetroActivityFuture"));
             intent.putExtra("ROM", rom.toString()); intent.putExtra("LIBRETRO", "/data/user/0/" + packageName + "/cores/" + core + "_libretro_android.so");
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_CLEAR_TOP); intent.setClipData(ClipData.newRawUri("ROM", rom));
             launchingClassic = true; startActivity(intent);
         } catch (Exception error) { launchingClassic = false; classicsRepository.cancelSession(); Toast.makeText(this, "Não foi possível abrir no RetroArch: " + error.getMessage(), Toast.LENGTH_LONG).show(); }
-    }
-
-    private String defaultCore(String filename) {
-        String extension = ClassicsRules.extension(filename);
-        if ("gba".equals(extension)) return "mgba"; if ("gb".equals(extension) || "gbc".equals(extension)) return "gambatte";
-        if ("nes".equals(extension)) return "mesen"; if ("sfc".equals(extension) || "smc".equals(extension)) return "snes9x";
-        if ("n64".equals(extension) || "z64".equals(extension) || "v64".equals(extension)) return "mupen64plus_next";
-        if ("nds".equals(extension)) return "melondsds"; if ("sms".equals(extension) || "gg".equals(extension) || "md".equals(extension) || "gen".equals(extension)) return "genesis_plus_gx";
-        if ("pce".equals(extension)) return "mednafen_pce_fast"; return null;
     }
 
     private List<String> installedRetroArchPackages() {
@@ -2003,7 +2009,7 @@ public final class MainActivity extends Activity {
                 if (!"https".equalsIgnoreCase(url.getProtocol()) || !(host.endsWith("steamstatic.com") || host.endsWith("akamaihd.net"))) return;
                 connection = (HttpURLConnection) url.openConnection();
                 connection.setConnectTimeout(6000); connection.setReadTimeout(8000); connection.setInstanceFollowRedirects(false);
-                connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android/0.21.0");
+                connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android/0.21.1");
                 if (connection.getResponseCode() != 200 || connection.getContentLengthLong() > 2 * 1024 * 1024) return;
                 byte[] buffer = new byte[8192]; int read; int total = 0;
                 ByteArrayOutputStream output = new ByteArrayOutputStream();

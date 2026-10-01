@@ -1,6 +1,6 @@
 # BRUMCLASSICS MÓVEL para iOS
 
-Versão 0.13.4: jogos GB, GBC e GBA abrem preenchendo toda a tela horizontal pelo **BRUM Core**, sem importar a ROM para o RetroArch. O modo padrão preserva a proporção e recorta apenas o excesso; o botão de exibição permite mostrar a imagem inteira quando necessário. O botão com setas alterna o avanço rápido em 5×. A leitura de Downloads, iCloud Drive e outros provedores é coordenada pelo iOS para preservar a autorização da pasta. O aplicativo prepara uma cópia temporária protegida e oferece vídeo, áudio, controles na tela, controle Bluetooth e save local. Outros sistemas continuam usando o RetroArch como fallback enquanto recebem suporte interno. O IPA sem assinatura é anexado à versão `ios-v0.13.4`.
+Versão 0.13.5: o Gaming Mode passa a reconhecer GB, GBC e GBA pelo conteúdo da ROM. O BRUM Core usa identidade estável, registro de núcleo e saves versionados por hash, migrando por cópia os saves antigos baseados no nome. Os jogos continuam preenchendo a tela horizontal, com avanço rápido em 5×, controles virtuais e Bluetooth. Outros sistemas permanecem no RetroArch enquanto recebem suporte interno. O IPA sem assinatura é anexado à versão `ios-v0.13.5`.
 
 Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o protocolo local seguro versão 10, mantém o cache anterior para leitura offline e não altera dados fora das ações explícitas do usuário.
 

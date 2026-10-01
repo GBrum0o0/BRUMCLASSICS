@@ -97,7 +97,7 @@ actor PocketRAClient {
         var url = URLComponents(string: "https://retroachievements.org/API/API_GetGameInfoAndUserProgress.php")!
         url.queryItems = [URLQueryItem(name: "y", value: key), URLQueryItem(name: "u", value: username), URLQueryItem(name: "g", value: String(gameID))]
         var request = URLRequest(url: url.url!, timeoutInterval: 20)
-        request.setValue("BRUMCLASSICS-iOS/0.13.4", forHTTPHeaderField: "User-Agent")
+        request.setValue("BRUMCLASSICS-iOS/0.13.5", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200, data.count <= 12 * 1024 * 1024 else { throw PocketError.message("RetroAchievements indisponível ou credencial inválida. Tente mais tarde; o progresso salvo foi mantido.") }
         return try PocketProgress.decode(data, username: username, expectedID: gameID)
@@ -262,7 +262,7 @@ actor PocketRAClient {
     private func normalizedLibraryTitle(_ value: String) -> String {
         RetroArchLibraryRules.normalizedTitle(ROMTitleRules.clean(value))
     }
-    func prepareIntegratedROM(_ rom: ROMFolderGame, launcher: AppStore) async throws -> URL {
+    func prepareIntegratedROM(_ rom: ROMFolderGame, launcher: AppStore) async throws -> EmulationLaunchDescriptor {
         guard IntegratedEmulatorSupport.supports(rom) else {
             throw PocketError.message("Este sistema ainda não possui um núcleo integrado. Use o RetroArch enquanto ampliamos o BRUM Core.")
         }
@@ -279,7 +279,9 @@ actor PocketRAClient {
         catch { runtimeStatus = "A sessão será aberta, mas o contador preciso não pôde ser preparado: \(error.localizedDescription)" }
         try await playSessions.begin(record, integrated: true)
         await recordLaunch(record, launcher: launcher)
-        return staged
+        return try await Task.detached(priority: .userInitiated) {
+            try EmulationLaunchBuilder.prepare(romURL: staged, title: rom.title, originalFilename: rom.filename)
+        }.value
     }
     func finishIntegratedPlay(launcher: AppStore) async {
         await finishPlaySession(launcher: launcher)

@@ -2,6 +2,7 @@
 #import "BrumLibretroAPI.h"
 
 #import <AudioToolbox/AudioToolbox.h>
+#import <CommonCrypto/CommonDigest.h>
 #import <GameController/GameController.h>
 #import <QuartzCore/QuartzCore.h>
 #import <dlfcn.h>
@@ -12,6 +13,16 @@
 
 static NSString *const BrumLibretroErrorDomain = @"com.brumclassics.mobile.ios.libretro";
 static const void *BrumHardwareFrameBuffer = (const void *)(intptr_t)-1;
+
+static NSString *BrumSHA256(NSData *data) {
+    unsigned char digest[CC_SHA256_DIGEST_LENGTH];
+    CC_SHA256(data.bytes, (CC_LONG)data.length, digest);
+    NSMutableString *result = [NSMutableString stringWithCapacity:CC_SHA256_DIGEST_LENGTH * 2];
+    for (NSUInteger index = 0; index < CC_SHA256_DIGEST_LENGTH; index++) {
+        [result appendFormat:@"%02x", digest[index]];
+    }
+    return result;
+}
 
 typedef unsigned (*retro_api_version_fn)(void);
 typedef void (*retro_init_fn)(void);
@@ -77,6 +88,13 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     NSString *_systemDirectory;
     NSString *_saveDirectory;
     NSString *_savePath;
+    NSString *_saveManifestPath;
+    NSString *_canonicalGameID;
+    NSString *_emulatedSystemID;
+    NSString *_contentSHA256;
+    NSString *_coreID;
+    NSString *_saveIdentifier;
+    NSString *_legacySaveBasename;
     NSMutableDictionary<NSString *, NSString *> *_variables;
     BrumEmulatorExitHandler _onExit;
     NSError *_startupError;
@@ -277,11 +295,25 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 
 @implementation BrumLibretroViewController
 
-- (instancetype)initWithROMURL:(NSURL *)romURL title:(NSString *)title onExit:(BrumEmulatorExitHandler)onExit {
+- (instancetype)initWithROMURL:(NSURL *)romURL
+                         title:(NSString *)title
+               canonicalGameID:(NSString *)canonicalGameID
+                      systemID:(NSString *)systemID
+                 contentSHA256:(NSString *)contentSHA256
+                        coreID:(NSString *)coreID
+                saveIdentifier:(NSString *)saveIdentifier
+            legacySaveBasename:(NSString *)legacySaveBasename
+                        onExit:(BrumEmulatorExitHandler)onExit {
     self = [super initWithNibName:nil bundle:nil];
     if (!self) return nil;
     _romURL = romURL;
     _gameTitle = [title copy];
+    _canonicalGameID = [canonicalGameID copy];
+    _emulatedSystemID = [systemID copy];
+    _contentSHA256 = [contentSHA256 copy];
+    _coreID = [coreID copy];
+    _saveIdentifier = [saveIdentifier copy];
+    _legacySaveBasename = [legacySaveBasename copy];
     _onExit = [onExit copy];
     _variables = [NSMutableDictionary dictionary];
     _pixelFormat = BRUM_RETRO_PIXEL_FORMAT_0RGB1555;
@@ -299,13 +331,24 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     if (!support) return NO;
     NSURL *root = [support URLByAppendingPathComponent:@"IntegratedEmulator" isDirectory:YES];
     NSURL *system = [root URLByAppendingPathComponent:@"System" isDirectory:YES];
-    NSURL *saves = [root URLByAppendingPathComponent:@"Saves" isDirectory:YES];
+    NSURL *savesRoot = [root URLByAppendingPathComponent:@"Saves" isDirectory:YES];
+    NSURL *saves = [savesRoot URLByAppendingPathComponent:_emulatedSystemID isDirectory:YES];
     if (![[NSFileManager defaultManager] createDirectoryAtURL:system withIntermediateDirectories:YES attributes:nil error:error]) return NO;
     if (![[NSFileManager defaultManager] createDirectoryAtURL:saves withIntermediateDirectories:YES attributes:nil error:error]) return NO;
     _systemDirectory = system.path;
     _saveDirectory = saves.path;
-    NSString *saveName = [[_romURL.lastPathComponent stringByDeletingPathExtension] stringByAppendingPathExtension:@"srm"];
+    NSString *saveName = [_contentSHA256 stringByAppendingPathExtension:@"srm"];
     _savePath = [[saves URLByAppendingPathComponent:saveName] path];
+    _saveManifestPath = [[saves URLByAppendingPathComponent:[_contentSHA256 stringByAppendingPathExtension:@"save.json"]] path];
+
+    // Releases anteriores usavam somente o nome do arquivo. Copiamos o save
+    // antigo uma única vez; nunca o apagamos, para que a migração seja reversível.
+    NSString *legacyName = [_legacySaveBasename stringByAppendingPathExtension:@"srm"];
+    NSString *legacyPath = [[savesRoot URLByAppendingPathComponent:legacyName] path];
+    NSFileManager *manager = NSFileManager.defaultManager;
+    if (![manager fileExistsAtPath:_savePath] && [manager fileExistsAtPath:legacyPath]) {
+        if (![manager copyItemAtPath:legacyPath toPath:_savePath error:error]) return NO;
+    }
     return YES;
 }
 
@@ -605,7 +648,49 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     if (!_gameLoaded) return;
     void *memory = _core.getMemoryData(BRUM_RETRO_MEMORY_SAVE_RAM);
     size_t size = _core.getMemorySize(BRUM_RETRO_MEMORY_SAVE_RAM);
-    if (memory && size) [[NSData dataWithBytes:memory length:size] writeToFile:_savePath options:NSDataWritingAtomic error:nil];
+    if (!memory || !size) return;
+
+    NSData *payload = [NSData dataWithBytes:memory length:size];
+    NSString *payloadHash = BrumSHA256(payload);
+    NSDictionary *previous = nil;
+    NSData *previousData = [NSData dataWithContentsOfFile:_saveManifestPath];
+    if (previousData) {
+        id decoded = [NSJSONSerialization JSONObjectWithData:previousData options:0 error:nil];
+        if ([decoded isKindOfClass:NSDictionary.class]) previous = decoded;
+    }
+    BOOL unchanged = [previous[@"payloadSHA256"] isEqualToString:payloadHash] &&
+                     [NSFileManager.defaultManager fileExistsAtPath:_savePath];
+    if (unchanged) return;
+
+    NSError *writeError = nil;
+    if (![payload writeToFile:_savePath options:NSDataWritingAtomic error:&writeError]) {
+        NSLog(@"BRUM Core: não foi possível persistir o save: %@", writeError.localizedDescription);
+        return;
+    }
+    NSInteger generation = [previous[@"generation"] integerValue] + 1;
+    if (generation < 1) generation = 1;
+    NSString *deviceID = UIDevice.currentDevice.identifierForVendor.UUIDString ?: @"ios-local";
+    NSString *updatedAt = [NSISO8601DateFormatter stringFromDate:NSDate.date
+                                                        timeZone:[NSTimeZone timeZoneForSecondsFromGMT:0]
+                                                   formatOptions:NSISO8601DateFormatWithInternetDateTime];
+    NSDictionary *manifest = @{
+        @"schemaVersion": @1,
+        @"canonicalGameID": _canonicalGameID,
+        @"systemID": _emulatedSystemID,
+        @"coreID": _coreID,
+        @"slot": @"battery",
+        @"generation": @(generation),
+        @"payloadSHA256": payloadHash,
+        @"sizeBytes": @(size),
+        @"updatedAt": updatedAt,
+        @"deviceID": deviceID,
+        @"formatVersion": @1,
+        @"saveIdentifier": _saveIdentifier
+    };
+    NSData *manifestData = [NSJSONSerialization dataWithJSONObject:manifest options:NSJSONWritingSortedKeys error:&writeError];
+    if (!manifestData || ![manifestData writeToFile:_saveManifestPath options:NSDataWritingAtomic error:&writeError]) {
+        NSLog(@"BRUM Core: save gravado, mas o manifesto falhou: %@", writeError.localizedDescription);
+    }
 }
 
 - (void)closeEmulator {

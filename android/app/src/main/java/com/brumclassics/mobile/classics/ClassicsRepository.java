@@ -111,6 +111,18 @@ public final class ClassicsRepository {
 
     public synchronized void prepareLaunch(LocalClassic game) throws Exception {
         LocalClassic stored = find(game.id); if (stored == null) throw new IllegalStateException("Atualize a pasta de ROMs antes de jogar.");
+        if (stored.canonicalGameId.isEmpty() || stored.contentSha256.isEmpty()) {
+            EmulationIdentity identity;
+            try (InputStream input = resolver.openInputStream(Uri.parse(stored.uri))) {
+                if (input == null) throw new IllegalStateException("O Android não liberou a leitura desta ROM.");
+                identity = EmulationIdentity.inspect(input, stored.filename);
+            }
+            stored.systemId = identity.systemId;
+            stored.contentSha256 = identity.contentSha256;
+            stored.canonicalGameId = identity.canonicalGameId();
+            String resolvedCore = CoreRegistry.retroArchCore(stored.systemId, stored.filename);
+            stored.coreId = resolvedCore == null ? "" : resolvedCore;
+        }
         ensureUniqueLogName(stored);
         if (stored.streamId == null || stored.streamId.isEmpty()) stored.streamId = java.util.UUID.randomUUID().toString();
         if (runtimeFolderConfigured() && stored.lastObservedSeconds == 0 && stored.creditedSeconds == 0 && !stored.counterReset) {
