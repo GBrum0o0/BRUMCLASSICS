@@ -1,9 +1,12 @@
 {
-  "version": "0.13.1",
-  "build": 26,
+  "version": "0.13.2",
+  "build": 27,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.13.1",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.13.2",
   "notes": [
+    "O BRUM Core agora usa toda a tela horizontal, sem moldura ou margens ao redor do jogo.",
+    "Novo botão de avanço rápido com setas acelera GB, GBC e GBA em 3× e indica visualmente quando está ativo.",
+    "Durante o avanço rápido, o áudio é silenciado e os quadros intermediários não são desenhados para evitar atraso e consumo desnecessário.",
     "Corrige a permissão ao abrir ROMs de pastas autorizadas, iCloud Drive e outros provedores no BRUM Core.",
     "A leitura agora usa NSFileCoordinator, conforme o fluxo exigido pelo seletor de documentos do iOS.",
     "A tela de erro permite reautorizar a pasta de ROMs sem procurar a opção nas configurações.",

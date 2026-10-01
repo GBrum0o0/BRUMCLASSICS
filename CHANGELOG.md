@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## iOS 0.13.2 — Tela cheia e avanço rápido
+
+- O BRUM Core passa a usar toda a tela horizontal, preservando a proporção original do jogo.
+- Um botão com setas alterna a aceleração em 3× e fica verde enquanto estiver ativo.
+- O áudio é silenciado e quadros intermediários deixam de ser desenhados durante o avanço rápido para evitar atraso.
+- A orientação retorna corretamente ao Gaming Mode horizontal ou à interface vertical de origem.
+
 ## Android 0.21.0 e iOS 0.12.0 — BRUMCLASSICS Gaming Mode
 
 - A navegação móvel recebe um botão circular central **JOGAR** para entrar no Gaming Mode.

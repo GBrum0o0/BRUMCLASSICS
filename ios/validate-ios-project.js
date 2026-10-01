@@ -82,6 +82,14 @@ for (const marker of ['IntegratedEmulatorSupport.supports', 'prepareIntegratedRO
 for (const marker of ['CoordinatedFileAccess', 'NSFileCoordinator', 'REAUTORIZAR PASTA']) {
   if (!source.includes(marker)) throw new Error(`Acesso coordenado às ROMs incompleto: ${marker}`);
 }
+const integratedEngine = fs.readFileSync(path.join(app, 'Libretro', 'BrumLibretroEngine.mm'), 'utf8');
+for (const marker of ['forward.fill', 'toggleFastForward', '_fastForwardEnabled ? 3 : 1', '_suppressVideo', 'AVANÇO RÁPIDO · 3×']) {
+  if (!integratedEngine.includes(marker)) throw new Error(`Avanço rápido do BRUM Core incompleto: ${marker}`);
+}
+for (const marker of ['constraintEqualToAnchor:self.view.leadingAnchor', 'constraintEqualToAnchor:self.view.trailingAnchor', 'constraintEqualToAnchor:self.view.topAnchor', 'constraintEqualToAnchor:self.view.bottomAnchor']) {
+  if (!integratedEngine.includes(marker)) throw new Error(`Tela cheia do BRUM Core incompleta: ${marker}`);
+}
+if (!source.includes('IntegratedEmulatorView(rom: $0, returnsToPortrait: false)')) throw new Error('BRUM Core precisa preservar o Gaming Mode horizontal ao sair.');
 const homeSource = fs.readFileSync(path.join(app, 'HomeView.swift'), 'utf8');
 if (homeSource.includes('classics-everywhere-link') || homeSource.includes('NavigationLink { BCardLibraryView()')) throw new Error('Início ainda expõe atalhos removidos de B-CARD ou CLASSICS Everywhere.');
 if (!homeSource.includes('profile-home-link')) throw new Error('Perfil precisa estar acessível pelo Início.');

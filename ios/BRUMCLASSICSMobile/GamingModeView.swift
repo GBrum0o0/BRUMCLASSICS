@@ -78,7 +78,7 @@ struct GamingModeView: View {
             await pocket.refreshROMFolder()
         }
         .fullScreenCover(item: $selectedGame) { GamingGameView(game: $0) }
-        .fullScreenCover(item: $selectedROM) { IntegratedEmulatorView(rom: $0) }
+        .fullScreenCover(item: $selectedROM) { IntegratedEmulatorView(rom: $0, returnsToPortrait: false) }
     }
 
     private func gameSection<Content: View>(title: String, count: Int, @ViewBuilder content: () -> Content) -> some View {
@@ -93,7 +93,7 @@ struct GamingModeView: View {
     }
 }
 
-@MainActor private enum GamingOrientation {
+@MainActor enum GamingOrientation {
     static func request(_ orientations: UIInterfaceOrientationMask) {
         guard #available(iOS 16.0, *) else { return }
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }

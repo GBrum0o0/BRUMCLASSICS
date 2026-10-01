@@ -17,10 +17,16 @@ struct IntegratedEmulatorView: View {
     @EnvironmentObject private var launcher: AppStore
     @Environment(\.dismiss) private var dismiss
     let rom: ROMFolderGame
+    let returnsToPortrait: Bool
     @State private var stagedURL: URL?
     @State private var failure = ""
     @State private var finishing = false
     @State private var choosingROMFolder = false
+
+    init(rom: ROMFolderGame, returnsToPortrait: Bool = true) {
+        self.rom = rom
+        self.returnsToPortrait = returnsToPortrait
+    }
 
     var body: some View {
         ZStack {
@@ -45,6 +51,10 @@ struct IntegratedEmulatorView: View {
                         .font(.caption).multilineTextAlignment(.center).foregroundStyle(.white.opacity(0.62)).frame(maxWidth: 440)
                 }
             }
+        }
+        .onAppear { GamingOrientation.request(.landscape) }
+        .onDisappear {
+            if returnsToPortrait { GamingOrientation.request(.portrait) }
         }
         .task { await prepare() }
         .fileImporter(isPresented: $choosingROMFolder, allowedContentTypes: [.folder]) { result in

@@ -1,8 +1,8 @@
 # RetroArch compatível com o BRUMCLASSICS
 
-> Documento atualizado para o BRUMCLASSICS MÓVEL 0.13.1. GB, GBC e GBA usam o BRUM Core; este fluxo permanece como fallback para os demais sistemas.
+> Documento atualizado para o BRUMCLASSICS MÓVEL 0.13.2. GB, GBC e GBA usam o BRUM Core; este fluxo permanece como fallback para os demais sistemas.
 
-No BRUMCLASSICS MÓVEL 0.13.1, GB, GBC e GBA abrem diretamente no **BRUM Core** e não usam este procedimento. Para os demais sistemas, **CLASSICS Everywhere** ainda cria uma cópia temporária legível e abre a folha de compartilhamento no primeiro uso. Ao concluir a entrega, grava o vínculo local. Nos próximos toques, formatos reconhecidos abrem diretamente a ROM já copiada em `RetroArch/downloads`, sem importar novamente. A ROM original é preservada.
+No BRUMCLASSICS MÓVEL 0.13.2, GB, GBC e GBA abrem diretamente no **BRUM Core** e não usam este procedimento. Para os demais sistemas, **CLASSICS Everywhere** ainda cria uma cópia temporária legível e abre a folha de compartilhamento no primeiro uso. Ao concluir a entrega, grava o vínculo local. Nos próximos toques, formatos reconhecidos abrem diretamente a ROM já copiada em `RetroArch/downloads`, sem importar novamente. A ROM original é preservada.
 
 ## Versão necessária
 

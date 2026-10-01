@@ -61,11 +61,14 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     BOOL _coreInitialized;
     BOOL _gameLoaded;
     BOOL _stopped;
+    BOOL _fastForwardEnabled;
+    BOOL _suppressVideo;
     unsigned _pixelFormat;
     uint32_t _inputMask;
     CADisplayLink *_displayLink;
     UIImageView *_screen;
     UILabel *_statusLabel;
+    UIButton *_fastForwardButton;
     NSURL *_romURL;
     NSData *_romData;
     NSString *_gameTitle;
@@ -162,7 +165,7 @@ static bool BrumEnvironment(unsigned command, void *data) {
 
 static void BrumVideo(const void *data, unsigned width, unsigned height, size_t pitch) {
     BrumLibretroViewController *host = BrumCurrentHost;
-    if (!host || !data || data == BrumHardwareFrameBuffer || !width || !height) return;
+    if (!host || host->_suppressVideo || !data || data == BrumHardwareFrameBuffer || !width || !height) return;
     NSMutableData *pixels = [NSMutableData dataWithLength:(NSUInteger)width * height * 4];
     uint32_t *target = (uint32_t *)pixels.mutableBytes;
     for (unsigned y = 0; y < height; y++) {
@@ -202,7 +205,7 @@ static void BrumVideo(const void *data, unsigned width, unsigned height, size_t 
 
 static void BrumPushAudio(const int16_t *data, size_t frames) {
     BrumLibretroViewController *host = BrumCurrentHost;
-    if (!host || !host->_audioRing || !data || !frames) return;
+    if (!host || host->_fastForwardEnabled || !host->_audioRing || !data || !frames) return;
     os_unfair_lock_lock(&host->_audioLock);
     const size_t samples = frames * 2;
     for (size_t index = 0; index < samples; index++) {
@@ -367,6 +370,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _screen.translatesAutoresizingMaskIntoConstraints = NO;
     _screen.backgroundColor = [UIColor colorWithWhite:0.02 alpha:1];
     _screen.layer.magnificationFilter = kCAFilterNearest;
+    _screen.userInteractionEnabled = NO;
     [self.view addSubview:_screen];
 
     UILabel *title = [[UILabel alloc] init];
@@ -379,6 +383,15 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     UIButton *close = [self controlButton:@"←  SAIR" identifier:-1];
     [close addTarget:self action:@selector(closeEmulator) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:close];
+
+    _fastForwardButton = [self controlButton:@"  3×" identifier:-1];
+    UIImageSymbolConfiguration *fastSymbol = [UIImageSymbolConfiguration configurationWithPointSize:13 weight:UIImageSymbolWeightBlack];
+    [_fastForwardButton setImage:[[UIImage systemImageNamed:@"forward.fill"] imageWithConfiguration:fastSymbol] forState:UIControlStateNormal];
+    _fastForwardButton.tintColor = UIColor.whiteColor;
+    _fastForwardButton.accessibilityLabel = @"Avanço rápido, três vezes";
+    _fastForwardButton.accessibilityValue = @"Desativado";
+    [_fastForwardButton addTarget:self action:@selector(toggleFastForward) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:_fastForwardButton];
 
     _statusLabel = [[UILabel alloc] init];
     _statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
@@ -403,10 +416,13 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         [close.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:16],
         [close.topAnchor constraintEqualToAnchor:safe.topAnchor constant:10],
         [close.widthAnchor constraintEqualToConstant:92], [close.heightAnchor constraintEqualToConstant:38],
+        [_fastForwardButton.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-16],
+        [_fastForwardButton.topAnchor constraintEqualToAnchor:safe.topAnchor constant:10],
+        [_fastForwardButton.widthAnchor constraintEqualToConstant:92], [_fastForwardButton.heightAnchor constraintEqualToConstant:38],
         [title.centerXAnchor constraintEqualToAnchor:safe.centerXAnchor], [title.centerYAnchor constraintEqualToAnchor:close.centerYAnchor],
-        [_statusLabel.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-16], [_statusLabel.centerYAnchor constraintEqualToAnchor:close.centerYAnchor],
-        [_screen.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:16], [_screen.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-16],
-        [_screen.topAnchor constraintEqualToAnchor:close.bottomAnchor constant:8], [_screen.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-12],
+        [_statusLabel.centerXAnchor constraintEqualToAnchor:safe.centerXAnchor], [_statusLabel.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:2],
+        [_screen.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor], [_screen.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [_screen.topAnchor constraintEqualToAnchor:self.view.topAnchor], [_screen.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
         [up.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:26], [up.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-24],
         [actions.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-30], [actions.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-36],
         [menu.centerXAnchor constraintEqualToAnchor:safe.centerXAnchor], [menu.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-16]
@@ -462,6 +478,21 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 
 - (void)inputDown:(UIButton *)sender { if (sender.tag >= 0) _inputMask |= 1u << sender.tag; }
 - (void)inputUp:(UIButton *)sender { if (sender.tag >= 0) _inputMask &= ~(1u << sender.tag); }
+
+- (void)toggleFastForward {
+    _fastForwardEnabled = !_fastForwardEnabled;
+    os_unfair_lock_lock(&_audioLock);
+    _audioRead = 0; _audioWrite = 0; _audioCount = 0;
+    os_unfair_lock_unlock(&_audioLock);
+    UIColor *accent = [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:1];
+    _fastForwardButton.backgroundColor = _fastForwardEnabled ? accent : [UIColor colorWithWhite:0.1 alpha:0.82];
+    [_fastForwardButton setTitleColor:_fastForwardEnabled ? UIColor.blackColor : UIColor.whiteColor forState:UIControlStateNormal];
+    _fastForwardButton.tintColor = _fastForwardEnabled ? UIColor.blackColor : UIColor.whiteColor;
+    _fastForwardButton.layer.borderColor = (_fastForwardEnabled ? accent : [UIColor colorWithWhite:1 alpha:0.16]).CGColor;
+    _fastForwardButton.accessibilityValue = _fastForwardEnabled ? @"Ativado" : @"Desativado";
+    _fastForwardButton.accessibilityTraits = _fastForwardEnabled ? UIAccessibilityTraitButton | UIAccessibilityTraitSelected : UIAccessibilityTraitButton;
+    _statusLabel.text = _fastForwardEnabled ? @"AVANÇO RÁPIDO · 3×" : @"BRUM CORE · mGBA";
+}
 
 - (BOOL)startCore:(NSError **)error {
     BrumCurrentHost = self;
@@ -519,7 +550,15 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     AudioQueueStart(_audioQueue, NULL);
 }
 
-- (void)runFrame { if (!_stopped && _gameLoaded) _core.run(); }
+- (void)runFrame {
+    if (_stopped || !_gameLoaded) return;
+    NSUInteger frameCount = _fastForwardEnabled ? 3 : 1;
+    for (NSUInteger frame = 0; frame < frameCount; frame++) {
+        _suppressVideo = frame + 1 < frameCount;
+        _core.run();
+    }
+    _suppressVideo = NO;
+}
 
 - (void)restoreSaveRAM {
     void *memory = _core.getMemoryData(BRUM_RETRO_MEMORY_SAVE_RAM);
