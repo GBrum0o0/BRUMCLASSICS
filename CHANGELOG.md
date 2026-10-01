@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## iOS 0.13.4 — Preenchimento total da tela
+
+- O BRUM Core passa a abrir no modo Preencher tela, ocupando todo o painel horizontal sem deformar a imagem.
+- Um novo botão alterna imediatamente para Mostrar imagem inteira quando o recorte esconder uma área importante.
+- Os botões superiores deixam de combinar restrições de altura incompatíveis e ficam alinhados de forma previsível.
+- Tela cheia, avanço rápido 5×, saves, controles virtuais e controle Bluetooth permanecem integrados.
+
 ## iOS 0.13.3 — Avanço rápido 5×
 
 - O botão de avanço rápido do BRUM Core passa de 3× para 5×.

@@ -1,9 +1,12 @@
 {
-  "version": "0.13.3",
-  "build": 28,
+  "version": "0.13.4",
+  "build": 29,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.13.3",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.13.4",
   "notes": [
+    "O jogo agora abre preenchendo toda a tela horizontal, sem deformar a imagem.",
+    "Um botão de exibição alterna entre Preencher tela e Mostrar imagem inteira quando algum conteúdo ficar recortado.",
+    "Os botões superiores foram realinhados e não possuem mais restrições de altura conflitantes.",
     "O BRUM Core agora usa toda a tela horizontal, sem moldura ou margens ao redor do jogo.",
     "O botão de avanço rápido com setas agora acelera GB, GBC e GBA em 5× e indica visualmente quando está ativo.",
     "Durante o avanço rápido, o áudio é silenciado e os quadros intermediários não são desenhados para evitar atraso e consumo desnecessário.",

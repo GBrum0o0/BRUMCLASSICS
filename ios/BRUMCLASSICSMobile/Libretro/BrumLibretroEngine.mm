@@ -63,12 +63,14 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     BOOL _stopped;
     BOOL _fastForwardEnabled;
     BOOL _suppressVideo;
+    BOOL _screenFillsDisplay;
     unsigned _pixelFormat;
     uint32_t _inputMask;
     CADisplayLink *_displayLink;
     UIImageView *_screen;
     UILabel *_statusLabel;
     UIButton *_fastForwardButton;
+    UIButton *_displayModeButton;
     NSURL *_romURL;
     NSData *_romData;
     NSString *_gameTitle;
@@ -90,6 +92,7 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
 - (void)closeEmulator;
 - (void)stopCore;
 - (void)persistSaveRAM;
+- (void)updateDisplayModeButton;
 @end
 
 static void *BrumLoadSymbol(void *handle, const char *name) {
@@ -196,7 +199,7 @@ static void BrumVideo(const void *data, unsigned width, unsigned height, size_t 
     CGImageRef image = CGImageCreate(width, height, 8, 32, (size_t)width * 4, colorSpace, bitmap, provider, NULL, false, kCGRenderingIntentDefault);
     if (image) {
         host->_screen.layer.contents = (__bridge id)image;
-        host->_screen.layer.contentsGravity = kCAGravityResizeAspect;
+        host->_screen.layer.contentsGravity = host->_screenFillsDisplay ? kCAGravityResizeAspectFill : kCAGravityResizeAspect;
         CGImageRelease(image);
     }
     CGDataProviderRelease(provider);
@@ -282,6 +285,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _onExit = [onExit copy];
     _variables = [NSMutableDictionary dictionary];
     _pixelFormat = BRUM_RETRO_PIXEL_FORMAT_0RGB1555;
+    _screenFillsDisplay = YES;
     _audioLock = OS_UNFAIR_LOCK_INIT;
     _audioCapacity = 262144;
     _audioRing = (int16_t *)calloc(_audioCapacity, sizeof(int16_t));
@@ -370,6 +374,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _screen.translatesAutoresizingMaskIntoConstraints = NO;
     _screen.backgroundColor = [UIColor colorWithWhite:0.02 alpha:1];
     _screen.layer.magnificationFilter = kCAFilterNearest;
+    _screen.clipsToBounds = YES;
     _screen.userInteractionEnabled = NO;
     [self.view addSubview:_screen];
 
@@ -378,6 +383,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     title.text = _gameTitle;
     title.textColor = UIColor.whiteColor;
     title.font = [UIFont systemFontOfSize:14 weight:UIFontWeightBold];
+    title.lineBreakMode = NSLineBreakByTruncatingTail;
     [self.view addSubview:title];
 
     UIButton *close = [self controlButton:@"←  SAIR" identifier:-1];
@@ -392,6 +398,14 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _fastForwardButton.accessibilityValue = @"Desativado";
     [_fastForwardButton addTarget:self action:@selector(toggleFastForward) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:_fastForwardButton];
+
+    _displayModeButton = [self controlButton:@"" identifier:-1];
+    UIImageSymbolConfiguration *displaySymbol = [UIImageSymbolConfiguration configurationWithPointSize:14 weight:UIImageSymbolWeightBlack];
+    [_displayModeButton setImage:[[UIImage systemImageNamed:@"arrow.up.left.and.arrow.down.right"] imageWithConfiguration:displaySymbol] forState:UIControlStateNormal];
+    _displayModeButton.accessibilityLabel = @"Modo de exibição";
+    [_displayModeButton addTarget:self action:@selector(toggleDisplayMode) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:_displayModeButton];
+    [self updateDisplayModeButton];
 
     _statusLabel = [[UILabel alloc] init];
     _statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
@@ -415,11 +429,16 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [NSLayoutConstraint activateConstraints:@[
         [close.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:16],
         [close.topAnchor constraintEqualToAnchor:safe.topAnchor constant:10],
-        [close.widthAnchor constraintEqualToConstant:92], [close.heightAnchor constraintEqualToConstant:38],
+        [close.widthAnchor constraintEqualToConstant:92],
         [_fastForwardButton.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-16],
         [_fastForwardButton.topAnchor constraintEqualToAnchor:safe.topAnchor constant:10],
-        [_fastForwardButton.widthAnchor constraintEqualToConstant:92], [_fastForwardButton.heightAnchor constraintEqualToConstant:38],
+        [_fastForwardButton.widthAnchor constraintEqualToConstant:92],
+        [_displayModeButton.trailingAnchor constraintEqualToAnchor:_fastForwardButton.leadingAnchor constant:-10],
+        [_displayModeButton.centerYAnchor constraintEqualToAnchor:_fastForwardButton.centerYAnchor],
+        [_displayModeButton.widthAnchor constraintEqualToConstant:54],
         [title.centerXAnchor constraintEqualToAnchor:safe.centerXAnchor], [title.centerYAnchor constraintEqualToAnchor:close.centerYAnchor],
+        [title.leadingAnchor constraintGreaterThanOrEqualToAnchor:close.trailingAnchor constant:8],
+        [title.trailingAnchor constraintLessThanOrEqualToAnchor:_displayModeButton.leadingAnchor constant:-8],
         [_statusLabel.centerXAnchor constraintEqualToAnchor:safe.centerXAnchor], [_statusLabel.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:2],
         [_screen.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor], [_screen.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
         [_screen.topAnchor constraintEqualToAnchor:self.view.topAnchor], [_screen.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
@@ -492,6 +511,21 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _fastForwardButton.accessibilityValue = _fastForwardEnabled ? @"Ativado" : @"Desativado";
     _fastForwardButton.accessibilityTraits = _fastForwardEnabled ? UIAccessibilityTraitButton | UIAccessibilityTraitSelected : UIAccessibilityTraitButton;
     _statusLabel.text = _fastForwardEnabled ? @"AVANÇO RÁPIDO · 5×" : @"BRUM CORE · mGBA";
+}
+
+- (void)toggleDisplayMode {
+    _screenFillsDisplay = !_screenFillsDisplay;
+    [self updateDisplayModeButton];
+}
+
+- (void)updateDisplayModeButton {
+    UIColor *accent = [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:1];
+    _displayModeButton.backgroundColor = _screenFillsDisplay ? accent : [UIColor colorWithWhite:0.1 alpha:0.82];
+    _displayModeButton.tintColor = _screenFillsDisplay ? UIColor.blackColor : UIColor.whiteColor;
+    _displayModeButton.layer.borderColor = (_screenFillsDisplay ? accent : [UIColor colorWithWhite:1 alpha:0.16]).CGColor;
+    _displayModeButton.accessibilityValue = _screenFillsDisplay ? @"Preencher tela" : @"Mostrar imagem inteira";
+    _displayModeButton.accessibilityTraits = _screenFillsDisplay ? UIAccessibilityTraitButton | UIAccessibilityTraitSelected : UIAccessibilityTraitButton;
+    _screen.layer.contentsGravity = _screenFillsDisplay ? kCAGravityResizeAspectFill : kCAGravityResizeAspect;
 }
 
 - (BOOL)startCore:(NSError **)error {
