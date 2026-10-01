@@ -29,6 +29,9 @@ using retro_run_fn = void (*)(void);
 using retro_set_controller_port_device_fn = void (*)(unsigned, unsigned);
 using retro_get_memory_data_fn = void *(*)(unsigned);
 using retro_get_memory_size_fn = size_t (*)(unsigned);
+using retro_serialize_size_fn = size_t (*)(void);
+using retro_serialize_fn = bool (*)(void *, size_t);
+using retro_unserialize_fn = bool (*)(const void *, size_t);
 
 struct CoreFunctions {
     retro_api_version_fn apiVersion{}; retro_init_fn initialize{}; retro_deinit_fn deinitialize{};
@@ -39,6 +42,8 @@ struct CoreFunctions {
     retro_load_game_fn loadGame{}; retro_unload_game_fn unloadGame{}; retro_run_fn run{};
     retro_set_controller_port_device_fn setController{}; retro_get_memory_data_fn getMemoryData{};
     retro_get_memory_size_fn getMemorySize{};
+    retro_serialize_size_fn serializeSize{}; retro_serialize_fn serialize{};
+    retro_unserialize_fn unserialize{};
 };
 
 class CoreSession;
@@ -114,6 +119,36 @@ public:
         if (written) std::rename(temporary.c_str(), savePath.c_str()); else std::remove(temporary.c_str());
     }
 
+    bool saveState(const std::string &path) {
+        if (!gameLoaded) return false;
+        size_t size = core.serializeSize();
+        if (!size || size > 64 * 1024 * 1024) return false;
+        std::vector<uint8_t> state(size);
+        if (!core.serialize(state.data(), size)) return false;
+        std::string temporary = path + ".tmp";
+        FILE *file = std::fopen(temporary.c_str(), "wb");
+        if (!file) return false;
+        bool written = std::fwrite(state.data(), 1, size, file) == size;
+        std::fflush(file); std::fclose(file);
+        if (!written) { std::remove(temporary.c_str()); return false; }
+        if (std::rename(temporary.c_str(), path.c_str()) != 0) { std::remove(temporary.c_str()); return false; }
+        return true;
+    }
+
+    bool loadState(const std::string &path) {
+        if (!gameLoaded) return false;
+        size_t expected = core.serializeSize();
+        if (!expected || expected > 64 * 1024 * 1024) return false;
+        std::ifstream file(path, std::ios::binary | std::ios::ate);
+        if (!file || static_cast<size_t>(file.tellg()) != expected) return false;
+        file.seekg(0, std::ios::beg); std::vector<uint8_t> state(expected);
+        file.read(reinterpret_cast<char *>(state.data()), static_cast<std::streamsize>(expected));
+        if (!file) return false;
+        bool restored = core.unserialize(state.data(), expected);
+        if (restored) audio.clear();
+        return restored;
+    }
+
     CoreFunctions core{};
     unsigned pixelFormat = BRUM_RETRO_PIXEL_FORMAT_0RGB1555;
     uint32_t inputMask = 0;
@@ -145,6 +180,8 @@ private:
         core.loadGame = symbol<retro_load_game_fn>("retro_load_game"); core.unloadGame = symbol<retro_unload_game_fn>("retro_unload_game"); core.run = symbol<retro_run_fn>("retro_run");
         core.setController = symbol<retro_set_controller_port_device_fn>("retro_set_controller_port_device");
         core.getMemoryData = symbol<retro_get_memory_data_fn>("retro_get_memory_data"); core.getMemorySize = symbol<retro_get_memory_size_fn>("retro_get_memory_size");
+        core.serializeSize = symbol<retro_serialize_size_fn>("retro_serialize_size");
+        core.serialize = symbol<retro_serialize_fn>("retro_serialize"); core.unserialize = symbol<retro_unserialize_fn>("retro_unserialize");
     }
 
     void restoreSave() {
@@ -269,6 +306,18 @@ Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeSampleRate(JNIEnv *,
 extern "C" JNIEXPORT void JNICALL
 Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativePersist(JNIEnv *, jclass, jlong handle) {
     auto *session = reinterpret_cast<CoreSession *>(handle); if (session) session->persist();
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeSaveState(JNIEnv *env, jclass, jlong handle, jstring path) {
+    auto *session = reinterpret_cast<CoreSession *>(handle);
+    return session && session->saveState(jstringValue(env, path)) ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeLoadState(JNIEnv *env, jclass, jlong handle, jstring path) {
+    auto *session = reinterpret_cast<CoreSession *>(handle);
+    return session && session->loadState(jstringValue(env, path)) ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT void JNICALL

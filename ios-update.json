@@ -1,9 +1,11 @@
 {
-  "version": "0.13.5",
-  "build": 30,
+  "version": "0.13.6",
+  "build": 31,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.13.5",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.13.6",
   "notes": [
+    "O BRUM Core agora oferece três slots de estado rápido por jogo, separados do save normal.",
+    "Cada slot é identificado pelo conteúdo da ROM e registra a versão exata do núcleo para detectar incompatibilidades.",
     "Gaming Mode agora identifica GB, GBC e GBA pelo conteúdo da ROM, sem depender do nome ou da pasta.",
     "O BRUM Core passa a escolher o núcleo por um registro versionado de sistemas e licenças.",
     "Saves integrados usam um endereço estável por sistema e hash, acompanhado de manifesto com geração e integridade.",

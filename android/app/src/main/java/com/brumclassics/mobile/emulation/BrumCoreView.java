@@ -86,6 +86,21 @@ final class BrumCoreView extends View implements Runnable {
     boolean fillsDisplay() { return fillDisplay; }
     long playedSeconds() { return Math.max(0L, playedNanos / 1_000_000_000L); }
 
+    boolean saveState(String path) {
+        boolean wasRunning = running; pauseEmulation();
+        boolean saved = core.saveState(path);
+        if (wasRunning) resumeEmulation();
+        return saved;
+    }
+
+    boolean loadState(String path) {
+        boolean wasRunning = running; pauseEmulation();
+        boolean loaded = core.loadState(path);
+        if (audioTrack != null) audioTrack.flush();
+        if (wasRunning) resumeEmulation();
+        return loaded;
+    }
+
     @Override public void run() {
         final long frameDuration = 16_666_667L;
         long lastAccounting = System.nanoTime();

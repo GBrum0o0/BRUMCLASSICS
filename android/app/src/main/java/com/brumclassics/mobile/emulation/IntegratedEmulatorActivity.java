@@ -1,6 +1,7 @@
 package com.brumclassics.mobile.emulation;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
@@ -19,6 +20,7 @@ import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.File;
 
@@ -116,11 +118,14 @@ public final class IntegratedEmulatorActivity extends Activity {
         FrameLayout.LayoutParams titleParams = frame(300, 42, Gravity.TOP | Gravity.CENTER_HORIZONTAL); titleParams.topMargin = dp(13); root.addView(title, titleParams);
 
         LinearLayout tools = new LinearLayout(this); tools.setOrientation(LinearLayout.HORIZONTAL); tools.setGravity(Gravity.CENTER); tools.setPadding(0, 0, 0, 0);
-        Button display = control("PREENCHER"); Button fast = control("≫  5×");
+        Button states = control("SLOTS"); Button display = control("PREENCHER"); Button fast = control("≫  5×");
+        states.setOnClickListener(v -> showStateMenu());
         display.setOnClickListener(v -> { emulatorView.toggleFillDisplay(); display.setText(emulatorView.fillsDisplay() ? "PREENCHER" : "INTEIRA"); });
         fast.setOnClickListener(v -> { emulatorView.setFastForward(!emulatorView.isFastForward()); fast.setTextColor(emulatorView.isFastForward() ? Color.BLACK : Color.WHITE); fast.setBackground(controlBackground(emulatorView.isFastForward())); });
-        tools.addView(display, new LinearLayout.LayoutParams(dp(100), dp(44))); LinearLayout.LayoutParams fastParams = new LinearLayout.LayoutParams(dp(82), dp(44)); fastParams.leftMargin = dp(8); tools.addView(fast, fastParams);
-        FrameLayout.LayoutParams toolsParams = frame(190, 44, Gravity.TOP | Gravity.END); toolsParams.setMargins(0, dp(12), dp(14), 0); root.addView(tools, toolsParams);
+        tools.addView(states, new LinearLayout.LayoutParams(dp(66), dp(44)));
+        LinearLayout.LayoutParams displayParams = new LinearLayout.LayoutParams(dp(100), dp(44)); displayParams.leftMargin = dp(8); tools.addView(display, displayParams);
+        LinearLayout.LayoutParams fastParams = new LinearLayout.LayoutParams(dp(82), dp(44)); fastParams.leftMargin = dp(8); tools.addView(fast, fastParams);
+        FrameLayout.LayoutParams toolsParams = frame(272, 44, Gravity.TOP | Gravity.END); toolsParams.setMargins(0, dp(12), dp(14), 0); root.addView(tools, toolsParams);
 
         addPadButton(root, "↑", 4, Gravity.BOTTOM | Gravity.START, 78, 126);
         addPadButton(root, "↓", 5, Gravity.BOTTOM | Gravity.START, 78, 18);
@@ -136,6 +141,45 @@ public final class IntegratedEmulatorActivity extends Activity {
         TextView status = label("BRUM CORE · mGBA · " + launch.systemId.toUpperCase(), 9, ACCENT, true);
         FrameLayout.LayoutParams statusParams = frame(260, 28, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL); statusParams.bottomMargin = dp(65); root.addView(status, statusParams);
         return root;
+    }
+
+    private void showStateMenu() {
+        String[] choices = new String[6];
+        for (int slot = 1; slot <= 3; slot++) {
+            File state = launch.quickStateFile(slot);
+            choices[(slot - 1) * 2] = "Salvar no slot " + slot;
+            choices[(slot - 1) * 2 + 1] = "Carregar slot " + slot + (QuickStateStore.isCompatible(launch, slot, state) ? "" : " (vazio ou incompatível)");
+        }
+        new AlertDialog.Builder(this)
+            .setTitle("ESTADOS RÁPIDOS")
+            .setMessage("O save normal continua separado. Escolha um dos três slots locais.")
+            .setItems(choices, (dialog, which) -> {
+                int slot = which / 2 + 1;
+                if ((which & 1) == 0) saveQuickState(slot); else loadQuickState(slot);
+            })
+            .setNegativeButton("Cancelar", null)
+            .show();
+    }
+
+    private void saveQuickState(int slot) {
+        File state = launch.quickStateFile(slot);
+        if (!emulatorView.saveState(state.getAbsolutePath())) {
+            Toast.makeText(this, "Não foi possível salvar o slot.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try { QuickStateStore.update(launch, slot, state); }
+        catch (Exception error) {
+            state.delete(); new File(state.getAbsolutePath() + ".json").delete();
+            Toast.makeText(this, "Não foi possível concluir o slot.", Toast.LENGTH_SHORT).show(); return;
+        }
+        Toast.makeText(this, "Slot " + slot + " salvo.", Toast.LENGTH_SHORT).show();
+    }
+
+    private void loadQuickState(int slot) {
+        File state = launch.quickStateFile(slot);
+        if (!QuickStateStore.isCompatible(launch, slot, state)) { Toast.makeText(this, "O slot está vazio ou é incompatível.", Toast.LENGTH_SHORT).show(); return; }
+        if (!emulatorView.loadState(state.getAbsolutePath())) { Toast.makeText(this, "Estado incompatível ou corrompido.", Toast.LENGTH_SHORT).show(); return; }
+        Toast.makeText(this, "Slot " + slot + " carregado.", Toast.LENGTH_SHORT).show();
     }
 
     private void addPadButton(FrameLayout root, String text, int id, int gravity, int horizontal, int bottom) {

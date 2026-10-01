@@ -28,4 +28,8 @@ public final class IntegratedEmulatorLaunch {
         this.manifestFile = manifestFile;
         this.systemDirectory = systemDirectory;
     }
+
+    public File quickStateFile(int slot) {
+        return new File(saveFile.getParentFile(), contentSha256 + ".slot" + slot + ".state");
+    }
 }

@@ -41,6 +41,9 @@ typedef void (*retro_run_fn)(void);
 typedef void (*retro_set_controller_port_device_fn)(unsigned, unsigned);
 typedef void *(*retro_get_memory_data_fn)(unsigned);
 typedef size_t (*retro_get_memory_size_fn)(unsigned);
+typedef size_t (*retro_serialize_size_fn)(void);
+typedef bool (*retro_serialize_fn)(void *, size_t);
+typedef bool (*retro_unserialize_fn)(const void *, size_t);
 
 typedef struct {
     retro_api_version_fn apiVersion;
@@ -60,6 +63,9 @@ typedef struct {
     retro_set_controller_port_device_fn setController;
     retro_get_memory_data_fn getMemoryData;
     retro_get_memory_size_fn getMemorySize;
+    retro_serialize_size_fn serializeSize;
+    retro_serialize_fn serialize;
+    retro_unserialize_fn unserialize;
 } BrumRetroFunctions;
 
 @class BrumLibretroViewController;
@@ -82,6 +88,7 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     UILabel *_statusLabel;
     UIButton *_fastForwardButton;
     UIButton *_displayModeButton;
+    UIButton *_stateButton;
     NSURL *_romURL;
     NSData *_romData;
     NSString *_gameTitle;
@@ -111,6 +118,10 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
 - (void)stopCore;
 - (void)persistSaveRAM;
 - (void)updateDisplayModeButton;
+- (void)showStateMenu;
+- (void)saveStateAtSlot:(NSInteger)slot;
+- (void)loadStateAtSlot:(NSInteger)slot;
+- (void)showStateStatus:(NSString *)text error:(BOOL)error;
 @end
 
 static void *BrumLoadSymbol(void *handle, const char *name) {
@@ -378,6 +389,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     BRUM_LOAD(setController, "retro_set_controller_port_device");
     BRUM_LOAD(getMemoryData, "retro_get_memory_data");
     BRUM_LOAD(getMemorySize, "retro_get_memory_size");
+    BRUM_LOAD(serializeSize, "retro_serialize_size");
+    BRUM_LOAD(serialize, "retro_serialize");
+    BRUM_LOAD(unserialize, "retro_unserialize");
 #undef BRUM_LOAD
     if (_core.apiVersion() != BRUM_RETRO_API_VERSION) {
         if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:3 userInfo:@{NSLocalizedDescriptionKey: @"A versão do núcleo não é compatível com este aplicativo."}];
@@ -450,6 +464,11 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [self.view addSubview:_displayModeButton];
     [self updateDisplayModeButton];
 
+    _stateButton = [self controlButton:@"SLOTS" identifier:-1];
+    _stateButton.accessibilityLabel = @"Estados rápidos";
+    [_stateButton addTarget:self action:@selector(showStateMenu) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:_stateButton];
+
     _statusLabel = [[UILabel alloc] init];
     _statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
     _statusLabel.text = @"BRUM CORE · mGBA";
@@ -479,9 +498,12 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         [_displayModeButton.trailingAnchor constraintEqualToAnchor:_fastForwardButton.leadingAnchor constant:-10],
         [_displayModeButton.centerYAnchor constraintEqualToAnchor:_fastForwardButton.centerYAnchor],
         [_displayModeButton.widthAnchor constraintEqualToConstant:54],
+        [_stateButton.trailingAnchor constraintEqualToAnchor:_displayModeButton.leadingAnchor constant:-10],
+        [_stateButton.centerYAnchor constraintEqualToAnchor:_displayModeButton.centerYAnchor],
+        [_stateButton.widthAnchor constraintEqualToConstant:64],
         [title.centerXAnchor constraintEqualToAnchor:safe.centerXAnchor], [title.centerYAnchor constraintEqualToAnchor:close.centerYAnchor],
         [title.leadingAnchor constraintGreaterThanOrEqualToAnchor:close.trailingAnchor constant:8],
-        [title.trailingAnchor constraintLessThanOrEqualToAnchor:_displayModeButton.leadingAnchor constant:-8],
+        [title.trailingAnchor constraintLessThanOrEqualToAnchor:_stateButton.leadingAnchor constant:-8],
         [_statusLabel.centerXAnchor constraintEqualToAnchor:safe.centerXAnchor], [_statusLabel.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:2],
         [_screen.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor], [_screen.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
         [_screen.topAnchor constraintEqualToAnchor:self.view.topAnchor], [_screen.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
@@ -569,6 +591,83 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _displayModeButton.accessibilityValue = _screenFillsDisplay ? @"Preencher tela" : @"Mostrar imagem inteira";
     _displayModeButton.accessibilityTraits = _screenFillsDisplay ? UIAccessibilityTraitButton | UIAccessibilityTraitSelected : UIAccessibilityTraitButton;
     _screen.layer.contentsGravity = _screenFillsDisplay ? kCAGravityResizeAspectFill : kCAGravityResizeAspect;
+}
+
+- (NSString *)statePathForSlot:(NSInteger)slot {
+    return [_saveDirectory stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.slot%ld.state", _contentSHA256, (long)slot]];
+}
+
+- (void)showStateMenu {
+    if (!_gameLoaded || _stopped) return;
+    UIAlertController *menu = [UIAlertController alertControllerWithTitle:@"ESTADOS RÁPIDOS"
+                                                                   message:@"O save normal continua separado. Escolha um dos três slots locais."
+                                                            preferredStyle:UIAlertControllerStyleActionSheet];
+    for (NSInteger slot = 1; slot <= 3; slot++) {
+        NSInteger selected = slot;
+        [menu addAction:[UIAlertAction actionWithTitle:[NSString stringWithFormat:@"Salvar no slot %ld", (long)slot]
+                                                 style:UIAlertActionStyleDefault
+                                               handler:^(__unused UIAlertAction *action) { [self saveStateAtSlot:selected]; }]];
+        UIAlertAction *load = [UIAlertAction actionWithTitle:[NSString stringWithFormat:@"Carregar slot %ld", (long)slot]
+                                                       style:UIAlertActionStyleDefault
+                                                     handler:^(__unused UIAlertAction *action) { [self loadStateAtSlot:selected]; }];
+        load.enabled = [NSFileManager.defaultManager fileExistsAtPath:[self statePathForSlot:slot]];
+        [menu addAction:load];
+    }
+    [menu addAction:[UIAlertAction actionWithTitle:@"Cancelar" style:UIAlertActionStyleCancel handler:nil]];
+    if (menu.popoverPresentationController) {
+        menu.popoverPresentationController.sourceView = _stateButton;
+        menu.popoverPresentationController.sourceRect = _stateButton.bounds;
+    }
+    [self presentViewController:menu animated:YES completion:nil];
+}
+
+- (void)saveStateAtSlot:(NSInteger)slot {
+    size_t size = _core.serializeSize();
+    if (!size || size > 64 * 1024 * 1024) { [self showStateStatus:@"ESTADO RÁPIDO INDISPONÍVEL" error:YES]; return; }
+    NSMutableData *state = [NSMutableData dataWithLength:size];
+    if (!_core.serialize(state.mutableBytes, size) || ![state writeToFile:[self statePathForSlot:slot] options:NSDataWritingAtomic error:nil]) {
+        [self showStateStatus:@"NÃO FOI POSSÍVEL SALVAR O SLOT" error:YES]; return;
+    }
+    NSDictionary *metadata = @{
+        @"schemaVersion": @1, @"canonicalGameID": _canonicalGameID, @"systemID": _emulatedSystemID, @"coreID": _coreID,
+        @"coreVersion": @"7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6", @"slot": @(slot),
+        @"sizeBytes": @(size), @"updatedAt": [NSISO8601DateFormatter stringFromDate:NSDate.date timeZone:[NSTimeZone timeZoneForSecondsFromGMT:0] formatOptions:NSISO8601DateFormatWithInternetDateTime]
+    };
+    NSData *json = [NSJSONSerialization dataWithJSONObject:metadata options:NSJSONWritingSortedKeys error:nil];
+    if (!json || ![json writeToFile:[[self statePathForSlot:slot] stringByAppendingString:@".json"] options:NSDataWritingAtomic error:nil]) {
+        [NSFileManager.defaultManager removeItemAtPath:[self statePathForSlot:slot] error:nil];
+        [self showStateStatus:@"NÃO FOI POSSÍVEL CONCLUIR O SLOT" error:YES]; return;
+    }
+    [self showStateStatus:[NSString stringWithFormat:@"SLOT %ld SALVO", (long)slot] error:NO];
+}
+
+- (void)loadStateAtSlot:(NSInteger)slot {
+    NSString *path = [self statePathForSlot:slot];
+    NSData *metadataData = [NSData dataWithContentsOfFile:[path stringByAppendingString:@".json"]];
+    NSDictionary *metadata = metadataData ? [NSJSONSerialization JSONObjectWithData:metadataData options:0 error:nil] : nil;
+    BOOL compatible = [metadata isKindOfClass:NSDictionary.class] && [metadata[@"schemaVersion"] integerValue] == 1 &&
+        [metadata[@"slot"] integerValue] == slot && [metadata[@"canonicalGameID"] isEqualToString:_canonicalGameID] &&
+        [metadata[@"systemID"] isEqualToString:_emulatedSystemID] && [metadata[@"coreID"] isEqualToString:_coreID] &&
+        [metadata[@"coreVersion"] isEqualToString:@"7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6"];
+    NSData *state = compatible ? [NSData dataWithContentsOfFile:path] : nil;
+    size_t expected = _core.serializeSize();
+    if (!state || !expected || state.length != expected || [metadata[@"sizeBytes"] unsignedLongLongValue] != state.length || !_core.unserialize(state.bytes, state.length)) {
+        [self showStateStatus:@"ESTADO INCOMPATÍVEL OU CORROMPIDO" error:YES]; return;
+    }
+    os_unfair_lock_lock(&_audioLock); _audioRead = 0; _audioWrite = 0; _audioCount = 0; os_unfair_lock_unlock(&_audioLock);
+    [self showStateStatus:[NSString stringWithFormat:@"SLOT %ld CARREGADO", (long)slot] error:NO];
+}
+
+- (void)showStateStatus:(NSString *)text error:(BOOL)error {
+    _statusLabel.text = text;
+    _statusLabel.textColor = error ? UIColor.systemRedColor : [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:1];
+    __weak BrumLibretroViewController *weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        BrumLibretroViewController *strongSelf = weakSelf;
+        if (!strongSelf || strongSelf->_stopped) return;
+        strongSelf->_statusLabel.text = strongSelf->_fastForwardEnabled ? @"AVANÇO RÁPIDO · 5×" : @"BRUM CORE · mGBA";
+        strongSelf->_statusLabel.textColor = [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:1];
+    });
 }
 
 - (BOOL)startCore:(NSError **)error {
