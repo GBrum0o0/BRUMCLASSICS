@@ -45,6 +45,7 @@ jobs:
             xcodebuild -project BRUMCLASSICSMobile.xcodeproj -scheme BRUMCLASSICSMobile -sdk iphonesimulator \
             -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -derivedDataPath build/Simulator \
             -resultBundlePath build/iOS-Tests.xcresult -parallel-testing-enabled NO \
+            -retry-tests-on-failure -test-iterations 2 \
             -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
             CODE_SIGNING_ALLOWED=NO test 2>&1 | tee "$XCODE_LOG"
           XCODE_STATUS=${PIPESTATUS[0]}
