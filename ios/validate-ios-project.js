@@ -83,7 +83,7 @@ for (const marker of ['CoordinatedFileAccess', 'NSFileCoordinator', 'REAUTORIZAR
   if (!source.includes(marker)) throw new Error(`Acesso coordenado às ROMs incompleto: ${marker}`);
 }
 const integratedEngine = fs.readFileSync(path.join(app, 'Libretro', 'BrumLibretroEngine.mm'), 'utf8');
-for (const marker of ['forward.fill', 'toggleFastForward', '_fastForwardEnabled ? 3 : 1', '_suppressVideo', 'AVANÇO RÁPIDO · 3×']) {
+for (const marker of ['forward.fill', 'toggleFastForward', '_fastForwardEnabled ? 5 : 1', '_suppressVideo', 'AVANÇO RÁPIDO · 5×']) {
   if (!integratedEngine.includes(marker)) throw new Error(`Avanço rápido do BRUM Core incompleto: ${marker}`);
 }
 for (const marker of ['constraintEqualToAnchor:self.view.leadingAnchor', 'constraintEqualToAnchor:self.view.trailingAnchor', 'constraintEqualToAnchor:self.view.topAnchor', 'constraintEqualToAnchor:self.view.bottomAnchor']) {

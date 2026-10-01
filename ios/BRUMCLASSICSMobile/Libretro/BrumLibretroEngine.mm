@@ -384,11 +384,11 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [close addTarget:self action:@selector(closeEmulator) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:close];
 
-    _fastForwardButton = [self controlButton:@"  3×" identifier:-1];
+    _fastForwardButton = [self controlButton:@"  5×" identifier:-1];
     UIImageSymbolConfiguration *fastSymbol = [UIImageSymbolConfiguration configurationWithPointSize:13 weight:UIImageSymbolWeightBlack];
     [_fastForwardButton setImage:[[UIImage systemImageNamed:@"forward.fill"] imageWithConfiguration:fastSymbol] forState:UIControlStateNormal];
     _fastForwardButton.tintColor = UIColor.whiteColor;
-    _fastForwardButton.accessibilityLabel = @"Avanço rápido, três vezes";
+    _fastForwardButton.accessibilityLabel = @"Avanço rápido, cinco vezes";
     _fastForwardButton.accessibilityValue = @"Desativado";
     [_fastForwardButton addTarget:self action:@selector(toggleFastForward) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:_fastForwardButton];
@@ -491,7 +491,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _fastForwardButton.layer.borderColor = (_fastForwardEnabled ? accent : [UIColor colorWithWhite:1 alpha:0.16]).CGColor;
     _fastForwardButton.accessibilityValue = _fastForwardEnabled ? @"Ativado" : @"Desativado";
     _fastForwardButton.accessibilityTraits = _fastForwardEnabled ? UIAccessibilityTraitButton | UIAccessibilityTraitSelected : UIAccessibilityTraitButton;
-    _statusLabel.text = _fastForwardEnabled ? @"AVANÇO RÁPIDO · 3×" : @"BRUM CORE · mGBA";
+    _statusLabel.text = _fastForwardEnabled ? @"AVANÇO RÁPIDO · 5×" : @"BRUM CORE · mGBA";
 }
 
 - (BOOL)startCore:(NSError **)error {
@@ -552,7 +552,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 
 - (void)runFrame {
     if (_stopped || !_gameLoaded) return;
-    NSUInteger frameCount = _fastForwardEnabled ? 3 : 1;
+    NSUInteger frameCount = _fastForwardEnabled ? 5 : 1;
     for (NSUInteger frame = 0; frame < frameCount; frame++) {
         _suppressVideo = frame + 1 < frameCount;
         _core.run();

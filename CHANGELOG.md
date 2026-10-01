@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## iOS 0.13.3 — Avanço rápido 5×
+
+- O botão de avanço rápido do BRUM Core passa de 3× para 5×.
+- Quatro quadros intermediários deixam de ser desenhados a cada atualização, mantendo a interface responsiva durante a aceleração.
+- O áudio continua silenciado enquanto o avanço rápido estiver ativo para evitar atraso acumulado.
+
 ## iOS 0.13.2 — Tela cheia e avanço rápido
 
 - O BRUM Core passa a usar toda a tela horizontal, preservando a proporção original do jogo.
