@@ -4,6 +4,8 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.net.ConnectivityManager;
+import android.net.NetworkCapabilities;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -27,6 +29,8 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Locale;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -163,6 +167,39 @@ public final class BridgeClient {
                 JSONObject result = root.optJSONObject("result");
                 if (result == null || !result.optBoolean("ok", false)) {
                     throw new IllegalStateException(result == null ? "O launcher não confirmou a abertura." : result.optString("message", "Não foi possível iniciar o jogo."));
+                }
+                post(() -> callback.onResult(result));
+            } catch (Exception error) { post(() -> callback.onError(safeMessage(error))); }
+        });
+    }
+
+    public void launchStream(Game game, String mode, BCardCallback callback) {
+        if (!isConfigured()) { callback.onError("Conecte este celular ao launcher primeiro."); return; }
+        if (game == null || game.id.isEmpty() || !game.installed) { callback.onError("Este jogo não está confirmado como instalado."); return; }
+        executor.execute(() -> {
+            try {
+                JSONObject payload = new JSONObject();
+                payload.put("gameId", game.id);
+                payload.put("mode", "continue-auto".equals(mode) || "continue-manual".equals(mode) ? mode : "new");
+                JSONObject body = new JSONObject();
+                body.put("command", "stream_game");
+                body.put("requestId", UUID.randomUUID().toString());
+                body.put("issuedAt", System.currentTimeMillis());
+                body.put("payload", payload);
+                HttpURLConnection connection = open(baseUrl() + "/v1/remote", "POST", true);
+                connection.setDoOutput(true);
+                byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
+                connection.setFixedLengthStreamingMode(bytes.length);
+                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                try (OutputStream output = connection.getOutputStream()) { output.write(bytes); }
+                String response = readResponse(connection, 256 * 1024);
+                JSONObject root = response.isEmpty() ? new JSONObject() : new JSONObject(response);
+                if (connection.getResponseCode() != 200 || !root.optBoolean("ok", false)) {
+                    throw new IllegalStateException(root.optString("message", "O launcher recusou a transmissão."));
+                }
+                JSONObject result = root.optJSONObject("result");
+                if (result == null || !result.optBoolean("ok", false) || result.optJSONObject("session") == null) {
+                    throw new IllegalStateException(result == null ? "O launcher não preparou a transmissão." : result.optString("message", "Não foi possível iniciar o streaming."));
                 }
                 post(() -> callback.onResult(result));
             } catch (Exception error) { post(() -> callback.onError(safeMessage(error))); }
@@ -395,6 +432,10 @@ public final class BridgeClient {
     }
 
     public void pair(String inputHost, int port, String code, String fingerprint, PairCallback callback) {
+        pair(inputHost, java.util.Collections.emptyList(), port, code, fingerprint, callback);
+    }
+
+    public void pair(String inputHost, List<String> alternateHosts, int port, String code, String fingerprint, PairCallback callback) {
         executor.execute(() -> {
             try {
                 String host = normalizeHost(inputHost);
@@ -417,7 +458,12 @@ public final class BridgeClient {
                 if (result.optInt("protocolVersion", 0) < 10) throw new IllegalStateException("Atualize o launcher para usar conquistas manuais.");
                 String token = result.optString("token", "");
                 if (token.length() < 32) throw new IllegalStateException("O launcher retornou uma autorização inválida.");
-                preferences.edit().putString("host", host).putInt("port", port).putString("token", token).putString("tls_pin", pin).apply();
+                ArrayList<String> safeAlternates = new ArrayList<>();
+                for (String value : alternateHosts == null ? java.util.Collections.<String>emptyList() : alternateHosts) {
+                    String normalized = normalizeHost(value);
+                    if (!normalized.equals(host) && !safeAlternates.contains(normalized)) safeAlternates.add(normalized);
+                }
+                preferences.edit().putString("host", host).putString("alternate_hosts", android.text.TextUtils.join(",", safeAlternates)).putInt("port", port).putString("token", token).putString("tls_pin", pin).apply();
                 post(callback::onSuccess);
                 fetchSnapshot();
                 startRealtime();
@@ -830,11 +876,25 @@ public final class BridgeClient {
         connection.setReadTimeout(12000);
         connection.setUseCaches(false);
         connection.setRequestProperty("Accept", "application/json");
-        connection.setRequestProperty("User-Agent", "BRUMCLASSICS-MOVEL/0.22.2 Android");
+        connection.setRequestProperty("User-Agent", "BRUMCLASSICS-MOVEL/0.23.0 Android");
         if (authenticated) connection.setRequestProperty("Authorization", "Bearer " + preferences.getString("token", ""));
     }
 
-    private String baseUrl() { return "https://" + preferences.getString("host", "") + ":" + preferences.getInt("port", 46991); }
+    private String baseUrl() { return "https://" + preferredHost() + ":" + preferences.getInt("port", 46991); }
+
+    private String preferredHost() {
+        String local = preferences.getString("host", "");
+        String alternates = preferences.getString("alternate_hosts", "");
+        String remote = "";
+        for (String candidate : alternates.split(",")) if (candidate.startsWith("100.")) { remote = candidate; break; }
+        if (remote.isEmpty()) return local;
+        try {
+            ConnectivityManager manager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkCapabilities capabilities = manager == null ? null : manager.getNetworkCapabilities(manager.getActiveNetwork());
+            boolean physical = capabilities != null && (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET));
+            return physical ? local : remote;
+        } catch (Exception ignored) { return local; }
+    }
 
     private String normalizeHost(String value) {
         String host = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);

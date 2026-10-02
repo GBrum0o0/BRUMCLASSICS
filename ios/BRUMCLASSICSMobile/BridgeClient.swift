@@ -56,17 +56,20 @@ actor BridgeClient {
     struct Device: Codable { let id: String; let name: String }
     struct ServerEnvelope<T: Decodable>: Decodable { let ok: Bool?; let result: T?; let message: String?; let error: String? }
     struct EmptyResult: Codable {}
+    struct StreamingLaunchResult: Decodable { let ok: Bool; let session: StreamingSession }
     struct NotificationReadResponse: Decodable { let ok: Bool; let unread: Int }
     struct MomentResponse: Decodable { let id: String; let gameId: String; let gameTitle: String; let capturedAt: String; let imagePath: String }
 
     private let delegate = PinnedSessionDelegate()
     private lazy var session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
     private var configuration: PairingConfiguration?
+    private var activeHost: String?
     private var token = ""
     private var socket: URLSessionWebSocketTask?
 
     func configure(_ configuration: PairingConfiguration?, token: String?) {
         self.configuration = configuration
+        activeHost = configuration?.host
         self.token = token ?? ""
         delegate.expectedFingerprint = configuration?.fingerprint ?? ""
     }
@@ -77,7 +80,7 @@ actor BridgeClient {
         let data = try JSONSerialization.data(withJSONObject: body)
         let response: PairResponse = try await request(path: "/v1/pair", method: "POST", body: data, authenticated: false, overrideHost: payload.host, overridePort: payload.port)
         guard response.protocolVersion >= 10 else { throw BridgeError.invalidResponse("Atualize o launcher para usar conquistas manuais e o protocolo móvel atual.") }
-        let config = PairingConfiguration(host: payload.host, port: payload.port, fingerprint: payload.pin, deviceID: response.device.id, deviceName: response.device.name)
+        let config = PairingConfiguration(host: payload.host, alternateHosts: payload.alternateHosts, port: payload.port, fingerprint: payload.pin, deviceID: response.device.id, deviceName: response.device.name)
         configuration = config
         token = response.token
         return (config, response.token)
@@ -142,6 +145,17 @@ actor BridgeClient {
         let _: ServerEnvelope<EmptyResult> = try await request(path: "/v1/remote", method: "POST", body: data)
     }
 
+    func launchStream(gameID: String, mode: String) async throws -> StreamingSession {
+        let body = try JSONSerialization.data(withJSONObject: [
+            "command": "stream_game", "requestId": UUID().uuidString,
+            "issuedAt": Int(Date().timeIntervalSince1970 * 1000),
+            "payload": ["gameId": gameID, "mode": mode]
+        ])
+        let envelope: ServerEnvelope<StreamingLaunchResult> = try await request(path: "/v1/remote", method: "POST", body: body)
+        guard let result = envelope.result, result.ok else { throw BridgeError.server(envelope.message ?? "O launcher não preparou a transmissão.") }
+        return result.session
+    }
+
     func save(_ mutation: PendingMutation) async throws {
         var body: [String: Any] = ["gameId": mutation.gameID, "revision": mutation.revision, "force": mutation.force]
         let path: String
@@ -192,10 +206,19 @@ actor BridgeClient {
     }
 
     private func dataRequest(path: String, method: String = "GET", body: Data? = nil, authenticated: Bool = true, overrideHost: String? = nil, overridePort: Int? = nil, maximumBytes: Int = 24 * 1024 * 1024) async throws -> Data {
-        guard var request = try makeRequest(path: path, authenticated: authenticated, overrideHost: overrideHost, overridePort: overridePort) else { throw BridgeError.notPaired }
-        request.httpMethod = method; request.httpBody = body
-        if body != nil { request.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type") }
-        do {
+        let candidates: [String]
+        if let overrideHost { candidates = [overrideHost] }
+        else if let configuration {
+            candidates = ([activeHost, configuration.host] + (configuration.alternateHosts ?? []).map(Optional.some)).compactMap { $0 }.reduce(into: []) { result, value in
+                if !result.contains(value) { result.append(value) }
+            }
+        } else { throw BridgeError.notPaired }
+        var lastNetworkError: Error?
+        for candidate in candidates {
+          guard var request = try makeRequest(path: path, authenticated: authenticated, overrideHost: candidate, overridePort: overridePort) else { throw BridgeError.notPaired }
+          request.httpMethod = method; request.httpBody = body
+          if body != nil { request.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type") }
+          do {
             let (data, response) = try await session.data(for: request)
             guard data.count <= maximumBytes else { throw BridgeError.invalidResponse("A resposta excede o limite de segurança.") }
             guard let http = response as? HTTPURLResponse else { throw BridgeError.invalidResponse("Resposta de rede inválida.") }
@@ -205,21 +228,28 @@ actor BridgeClient {
                 let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
                 throw BridgeError.server((object?["message"] as? String) ?? pairingMessage(object?["error"] as? String) ?? "O launcher recusou a solicitação (\(http.statusCode)).")
             }
+            if overrideHost == nil { activeHost = candidate }
             return data
-        } catch let error as BridgeError { throw error }
-        catch let error as URLError where error.code == .cancelled || error.code == .serverCertificateUntrusted { throw BridgeError.invalidCertificate }
-        catch { throw BridgeError.unreachable }
+          } catch let error as BridgeError { throw error }
+          catch let error as URLError where [.cannotConnectToHost, .timedOut, .networkConnectionLost, .notConnectedToInternet, .dnsLookupFailed, .cannotFindHost].contains(error.code) {
+            lastNetworkError = error
+            continue
+          } catch let error as URLError where error.code == .cancelled || error.code == .serverCertificateUntrusted { throw BridgeError.invalidCertificate }
+          catch { lastNetworkError = error; continue }
+        }
+        if lastNetworkError != nil { throw BridgeError.unreachable }
+        throw BridgeError.notPaired
     }
 
     private func makeRequest(path: String, authenticated: Bool, overrideHost: String? = nil, overridePort: Int? = nil, webSocket: Bool = false) throws -> URLRequest? {
-        let host = overrideHost ?? configuration?.host
+        let host = overrideHost ?? activeHost ?? configuration?.host
         let port = overridePort ?? configuration?.port
         guard let host, let port else { return nil }
         let scheme = webSocket ? "wss" : "https"
         guard let url = URL(string: "\(scheme)://\(host):\(port)\(path)") else { throw BridgeError.invalidResponse("Endereço local inválido.") }
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("BRUMCLASSICS-MOVEL/0.13.7 iOS", forHTTPHeaderField: "User-Agent")
+        request.setValue("BRUMCLASSICS-MOVEL/0.14.0 iOS", forHTTPHeaderField: "User-Agent")
         if authenticated { guard !token.isEmpty else { throw BridgeError.notPaired }; request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         return request
     }

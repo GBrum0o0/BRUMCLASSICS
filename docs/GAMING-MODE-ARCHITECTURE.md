@@ -32,13 +32,24 @@ O save integrado fica em `IntegratedEmulator/Saves/<system>/<sha256>.srm`. Ao la
 
 Na primeira execução, se existir o save legado baseado em nome, ele é copiado para o novo endereço. O arquivo anterior não é removido. Esse comportamento permite reversão e evita perda silenciosa.
 
-## Próximas etapas
+## Streaming do PC
+
+O transporte remoto usa componentes externos maduros em vez de duplicar captura e codificação dentro do aplicativo:
+
+- o BRUM Launcher valida o perfil, confirma a instalação e inicia o jogo;
+- Sunshine, instalado no computador, captura e transmite vídeo e áudio;
+- Moonlight recebe a sessão e envia controles no Android ou iOS;
+- Tailscale oferece o caminho remoto criptografado sem publicar a ponte móvel na internet.
+
+O QR Code mantém o endereço físico e endereços alternativos sob a mesma impressão TLS. Android escolhe o endereço protegido fora da rede física; iOS tenta os endereços autorizados em sequência. Sunshine e Moonlight não são incorporados ao BRUMCLASSICS porque possuem projeto, atualização e licença próprios.
+
+## Estado atual
 
 O runtime Libretro integrado já está presente no Android para GB, GBC e GBA. Ele usa o mesmo ID canônico, core mGBA fixado e manifesto de save do iOS.
 
-1. Slots manuais e estados rápidos separados do save de bateria.
-2. Sincronização de saves com comparação de geração e resolução explícita de conflitos.
-3. Sessão remota do PC com autenticação por dispositivo e transporte criptografado.
-4. RetroAchievements ligado ao ID do conteúdo, sem depender do nome do arquivo.
+1. Slots manuais e estados rápidos separados do save de bateria: concluído.
+2. Sessão remota autenticada e transporte protegido: concluído por orquestração Sunshine/Moonlight/Tailscale.
+3. Sincronização automática de saves entre aparelhos: planejada; conflitos nunca serão sobrescritos silenciosamente.
+4. RetroAchievements ligado ao ID do conteúdo: em evolução por sistema compatível.
 
 ROMs, BIOS e conteúdo protegido não fazem parte do aplicativo. Cada core só entra no produto depois de revisão técnica e de licença.

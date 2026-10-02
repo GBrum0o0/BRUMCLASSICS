@@ -1,12 +1,12 @@
-# BRUMCLASSICS MÓVEL Android 0.19.0
+# BRUMCLASSICS MÓVEL Android 0.23.0 e iOS 0.14.0
 
 Jogos cadastrados no launcher como **não oficiais** são sincronizados como itens locais instalados. O aplicativo recebe somente a classificação e o SteamID de referência quando houver; o caminho do executável nunca sai do computador. B-CARD, anotações e BRUMCOMPANION continuam usando a identidade segura enviada pelo launcher.
 
-Esta versão também adiciona **CLASSICS Everywhere**: a biblioteca local de ROMs autorizada pelo usuário, abertura no RetroArch, capas, conquistas oficiais do RetroAchievements e horas disponíveis offline. Guia compatível com BRUMCLASSICS OFICIAL 1.55.4 ou superior. Android 8.0 ou superior.
+O **Gaming Mode** reúne ROMs autorizadas e jogos instalados no PC. GB, GBC e GBA usam o BRUM Core integrado; outros sistemas permanecem no RetroArch até terem núcleo aprovado. Jogos do computador podem ser iniciados e transmitidos com Sunshine e Moonlight. Android requer 8.0 ou superior; iOS requer 16.0 ou superior.
 
 ## Instalar e atualizar
 
-Instale o APK 0.19.0 da release oficial sobre o aplicativo existente, sem limpar seus dados. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente. Se a rede externa estiver indisponível, o launcher pareado pode oferecer o mesmo APK localmente.
+Instale o APK 0.23.0 da release oficial sobre o aplicativo existente, sem limpar seus dados. No iPhone, assine o IPA 0.14.0 com Sideloadly ou AltStore. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente.
 
 Em fontes sem leitura oficial completa, abra a nova aba **Conquistas**, pesquise o jogo e toque no item oficial para marcar ou desfazer o progresso manual. Imagem, título e descrição vêm do catálogo carregado pelo launcher 1.62.0; não há formulário de data nem cadastro livre.
 
@@ -32,9 +32,9 @@ O botão circular **JOGAR**, no centro da navegação inferior, abre uma tela si
 - **No celular:** todos os arquivos de jogo reconhecidos na pasta de ROMs escolhida pelo usuário; GB, GBC e GBA abrem diretamente pelo BRUM Core, sem importação;
 - **Instalados no computador:** somente jogos cujo estado instalado foi confirmado pelo launcher;
 - sistemas ainda não integrados abrem pelo fluxo configurado do RetroArch como fallback;
-- jogos do PC usam a solicitação autenticada do B-CARD e informam quando o computador está offline.
+- jogos do PC usam uma solicitação autenticada, são iniciados pelo launcher e abrem o Moonlight quando o Sunshine está pronto.
 
-Jogos apenas preservados no cache, mas que não estejam instalados, não aparecem no Gaming Mode. A versão atual consegue iniciar o jogo no PC, mas ainda não transmite vídeo, áudio ou controles pela internet.
+Jogos apenas preservados no cache, mas que não estejam instalados, não aparecem no Gaming Mode. A transmissão usa Sunshine/Moonlight. Para acesso fora de casa, configure Tailscale nos dois aparelhos; o QR guarda o endereço remoto sob a mesma identidade TLS. Consulte [o guia de streaming](STREAMING.md). Nunca exponha a porta da ponte móvel no roteador.
 
 ## Central BRUM
 

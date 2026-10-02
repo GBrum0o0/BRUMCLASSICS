@@ -1,6 +1,6 @@
 # BRUMCLASSICS MÓVEL para iOS
 
-Versão 0.13.7: o host do BRUM Core passa a selecionar dinamicamente a biblioteca, o nome e a versão do núcleo. Saves e slots registram essa versão real, preparando a inclusão segura de novos sistemas. GB, GBC e GBA continuam no mGBA; outros sistemas permanecem claramente no RetroArch até receberem um núcleo aprovado. O IPA sem assinatura é anexado à versão `ios-v0.13.7`.
+Versão 0.14.0: o Gaming Mode inicia jogos instalados no PC e entrega a sessão ao Moonlight quando Sunshine está pronto. O pareamento preserva endereços local e Tailscale com a mesma validação TLS. GB, GBC e GBA continuam no BRUM Core; outros sistemas permanecem claramente no RetroArch. O IPA sem assinatura é anexado à versão `ios-v0.14.0`.
 
 Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o protocolo local seguro versão 10, mantém o cache anterior para leitura offline e não altera dados fora das ações explícitas do usuário.
 

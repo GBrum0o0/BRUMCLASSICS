@@ -10,8 +10,53 @@ struct LibrarySnapshot: Codable, Equatable {
     var companion: CompanionState?
     var performance: PerformanceState?
     var notifications: MobileNotificationSnapshot?
+    var experience: MobileExperience?
 
-    static let empty = LibrarySnapshot(protocolVersion: 10, revision: 0, generatedAt: "", games: [], collections: [], activity: [], companion: nil, performance: nil, notifications: nil)
+    static let empty = LibrarySnapshot(protocolVersion: 10, revision: 0, generatedAt: "", games: [], collections: [], activity: [], companion: nil, performance: nil, notifications: nil, experience: nil)
+}
+
+struct MobileExperience: Codable, Equatable {
+    let streaming: StreamingStatus?
+}
+
+struct StreamingStatus: Codable, Equatable {
+    struct Host: Codable, Equatable { let installed: Bool; let running: Bool; let dashboardURL: String }
+    struct Network: Codable, Equatable {
+        let localReady: Bool
+        let remoteReady: Bool
+        let localAddresses: [String]
+        let remoteAddress: String
+        let preference: String
+    }
+    struct Client: Codable, Equatable {
+        let name: String
+        let androidPackage: String
+        let androidStoreURL: String
+        let iosScheme: String
+        let iosStoreURL: String
+        let integrated: Bool
+    }
+    let available: Bool
+    let state: String
+    let provider: String
+    let host: Host
+    let network: Network
+    let client: Client
+    let quality: String
+    let message: String
+}
+
+struct StreamingSession: Codable, Equatable {
+    let id: String
+    let state: String
+    let gameId: String
+    let gameTitle: String
+    let createdAt: String
+    let expiresAt: String
+    let network: String
+    let hosts: [String]
+    let client: StreamingStatus.Client
+    let quality: String
 }
 
 struct MobileNotificationSnapshot: Codable, Equatable {
@@ -176,6 +221,7 @@ struct BrumMoment: Codable, Identifiable, Equatable {
 
 struct PairingPayload: Equatable {
     let host: String
+    let alternateHosts: [String]
     let port: Int
     let code: String
     let pin: String
@@ -188,6 +234,7 @@ struct PairingPayload: Equatable {
               let pin = components.queryItems?.first(where: { $0.name == "pin" })?.value,
               code.range(of: #"^\d{6}$"#, options: .regularExpression) != nil else { return nil }
         self.host = host
+        self.alternateHosts = components.queryItems?.filter { $0.name == "alt" }.compactMap(\.value).filter { !$0.isEmpty && $0 != host } ?? []
         self.port = Int(components.queryItems?.first(where: { $0.name == "port" })?.value ?? "46991") ?? 46991
         self.code = code
         self.pin = pin

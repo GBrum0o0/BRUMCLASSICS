@@ -120,6 +120,9 @@ private struct GamingGameView: View {
     let game: Game
     @State private var launchState = ""
     @State private var launching = false
+    @State private var openingClient = false
+
+    private var streaming: StreamingStatus? { store.snapshot.experience?.streaming }
 
     var body: some View {
         NavigationStack {
@@ -131,13 +134,16 @@ private struct GamingGameView: View {
                         Text(game.title).font(.system(size: 34, weight: .black)).foregroundStyle(BrumTheme.text)
                         Text(game.description).font(.body).foregroundStyle(BrumTheme.muted)
                     }
-                    Button(action: play) { HStack { if launching { ProgressView().tint(.black) }; Text(playLabel) }.frame(maxWidth: .infinity) }
+                    Button(action: playStream) { HStack { if launching { ProgressView().tint(.black) }; Text(streamPlayLabel) }.frame(maxWidth: .infinity) }
                         .buttonStyle(PrimaryButtonStyle()).disabled(!canPlay || launching).opacity(canPlay ? 1 : 0.38)
+                    Button(action: playOnPC) { Text("SOMENTE INICIAR NO COMPUTADOR").font(.caption.bold()).frame(maxWidth: .infinity).frame(height: 44) }
+                        .buttonStyle(.bordered).tint(BrumTheme.primary).disabled(!canStartOnPC || launching).opacity(canStartOnPC ? 1 : 0.38)
                     if !launchState.isEmpty { Text(launchState).font(.caption).foregroundStyle(launchState.contains("não") ? Color.orange : BrumTheme.primary) }
                     BrumCard {
                         VStack(alignment: .leading, spacing: 9) {
-                            HStack { BrumSectionLabel(text: "STREAMING REMOTO"); Spacer(); Text("EM DESENVOLVIMENTO").font(.caption2.bold()).foregroundStyle(.orange) }
-                            Text("O jogo pode ser iniciado no computador, mas esta versão ainda não recebe vídeo e áudio nem envia controles pela internet.").font(.caption).foregroundStyle(BrumTheme.muted)
+                            HStack { BrumSectionLabel(text: "STREAMING"); Spacer(); Text(streaming?.available == true ? "PRONTO" : "AÇÃO NECESSÁRIA").font(.caption2.bold()).foregroundStyle(streaming?.available == true ? BrumTheme.primary : .orange) }
+                            Text(streamingDescription).font(.caption).foregroundStyle(BrumTheme.muted)
+                            if streaming?.network.remoteReady == true { Label("Acesso remoto protegido disponível", systemImage: "checkmark.shield.fill").font(.caption2.bold()).foregroundStyle(BrumTheme.primary) }
                         }
                     }
                 }.padding(20)
@@ -148,13 +154,20 @@ private struct GamingGameView: View {
     }
 
     private var routeLabel: String { "PC · CANAL SEGURO" }
-    private var playLabel: String {
+    private var streamPlayLabel: String {
         if !game.installed { return "INSTALAÇÃO NÃO CONFIRMADA" }
-        return store.connection == .online ? "INICIAR NO COMPUTADOR" : "COMPUTADOR OFFLINE"
+        if store.connection != .online { return "COMPUTADOR OFFLINE" }
+        return streaming?.available == true ? "JOGAR NO IPHONE" : "CONFIGURE O STREAMING NO PC"
     }
-    private var canPlay: Bool { game.installed && store.connection == .online }
+    private var canPlay: Bool { game.installed && store.connection == .online && streaming?.available == true }
+    private var canStartOnPC: Bool { game.installed && store.connection == .online }
+    private var streamingDescription: String {
+        guard let streaming else { return "Atualize e sincronize o launcher para verificar Sunshine e Moonlight." }
+        if streaming.available { return streaming.network.remoteReady ? "Sunshine ativo. Funciona na rede local e pela rede privada configurada." : "Sunshine ativo na rede local. Conecte Tailscale no computador e no iPhone para jogar fora de casa." }
+        return streaming.message
+    }
 
-    private func play() {
+    private func playOnPC() {
         launching = true
         launchState = "Conectando ao computador e validando a instalação…"
         Task {
@@ -163,6 +176,39 @@ private struct GamingGameView: View {
                 launching = false
                 launchState = error.map { "Não foi possível iniciar: \($0)" } ?? "Jogo iniciado no computador."
             }
+        }
+    }
+
+    private func playStream() {
+        launching = true
+        launchState = "Preparando vídeo, áudio e controles…"
+        Task {
+            let result = await store.launchStream(game)
+            await MainActor.run {
+                launching = false
+                switch result {
+                case .success(let session):
+                    launchState = "Jogo iniciado. Abrindo Moonlight…"
+                    openStreamingClient(session)
+                case .failure(let error): launchState = "Não foi possível iniciar: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    private func openStreamingClient(_ session: StreamingSession) {
+        guard !openingClient else { return }
+        openingClient = true
+        let scheme = URL(string: session.client.iosScheme)
+        let storeURL = URL(string: session.client.iosStoreURL)
+        if let scheme {
+            UIApplication.shared.open(scheme, options: [:]) { opened in
+                if !opened, let storeURL { UIApplication.shared.open(storeURL) }
+                Task { @MainActor in openingClient = false }
+            }
+        } else {
+            if let storeURL { UIApplication.shared.open(storeURL) }
+            openingClient = false
         }
     }
 }

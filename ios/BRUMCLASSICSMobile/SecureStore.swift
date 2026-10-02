@@ -37,6 +37,7 @@ enum SecureStore {
 
 struct PairingConfiguration: Codable, Equatable {
     var host: String
+    var alternateHosts: [String]? = nil
     var port: Int
     var fingerprint: String
     var deviceID: String

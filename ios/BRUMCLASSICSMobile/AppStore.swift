@@ -215,6 +215,13 @@ final class AppStore: ObservableObject {
         } catch { return error.localizedDescription }
     }
 
+    func launchStream(_ game: Game, mode: String = "new") async -> Result<StreamingSession, Error> {
+        guard connection == .online else { return .failure(BridgeError.unreachable) }
+        guard game.installed else { return .failure(BridgeError.server("Este jogo não está confirmado como instalado.")) }
+        do { return .success(try await bridge.launchStream(gameID: game.id, mode: BCardLaunchMode.validated(mode, classic: game.isClassic))) }
+        catch { return .failure(error) }
+    }
+
     func markNotificationRead(_ notification: MobileNotification) async {
         guard !notification.isRead else { return }
         guard connection == .online else { message = "Conecte o iPhone ao launcher para marcar a notificação como lida."; return }

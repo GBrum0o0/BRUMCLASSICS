@@ -1,9 +1,12 @@
 {
-  "version": "0.13.7",
-  "build": 32,
+  "version": "0.14.0",
+  "build": 33,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.13.7",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.14.0",
   "notes": [
+    "Gaming Mode agora inicia jogos instalados no computador e prepara a sessão para Sunshine e Moonlight.",
+    "O aplicativo informa claramente se Sunshine está pronto, parado ou ausente.",
+    "O QR de pareamento guarda endereços local e Tailscale sob o mesmo certificado TLS para reconexão remota protegida.",
     "O BRUM Core agora seleciona dinamicamente a biblioteca, o nome, a versão e a licença de cada núcleo integrado.",
     "Saves normais e estados rápidos registram a versão real do núcleo para preparar novos sistemas sem quebrar compatibilidade.",
     "Jogos sem núcleo interno aprovado continuam claramente no RetroArch, sem simular suporte dentro do aplicativo.",

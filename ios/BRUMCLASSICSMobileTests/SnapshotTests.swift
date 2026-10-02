@@ -68,9 +68,10 @@ final class SnapshotTests: XCTestCase {
     }
 
     func testPairingURLParsesSecureIdentity() throws {
-        let url = try XCTUnwrap(URL(string: "brumclassics://pair?host=192.168.1.10&port=46991&code=123456&pin=AA:BB"))
+        let url = try XCTUnwrap(URL(string: "brumclassics://pair?host=192.168.1.10&alt=100.64.1.5&port=46991&code=123456&pin=AA:BB"))
         let value = try XCTUnwrap(PairingPayload(url: url))
         XCTAssertEqual(value.host, "192.168.1.10")
+        XCTAssertEqual(value.alternateHosts, ["100.64.1.5"])
         XCTAssertEqual(value.port, 46991)
         XCTAssertEqual(value.code, "123456")
         XCTAssertEqual(value.pin, "AA:BB")

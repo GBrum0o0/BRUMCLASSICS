@@ -1164,21 +1164,37 @@ public final class MainActivity extends Activity {
         TextView route = eyebrow("PC · CANAL SEGURO"); route.setGravity(Gravity.CENTER); page.addView(route, margins(-1, 20, -1, 8));
         TextView title = text(game.title, 28, TEXT, true); title.setGravity(Gravity.CENTER); page.addView(title);
         if (!game.description.trim().isEmpty()) page.addView(text(game.description, 10, MUTED, false), margins(-1, 11, -1, 0));
-        TextView launchState = text(game.installed ? ("connected".equals(syncState) ? "PRONTO PARA INICIAR NO COMPUTADOR" : "COMPUTADOR FORA DE ALCANCE") : "INSTALAÇÃO NÃO CONFIRMADA", 8, game.installed && "connected".equals(syncState) ? ACCENT : MUTED, true);
+        org.json.JSONObject streamingStatus = experience.optJSONObject("streaming");
+        boolean streamingReady = streamingStatus != null && streamingStatus.optBoolean("available", false);
+        TextView launchState = text(game.installed ? ("connected".equals(syncState) ? (streamingReady ? "PRONTO PARA JOGAR NO CELULAR" : "STREAMING PRECISA SER CONFIGURADO NO PC") : "COMPUTADOR FORA DE ALCANCE") : "INSTALAÇÃO NÃO CONFIRMADA", 8, game.installed && "connected".equals(syncState) && streamingReady ? ACCENT : MUTED, true);
         launchState.setGravity(Gravity.CENTER); page.addView(launchState, margins(-1, 20, -1, 9));
-        Button play = primaryButton(game.installed ? "INICIAR NO COMPUTADOR" : "INSTALAÇÃO NÃO CONFIRMADA");
-        play.setEnabled(game.installed && "connected".equals(syncState));
+        Button play = primaryButton(game.installed ? (streamingReady ? "JOGAR NO CELULAR" : "CONFIGURE O STREAMING NO PC") : "INSTALAÇÃO NÃO CONFIRMADA");
+        play.setEnabled(game.installed && "connected".equals(syncState) && streamingReady);
         play.setAlpha(play.isEnabled() ? 1f : .42f);
         play.setOnClickListener(v -> {
-            play.setEnabled(false); play.setText("CONECTANDO..."); launchState.setText("VALIDANDO O JOGO E ENVIANDO O COMANDO");
-            bridgeClient.launchBCard(game, "new", new BridgeClient.BCardCallback() {
-                @Override public void onResult(org.json.JSONObject result) { launchState.setText("JOGO INICIADO NO COMPUTADOR"); launchState.setTextColor(ACCENT); play.setText("INICIADO"); bridgeClient.fetchSnapshot(); }
+            play.setEnabled(false); play.setText("PREPARANDO..."); launchState.setText("VALIDANDO SUNSHINE, JOGO E CONEXÃO SEGURA");
+            bridgeClient.launchStream(game, "new", new BridgeClient.BCardCallback() {
+                @Override public void onResult(org.json.JSONObject result) { launchState.setText("JOGO INICIADO · ABRINDO MOONLIGHT"); launchState.setTextColor(ACCENT); play.setText("ABRINDO..."); openMoonlightClient(result.optJSONObject("session")); bridgeClient.fetchSnapshot(); }
                 @Override public void onError(String safeMessage) { launchState.setText(safeMessage.toUpperCase(Locale.ROOT)); launchState.setTextColor(Color.rgb(255, 118, 118)); play.setText("TENTAR NOVAMENTE"); play.setEnabled(true); }
             });
         }); page.addView(play, new LinearLayout.LayoutParams(-1, dp(50)));
 
+        Button pcOnly = button("SOMENTE INICIAR NO COMPUTADOR"); pcOnly.setTextColor(ACCENT); pcOnly.setBackground(background(SURFACE, 5, ACCENT, 1));
+        pcOnly.setEnabled(game.installed && "connected".equals(syncState)); pcOnly.setAlpha(pcOnly.isEnabled() ? 1f : .42f);
+        pcOnly.setOnClickListener(v -> {
+            pcOnly.setEnabled(false); pcOnly.setText("INICIANDO...");
+            bridgeClient.launchBCard(game, "new", new BridgeClient.BCardCallback() {
+                @Override public void onResult(org.json.JSONObject result) { launchState.setText("JOGO INICIADO NO COMPUTADOR"); launchState.setTextColor(ACCENT); pcOnly.setText("INICIADO"); bridgeClient.fetchSnapshot(); }
+                @Override public void onError(String safeMessage) { launchState.setText(safeMessage.toUpperCase(Locale.ROOT)); launchState.setTextColor(Color.rgb(255, 118, 118)); pcOnly.setText("TENTAR NOVAMENTE"); pcOnly.setEnabled(true); }
+            });
+        }); page.addView(pcOnly, margins(-1, 10, -1, 0, 46));
+
         LinearLayout streaming = column(); streaming.setPadding(dp(15), dp(15), dp(15), dp(15)); streaming.setBackground(background(SURFACE, 7, LINE, 1));
-        streaming.addView(eyebrow("STREAMING REMOTO · EM DESENVOLVIMENTO")); streaming.addView(text("Esta versão inicia o jogo no computador, mas ainda não transmite vídeo, áudio ou controles para o celular.", 9, MUTED, false), margins(-1, 8, -1, 0));
+        org.json.JSONObject network = streamingStatus == null ? null : streamingStatus.optJSONObject("network");
+        String streamDetail = streamingStatus == null ? "Atualize e sincronize o launcher para verificar Sunshine e Moonlight."
+            : streamingReady ? ((network != null && network.optBoolean("remoteReady", false)) ? "Sunshine ativo · rede local e acesso remoto protegido prontos." : "Sunshine ativo na rede local · use Tailscale para jogar fora de casa.")
+            : streamingStatus.optString("message", "Configure o Sunshine no computador.");
+        streaming.addView(eyebrow("STREAMING · " + (streamingReady ? "PRONTO" : "AÇÃO NECESSÁRIA"))); streaming.addView(text(streamDetail, 9, MUTED, false), margins(-1, 8, -1, 0));
         streaming.setOnClickListener(v -> showStreamingRoadmap()); page.addView(streaming, margins(-1, 23, -1, 0));
         Button details = button("VER PERFIL COMPLETO DO JOGO"); details.setTextColor(ACCENT); details.setBackground(background(SURFACE, 5, ACCENT, 1));
         details.setOnClickListener(v -> { detailsReturnScreen = "gaming"; showDetails(game); }); page.addView(details, margins(-1, 10, -1, 30, 46));
@@ -1197,9 +1213,24 @@ public final class MainActivity extends Activity {
 
     private void showStreamingRoadmap() {
         new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
-            .setTitle("STREAMING REMOTO")
-            .setMessage("O início remoto pelo B-CARD já está disponível. Vídeo, áudio, controles pela internet, pareamento externo e retomada de sessão exigem um serviço de streaming no PC e serão implementados em uma etapa própria.")
-            .setPositiveButton("ENTENDI", null).show();
+            .setTitle("STREAMING BRUMCLASSICS")
+            .setMessage("O BRUMCLASSICS inicia o jogo e entrega a sessão ao Moonlight. No computador, instale e pareie o Sunshine. Para jogar fora de casa, conecte computador e celular à mesma rede privada Tailscale. Nenhuma porta do launcher deve ser aberta na internet.")
+            .setPositiveButton("ABRIR MOONLIGHT", (dialog, which) -> openMoonlightClient(null))
+            .setNegativeButton("FECHAR", null).show();
+    }
+
+    private void openMoonlightClient(org.json.JSONObject session) {
+        Intent intent = getPackageManager().getLaunchIntentForPackage("com.limelight");
+        if (intent != null) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            startActivity(intent);
+            return;
+        }
+        new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+            .setTitle("MOONLIGHT NECESSÁRIO")
+            .setMessage("Instale o cliente Moonlight uma vez. Depois do pareamento com Sunshine, JOGAR abrirá a transmissão automaticamente.")
+            .setPositiveButton("INSTALAR", (dialog, which) -> startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.limelight"))))
+            .setNegativeButton("AGORA NÃO", null).show();
     }
 
     private void showClassics() {
@@ -2045,7 +2076,7 @@ public final class MainActivity extends Activity {
                 if (!"https".equalsIgnoreCase(url.getProtocol()) || !(host.endsWith("steamstatic.com") || host.endsWith("akamaihd.net"))) return;
                 connection = (HttpURLConnection) url.openConnection();
                 connection.setConnectTimeout(6000); connection.setReadTimeout(8000); connection.setInstanceFollowRedirects(false);
-                connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android/0.22.2");
+                connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android/0.23.0");
                 if (connection.getResponseCode() != 200 || connection.getContentLengthLong() > 2 * 1024 * 1024) return;
                 byte[] buffer = new byte[8192]; int read; int total = 0;
                 ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -2611,10 +2642,14 @@ public final class MainActivity extends Activity {
         int port = 46991;
         try { port = Integer.parseInt(data.getQueryParameter("port")); } catch (Exception ignored) {}
         intent.setData(null);
-        showPairDialog(host == null ? "" : host, port, code == null ? "" : code, pin == null ? "" : pin);
+        showPairDialog(host == null ? "" : host, data.getQueryParameters("alt"), port, code == null ? "" : code, pin == null ? "" : pin);
     }
 
     private void showPairDialog(String hostValue, int portValue, String codeValue, String pinValue) {
+        showPairDialog(hostValue, java.util.Collections.emptyList(), portValue, codeValue, pinValue);
+    }
+
+    private void showPairDialog(String hostValue, List<String> alternateHosts, int portValue, String codeValue, String pinValue) {
         LinearLayout form = column();
         form.setPadding(dp(22), dp(8), dp(22), 0);
         TextView note = text("O computador e o celular precisam estar na mesma rede Wi-Fi.", 10, MUTED, false);
@@ -2645,7 +2680,7 @@ public final class MainActivity extends Activity {
                 dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
                 dialog.getButton(AlertDialog.BUTTON_POSITIVE).setText("TESTANDO…");
                 note.setText("1/3 Identidade segura · 2/3 Autorização · 3/3 Teste da biblioteca");
-                bridgeClient.pair(host.getText().toString(), selectedPort, code.getText().toString(), pin.getText().toString(), new BridgeClient.PairCallback() {
+                bridgeClient.pair(host.getText().toString(), alternateHosts, selectedPort, code.getText().toString(), pin.getText().toString(), new BridgeClient.PairCallback() {
                     public void onSuccess() { dialog.dismiss(); syncState = "connecting"; syncDetail = "Identidade confirmada · testando biblioteca"; showProfile(); }
                     public void onError(String error) { dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true); dialog.getButton(AlertDialog.BUTTON_POSITIVE).setText("CONECTAR"); note.setText("O teste indicou o que precisa ser corrigido abaixo."); code.setError(error); }
                 });
