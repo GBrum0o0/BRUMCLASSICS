@@ -10,8 +10,8 @@
 
 <p align="center">
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.75.1"><strong>Windows 1.75.1</strong></a> ·
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.23.1"><strong>Android 0.23.1</strong></a> ·
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.14.0"><strong>iOS 0.14.0</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.24.0"><strong>Android 0.24.0</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.0"><strong>iOS 0.15.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
   <a href="PRIVACY.md">Privacidade</a> ·
   <a href="SECURITY.md">Segurança</a>
@@ -64,7 +64,7 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - Aplicativo Android com biblioteca offline, capas, estatísticas e BRUMCOMPANION.
 - Aplicativo iOS pessoal em SwiftUI, com o mesmo cache offline, B-CARD e BRUMCOMPANION, preparado para sideload.
 - Gaming Mode móvel horizontal com botão central JOGAR e listas separadas de ROMs presentes no celular e jogos instalados no computador.
-- BRUM Core executa GB, GBC e GBA diretamente no aplicativo; RetroArch permanece como fallback e jogos não instalados ficam fora desse modo.
+- BRUM Core executa NES/Famicom, SNES/Super Famicom, Master System, Game Gear, PC Engine/TurboGrafx-16, GB, GBC, GBA, Nintendo DS e Neo Geo AES/MVS diretamente no Android e iOS; no Android, PlayStation 2 também está disponível em caráter experimental. RetroArch permanece como fallback externo e não é anunciado como suporte nativo.
 - BRUM Core oferece três slots de estado rápido por jogo no Android e iOS, separados do save normal e identificados pelo conteúdo da ROM e pela versão do núcleo.
 - Registro multicore escolhe dinamicamente nome, versão, licença e biblioteca nativa; sistemas sem núcleo aprovado continuam identificados no RetroArch sem simular suporte interno.
 - Central BRUM sincronizada com iPhone e Android, limitada ao perfil ativo e sem enviar credenciais ou caminhos locais.
@@ -83,12 +83,12 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
 | Windows | 1.75.1 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.75.1) |
-| Android | 0.23.1 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.23.1) · [Guia](docs/MOVEL.md) |
-| iOS pessoal | 0.14.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.14.0) · [Guia](ios/README-IOS.md) |
+| Android | 0.24.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.24.0) · [Guia](docs/MOVEL.md) |
+| iOS pessoal | 0.15.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.0) · [Guia](ios/README-IOS.md) |
 
 Os hashes SHA-256 acompanham os arquivos publicados. O GitHub hospeda executáveis, APKs e IPAs somente em Releases; esses binários não entram no histórico do repositório.
 
-A versão pessoal para iPhone é compilada separadamente em **Actions → Build iOS pessoal**. O artefato contém um IPA sem assinatura para instalação com AltStore ou Sideloadly. Android 0.23.1 e iOS 0.14.0 incluem Gaming Mode, BRUM Core, biblioteca unificada e início de jogos do PC por Sunshine/Moonlight. Consulte [o guia de streaming](docs/STREAMING.md), [as instruções do iOS](ios/README-IOS.md) e a [política de cores integrados](docs/CORES-INTEGRADOS.md).
+A versão pessoal para iPhone é compilada separadamente em **Actions → Build iOS pessoal**. O artefato contém um IPA sem assinatura para instalação com AltStore ou Sideloadly. Android 0.24.0 e iOS 0.15.0 incluem Gaming Mode, BRUM Core multicore e os novos núcleos GPL. O código móvel usa GPL-3.0-or-later; launcher de PC e marca permanecem sob licenças separadas. Consulte [o licenciamento móvel](MOBILE-LICENSING.md), [as instruções do iOS](ios/README-IOS.md) e a [política de cores integrados](docs/CORES-INTEGRADOS.md).
 
 ## Versões atuais
 

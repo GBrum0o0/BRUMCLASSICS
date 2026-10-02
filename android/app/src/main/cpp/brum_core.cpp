@@ -2,7 +2,11 @@
 
 #include <jni.h>
 #include <dlfcn.h>
+#include <android/log.h>
+#include <EGL/egl.h>
+#include <GLES3/gl3.h>
 #include <algorithm>
+#include <cstdarg>
 #include <cstdio>
 #include <cstring>
 #include <deque>
@@ -49,14 +53,132 @@ struct CoreFunctions {
 class CoreSession;
 static CoreSession *activeSession = nullptr;
 
+class HardwareContext {
+public:
+    bool configure(brum_retro_hw_render_callback *requested) {
+        if (!requested || (requested->context_type != BRUM_RETRO_HW_CONTEXT_OPENGLES3 &&
+                           requested->context_type != BRUM_RETRO_HW_CONTEXT_OPENGLES_VERSION)) return false;
+        if (requested->context_type == BRUM_RETRO_HW_CONTEXT_OPENGLES_VERSION && requested->version_major > 3) return false;
+        callback = *requested;
+        callback.get_current_framebuffer = currentFramebuffer;
+        callback.get_proc_address = getProcAddress;
+        requested->get_current_framebuffer = currentFramebuffer;
+        requested->get_proc_address = getProcAddress;
+        pending = true;
+        return true;
+    }
+
+    void initialize() {
+        if (!pending || initialized) return;
+        display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+        if (display == EGL_NO_DISPLAY || !eglInitialize(display, nullptr, nullptr)) fail("O contexto gráfico EGL não pôde ser iniciado.");
+        if (!eglBindAPI(EGL_OPENGL_ES_API)) fail("O OpenGL ES não está disponível neste aparelho.");
+        const EGLint attributes[] = {
+            EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
+            EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT,
+            EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8,
+            EGL_DEPTH_SIZE, callback.depth ? 24 : 0,
+            EGL_STENCIL_SIZE, callback.stencil ? 8 : 0,
+            EGL_NONE
+        };
+        EGLint count = 0;
+        if (!eglChooseConfig(display, attributes, &config, 1, &count) || count != 1) fail("Este aparelho não oferece OpenGL ES 3 compatível com o núcleo.");
+        const EGLint surfaceAttributes[] = { EGL_WIDTH, surfaceSize, EGL_HEIGHT, surfaceSize, EGL_NONE };
+        surface = eglCreatePbufferSurface(display, config, surfaceAttributes);
+        if (surface == EGL_NO_SURFACE) fail("Não foi possível criar a superfície gráfica do BRUM Core.");
+        const EGLint contextAttributes[] = { EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE };
+        context = eglCreateContext(display, config, EGL_NO_CONTEXT, contextAttributes);
+        if (context == EGL_NO_CONTEXT) fail("Não foi possível criar o contexto OpenGL ES 3.");
+        initialized = true;
+        makeCurrent();
+        const char *version = reinterpret_cast<const char *>(glGetString(GL_VERSION));
+        if (!version) fail("O driver gráfico não respondeu ao BRUM Core.");
+    }
+
+    void makeCurrent() {
+        if (initialized && !eglMakeCurrent(display, surface, surface, context)) fail("O contexto gráfico do BRUM Core foi perdido.");
+    }
+
+    void releaseCurrent() {
+        if (initialized) eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+    }
+
+    void capture(unsigned width, unsigned height, std::vector<uint32_t> &target) {
+        if (!initialized || !width || !height || width > surfaceSize || height > surfaceSize) return;
+        const size_t pixelCount = static_cast<size_t>(width) * height;
+        if (pixelCount > 16u * 1024u * 1024u) return;
+        rgba.resize(pixelCount * 4);
+        glPixelStorei(GL_PACK_ALIGNMENT, 1);
+        glReadPixels(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height), GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+        if (glGetError() != GL_NO_ERROR) return;
+        target.resize(pixelCount);
+        for (unsigned y = 0; y < height; y++) {
+            const unsigned sourceY = height - 1 - y;
+            for (unsigned x = 0; x < width; x++) {
+                size_t source = (static_cast<size_t>(sourceY) * width + x) * 4;
+                target[static_cast<size_t>(y) * width + x] = 0xFF000000u |
+                    (static_cast<uint32_t>(rgba[source]) << 16) |
+                    (static_cast<uint32_t>(rgba[source + 1]) << 8) |
+                    static_cast<uint32_t>(rgba[source + 2]);
+            }
+        }
+    }
+
+    void resetCore() {
+        if (!pending) return;
+        initialize();
+        if (callback.context_reset) callback.context_reset();
+        releaseCurrent();
+    }
+
+    void shutdown() {
+        if (!initialized) return;
+        makeCurrent();
+        if (callback.context_destroy) callback.context_destroy();
+        releaseCurrent();
+        eglDestroyContext(display, context);
+        eglDestroySurface(display, surface);
+        eglTerminate(display);
+        display = EGL_NO_DISPLAY; context = EGL_NO_CONTEXT; surface = EGL_NO_SURFACE;
+        initialized = false;
+    }
+
+    bool active() const { return initialized; }
+
+private:
+    static constexpr EGLint surfaceSize = 2048;
+    EGLDisplay display = EGL_NO_DISPLAY;
+    EGLContext context = EGL_NO_CONTEXT;
+    EGLSurface surface = EGL_NO_SURFACE;
+    EGLConfig config{};
+    brum_retro_hw_render_callback callback{};
+    bool pending = false;
+    bool initialized = false;
+    std::vector<uint8_t> rgba;
+
+    [[noreturn]] static void fail(const char *message) { throw std::runtime_error(message); }
+    static uintptr_t currentFramebuffer() { return 0; }
+    static brum_retro_proc_address_t getProcAddress(const char *name) {
+        void *symbol = name ? reinterpret_cast<void *>(eglGetProcAddress(name)) : nullptr;
+        if (!symbol && name) symbol = dlsym(RTLD_DEFAULT, name);
+        return reinterpret_cast<brum_retro_proc_address_t>(symbol);
+    }
+};
+
 class CoreSession {
 public:
     CoreSession(const std::string &corePath, const std::string &romPath, const std::string &systemDirectory,
                 const std::string &saveDirectory, const std::string &savePath)
         : systemDirectory(systemDirectory), saveDirectory(saveDirectory), romPath(romPath), savePath(savePath) {
         try {
+            variables["system_core_override"] = "Automatic";
+            variables["system_gb_bios_enable"] = "ON";
+            variables["system_gba_bios_enable"] = "ON";
+            variables["system_nds_bios_enable"] = "ON";
+            if (std::ifstream(systemDirectory + "/aes.zip").good()) variables["geolith_system_type"] = "aes";
+            else if (std::ifstream(systemDirectory + "/neogeo.zip").good()) variables["geolith_system_type"] = "mvs";
             coreHandle = dlopen(corePath.c_str(), RTLD_NOW | RTLD_LOCAL);
-            if (!coreHandle) throw std::runtime_error("O núcleo mGBA não pôde ser carregado.");
+            if (!coreHandle) throw std::runtime_error("O núcleo integrado não pôde ser carregado.");
             loadSymbols();
             if (core.apiVersion() != BRUM_RETRO_API_VERSION) throw std::runtime_error("A versão Libretro do núcleo não é compatível.");
             activeSession = this;
@@ -74,16 +196,20 @@ public:
             if (!file) throw std::runtime_error("A cópia protegida da ROM não pôde ser lida.");
             file.seekg(0, std::ios::end); auto length = file.tellg(); file.seekg(0, std::ios::beg);
             if (length <= 0) throw std::runtime_error("A ROM está vazia.");
-            rom.resize(static_cast<size_t>(length)); file.read(reinterpret_cast<char *>(rom.data()), static_cast<std::streamsize>(length));
-            if (!file) throw std::runtime_error("A ROM não pôde ser carregada por completo.");
+            if (!info.need_fullpath) {
+                rom.resize(static_cast<size_t>(length)); file.read(reinterpret_cast<char *>(rom.data()), static_cast<std::streamsize>(length));
+                if (!file) throw std::runtime_error("A ROM não pôde ser carregada por completo.");
+            }
 
             brum_retro_game_info game{}; game.path = this->romPath.c_str();
             if (!info.need_fullpath) { game.data = rom.data(); game.size = rom.size(); }
-            if (!core.loadGame(&game)) throw std::runtime_error("O núcleo mGBA recusou este arquivo.");
-            gameLoaded = true; restoreSave();
+            if (!core.loadGame(&game)) throw std::runtime_error("O núcleo integrado recusou este arquivo.");
+            gameLoaded = true; hardware.resetCore(); restoreSave();
             brum_retro_system_av_info av{}; core.getAVInfo(&av); sampleRate = static_cast<int>(av.timing.sample_rate);
         } catch (...) {
+            if (hardware.active()) hardware.makeCurrent();
             if (gameLoaded) core.unloadGame();
+            hardware.shutdown();
             if (initialized) core.deinitialize();
             if (activeSession == this) activeSession = nullptr;
             if (coreHandle) dlclose(coreHandle);
@@ -93,8 +219,10 @@ public:
     }
 
     ~CoreSession() {
+        if (hardware.active()) hardware.makeCurrent();
         persist();
         if (gameLoaded) core.unloadGame();
+        hardware.shutdown();
         if (initialized) core.deinitialize();
         if (activeSession == this) activeSession = nullptr;
         if (coreHandle) dlclose(coreHandle);
@@ -102,8 +230,14 @@ public:
 
     void runFrames(int count, uint32_t mask) {
         inputMask = mask;
+        if (hardware.active()) hardware.makeCurrent();
         for (int index = 0; index < count; index++) { suppressVideo = index + 1 < count; core.run(); }
         suppressVideo = false;
+        if (hardware.active()) hardware.releaseCurrent();
+    }
+
+    void setPointer(int16_t x, int16_t y, bool pressed) {
+        pointerX = x; pointerY = y; pointerPressed = pressed;
     }
 
     void persist() {
@@ -159,6 +293,9 @@ public:
     std::unordered_map<std::string, std::string> variables;
     std::string systemDirectory, saveDirectory;
     int sampleRate = 48000;
+    int16_t pointerX = 0, pointerY = 0;
+    bool pointerPressed = false;
+    HardwareContext hardware;
 
 private:
     void *coreHandle{}; bool initialized = false, gameLoaded = false;
@@ -209,16 +346,28 @@ private:
                 while (variable && variable->key) {
                     std::string definition = variable->value ? variable->value : ""; size_t separator = definition.find("; ");
                     std::string choices = separator == std::string::npos ? definition : definition.substr(separator + 2);
-                    size_t pipe = choices.find('|'); session->variables[variable->key] = choices.substr(0, pipe); variable++;
+                    size_t pipe = choices.find('|');
+                    if (session->variables.find(variable->key) == session->variables.end()) session->variables[variable->key] = choices.substr(0, pipe);
+                    variable++;
                 }
                 return true;
             }
             case BRUM_RETRO_ENVIRONMENT_GET_VARIABLE: {
                 auto *variable = static_cast<brum_retro_variable *>(data); if (!variable || !variable->key) return false;
-                auto found = session->variables.find(variable->key); if (found == session->variables.end()) return false;
+                auto found = session->variables.find(variable->key); if (found == session->variables.end()) { variable->value = nullptr; return false; }
                 variable->value = found->second.c_str(); return true;
             }
             case BRUM_RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE: *static_cast<bool *>(data) = false; return true;
+            case BRUM_RETRO_ENVIRONMENT_GET_LOG_INTERFACE: {
+                auto *callback = static_cast<brum_retro_log_callback *>(data); if (!callback) return false;
+                callback->log = coreLog; return true;
+            }
+            case BRUM_RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE: *static_cast<int *>(data) = 3; return true;
+            case BRUM_RETRO_ENVIRONMENT_SET_HW_RENDER:
+                return session->hardware.configure(static_cast<brum_retro_hw_render_callback *>(data));
+            case BRUM_RETRO_ENVIRONMENT_SET_HW_SHARED_CONTEXT:
+                return true;
+            case BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2_INTL: return true;
             case BRUM_RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL:
             case BRUM_RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS:
             case BRUM_RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME: return true;
@@ -228,6 +377,11 @@ private:
 
     static void video(const void *data, unsigned width, unsigned height, size_t pitch) {
         CoreSession *session = activeSession; if (!session || session->suppressVideo || !data || !width || !height) return;
+        if (data == BRUM_RETRO_HW_FRAME_BUFFER_VALID) {
+            session->frameWidth = width; session->frameHeight = height;
+            session->hardware.capture(width, height, session->frame);
+            return;
+        }
         session->frameWidth = width; session->frameHeight = height; session->frame.resize(static_cast<size_t>(width) * height);
         for (unsigned y = 0; y < height; y++) {
             if (session->pixelFormat == BRUM_RETRO_PIXEL_FORMAT_XRGB8888) {
@@ -254,8 +408,21 @@ private:
     static size_t audioBatch(const int16_t *data, size_t frames) { pushAudio(data, frames * 2); return frames; }
     static void inputPoll() {}
     static int16_t inputState(unsigned port, unsigned device, unsigned index, unsigned id) {
-        CoreSession *session = activeSession; if (!session || port != 0 || device != BRUM_RETRO_DEVICE_JOYPAD || index != 0 || id > 15) return 0;
-        return (session->inputMask & (1u << id)) ? 1 : 0;
+        CoreSession *session = activeSession; if (!session || port != 0 || index != 0) return 0;
+        if (device == BRUM_RETRO_DEVICE_JOYPAD && id <= 15) return (session->inputMask & (1u << id)) ? 1 : 0;
+        if (device == BRUM_RETRO_DEVICE_POINTER) {
+            if (id == BRUM_RETRO_DEVICE_ID_POINTER_X) return session->pointerX;
+            if (id == BRUM_RETRO_DEVICE_ID_POINTER_Y) return session->pointerY;
+            if (id == BRUM_RETRO_DEVICE_ID_POINTER_PRESSED) return session->pointerPressed ? 1 : 0;
+        }
+        return 0;
+    }
+
+    static void coreLog(int level, const char *format, ...) {
+        int priority = level >= 3 ? ANDROID_LOG_ERROR : (level == 2 ? ANDROID_LOG_WARN : ANDROID_LOG_INFO);
+        va_list arguments; va_start(arguments, format);
+        __android_log_vprint(priority, "BRUMCore", format ? format : "", arguments);
+        va_end(arguments);
     }
 };
 
@@ -279,6 +446,12 @@ Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeCreate(JNIEnv *env, 
 extern "C" JNIEXPORT void JNICALL
 Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeRunFrames(JNIEnv *, jclass, jlong handle, jint count, jint inputMask) {
     auto *session = reinterpret_cast<CoreSession *>(handle); if (session) session->runFrames(count, static_cast<uint32_t>(inputMask));
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeSetPointer(JNIEnv *, jclass, jlong handle, jint x, jint y, jboolean pressed) {
+    auto *session = reinterpret_cast<CoreSession *>(handle);
+    if (session) session->setPointer(static_cast<int16_t>(std::clamp(x, -32767, 32767)), static_cast<int16_t>(std::clamp(y, -32767, 32767)), pressed == JNI_TRUE);
 }
 
 extern "C" JNIEXPORT jlong JNICALL

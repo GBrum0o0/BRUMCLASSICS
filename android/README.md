@@ -1,6 +1,6 @@
 # BRUMCLASSICS MÓVEL para Android
 
-Cliente Android nativo complementar ao BRUMCLASSICS. A versão atual é a **0.23.1** (`versionCode 35`) e requer Android 8.0/API 26 ou superior.
+Cliente Android nativo complementar ao BRUMCLASSICS. A versão atual é a **0.24.0** (`versionCode 36`) e requer Android 8.0/API 26 ou superior.
 
 Em jogos cuja conexão não oferece leitura oficial completa, a aba **Conquistas** pesquisa jogos e mostra imagem, título e descrição do catálogo carregado pelo launcher. Toque em um item para marcar ou desfazer o progresso manual. O launcher 1.62.0 mantém esses registros por perfil e protege confirmações oficiais.
 
@@ -12,7 +12,7 @@ Em jogos cuja conexão não oferece leitura oficial completa, a aba **Conquistas
 - Fila offline para mudanças feitas longe do launcher.
 - Atualização pelo próprio aplicativo usando releases oficiais assinadas.
 - **CLASSICS Everywhere** com pasta de ROMs autorizada pelo seletor nativo do Android.
-- BRUM Core integrado para GB, GBC e GBA; RetroArch permanece como fallback para os demais sistemas.
+- BRUM Core integrado para NES/Famicom, SNES/Super Famicom, Master System, Game Gear, PC Engine/TurboGrafx-16, GB, GBC, GBA, Nintendo DS, Neo Geo AES/MVS e PlayStation 2 experimental.
 - Três slots de estado rápido locais por jogo, separados do save normal e protegidos por identidade de ROM e núcleo.
 - Registro multicore com seleção dinâmica de biblioteca, nome, versão e licença; jogos sem núcleo interno aprovado permanecem no RetroArch.
 - Consulta oficial do RetroAchievements, com usuário e Web API Key protegidos pelo Android Keystore.
@@ -22,15 +22,19 @@ Em jogos cuja conexão não oferece leitura oficial completa, a aba **Conquistas
 - Roteamento automático entre BRUM Core, RetroArch e início seguro no computador pelo B-CARD.
 - Navegação inferior com Início, Biblioteca, JOGAR, Estatísticas e Companion; Perfil fica dentro da Início.
 
-ROMs, BIOS, saves e credenciais não fazem parte deste repositório nem do APK. O APK inclui somente o núcleo mGBA aprovado e seu aviso de licença.
+ROMs, BIOS, saves e credenciais não fazem parte deste repositório nem do APK. O APK inclui somente núcleos aprovados, suas licenças integrais e a GPL do aplicativo móvel.
 
 ## Compilar
 
 Use JDK 17 e Android SDK 36:
 
 ```bash
-git clone --filter=blob:none https://github.com/libretro/mgba.git app/src/main/cpp/vendor/mgba
-git -C app/src/main/cpp/vendor/mgba checkout --detach 7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6
+./fetch-mgba-core.ps1
+./fetch-skyemu-core.ps1
+./fetch-geolith-core.ps1
+./fetch-gearsystem-core.ps1
+./fetch-nestopia-core.ps1
+./fetch-play-core.ps1
 ./gradlew :app:assembleDebug
 ```
 
@@ -38,6 +42,11 @@ No Windows:
 
 ```powershell
 .\fetch-mgba-core.ps1
+.\fetch-skyemu-core.ps1
+.\fetch-geolith-core.ps1
+.\fetch-gearsystem-core.ps1
+.\fetch-nestopia-core.ps1
+.\fetch-play-core.ps1
 .\gradlew.bat :app:assembleDebug
 ```
 
@@ -47,6 +56,6 @@ O APK publicado em Releases é assinado separadamente com a identidade usada nas
 
 O workflow `Android CI` compila o aplicativo e executa os testes de contrato sem depender de um aparelho. A abertura do RetroArch, o provedor de documentos e a leitura dos logs `.lrtl` também devem ser confirmados em um Android físico.
 
-GB, GBC e GBA agora rodam diretamente no **BRUM Core**, com mGBA integrado, tela horizontal, controles virtuais e Bluetooth, save local e avanço rápido 5×. Os demais sistemas continuam usando o RetroArch como fallback.
+NES, SNES, Master System, Game Gear, PC Engine/TurboGrafx-16, GB, GBC, GBA, Nintendo DS, Neo Geo e PS2 experimental rodam diretamente no **BRUM Core** conforme a matriz de plataformas. Sistemas restantes podem ser encaminhados ao RetroArch externo, sem serem anunciados como nativos.
 
-Veja o [guia de uso](../docs/MOVEL.md), o [guia de streaming](../docs/STREAMING.md), as [notas da versão](../releases/android-v0.23.1/RELEASE-NOTES.md) e a [validação](../releases/android-v0.23.1/VALIDACAO.md).
+Veja o [guia de uso](../docs/MOVEL.md), o [licenciamento móvel](../MOBILE-LICENSING.md), as [notas da versão](../releases/android-v0.24.0/RELEASE-NOTES.md) e a [validação](../releases/android-v0.24.0/VALIDACAO.md).

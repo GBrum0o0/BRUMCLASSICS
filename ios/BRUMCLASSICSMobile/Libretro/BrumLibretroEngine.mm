@@ -9,6 +9,7 @@
 #import <math.h>
 #import <os/lock.h>
 #import <stdlib.h>
+#import <stdarg.h>
 #import <string.h>
 
 static NSString *const BrumLibretroErrorDomain = @"com.brumclassics.mobile.ios.libretro";
@@ -83,6 +84,11 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     BOOL _screenFillsDisplay;
     unsigned _pixelFormat;
     uint32_t _inputMask;
+    int16_t _pointerX;
+    int16_t _pointerY;
+    BOOL _pointerPressed;
+    unsigned _frameWidth;
+    unsigned _frameHeight;
     CADisplayLink *_displayLink;
     UIImageView *_screen;
     UILabel *_statusLabel;
@@ -132,6 +138,15 @@ static void *BrumLoadSymbol(void *handle, const char *name) {
     return dlsym(handle, name);
 }
 
+static void BrumCoreLog(int level, const char *format, ...) {
+    if (!format) return;
+    char message[2048];
+    va_list arguments; va_start(arguments, format);
+    vsnprintf(message, sizeof(message), format, arguments);
+    va_end(arguments);
+    NSLog(@"BRUM Core [%d] %s", level, message);
+}
+
 static bool BrumEnvironment(unsigned command, void *data) {
     BrumLibretroViewController *host = BrumCurrentHost;
     if (!host) return false;
@@ -162,7 +177,7 @@ static bool BrumEnvironment(unsigned command, void *data) {
                 NSString *definition = variable->value ? [NSString stringWithUTF8String:variable->value] : @"";
                 NSString *choices = [[definition componentsSeparatedByString:@"; "] lastObject] ?: @"";
                 NSString *value = [[choices componentsSeparatedByString:@"|"] firstObject] ?: @"";
-                if (key.length && value.length) host->_variables[key] = value;
+                if (key.length && value.length && !host->_variables[key]) host->_variables[key] = value;
                 variable++;
             }
             return true;
@@ -176,6 +191,17 @@ static bool BrumEnvironment(unsigned command, void *data) {
         }
         case BRUM_RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE:
             *(bool *)data = false;
+            return true;
+        case BRUM_RETRO_ENVIRONMENT_GET_LOG_INTERFACE: {
+            brum_retro_log_callback *callback = (brum_retro_log_callback *)data;
+            if (!callback) return false;
+            callback->log = BrumCoreLog;
+            return true;
+        }
+        case BRUM_RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE:
+            *(int *)data = 3;
+            return true;
+        case BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2_INTL:
             return true;
         case BRUM_RETRO_ENVIRONMENT_SET_MESSAGE: {
             const brum_retro_message *message = (const brum_retro_message *)data;
@@ -201,6 +227,8 @@ static bool BrumEnvironment(unsigned command, void *data) {
 static void BrumVideo(const void *data, unsigned width, unsigned height, size_t pitch) {
     BrumLibretroViewController *host = BrumCurrentHost;
     if (!host || host->_suppressVideo || !data || data == BrumHardwareFrameBuffer || !width || !height) return;
+    host->_frameWidth = width;
+    host->_frameHeight = height;
     NSMutableData *pixels = [NSMutableData dataWithLength:(NSUInteger)width * height * 4];
     uint32_t *target = (uint32_t *)pixels.mutableBytes;
     for (unsigned y = 0; y < height; y++) {
@@ -269,7 +297,14 @@ static void BrumInputPoll(void) {}
 
 static int16_t BrumInputState(unsigned port, unsigned device, unsigned index, unsigned identifier) {
     BrumLibretroViewController *host = BrumCurrentHost;
-    if (!host || port != 0 || device != BRUM_RETRO_DEVICE_JOYPAD || index != 0 || identifier > 15) return 0;
+    if (!host || port != 0 || index != 0) return 0;
+    if (device == BRUM_RETRO_DEVICE_POINTER) {
+        if (identifier == BRUM_RETRO_DEVICE_ID_POINTER_X) return host->_pointerX;
+        if (identifier == BRUM_RETRO_DEVICE_ID_POINTER_Y) return host->_pointerY;
+        if (identifier == BRUM_RETRO_DEVICE_ID_POINTER_PRESSED) return host->_pointerPressed ? 1 : 0;
+        return 0;
+    }
+    if (device != BRUM_RETRO_DEVICE_JOYPAD || identifier > 15) return 0;
     BOOL pressed = (host->_inputMask & (1u << identifier)) != 0;
     GCExtendedGamepad *gamepad = GCController.controllers.firstObject.extendedGamepad;
     if (gamepad) {
@@ -280,6 +315,10 @@ static int16_t BrumInputState(unsigned port, unsigned device, unsigned index, un
             case BRUM_RETRO_DEVICE_ID_JOYPAD_RIGHT: pressed |= gamepad.dpad.right.isPressed; break;
             case BRUM_RETRO_DEVICE_ID_JOYPAD_A: pressed |= gamepad.buttonA.isPressed; break;
             case BRUM_RETRO_DEVICE_ID_JOYPAD_B: pressed |= gamepad.buttonB.isPressed; break;
+            case BRUM_RETRO_DEVICE_ID_JOYPAD_X: pressed |= gamepad.buttonX.isPressed; break;
+            case BRUM_RETRO_DEVICE_ID_JOYPAD_Y: pressed |= gamepad.buttonY.isPressed; break;
+            case BRUM_RETRO_DEVICE_ID_JOYPAD_L: pressed |= gamepad.leftShoulder.isPressed; break;
+            case BRUM_RETRO_DEVICE_ID_JOYPAD_R: pressed |= gamepad.rightShoulder.isPressed; break;
             case BRUM_RETRO_DEVICE_ID_JOYPAD_START: pressed |= gamepad.buttonMenu.isPressed; break;
             case BRUM_RETRO_DEVICE_ID_JOYPAD_SELECT:
                 if (@available(iOS 13.0, *)) pressed |= gamepad.buttonOptions.isPressed;
@@ -336,13 +375,27 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _legacySaveBasename = [legacySaveBasename copy];
     _onExit = [onExit copy];
     _variables = [NSMutableDictionary dictionary];
+    _variables[@"system_core_override"] = @"Automatic";
+    _variables[@"system_gb_bios_enable"] = @"ON";
+    _variables[@"system_gba_bios_enable"] = @"ON";
+    _variables[@"system_nds_bios_enable"] = @"ON";
     _pixelFormat = BRUM_RETRO_PIXEL_FORMAT_0RGB1555;
     _screenFillsDisplay = YES;
     _audioLock = OS_UNFAIR_LOCK_INIT;
     _audioCapacity = 262144;
     _audioRing = (int16_t *)calloc(_audioCapacity, sizeof(int16_t));
     NSError *startupError = nil;
-    if (![self prepareDirectories:&startupError] || ![self loadCore:&startupError]) _startupError = startupError;
+    if (![self prepareDirectories:&startupError]) {
+        _startupError = startupError;
+    } else {
+        NSFileManager *manager = NSFileManager.defaultManager;
+        if ([manager fileExistsAtPath:[_systemDirectory stringByAppendingPathComponent:@"aes.zip"]]) {
+            _variables[@"geolith_system_type"] = @"aes";
+        } else if ([manager fileExistsAtPath:[_systemDirectory stringByAppendingPathComponent:@"neogeo.zip"]]) {
+            _variables[@"geolith_system_type"] = @"mvs";
+        }
+        if (![self loadCore:&startupError]) _startupError = startupError;
+    }
     return self;
 }
 
@@ -441,7 +494,12 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _screen.backgroundColor = [UIColor colorWithWhite:0.02 alpha:1];
     _screen.layer.magnificationFilter = kCAFilterNearest;
     _screen.clipsToBounds = YES;
-    _screen.userInteractionEnabled = NO;
+    _screen.userInteractionEnabled = YES;
+    UILongPressGestureRecognizer *touch = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(screenTouch:)];
+    touch.minimumPressDuration = 0;
+    touch.allowableMovement = CGFLOAT_MAX;
+    touch.cancelsTouchesInView = NO;
+    [_screen addGestureRecognizer:touch];
     [self.view addSubview:_screen];
 
     UILabel *title = [[UILabel alloc] init];
@@ -491,10 +549,13 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         [self controlButton:@"SELECT" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_SELECT],
         [self controlButton:@"START" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_START]
     ]];
+    UIButton *leftShoulder = [self controlButton:@"L" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_L];
+    UIButton *rightShoulder = [self controlButton:@"R" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_R];
     menu.translatesAutoresizingMaskIntoConstraints = NO;
     menu.axis = UILayoutConstraintAxisHorizontal;
     menu.spacing = 10;
     [self.view addSubview:up]; [self.view addSubview:actions]; [self.view addSubview:menu];
+    [self.view addSubview:leftShoulder]; [self.view addSubview:rightShoulder];
 
     UILayoutGuide *safe = self.view.safeAreaLayoutGuide;
     [NSLayoutConstraint activateConstraints:@[
@@ -518,7 +579,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         [_screen.topAnchor constraintEqualToAnchor:self.view.topAnchor], [_screen.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
         [up.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:26], [up.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-24],
         [actions.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-30], [actions.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-36],
-        [menu.centerXAnchor constraintEqualToAnchor:safe.centerXAnchor], [menu.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-16]
+        [menu.centerXAnchor constraintEqualToAnchor:safe.centerXAnchor], [menu.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-16],
+        [leftShoulder.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:18], [leftShoulder.topAnchor constraintEqualToAnchor:safe.topAnchor constant:66],
+        [rightShoulder.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-18], [rightShoulder.topAnchor constraintEqualToAnchor:safe.topAnchor constant:66]
     ]];
   }
 
@@ -559,14 +622,33 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 }
 
 - (UIStackView *)actionPad {
+    UIButton *y = [self controlButton:@"Y" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_Y];
+    UIButton *x = [self controlButton:@"X" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_X];
     UIButton *b = [self controlButton:@"B" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_B];
     UIButton *a = [self controlButton:@"A" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_A];
-    b.layer.cornerRadius = 31; a.layer.cornerRadius = 31;
-    [b.widthAnchor constraintEqualToConstant:62].active = YES; [b.heightAnchor constraintEqualToConstant:62].active = YES;
-    [a.widthAnchor constraintEqualToConstant:62].active = YES; [a.heightAnchor constraintEqualToConstant:62].active = YES;
-    UIStackView *pad = [[UIStackView alloc] initWithArrangedSubviews:@[b, a]];
-    pad.translatesAutoresizingMaskIntoConstraints = NO; pad.axis = UILayoutConstraintAxisHorizontal; pad.spacing = 18;
+    for (UIButton *button in @[y, x, b, a]) { button.layer.cornerRadius = 26; [button.widthAnchor constraintEqualToConstant:52].active = YES; [button.heightAnchor constraintEqualToConstant:52].active = YES; }
+    UIStackView *top = [[UIStackView alloc] initWithArrangedSubviews:@[y, x]];
+    UIStackView *bottom = [[UIStackView alloc] initWithArrangedSubviews:@[b, a]];
+    top.axis = UILayoutConstraintAxisHorizontal; bottom.axis = UILayoutConstraintAxisHorizontal; top.spacing = 12; bottom.spacing = 12;
+    UIStackView *pad = [[UIStackView alloc] initWithArrangedSubviews:@[top, bottom]];
+    pad.translatesAutoresizingMaskIntoConstraints = NO; pad.axis = UILayoutConstraintAxisVertical; pad.spacing = 8;
     return pad;
+}
+
+- (void)screenTouch:(UILongPressGestureRecognizer *)gesture {
+    if (!_frameWidth || !_frameHeight) return;
+    CGPoint point = [gesture locationInView:_screen];
+    CGSize bounds = _screen.bounds.size;
+    CGFloat scaleX = bounds.width / (CGFloat)_frameWidth;
+    CGFloat scaleY = bounds.height / (CGFloat)_frameHeight;
+    CGFloat scale = _screenFillsDisplay ? MAX(scaleX, scaleY) : MIN(scaleX, scaleY);
+    CGSize image = CGSizeMake((CGFloat)_frameWidth * scale, (CGFloat)_frameHeight * scale);
+    CGRect target = CGRectMake((bounds.width - image.width) / 2.0, (bounds.height - image.height) / 2.0, image.width, image.height);
+    CGFloat normalizedX = target.size.width > 0 ? ((point.x - CGRectGetMinX(target)) / target.size.width) * 2.0 - 1.0 : 0;
+    CGFloat normalizedY = target.size.height > 0 ? ((point.y - CGRectGetMinY(target)) / target.size.height) * 2.0 - 1.0 : 0;
+    _pointerX = (int16_t)lrint(MAX(-1.0, MIN(1.0, normalizedX)) * 32767.0);
+    _pointerY = (int16_t)lrint(MAX(-1.0, MIN(1.0, normalizedY)) * 32767.0);
+    _pointerPressed = (gesture.state == UIGestureRecognizerStateBegan || gesture.state == UIGestureRecognizerStateChanged) && CGRectContainsPoint(target, point);
 }
 
 - (void)inputDown:(UIButton *)sender { if (sender.tag >= 0) _inputMask |= 1u << sender.tag; }
@@ -693,11 +775,22 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 
     brum_retro_system_info systemInfo = {};
     _core.getSystemInfo(&systemInfo);
-    _romData = [NSData dataWithContentsOfURL:_romURL options:NSDataReadingMappedIfSafe error:error];
-    if (!_romData) return NO;
     brum_retro_game_info gameInfo = {};
     gameInfo.path = _romURL.path.fileSystemRepresentation;
-    if (!systemInfo.need_fullpath) { gameInfo.data = _romData.bytes; gameInfo.size = _romData.length; }
+    if (systemInfo.need_fullpath) {
+        NSNumber *isRegular = nil;
+        NSNumber *fileSize = nil;
+        if (![_romURL getResourceValue:&isRegular forKey:NSURLIsRegularFileKey error:error] || !isRegular.boolValue ||
+            ![_romURL getResourceValue:&fileSize forKey:NSURLFileSizeKey error:error] || fileSize.unsignedLongLongValue == 0) {
+            if (error && !*error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:5 userInfo:@{NSLocalizedDescriptionKey: @"A ROM não está disponível como um arquivo local válido."}];
+            return NO;
+        }
+    } else {
+        _romData = [NSData dataWithContentsOfURL:_romURL options:NSDataReadingMappedIfSafe error:error];
+        if (!_romData) return NO;
+        gameInfo.data = _romData.bytes;
+        gameInfo.size = _romData.length;
+    }
     if (!_core.loadGame(&gameInfo)) {
         if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:4 userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"O núcleo %@ recusou este arquivo. Confirme que a ROM é válida para %@.", _coreDisplayName, _emulatedSystemID.uppercaseString]}];
         return NO;

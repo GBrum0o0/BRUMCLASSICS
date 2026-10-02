@@ -112,6 +112,24 @@ if (!workflow.includes('ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa')) throw new Erro
 for (const marker of ['CORE_COMMIT="7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6"', 'mgba_libretro_ios.dylib', '-DCMAKE_SYSTEM_NAME=iOS', '--target mgba_libretro']) {
   if (!workflow.includes(marker)) throw new Error(`Build reproduzível do core mGBA incompleto: ${marker}`);
 }
+for (const marker of ['CORE_COMMIT="36771a16bfde7eb5c1c0315877b5e465e6f38858"', 'skyemu_libretro_ios.dylib', '--target skyemu_libretro']) {
+  if (!workflow.includes(marker)) throw new Error(`Build reproduzível do core SkyEmu incompleto: ${marker}`);
+}
+for (const marker of ['CORE_COMMIT="194024931935eff2092e36fc4f8e53e62ed11097"', 'geolith_libretro_ios.dylib', 'platform=ios-arm64']) {
+  if (!workflow.includes(marker)) throw new Error(`Build reproduzível do core Geolith incompleto: ${marker}`);
+}
+for (const marker of ['CORE_COMMIT="2d9106f2063d1a6e0661cc8938bb7f8eb737bcae"', 'gearsystem_libretro_ios.dylib', 'Gearsystem-LICENSE.txt', 'BRUMCLASSICS-Mobile-GPL-3.0.txt']) {
+  if (!workflow.includes(marker)) throw new Error(`Build reproduzível do core Gearsystem incompleto: ${marker}`);
+}
+for (const marker of ['CORE_COMMIT="8f00f500912a847062de432e38765c7285483e62"', 'nestopia_libretro_ios.dylib', 'Nestopia-LICENSE.txt']) {
+  if (!workflow.includes(marker)) throw new Error(`Build reproduzível do core Nestopia incompleto: ${marker}`);
+}
+for (const marker of ['CORE_COMMIT="3f946f277aef3aa99a95551618bbcd1dd2bda0d9"', 'mednafen_pce_fast_libretro_ios.dylib', 'Beetle-PCE-Fast-LICENSE.txt']) {
+  if (!workflow.includes(marker)) throw new Error(`Build reproduzível do core Beetle PCE Fast incompleto: ${marker}`);
+}
+for (const marker of ['CORE_COMMIT="79d7f9de218b6ffa65a80bbdc5828532bc239232"', 'bsnes_mercury_performance_libretro_ios.dylib', 'bsnes-mercury-LICENSE.txt']) {
+  if (!workflow.includes(marker)) throw new Error(`Build reproduzível do core bsnes-mercury incompleto: ${marker}`);
+}
 if (!/^\d+\.\d+\.\d+$/.test(updateManifest.version)) throw new Error('Versão inválida em ios-update.json.');
 if (!String(updateManifest.buildUrl || '').startsWith('https://github.com/GBrum0o0/BRUMCLASSICS/')) throw new Error('URL do build pessoal inválida.');
 if (publishedUpdateManifest.version !== updateManifest.version || publishedUpdateManifest.build !== updateManifest.build || publishedUpdateManifest.buildUrl !== updateManifest.buildUrl) throw new Error('Manifesto público de atualização diverge do pacote iOS.');

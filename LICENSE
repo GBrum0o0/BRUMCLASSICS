@@ -1,4 +1,4 @@
-BRUMCLASSICS OFFICIAL BINARY LICENSE
+BRUMCLASSICS PC LAUNCHER AND OFFICIAL BINARY LICENSE
 
 Copyright (c) 2026 BRUMCLASSICS. All rights reserved.
 
@@ -7,5 +7,11 @@ Permission is granted to download and use the unmodified BRUMCLASSICS OFICIAL bi
 You may not sell, rebrand, misrepresent, reverse engineer for redistribution, or redistribute modified BRUMCLASSICS binaries without prior written permission from the BRUMCLASSICS project owner.
 
 Third-party components remain governed by their respective licenses. Nothing in this license restricts rights granted by those third-party licenses. See THIRD-PARTY-NOTICES.md.
+
+SCOPE EXCEPTION FOR THE MOBILE APPLICATION
+
+This license does not apply to the source code under `android/` and `ios/`, or to the BRUM Core mobile host implemented there. That mobile source code is licensed separately under GNU GPL version 3 or, at your option, any later version, as documented in MOBILE-LICENSING.md and LICENSES/GPL-3.0.txt.
+
+The GPL grant does not include the BRUMCLASSICS name, logos, artwork, screenshots, store listing material, or other brand assets. Those materials remain proprietary and may be replaced when making and distributing modified mobile builds. The desktop/PC launcher under `src/` remains governed exclusively by this license and is not relicensed by the mobile exception.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. USE IS AT YOUR OWN RISK.

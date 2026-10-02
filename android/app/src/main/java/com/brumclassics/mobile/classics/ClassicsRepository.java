@@ -134,24 +134,28 @@ public final class ClassicsRepository {
         if (core == null) throw new IllegalStateException("Nenhum núcleo integrado aprovado está disponível para este sistema.");
 
         String extension = ClassicsRules.extension(stored.filename);
-        File playDirectory = new File(context.getCacheDir(), "integrated-play");
-        File rom = new File(playDirectory, stored.contentSha256 + "." + extension);
-        if (!playDirectory.isDirectory() && !playDirectory.mkdirs()) throw new IllegalStateException("Não foi possível preparar a área privada da ROM.");
-        if (!rom.isFile() || rom.length() != stored.fileSize) {
-            File temporary = new File(playDirectory, stored.contentSha256 + ".tmp");
-            try (InputStream input = resolver.openInputStream(Uri.parse(stored.uri)); FileOutputStream output = new FileOutputStream(temporary)) {
-                if (input == null) throw new IllegalStateException("O Android não liberou a leitura desta ROM.");
-                byte[] buffer = new byte[1024 * 1024]; int read; long total = 0;
-                while ((read = input.read(buffer)) >= 0) {
-                    if (read == 0) continue;
-                    total += read;
-                    if (total > MAX_ROM_BYTES) throw new IllegalStateException("A ROM ultrapassa o limite seguro do aplicativo.");
-                    output.write(buffer, 0, read);
-                }
-                output.getFD().sync();
-            } catch (Exception error) { temporary.delete(); throw error; }
-            if (rom.exists() && !rom.delete()) { temporary.delete(); throw new IllegalStateException("Não foi possível substituir a cópia temporária da ROM."); }
-            if (!temporary.renameTo(rom)) { temporary.delete(); throw new IllegalStateException("Não foi possível concluir a cópia protegida da ROM."); }
+        boolean directDocument = "ps2".equals(stored.systemId) || "neogeo".equals(stored.systemId);
+        File rom = null;
+        if (!directDocument) {
+            File playDirectory = new File(context.getCacheDir(), "integrated-play");
+            rom = new File(playDirectory, stored.contentSha256 + "." + extension);
+            if (!playDirectory.isDirectory() && !playDirectory.mkdirs()) throw new IllegalStateException("Não foi possível preparar a área privada da ROM.");
+            if (!rom.isFile() || rom.length() != stored.fileSize) {
+                File temporary = new File(playDirectory, stored.contentSha256 + ".tmp");
+                try (InputStream input = resolver.openInputStream(Uri.parse(stored.uri)); FileOutputStream output = new FileOutputStream(temporary)) {
+                    if (input == null) throw new IllegalStateException("O Android não liberou a leitura desta ROM.");
+                    byte[] buffer = new byte[1024 * 1024]; int read; long total = 0;
+                    while ((read = input.read(buffer)) >= 0) {
+                        if (read == 0) continue;
+                        total += read;
+                        if (total > MAX_ROM_BYTES) throw new IllegalStateException("A ROM ultrapassa o limite seguro do aplicativo.");
+                        output.write(buffer, 0, read);
+                    }
+                    output.getFD().sync();
+                } catch (Exception error) { temporary.delete(); throw error; }
+                if (rom.exists() && !rom.delete()) { temporary.delete(); throw new IllegalStateException("Não foi possível substituir a cópia temporária da ROM."); }
+                if (!temporary.renameTo(rom)) { temporary.delete(); throw new IllegalStateException("Não foi possível concluir a cópia protegida da ROM."); }
+            }
         }
 
         File root = new File(context.getFilesDir(), "integrated-emulator");
@@ -160,12 +164,16 @@ public final class ClassicsRepository {
         if ((!systemDirectory.isDirectory() && !systemDirectory.mkdirs()) || (!saveDirectory.isDirectory() && !saveDirectory.mkdirs())) {
             throw new IllegalStateException("Não foi possível criar a pasta segura de saves.");
         }
+        if ("neogeo".equals(stored.systemId) &&
+            !new File(systemDirectory, "aes.zip").isFile() && !new File(systemDirectory, "neogeo.zip").isFile()) {
+            throw new IllegalStateException("BIOS do Neo Geo ausente. Coloque aes.zip ou neogeo.zip dentro da pasta de ROMs e verifique a pasta novamente.");
+        }
         stored.lastPlayedAt = System.currentTimeMillis();
         save();
         return new IntegratedEmulatorLaunch(
             stored.id, stored.title, stored.canonicalGameId, stored.systemId, stored.contentSha256,
             core.id, core.displayName, core.version, core.androidLibraryName,
-            rom, new File(saveDirectory, stored.contentSha256 + ".srm"),
+            rom, directDocument ? stored.uri : "", new File(saveDirectory, stored.contentSha256 + ".srm"),
             new File(saveDirectory, stored.contentSha256 + ".save.json"), systemDirectory
         );
     }
@@ -256,8 +264,11 @@ public final class ClassicsRepository {
                     String documentId = cursor.getString(0); String name = cursor.getString(1); String mime = cursor.getString(2);
                     long size = cursor.isNull(3) ? 0L : cursor.getLong(3); String relative = parent.relative.isEmpty() ? name : parent.relative + "/" + name;
                     if (DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) { queue.addLast(new Node(documentId, relative)); continue; }
-                    if (name == null || !ClassicsRules.accepts(name) || size <= 0 || size > MAX_ROM_BYTES) continue;
-                    Uri document = DocumentsContract.buildDocumentUriUsingTree(tree, documentId); String id = sha256(document.toString());
+                    if (name == null || size <= 0 || size > MAX_ROM_BYTES) continue;
+                    Uri document = DocumentsContract.buildDocumentUriUsingTree(tree, documentId);
+                    if (isNeoGeoFirmware(name)) { installFirmware(document, name, size); continue; }
+                    if (!ClassicsRules.accepts(name)) continue;
+                    String id = sha256(document.toString());
                     LocalClassic game = previous.get(id);
                     if (game == null) game = new LocalClassic(id, document.toString(), relative, name, ClassicsRules.cleanTitle(name), size);
                     else { game.uri = document.toString(); game.relativePath = relative; game.filename = name; game.title = ClassicsRules.cleanTitle(name); game.fileSize = size; }
@@ -266,6 +277,32 @@ public final class ClassicsRepository {
             }
         }
         return result;
+    }
+
+    private static boolean isNeoGeoFirmware(String name) {
+        String lower = name.toLowerCase(Locale.ROOT);
+        return "aes.zip".equals(lower) || "neogeo.zip".equals(lower) || "neocd.zip".equals(lower) || "neocdz.zip".equals(lower);
+    }
+
+    private void installFirmware(Uri source, String name, long size) throws Exception {
+        if (size <= 0 || size > 64L * 1024L * 1024L) throw new IllegalStateException("A BIOS " + name + " tem tamanho inválido.");
+        File directory = new File(new File(context.getFilesDir(), "integrated-emulator"), "system");
+        if (!directory.isDirectory() && !directory.mkdirs()) throw new IllegalStateException("Não foi possível preparar a pasta de BIOS.");
+        File target = new File(directory, name.toLowerCase(Locale.ROOT));
+        if (target.isFile() && target.length() == size) return;
+        File temporary = new File(directory, target.getName() + ".tmp");
+        try (InputStream input = resolver.openInputStream(source); FileOutputStream output = new FileOutputStream(temporary)) {
+            if (input == null) throw new IllegalStateException("O Android não liberou a BIOS " + name + ".");
+            byte[] buffer = new byte[256 * 1024]; int read; long total = 0;
+            while ((read = input.read(buffer)) >= 0) {
+                if (read == 0) continue;
+                total += read; if (total > 64L * 1024L * 1024L) throw new IllegalStateException("A BIOS " + name + " é grande demais.");
+                output.write(buffer, 0, read);
+            }
+            output.getFD().sync();
+        } catch (Exception error) { temporary.delete(); throw error; }
+        if (target.exists() && !target.delete()) { temporary.delete(); throw new IllegalStateException("Não foi possível atualizar a BIOS " + name + "."); }
+        if (!temporary.renameTo(target)) { temporary.delete(); throw new IllegalStateException("Não foi possível instalar a BIOS " + name + "."); }
     }
 
     private Long observedRuntime(String filename) throws Exception {

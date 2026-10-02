@@ -10,7 +10,12 @@
 #define BRUM_RETRO_API_VERSION 1
 
 #define BRUM_RETRO_DEVICE_JOYPAD 1
+#define BRUM_RETRO_DEVICE_POINTER 6
 #define BRUM_RETRO_MEMORY_SAVE_RAM 0
+
+#define BRUM_RETRO_DEVICE_ID_POINTER_X 0
+#define BRUM_RETRO_DEVICE_ID_POINTER_Y 1
+#define BRUM_RETRO_DEVICE_ID_POINTER_PRESSED 2
 
 #define BRUM_RETRO_ENVIRONMENT_GET_CAN_DUPE 3
 #define BRUM_RETRO_ENVIRONMENT_SET_MESSAGE 6
@@ -23,9 +28,12 @@
 #define BRUM_RETRO_ENVIRONMENT_SET_VARIABLES 16
 #define BRUM_RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE 17
 #define BRUM_RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME 18
+#define BRUM_RETRO_ENVIRONMENT_GET_LOG_INTERFACE 27
 #define BRUM_RETRO_ENVIRONMENT_GET_CORE_ASSETS_DIRECTORY 30
 #define BRUM_RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY 31
 #define BRUM_RETRO_ENVIRONMENT_GET_LANGUAGE 39
+#define BRUM_RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE (47 | 0x10000)
+#define BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2_INTL 68
 
 #define BRUM_RETRO_PIXEL_FORMAT_0RGB1555 0
 #define BRUM_RETRO_PIXEL_FORMAT_XRGB8888 1
@@ -41,6 +49,8 @@
 #define BRUM_RETRO_DEVICE_ID_JOYPAD_RIGHT 7
 #define BRUM_RETRO_DEVICE_ID_JOYPAD_A 8
 #define BRUM_RETRO_DEVICE_ID_JOYPAD_X 9
+#define BRUM_RETRO_DEVICE_ID_JOYPAD_L 10
+#define BRUM_RETRO_DEVICE_ID_JOYPAD_R 11
 
 typedef bool (*brum_retro_environment_t)(unsigned command, void *data);
 typedef void (*brum_retro_video_refresh_t)(const void *data, unsigned width, unsigned height, size_t pitch);
@@ -92,3 +102,5 @@ typedef struct {
     unsigned frames;
 } brum_retro_message;
 
+typedef void (*brum_retro_log_printf_t)(int level, const char *format, ...);
+typedef struct { brum_retro_log_printf_t log; } brum_retro_log_callback;

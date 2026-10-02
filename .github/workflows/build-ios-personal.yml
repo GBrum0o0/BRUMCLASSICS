@@ -7,6 +7,8 @@ on:
       - main
     paths:
       - "ios/**"
+      - "LICENSES/**"
+      - "MOBILE-LICENSING.md"
       - ".github/workflows/build-ios-personal.yml"
 
 permissions:
@@ -15,7 +17,7 @@ permissions:
 jobs:
   build-unsigned-ipa:
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -67,7 +69,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: BRUMCLASSICS-IOS-TESTES-0.14.0
+          name: BRUMCLASSICS-IOS-TESTES-0.15.0
           path: ios/build/iOS-Tests.xcresult
           retention-days: 7
           if-no-files-found: warn
@@ -129,6 +131,145 @@ jobs:
           chmod 755 "$APP/Frameworks/mgba_libretro_ios.dylib"
           file "$APP/Frameworks/mgba_libretro_ios.dylib" | grep -q arm64
 
+      - name: Compilar núcleo integrado SkyEmu
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE_COMMIT="36771a16bfde7eb5c1c0315877b5e465e6f38858"
+          git clone --depth 1 --branch v4 https://github.com/skylersaleh/SkyEmu.git build/skyemu-core
+          test "$(git -C build/skyemu-core rev-parse HEAD)" = "$CORE_COMMIT"
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("build/skyemu-core/CMakeLists.txt")
+          source = path.read_text(encoding="utf-8")
+          old = 'set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "" FORCE)'
+          new = 'if(NOT IOS)\n  set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "" FORCE)\nendif()'
+          if source.count(old) != 1:
+              raise SystemExit("Unexpected SkyEmu architecture declaration")
+          path.write_text(source.replace(old, new), encoding="utf-8")
+          PY
+          cmake -S build/skyemu-core -B build/skyemu-ios -G Xcode \
+            -DIOS=ON \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_SYSROOT=iphoneos \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0 \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
+            -DENABLE_RETRO_ACHIEVEMENTS=OFF \
+            -DENABLE_HTTP_CONTROL_SERVER=OFF
+          cmake --build build/skyemu-ios --config Release --target skyemu_libretro --parallel "$(sysctl -n hw.ncpu)"
+          CORE_PATH=$(find build/skyemu-ios -type f -name 'skyemu_libretro*.dylib' -print -quit)
+          test -n "$CORE_PATH"
+          APP="build/DerivedData/Build/Products/Release-iphoneos/BRUMCLASSICSMobile.app"
+          mkdir -p "$APP/Frameworks"
+          cp "$CORE_PATH" "$APP/Frameworks/skyemu_libretro_ios.dylib"
+          cp build/skyemu-core/LICENSE "$APP/Frameworks/SkyEmu-LICENSE.txt"
+          chmod 755 "$APP/Frameworks/skyemu_libretro_ios.dylib"
+          file "$APP/Frameworks/skyemu_libretro_ios.dylib" | grep -q arm64
+
+      - name: Compilar núcleo integrado Geolith
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE_COMMIT="194024931935eff2092e36fc4f8e53e62ed11097"
+          git clone --filter=blob:none https://github.com/libretro/geolith-libretro.git build/geolith-core
+          git -C build/geolith-core checkout --detach "$CORE_COMMIT"
+          IOSSDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          make -C build/geolith-core/libretro platform=ios-arm64 IOSSDK="$IOSSDK" -j"$(sysctl -n hw.ncpu)"
+          CORE_PATH="build/geolith-core/libretro/geolith_libretro_ios.dylib"
+          test -f "$CORE_PATH"
+          APP="build/DerivedData/Build/Products/Release-iphoneos/BRUMCLASSICSMobile.app"
+          mkdir -p "$APP/Frameworks"
+          cp "$CORE_PATH" "$APP/Frameworks/geolith_libretro_ios.dylib"
+          cp build/geolith-core/LICENSE "$APP/Frameworks/Geolith-LICENSE.txt"
+          chmod 755 "$APP/Frameworks/geolith_libretro_ios.dylib"
+          file "$APP/Frameworks/geolith_libretro_ios.dylib" | grep -q arm64
+
+      - name: Compilar núcleo integrado Gearsystem
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE_COMMIT="2d9106f2063d1a6e0661cc8938bb7f8eb737bcae"
+          git clone --filter=blob:none https://github.com/drhelius/Gearsystem.git build/gearsystem-core
+          git -C build/gearsystem-core checkout --detach "$CORE_COMMIT"
+          test "$(git -C build/gearsystem-core rev-parse HEAD)" = "$CORE_COMMIT"
+          IOSSDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          make -C build/gearsystem-core/platforms/libretro \
+            platform=ios-arm64 IOSSDK="$IOSSDK" IOS_MIN_VERSION=16.0 LTO=0 \
+            -j"$(sysctl -n hw.ncpu)"
+          CORE_PATH="build/gearsystem-core/platforms/libretro/gearsystem_libretro_ios.dylib"
+          test -f "$CORE_PATH"
+          APP="build/DerivedData/Build/Products/Release-iphoneos/BRUMCLASSICSMobile.app"
+          mkdir -p "$APP/Frameworks"
+          cp "$CORE_PATH" "$APP/Frameworks/gearsystem_libretro_ios.dylib"
+          cp build/gearsystem-core/LICENSE "$APP/Frameworks/Gearsystem-LICENSE.txt"
+          cp ../LICENSES/GPL-3.0.txt "$APP/Frameworks/BRUMCLASSICS-Mobile-GPL-3.0.txt"
+          chmod 755 "$APP/Frameworks/gearsystem_libretro_ios.dylib"
+          file "$APP/Frameworks/gearsystem_libretro_ios.dylib" | grep -q arm64
+
+      - name: Compilar núcleo integrado Nestopia
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE_COMMIT="8f00f500912a847062de432e38765c7285483e62"
+          git clone --filter=blob:none https://github.com/libretro/nestopia.git build/nestopia-core
+          git -C build/nestopia-core checkout --detach "$CORE_COMMIT"
+          test "$(git -C build/nestopia-core rev-parse HEAD)" = "$CORE_COMMIT"
+          IOSSDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          make -C build/nestopia-core/libretro platform=ios-arm64 IOSSDK="$IOSSDK" -j"$(sysctl -n hw.ncpu)"
+          CORE_PATH="build/nestopia-core/libretro/nestopia_libretro_ios.dylib"
+          test -f "$CORE_PATH"
+          APP="build/DerivedData/Build/Products/Release-iphoneos/BRUMCLASSICSMobile.app"
+          mkdir -p "$APP/Frameworks"
+          cp "$CORE_PATH" "$APP/Frameworks/nestopia_libretro_ios.dylib"
+          cp build/nestopia-core/COPYING "$APP/Frameworks/Nestopia-LICENSE.txt"
+          chmod 755 "$APP/Frameworks/nestopia_libretro_ios.dylib"
+          file "$APP/Frameworks/nestopia_libretro_ios.dylib" | grep -q arm64
+
+      - name: Compilar núcleo integrado Beetle PCE Fast
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE_COMMIT="3f946f277aef3aa99a95551618bbcd1dd2bda0d9"
+          git clone --filter=blob:none https://github.com/libretro/beetle-pce-fast-libretro.git build/beetle-pce-fast-core
+          git -C build/beetle-pce-fast-core checkout --detach "$CORE_COMMIT"
+          test "$(git -C build/beetle-pce-fast-core rev-parse HEAD)" = "$CORE_COMMIT"
+          IOSSDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          make -C build/beetle-pce-fast-core platform=ios-arm64 IOSSDK="$IOSSDK" -j"$(sysctl -n hw.ncpu)"
+          CORE_PATH="build/beetle-pce-fast-core/mednafen_pce_fast_libretro_ios.dylib"
+          test -f "$CORE_PATH"
+          APP="build/DerivedData/Build/Products/Release-iphoneos/BRUMCLASSICSMobile.app"
+          mkdir -p "$APP/Frameworks"
+          cp "$CORE_PATH" "$APP/Frameworks/mednafen_pce_fast_libretro_ios.dylib"
+          cp build/beetle-pce-fast-core/COPYING "$APP/Frameworks/Beetle-PCE-Fast-LICENSE.txt"
+          chmod 755 "$APP/Frameworks/mednafen_pce_fast_libretro_ios.dylib"
+          file "$APP/Frameworks/mednafen_pce_fast_libretro_ios.dylib" | grep -q arm64
+
+      - name: Compilar núcleo integrado bsnes-mercury Performance
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE_COMMIT="79d7f9de218b6ffa65a80bbdc5828532bc239232"
+          git clone --filter=blob:none https://github.com/libretro/bsnes-mercury.git build/bsnes-mercury-core
+          git -C build/bsnes-mercury-core checkout --detach "$CORE_COMMIT"
+          test "$(git -C build/bsnes-mercury-core rev-parse HEAD)" = "$CORE_COMMIT"
+          IOSSDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          make -C build/bsnes-mercury-core platform=ios-arm64 PROFILE=performance IOSSDK="$IOSSDK" -j"$(sysctl -n hw.ncpu)"
+          CORE_PATH="build/bsnes-mercury-core/bsnes_mercury_performance_libretro_ios.dylib"
+          test -f "$CORE_PATH"
+          APP="build/DerivedData/Build/Products/Release-iphoneos/BRUMCLASSICSMobile.app"
+          mkdir -p "$APP/Frameworks"
+          cp "$CORE_PATH" "$APP/Frameworks/bsnes_mercury_performance_libretro_ios.dylib"
+          cp build/bsnes-mercury-core/LICENSE "$APP/Frameworks/bsnes-mercury-LICENSE.txt"
+          chmod 755 "$APP/Frameworks/bsnes_mercury_performance_libretro_ios.dylib"
+          file "$APP/Frameworks/bsnes_mercury_performance_libretro_ios.dylib" | grep -q arm64
+
       - name: Empacotar IPA pessoal
         working-directory: ios
         shell: bash
@@ -139,7 +280,7 @@ jobs:
       - name: Guardar build pessoal
         uses: actions/upload-artifact@v4
         with:
-          name: BRUMCLASSICS-MOVEL-IOS-PESSOAL-0.14.0
+          name: BRUMCLASSICS-MOVEL-IOS-PESSOAL-0.15.0
           path: |
             ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa
             ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa.sha256

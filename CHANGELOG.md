@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## Android 0.24.0 e iOS 0.15.0 — BRUM Core GPL e novos sistemas
+
+- O código próprio do aplicativo móvel e do BRUM Core passa a GPL-3.0-or-later; launcher de PC, marca e artes mantêm suas licenças separadas.
+- Nestopia UE integra NES/Famicom em Android e iOS.
+- Beetle PCE Fast integra cartuchos PC Engine/TurboGrafx-16 `.pce` em Android e iOS; jogos em CD permanecem no fallback até a cópia coordenada de múltiplos arquivos e BIOS ser validada.
+- bsnes-mercury Performance integra SNES/Super Famicom `.sfc` e `.smc` em Android e iOS, substituindo o fallback Snes9x sem incorporar sua licença não comercial.
+- Gearsystem integra Master System e Game Gear em Android e iOS.
+- Builds reproduzíveis fixam cada revisão e empacotam GPL e licenças completas dos núcleos.
+- Saves, três slots rápidos, controles virtuais/físicos, áudio, vídeo e seleção multicore usam o mesmo host existente.
+- Limitações de JIT no iOS continuam explícitas; fallback externo não é anunciado como suporte nativo.
+
 ## iOS 0.13.4 — Preenchimento total da tela
 
 - O BRUM Core passa a abrir no modo Preencher tela, ocupando todo o painel horizontal sem deformar a imagem.

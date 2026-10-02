@@ -16,6 +16,7 @@ enum ROMArtworkRules {
         case "sms": return "Sega_-_Master_System_-_Mark_III"
         case "gg": return "Sega_-_Game_Gear"
         case "pce": return "NEC_-_PC_Engine_-_TurboGrafx_16"
+        case "neo": return "SNK_-_Neo_Geo"
         default: return nil
         }
     }
@@ -83,7 +84,7 @@ actor ROMArtworkCache {
         let task = Task<Index, Error> {
             let url = URL(string: "https://api.github.com/repos/libretro-thumbnails/\(repository)/git/trees/master?recursive=1")!
             var request = URLRequest(url: url)
-            request.setValue("BRUMCLASSICS-iOS/0.14.0", forHTTPHeaderField: "User-Agent")
+            request.setValue("BRUMCLASSICS-iOS/0.15.0", forHTTPHeaderField: "User-Agent")
             let (data, response) = try await session.data(for: request)
             guard (response as? HTTPURLResponse)?.statusCode == 200, data.count < 12_000_000 else { throw URLError(.badServerResponse) }
             let tree = try JSONDecoder().decode(Tree.self, from: data)

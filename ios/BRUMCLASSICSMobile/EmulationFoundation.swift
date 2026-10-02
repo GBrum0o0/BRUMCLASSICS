@@ -5,6 +5,13 @@ enum EmulatedSystemID: String, Codable, CaseIterable, Sendable {
     case gameBoy = "gb"
     case gameBoyColor = "gbc"
     case gameBoyAdvance = "gba"
+    case nintendoDS = "nds"
+    case neoGeo = "neogeo"
+    case masterSystem = "sms"
+    case gameGear = "gg"
+    case nintendoEntertainmentSystem = "nes"
+    case pcEngine = "pce"
+    case superNintendo = "sfc"
 }
 
 enum ROMDetectionSource: String, Codable, Sendable {
@@ -43,7 +50,61 @@ enum CoreRegistry {
         supportedSystems: [.gameBoy, .gameBoyColor, .gameBoyAdvance]
     )
 
-    static let all = [mgba]
+    static let skyEmu = CoreDescriptor(
+        id: "skyemu",
+        displayName: "SkyEmu",
+        version: "36771a16bfde7eb5c1c0315877b5e465e6f38858",
+        license: "MIT",
+        libraryName: "skyemu_libretro_ios.dylib",
+        supportedSystems: [.nintendoDS]
+    )
+
+    static let geolith = CoreDescriptor(
+        id: "geolith",
+        displayName: "Geolith",
+        version: "194024931935eff2092e36fc4f8e53e62ed11097",
+        license: "BSD-3-Clause",
+        libraryName: "geolith_libretro_ios.dylib",
+        supportedSystems: [.neoGeo]
+    )
+
+    static let gearsystem = CoreDescriptor(
+        id: "gearsystem",
+        displayName: "Gearsystem",
+        version: "2d9106f2063d1a6e0661cc8938bb7f8eb737bcae",
+        license: "GPL-3.0-or-later",
+        libraryName: "gearsystem_libretro_ios.dylib",
+        supportedSystems: [.masterSystem, .gameGear]
+    )
+
+    static let nestopia = CoreDescriptor(
+        id: "nestopia",
+        displayName: "Nestopia UE",
+        version: "8f00f500912a847062de432e38765c7285483e62",
+        license: "GPL-2.0-or-later",
+        libraryName: "nestopia_libretro_ios.dylib",
+        supportedSystems: [.nintendoEntertainmentSystem]
+    )
+
+    static let beetlePCEFast = CoreDescriptor(
+        id: "beetle-pce-fast",
+        displayName: "Beetle PCE Fast",
+        version: "3f946f277aef3aa99a95551618bbcd1dd2bda0d9",
+        license: "GPL-2.0-or-later",
+        libraryName: "mednafen_pce_fast_libretro_ios.dylib",
+        supportedSystems: [.pcEngine]
+    )
+
+    static let bsnesMercury = CoreDescriptor(
+        id: "bsnes-mercury-performance",
+        displayName: "bsnes-mercury Performance",
+        version: "79d7f9de218b6ffa65a80bbdc5828532bc239232",
+        license: "GPL-3.0",
+        libraryName: "bsnes_mercury_performance_libretro_ios.dylib",
+        supportedSystems: [.superNintendo]
+    )
+
+    static let all = [mgba, skyEmu, geolith, gearsystem, nestopia, beetlePCEFast, bsnesMercury]
 
     static func core(for system: EmulatedSystemID) -> CoreDescriptor? {
         all.first { $0.supportedSystems.contains(system) }
@@ -114,6 +175,13 @@ enum ROMContentInspector {
         case "gb": return (.gameBoy, .extensionFallback)
         case "gbc": return (.gameBoyColor, .extensionFallback)
         case "gba": return (.gameBoyAdvance, .extensionFallback)
+        case "nds": return (.nintendoDS, .extensionFallback)
+        case "neo": return (.neoGeo, .extensionFallback)
+        case "sms": return (.masterSystem, .extensionFallback)
+        case "gg": return (.gameGear, .extensionFallback)
+        case "nes": return (.nintendoEntertainmentSystem, .extensionFallback)
+        case "pce": return (.pcEngine, .extensionFallback)
+        case "sfc", "smc": return (.superNintendo, .extensionFallback)
         default: return nil
         }
     }

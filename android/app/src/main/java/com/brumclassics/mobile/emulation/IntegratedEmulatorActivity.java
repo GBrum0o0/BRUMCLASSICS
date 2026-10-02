@@ -9,6 +9,7 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.os.ParcelFileDescriptor;
 import android.view.Gravity;
 import android.view.InputDevice;
 import android.view.KeyEvent;
@@ -32,11 +33,12 @@ public final class IntegratedEmulatorActivity extends Activity {
         KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_Y, KeyEvent.KEYCODE_BUTTON_SELECT,
         KeyEvent.KEYCODE_BUTTON_START, KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
         KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_BUTTON_A,
-        KeyEvent.KEYCODE_BUTTON_X
+        KeyEvent.KEYCODE_BUTTON_X, KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_R1
     };
 
     private IntegratedEmulatorLaunch launch;
     private BrumCoreView emulatorView;
+    private ParcelFileDescriptor romDescriptor;
     private boolean closing;
 
     public static Intent intent(Context context, IntegratedEmulatorLaunch launch) {
@@ -46,7 +48,7 @@ public final class IntegratedEmulatorActivity extends Activity {
         intent.putExtra("contentSha256", launch.contentSha256); intent.putExtra("coreId", launch.coreId);
         intent.putExtra("coreDisplayName", launch.coreDisplayName); intent.putExtra("coreVersion", launch.coreVersion);
         intent.putExtra("coreLibraryName", launch.coreLibraryName);
-        intent.putExtra("romFile", launch.romFile.getAbsolutePath()); intent.putExtra("saveFile", launch.saveFile.getAbsolutePath());
+        intent.putExtra("romFile", launch.romFile == null ? "" : launch.romFile.getAbsolutePath()); intent.putExtra("romUri", launch.romUri); intent.putExtra("saveFile", launch.saveFile.getAbsolutePath());
         intent.putExtra("manifestFile", launch.manifestFile.getAbsolutePath()); intent.putExtra("systemDirectory", launch.systemDirectory.getAbsolutePath());
         return intent;
     }
@@ -59,7 +61,15 @@ public final class IntegratedEmulatorActivity extends Activity {
         try {
             String corePath = getApplicationInfo().nativeLibraryDir + "/" + launch.coreLibraryName;
             if (!new File(corePath).isFile()) throw new IllegalStateException("O núcleo " + launch.coreDisplayName + " não está presente nesta instalação.");
-            BrumCoreBridge bridge = new BrumCoreBridge(corePath, launch);
+            String romPath;
+            if (launch.romFile != null) {
+                romPath = launch.romFile.getAbsolutePath();
+            } else {
+                romDescriptor = getContentResolver().openFileDescriptor(android.net.Uri.parse(launch.romUri), "r");
+                if (romDescriptor == null) throw new IllegalStateException("O Android não liberou o arquivo do jogo.");
+                romPath = "/proc/self/fd/" + romDescriptor.getFd();
+            }
+            BrumCoreBridge bridge = new BrumCoreBridge(corePath, romPath, launch);
             emulatorView = new BrumCoreView(this, bridge);
             setContentView(buildInterface());
         } catch (Throwable error) {
@@ -82,6 +92,7 @@ public final class IntegratedEmulatorActivity extends Activity {
 
     @Override protected void onDestroy() {
         if (emulatorView != null) emulatorView.destroy();
+        if (romDescriptor != null) { try { romDescriptor.close(); } catch (Exception ignored) {} romDescriptor = null; }
         super.onDestroy();
     }
 
@@ -135,6 +146,11 @@ public final class IntegratedEmulatorActivity extends Activity {
         addPadButton(root, "→", 7, Gravity.BOTTOM | Gravity.START, 136, 72);
         addPadButton(root, "B", 0, Gravity.BOTTOM | Gravity.END, 136, 42);
         addPadButton(root, "A", 8, Gravity.BOTTOM | Gravity.END, 34, 88);
+        addPadButton(root, "Y", 1, Gravity.BOTTOM | Gravity.END, 194, 88);
+        addPadButton(root, "X", 9, Gravity.BOTTOM | Gravity.END, 136, 144);
+
+        addShoulderButton(root, "L", 10, Gravity.TOP | Gravity.START, 16);
+        addShoulderButton(root, "R", 11, Gravity.TOP | Gravity.END, 16);
 
         Button select = gameButton("SELECT", 2); Button start = gameButton("START", 3);
         FrameLayout.LayoutParams selectParams = frame(82, 40, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL); selectParams.setMargins(0, 0, dp(47), dp(18)); root.addView(select, selectParams);
@@ -189,6 +205,11 @@ public final class IntegratedEmulatorActivity extends Activity {
         FrameLayout.LayoutParams params = frame(58, 58, gravity); params.setMargins(dp(horizontal), 0, dp(horizontal), dp(bottom)); root.addView(button, params);
     }
 
+    private void addShoulderButton(FrameLayout root, String text, int id, int gravity, int horizontal) {
+        Button button = gameButton(text, id);
+        FrameLayout.LayoutParams params = frame(68, 42, gravity); params.setMargins(dp(horizontal), dp(66), dp(horizontal), 0); root.addView(button, params);
+    }
+
     private Button gameButton(String text, int id) {
         Button button = control(text); button.setTextSize(text.length() > 2 ? 9 : 20); button.setAlpha(.76f);
         button.setOnTouchListener((view, event) -> {
@@ -231,7 +252,7 @@ public final class IntegratedEmulatorActivity extends Activity {
         return new IntegratedEmulatorLaunch(intent.getStringExtra("gameId"), intent.getStringExtra("title"), intent.getStringExtra("canonicalGameId"),
             intent.getStringExtra("systemId"), intent.getStringExtra("contentSha256"), intent.getStringExtra("coreId"),
             intent.getStringExtra("coreDisplayName"), intent.getStringExtra("coreVersion"), intent.getStringExtra("coreLibraryName"),
-            new File(intent.getStringExtra("romFile")), new File(intent.getStringExtra("saveFile")),
+            intent.getStringExtra("romFile").isEmpty() ? null : new File(intent.getStringExtra("romFile")), intent.getStringExtra("romUri"), new File(intent.getStringExtra("saveFile")),
             new File(intent.getStringExtra("manifestFile")), new File(intent.getStringExtra("systemDirectory")));
     }
 

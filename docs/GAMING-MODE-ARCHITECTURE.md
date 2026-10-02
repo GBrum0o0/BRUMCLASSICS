@@ -12,7 +12,7 @@ O sistema é identificado primeiro pelo cabeçalho do arquivo. A extensão só �
 
 ## Registro de cores
 
-Um core declara ID estável, versão, licença e sistemas suportados. A primeira implementação integrada é `mgba`, sob MPL-2.0, para GB, GBC e GBA. Android mantém os demais formatos no RetroArch enquanto o runtime integrado é preparado.
+Um core declara ID estável, versão, licença e sistemas suportados. O registro atual contém mGBA para GB/GBC/GBA, SkyEmu para Nintendo DS e Geolith para Neo Geo AES/MVS no Android e iOS. O Android também contém Play! para PlayStation 2 em caráter experimental. Sistemas sem núcleo juridicamente e tecnicamente aprovado permanecem no RetroArch.
 
 ## Sessão de emulação
 
@@ -45,7 +45,7 @@ O QR Code mantém o endereço físico e endereços alternativos sob a mesma impr
 
 ## Estado atual
 
-O runtime Libretro integrado já está presente no Android para GB, GBC e GBA. Ele usa o mesmo ID canônico, core mGBA fixado e manifesto de save do iOS.
+O runtime Libretro integrado é multicore e usa a mesma identidade canônica, registro fixado e manifesto de save nas duas plataformas. Consulte [a matriz completa](CORES-INTEGRADOS.md).
 
 1. Slots manuais e estados rápidos separados do save de bateria: concluído.
 2. Sessão remota autenticada e transporte protegido: concluído por orquestração Sunshine/Moonlight/Tailscale.

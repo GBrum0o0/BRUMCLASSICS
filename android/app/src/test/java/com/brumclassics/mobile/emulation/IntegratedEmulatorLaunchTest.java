@@ -8,7 +8,7 @@ public final class IntegratedEmulatorLaunchTest {
         IntegratedEmulatorLaunch launch = new IntegratedEmulatorLaunch(
             "game-1", "Jogo", "gba:abc123", "gba", "abc123", "mgba", "mGBA",
             "7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6", "libmgba_libretro.so",
-            new File("roms/game.gba"), new File(directory, "abc123.srm"),
+            new File("roms/game.gba"), "", new File(directory, "abc123.srm"),
             new File(directory, "abc123.save.json"), new File("system"));
 
         assertEquals(new File(directory, "abc123.slot1.state"), launch.quickStateFile(1));

@@ -13,13 +13,14 @@ import android.media.AudioManager;
 import android.media.AudioTrack;
 import android.os.SystemClock;
 import android.view.View;
+import android.view.MotionEvent;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
 final class BrumCoreView extends View implements Runnable {
     private final BrumCoreBridge core;
     private final AtomicInteger inputMask = new AtomicInteger();
-    private final int[] pixels = new int[1024 * 1024];
+    private final int[] pixels = new int[2048 * 2048];
     private final short[] audioSamples = new short[16 * 1024];
     private final Object bitmapLock = new Object();
     private final Paint paint = new Paint();
@@ -30,6 +31,7 @@ final class BrumCoreView extends View implements Runnable {
     private volatile boolean fillDisplay = true;
     private AudioTrack audioTrack;
     private long playedNanos;
+    private final RectF displayTarget = new RectF();
 
     BrumCoreView(Context context, BrumCoreBridge core) {
         super(context);
@@ -146,8 +148,21 @@ final class BrumCoreView extends View implements Runnable {
             Rect source = new Rect(0, 0, bitmap.getWidth(), bitmap.getHeight());
             RectF target = new RectF((getWidth() - width) / 2f, (getHeight() - height) / 2f,
                 (getWidth() + width) / 2f, (getHeight() + height) / 2f);
+            displayTarget.set(target);
             canvas.drawBitmap(bitmap, source, target, paint);
         }
+    }
+
+    @Override public boolean onTouchEvent(MotionEvent event) {
+        int action = event.getActionMasked();
+        if (action != MotionEvent.ACTION_DOWN && action != MotionEvent.ACTION_MOVE && action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL) return true;
+        RectF target;
+        synchronized (bitmapLock) { target = new RectF(displayTarget); }
+        boolean pressed = action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL && target.width() > 0 && target.height() > 0;
+        float x = target.width() <= 0 ? 0 : ((event.getX() - target.left) / target.width()) * 2f - 1f;
+        float y = target.height() <= 0 ? 0 : ((event.getY() - target.top) / target.height()) * 2f - 1f;
+        core.setPointer(x, y, pressed && target.contains(event.getX(), event.getY()));
+        return true;
     }
 
     private void prepareAudio() {

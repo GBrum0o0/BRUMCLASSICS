@@ -22,6 +22,18 @@ Os aplicativos iOS e Android compilam e empacotam o core Libretro mGBA para exec
 - Licença MPL 2.0: https://github.com/mgba-emu/mgba/blob/master/LICENSE
 - API Libretro: https://github.com/libretro/libretro-common/blob/master/include/libretro.h
 
+## Núcleos adicionais do BRUM Core móvel
+
+O aplicativo móvel, licenciado sob GPL-3.0-or-later, também empacota os seguintes núcleos em revisões fixadas. As licenças integrais acompanham o APK/IPA e os scripts públicos reproduzem os builds.
+
+- SkyEmu (Nintendo DS), MIT, revisão `36771a16bfde7eb5c1c0315877b5e465e6f38858`: https://github.com/skylersaleh/SkyEmu
+- Geolith (Neo Geo AES/MVS), BSD-3-Clause, revisão `194024931935eff2092e36fc4f8e53e62ed11097`: https://github.com/libretro/geolith-libretro
+- Play! (PlayStation 2 experimental, somente Android), BSD-2-Clause, revisão `83700b2c31e593bc94e845b4b31b797be84dda59`: https://github.com/jpd002/Play-
+- Gearsystem (Master System/Game Gear), GPL-3.0-or-later, revisão `2d9106f2063d1a6e0661cc8938bb7f8eb737bcae`: https://github.com/drhelius/Gearsystem
+- Nestopia UE (NES/Famicom), GPL-2.0-or-later, revisão `8f00f500912a847062de432e38765c7285483e62`: https://github.com/libretro/nestopia
+- Beetle PCE Fast (PC Engine/TurboGrafx-16 em cartucho), GPL-2.0-or-later, revisão `3f946f277aef3aa99a95551618bbcd1dd2bda0d9`: https://github.com/libretro/beetle-pce-fast-libretro
+- bsnes-mercury Performance (SNES/Super Famicom), GPL-3.0, revisão `79d7f9de218b6ffa65a80bbdc5828532bc239232`: https://github.com/libretro/bsnes-mercury
+
 ## Electron, Node.js, Three.js e bibliotecas JavaScript
 
 O executável contém runtimes e dependências de terceiros com licenças próprias. Avisos e licenças empacotados com essas dependências permanecem aplicáveis.

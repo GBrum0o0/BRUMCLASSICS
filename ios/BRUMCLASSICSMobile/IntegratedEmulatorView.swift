@@ -11,6 +11,13 @@ enum IntegratedEmulatorSupport {
         case "gb": system = .gameBoy
         case "gbc": system = .gameBoyColor
         case "gba": system = .gameBoyAdvance
+        case "nds": system = .nintendoDS
+        case "neo": system = .neoGeo
+        case "sms": system = .masterSystem
+        case "gg": system = .gameGear
+        case "nes": system = .nintendoEntertainmentSystem
+        case "pce": system = .pcEngine
+        case "sfc", "smc": system = .superNintendo
         default: system = nil
         }
         return system.flatMap(CoreRegistry.core(for:))

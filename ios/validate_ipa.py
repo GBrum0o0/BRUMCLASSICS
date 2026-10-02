@@ -39,18 +39,40 @@ def validate_ipa(path, expected_version=None):
         mode = archive.getinfo(executable_path).external_attr >> 16
         if not mode & stat.S_IXUSR:
             raise ValueError("Executable permission missing from ZIP")
-        core_path = root + "Frameworks/mgba_libretro_ios.dylib"
-        if core_path not in names:
-            raise ValueError("Integrated mGBA core is absent")
-        core = archive.read(core_path)
-        if len(core) < 32:
-            raise ValueError("Truncated integrated mGBA core")
-        core_magic, core_cpu, _, core_filetype = struct.unpack_from("<IIII", core)
-        if core_magic != 0xFEEDFACF or core_cpu != 0x0100000C or core_filetype != 6:
-            raise ValueError("Expected an arm64 Mach-O mGBA dynamic library")
-        core_mode = archive.getinfo(core_path).external_attr >> 16
-        if not core_mode & stat.S_IXUSR:
-            raise ValueError("Integrated core executable permission missing from ZIP")
+        integrated_cores = {
+            "mGBA": root + "Frameworks/mgba_libretro_ios.dylib",
+            "SkyEmu": root + "Frameworks/skyemu_libretro_ios.dylib",
+            "Geolith": root + "Frameworks/geolith_libretro_ios.dylib",
+            "Gearsystem": root + "Frameworks/gearsystem_libretro_ios.dylib",
+            "Nestopia": root + "Frameworks/nestopia_libretro_ios.dylib",
+            "Beetle PCE Fast": root + "Frameworks/mednafen_pce_fast_libretro_ios.dylib",
+            "bsnes-mercury": root + "Frameworks/bsnes_mercury_performance_libretro_ios.dylib",
+        }
+        for core_name, core_path in integrated_cores.items():
+            if core_path not in names:
+                raise ValueError(f"Integrated {core_name} core is absent")
+            core = archive.read(core_path)
+            if len(core) < 32:
+                raise ValueError(f"Truncated integrated {core_name} core")
+            core_magic, core_cpu, _, core_filetype = struct.unpack_from("<IIII", core)
+            if core_magic != 0xFEEDFACF or core_cpu != 0x0100000C or core_filetype != 6:
+                raise ValueError(f"Expected an arm64 Mach-O {core_name} dynamic library")
+            core_mode = archive.getinfo(core_path).external_attr >> 16
+            if not core_mode & stat.S_IXUSR:
+                raise ValueError("Integrated core executable permission missing from ZIP")
+        required_licenses = [
+            root + "Frameworks/BRUMCLASSICS-Mobile-GPL-3.0.txt",
+            root + "Frameworks/mGBA-LICENSE.txt",
+            root + "Frameworks/SkyEmu-LICENSE.txt",
+            root + "Frameworks/Geolith-LICENSE.txt",
+            root + "Frameworks/Gearsystem-LICENSE.txt",
+            root + "Frameworks/Nestopia-LICENSE.txt",
+            root + "Frameworks/Beetle-PCE-Fast-LICENSE.txt",
+            root + "Frameworks/bsnes-mercury-LICENSE.txt",
+        ]
+        for license_path in required_licenses:
+            if license_path not in names or len(archive.read(license_path)) < 1_000:
+                raise ValueError("Required mobile or core license is absent")
         if info.get("CFBundleIdentifier") != "com.brumclassics.mobile.ios":
             raise ValueError("Unexpected bundle identifier")
         if "iPhoneOS" not in info.get("CFBundleSupportedPlatforms", []):
@@ -61,7 +83,7 @@ def validate_ipa(path, expected_version=None):
             raise ValueError("ZIP CRC check failed")
         return {"ok": True, "version": info.get("CFBundleShortVersionString"),
                 "build": info.get("CFBundleVersion"), "bundleId": info["CFBundleIdentifier"],
-                "executable": executable_path, "architecture": "arm64", "integratedCore": "mGBA arm64",
+                "executable": executable_path, "architecture": "arm64", "integratedCores": ["mGBA arm64", "SkyEmu arm64", "Geolith arm64", "Gearsystem arm64", "Nestopia arm64", "Beetle PCE Fast arm64", "bsnes-mercury arm64"],
                 "signing": "unsigned; requires AltStore or Sideloadly", "entries": len(names)}
 
 if __name__ == "__main__":

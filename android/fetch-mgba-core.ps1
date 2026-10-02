@@ -13,4 +13,7 @@ git -C $target checkout --detach $commit
 
 $actual = git -C $target rev-parse HEAD
 if ($actual -ne $commit) { throw "A revisão do mGBA não corresponde ao núcleo aprovado." }
+$licenses = Join-Path $PSScriptRoot "app\src\main\assets\core-licenses"
+New-Item -ItemType Directory -Force -Path $licenses | Out-Null
+Copy-Item -LiteralPath (Join-Path $target "LICENSE") -Destination (Join-Path $licenses "mGBA-LICENSE.txt") -Force
 Write-Host "mGBA preparado em $target ($actual)"

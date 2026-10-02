@@ -23,7 +23,7 @@ public final class EmulationIdentity {
     public static EmulationIdentity inspect(InputStream input, String filename) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         byte[] buffer = new byte[1024 * 1024];
-        byte[] header = new byte[512];
+        byte[] header = new byte[4 * 1024 * 1024];
         int headerSize = 0;
         int read;
         while ((read = input.read(buffer)) != -1) {
@@ -56,16 +56,32 @@ public final class EmulationIdentity {
             }
         }
         if (length > 0xB2 && (header[0xB2] & 0xff) == 0x96) return new DetectedSystem("gba", "header");
+        if (containsAscii(header, length, "BOOT2")) return new DetectedSystem("ps2", "header");
         String extension = ClassicsRules.extension(filename).toLowerCase(Locale.ROOT);
         switch (extension) {
             case "gb": case "gbc": case "gba": case "nes": case "sfc": case "smc":
             case "n64": case "z64": case "v64": case "nds": case "sms": case "gg":
             case "md": case "gen": case "pce":
                 return new DetectedSystem(extension, "extension");
+            case "elf": case "isz":
+                return new DetectedSystem("ps2", "extension");
+            case "neo":
+                return new DetectedSystem("neogeo", "extension");
             default:
                 break;
         }
         return null;
+    }
+
+    private static boolean containsAscii(byte[] bytes, int length, String value) {
+        byte[] wanted = value.getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        int limit = Math.min(length, bytes.length) - wanted.length;
+        for (int offset = 0; offset <= limit; offset++) {
+            int index = 0;
+            while (index < wanted.length && bytes[offset + index] == wanted[index]) index++;
+            if (index == wanted.length) return true;
+        }
+        return false;
     }
 
     private static String hex(byte[] bytes) {

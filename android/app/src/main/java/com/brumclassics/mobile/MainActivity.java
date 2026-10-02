@@ -998,7 +998,7 @@ public final class MainActivity extends Activity {
             final LocalClassic selectedClassic = recentClassic;
             LinearLayout recent = column(); recent.setPadding(dp(15), dp(14), dp(15), dp(14)); recent.setBackground(background(SURFACE, 4, LINE, 1));
             recent.addView(eyebrow("ÚLTIMO CLASSIC JOGADO NO CELULAR")); recent.addView(text(recentClassic.title, 17, TEXT, true), margins(-1, 7, -1, 4));
-            recent.addView(text(classicPlatform(recentClassic.filename) + " · " + formatClassicTime(recentClassic.creditedSeconds), 8, MUTED, true));
+            recent.addView(text(classicPlatform(recentClassic) + " · " + formatClassicTime(recentClassic.creditedSeconds), 8, MUTED, true));
             recent.setOnClickListener(v -> { classicDetailsReturnScreen = "home"; showClassicDetails(selectedClassic); }); page.addView(recent, margins(-1, 0, -1, 18));
         }
 
@@ -1238,7 +1238,7 @@ public final class MainActivity extends Activity {
         LinearLayout header = page(); header.setPadding(dp(20), dp(18), dp(20), dp(12));
         header.addView(backHeader("CLASSICS EVERYWHERE", () -> navigate(classicsReturnScreen)));
         header.addView(text("Seus clássicos no Android", 26, TEXT, true), margins(-1, 20, -1, 5));
-        header.addView(text("GB, GBC e GBA abrem no BRUM Core. Outros sistemas usam o RetroArch.", 10, MUTED, false));
+        header.addView(text("GB, GBC, GBA, Nintendo DS, Neo Geo e PS2 compatível abrem no BRUM Core. Outros sistemas usam o RetroArch.", 10, MUTED, false));
         Button refresh = primaryButton(classicsRepository.romFolderConfigured() ? "VERIFICAR " + classicsRepository.romFolderName().toUpperCase(Locale.ROOT) : "SELECIONAR PASTA DE ROMS");
         refresh.setOnClickListener(v -> {
             if (!classicsRepository.romFolderConfigured()) { chooseTree(REQUEST_ROM_TREE); return; }
@@ -1272,7 +1272,7 @@ public final class MainActivity extends Activity {
                 LocalClassic game = getItem(position); LinearLayout card = column(); Game launcherGame = launcherGameFor(game);
                 if (launcherGame != null) card.addView(cover(launcherGame, -1, 214), new LinearLayout.LayoutParams(-1, dp(214)));
                 else card.addView(localClassicArtwork(game, 214), new LinearLayout.LayoutParams(-1, dp(214)));
-                card.addView(text(classicPlatform(game.filename), 7, ACCENT, true), margins(-1, 9, -1, 3));
+                card.addView(text(classicPlatform(game), 7, ACCENT, true), margins(-1, 9, -1, 3));
                 card.addView(text(game.title, 12, TEXT, true));
                 String progress = game.achievements.isEmpty() ? "CONQUISTAS NÃO CONSULTADAS" : game.unlockedCount() + "/" + game.achievements.size() + " · " + game.progressPercent() + "%";
                 card.addView(text(progress, 7, MUTED, true), margins(-1, 4, -1, 0));
@@ -1293,7 +1293,7 @@ public final class MainActivity extends Activity {
             page.addView(localClassicArtwork(game, 294), coverLp);
         }
         CoreRegistry.Descriptor integratedCore = CoreRegistry.integratedCore(game.systemId, game.filename);
-        TextView platform = eyebrow(classicPlatform(game.filename) + (integratedCore == null ? " · RETROARCH" : " · BRUM CORE · " + integratedCore.displayName.toUpperCase(Locale.ROOT))); platform.setGravity(Gravity.CENTER);
+        TextView platform = eyebrow(classicPlatform(game) + (integratedCore == null ? " · RETROARCH" : " · BRUM CORE · " + integratedCore.displayName.toUpperCase(Locale.ROOT))); platform.setGravity(Gravity.CENTER);
         page.addView(platform, margins(-1, launcherGame == null ? 28 : 20, -1, 8));
         TextView title = text(game.title, 27, TEXT, true); title.setGravity(Gravity.CENTER); page.addView(title);
         page.addView(text(game.filename, 8, MUTED, false), margins(-1, 7, -1, 20));
@@ -1515,8 +1515,11 @@ public final class MainActivity extends Activity {
         });
     }
 
-    private String classicPlatform(String filename) {
-        String extension = ClassicsRules.extension(filename).toUpperCase(Locale.ROOT);
+    private String classicPlatform(LocalClassic game) {
+        if ("ps2".equals(game.systemId)) return "PLAYSTATION 2";
+        if ("nds".equals(game.systemId)) return "NINTENDO DS";
+        if ("neogeo".equals(game.systemId)) return "NEO GEO";
+        String extension = ClassicsRules.extension(game.filename).toUpperCase(Locale.ROOT);
         if ("SFC".equals(extension) || "SMC".equals(extension)) return "SUPER NINTENDO";
         if ("MD".equals(extension) || "GEN".equals(extension)) return "MEGA DRIVE";
         if ("Z64".equals(extension) || "V64".equals(extension)) return "N64";
@@ -2076,7 +2079,7 @@ public final class MainActivity extends Activity {
                 if (!"https".equalsIgnoreCase(url.getProtocol()) || !(host.endsWith("steamstatic.com") || host.endsWith("akamaihd.net"))) return;
                 connection = (HttpURLConnection) url.openConnection();
                 connection.setConnectTimeout(6000); connection.setReadTimeout(8000); connection.setInstanceFollowRedirects(false);
-                connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android/0.23.1");
+                connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android/0.24.0");
                 if (connection.getResponseCode() != 200 || connection.getContentLengthLong() > 2 * 1024 * 1024) return;
                 byte[] buffer = new byte[8192]; int read; int total = 0;
                 ByteArrayOutputStream output = new ByteArrayOutputStream();

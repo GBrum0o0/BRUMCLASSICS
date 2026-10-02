@@ -80,6 +80,7 @@ enum RetroArchAppStoreLaunchRules {
 
 enum ROMFolderScanner {
     static let maximumFiles = 10_000
+    static let firmwareFilenames: Set<String> = ["aes.zip", "neogeo.zip", "neocd.zip", "neocdz.zip"]
 
     static func scan(_ root: URL, allowedExtensions: Set<String> = PocketRules.extensions) throws -> ROMFolderScan {
         try CoordinatedFileAccess.read(root) { coordinatedRoot in
@@ -102,6 +103,7 @@ enum ROMFolderScanner {
             let values = try file.resourceValues(forKeys: Set(keys))
             guard values.isRegularFile == true, values.isSymbolicLink != true,
                   allowedExtensions.contains(file.pathExtension.lowercased()),
+                  !firmwareFilenames.contains(file.lastPathComponent.lowercased()),
                   let size = values.fileSize, size > 0 else { continue }
             let standardized = file.standardizedFileURL
             let rootPrefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
@@ -164,12 +166,18 @@ actor ROMFolderAccess {
             .appendingPathComponent("IntegratedPlay", isDirectory: true)
     }
 
+    private var systemRoot: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("IntegratedEmulator/System", isDirectory: true)
+    }
+
     var configured: Bool { UserDefaults.standard.data(forKey: bookmarkKey) != nil }
     var displayName: String { UserDefaults.standard.string(forKey: nameKey) ?? "Downloads" }
 
     func configure(_ folder: URL) throws -> ROMFolderScan {
         let accessing = folder.startAccessingSecurityScopedResource()
         defer { if accessing { folder.stopAccessingSecurityScopedResource() } }
+        try installNeoGeoFirmware(in: folder)
         let scan = try ROMFolderScanner.scan(folder)
         let bookmark = try folder.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
         UserDefaults.standard.set(bookmark, forKey: bookmarkKey)
@@ -185,6 +193,7 @@ actor ROMFolderAccess {
         let folder = try URL(resolvingBookmarkData: bookmark, options: [], relativeTo: nil, bookmarkDataIsStale: &stale)
         let accessing = folder.startAccessingSecurityScopedResource()
         defer { if accessing { folder.stopAccessingSecurityScopedResource() } }
+        try installNeoGeoFirmware(in: folder)
         let result = try ROMFolderScanner.scan(folder)
         if stale {
             let refreshed = try folder.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
@@ -243,6 +252,10 @@ actor ROMFolderAccess {
         guard source.path.hasPrefix(prefix), source.lastPathComponent == game.filename else {
             throw PocketError.message("O caminho da ROM não pertence mais à pasta autorizada.")
         }
+        try installNeoGeoFirmware(in: root)
+        if source.pathExtension.lowercased() == "neo" && !hasNeoGeoCartridgeFirmware() {
+            throw PocketError.message("Para iniciar Neo Geo, coloque aes.zip ou neogeo.zip na pasta de jogos. O BRUM Core copia somente a BIOS fornecida por você e não distribui arquivos protegidos.")
+        }
         try removeExpiredFiles(in: integratedRoot)
         do {
             if stale {
@@ -258,6 +271,44 @@ actor ROMFolderAccess {
     func finishShare(_ id: UUID) {
         guard let share = activeShares.removeValue(forKey: id) else { return }
         if share.accessing { share.root.stopAccessingSecurityScopedResource() }
+    }
+
+    private func hasNeoGeoCartridgeFirmware() -> Bool {
+        let manager = FileManager.default
+        return ["aes.zip", "neogeo.zip"].contains {
+            manager.fileExists(atPath: systemRoot.appendingPathComponent($0).path)
+        }
+    }
+
+    private func installNeoGeoFirmware(in root: URL) throws {
+        let manager = FileManager.default
+        try manager.createDirectory(at: systemRoot, withIntermediateDirectories: true)
+        let keys: [URLResourceKey] = [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]
+        guard let enumerator = manager.enumerator(
+            at: root,
+            includingPropertiesForKeys: keys,
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else { return }
+
+        var inspected = 0
+        for case let source as URL in enumerator {
+            inspected += 1
+            if inspected > ROMFolderScanner.maximumFiles { break }
+            let filename = source.lastPathComponent.lowercased()
+            guard ROMFolderScanner.firmwareFilenames.contains(filename) else { continue }
+            let values = try source.resourceValues(forKeys: Set(keys))
+            guard values.isRegularFile == true, values.isSymbolicLink != true,
+                  let size = values.fileSize, size > 0, size <= 64 * 1_024 * 1_024 else { continue }
+            let destination = systemRoot.appendingPathComponent(filename)
+            if let installedSize = try? destination.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+               installedSize == size { continue }
+            let data = try CoordinatedFileAccess.read(source) { try Data(contentsOf: $0, options: .mappedIfSafe) }
+            guard data.count == size else { continue }
+            try data.write(to: destination, options: [.atomic, .completeFileProtectionUnlessOpen])
+            var destinationValues = URLResourceValues()
+            destinationValues.isExcludedFromBackup = true
+            try? destination.setResourceValues(destinationValues)
+        }
     }
 
     private func removeExpiredExports(now: Date = Date()) throws {

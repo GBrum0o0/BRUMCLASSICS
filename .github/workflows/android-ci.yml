@@ -4,10 +4,14 @@ on:
   push:
     paths:
       - "android/**"
+      - "LICENSES/**"
+      - "MOBILE-LICENSING.md"
       - ".github/workflows/android-ci.yml"
   pull_request:
     paths:
       - "android/**"
+      - "LICENSES/**"
+      - "MOBILE-LICENSING.md"
       - ".github/workflows/android-ci.yml"
   workflow_dispatch:
 
@@ -30,6 +34,68 @@ jobs:
           git clone --filter=blob:none https://github.com/libretro/mgba.git android/app/src/main/cpp/vendor/mgba
           git -C android/app/src/main/cpp/vendor/mgba checkout --detach 7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6
           test "$(git -C android/app/src/main/cpp/vendor/mgba rev-parse HEAD)" = "7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6"
+          mkdir -p android/app/src/main/assets/core-licenses
+          cp android/app/src/main/cpp/vendor/mgba/LICENSE android/app/src/main/assets/core-licenses/mGBA-LICENSE.txt
+      - name: Fetch pinned SkyEmu core
+        run: |
+          git clone --depth 1 --branch v4 https://github.com/skylersaleh/SkyEmu.git android/app/src/main/cpp/vendor/skyemu
+          test "$(git -C android/app/src/main/cpp/vendor/skyemu rev-parse HEAD)" = "36771a16bfde7eb5c1c0315877b5e465e6f38858"
+          cp android/app/src/main/cpp/vendor/skyemu/LICENSE android/app/src/main/assets/core-licenses/SkyEmu-LICENSE.txt
+      - name: Fetch pinned Geolith core
+        run: |
+          git clone --filter=blob:none https://github.com/libretro/geolith-libretro.git android/app/src/main/cpp/vendor/geolith
+          git -C android/app/src/main/cpp/vendor/geolith checkout --detach 194024931935eff2092e36fc4f8e53e62ed11097
+          test "$(git -C android/app/src/main/cpp/vendor/geolith rev-parse HEAD)" = "194024931935eff2092e36fc4f8e53e62ed11097"
+          cp android/app/src/main/cpp/vendor/geolith/LICENSE android/app/src/main/assets/core-licenses/Geolith-LICENSE.txt
+      - name: Fetch pinned Gearsystem core
+        run: |
+          git clone --filter=blob:none https://github.com/drhelius/Gearsystem.git android/app/src/main/cpp/vendor/gearsystem
+          git -C android/app/src/main/cpp/vendor/gearsystem checkout --detach 2d9106f2063d1a6e0661cc8938bb7f8eb737bcae
+          test "$(git -C android/app/src/main/cpp/vendor/gearsystem rev-parse HEAD)" = "2d9106f2063d1a6e0661cc8938bb7f8eb737bcae"
+          cp android/app/src/main/cpp/vendor/gearsystem/LICENSE android/app/src/main/assets/core-licenses/Gearsystem-LICENSE.txt
+      - name: Fetch pinned Nestopia core
+        run: |
+          git clone --filter=blob:none https://github.com/libretro/nestopia.git android/app/src/main/cpp/vendor/nestopia
+          git -C android/app/src/main/cpp/vendor/nestopia checkout --detach 8f00f500912a847062de432e38765c7285483e62
+          test "$(git -C android/app/src/main/cpp/vendor/nestopia rev-parse HEAD)" = "8f00f500912a847062de432e38765c7285483e62"
+          cp android/app/src/main/cpp/vendor/nestopia/COPYING android/app/src/main/assets/core-licenses/Nestopia-LICENSE.txt
+      - name: Fetch pinned Beetle PCE Fast core
+        run: |
+          git clone --filter=blob:none https://github.com/libretro/beetle-pce-fast-libretro.git android/app/src/main/cpp/vendor/beetle-pce-fast
+          git -C android/app/src/main/cpp/vendor/beetle-pce-fast checkout --detach 3f946f277aef3aa99a95551618bbcd1dd2bda0d9
+          test "$(git -C android/app/src/main/cpp/vendor/beetle-pce-fast rev-parse HEAD)" = "3f946f277aef3aa99a95551618bbcd1dd2bda0d9"
+          cp android/app/src/main/cpp/vendor/beetle-pce-fast/COPYING android/app/src/main/assets/core-licenses/Beetle-PCE-Fast-LICENSE.txt
+      - name: Fetch pinned bsnes-mercury core
+        run: |
+          git clone --filter=blob:none https://github.com/libretro/bsnes-mercury.git android/app/src/main/cpp/vendor/bsnes-mercury
+          git -C android/app/src/main/cpp/vendor/bsnes-mercury checkout --detach 79d7f9de218b6ffa65a80bbdc5828532bc239232
+          test "$(git -C android/app/src/main/cpp/vendor/bsnes-mercury rev-parse HEAD)" = "79d7f9de218b6ffa65a80bbdc5828532bc239232"
+          cp android/app/src/main/cpp/vendor/bsnes-mercury/LICENSE android/app/src/main/assets/core-licenses/bsnes-mercury-LICENSE.txt
+      - name: Build pinned Play! PS2 core
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE_COMMIT="83700b2c31e593bc94e845b4b31b797be84dda59"
+          CORE_DIR="android/app/src/main/cpp/vendor/play"
+          git clone --filter=blob:none --recurse-submodules https://github.com/jpd002/Play-.git "$CORE_DIR"
+          git -C "$CORE_DIR" checkout --detach "$CORE_COMMIT"
+          git -C "$CORE_DIR" submodule update --init --recursive --depth 1
+          test "$(git -C "$CORE_DIR" rev-parse HEAD)" = "$CORE_COMMIT"
+          CMAKE_PATH="$ANDROID_HOME/cmake/3.22.1/bin"
+          NDK="$ANDROID_HOME/ndk/27.0.12077973"
+          "$CMAKE_PATH/cmake" -S "$CORE_DIR" -B "$CORE_DIR/build-brum-arm64" -G Ninja \
+            -DBUILD_LIBRETRO_CORE=ON -DBUILD_PLAY=OFF -DBUILD_TESTS=OFF -DENABLE_AMAZON_S3=OFF \
+            -DCMAKE_BUILD_TYPE=Release -DANDROID_ABI=arm64-v8a -DANDROID_NDK="$NDK" \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_NATIVE_API_LEVEL=26 -DANDROID_PLATFORM=android-26 -DANDROID_STL=c++_static \
+            -DANDROID_TOOLCHAIN=clang -DCMAKE_MAKE_PROGRAM="$CMAKE_PATH/ninja"
+          "$CMAKE_PATH/cmake" --build "$CORE_DIR/build-brum-arm64" --target play_libretro --parallel 4
+          mkdir -p android/app/src/main/jniLibs/arm64-v8a
+          cp "$CORE_DIR/build-brum-arm64/Source/ui_libretro/play_libretro_android.so" \
+            android/app/src/main/jniLibs/arm64-v8a/play_libretro_android.so
+          cp "$CORE_DIR/License.txt" android/app/src/main/assets/core-licenses/Play-LICENSE.txt
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" --dyn-syms \
+            android/app/src/main/jniLibs/arm64-v8a/play_libretro_android.so | grep -q 'retro_load_game'
       - name: Compile Android application
         working-directory: android
         run: ./gradlew :app:assembleDebug --no-daemon
@@ -38,6 +104,17 @@ jobs:
         run: |
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libbrumcore.so'
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libmgba_libretro.so'
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libskyemu_libretro.so'
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libgeolith_libretro.so'
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libgearsystem_libretro.so'
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libnestopia_libretro.so'
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libmednafen_pce_fast_libretro.so'
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libbsnes_mercury_performance_libretro.so'
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/play_libretro_android.so'
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/GPL-3.0.txt'
+          for license in mGBA SkyEmu Geolith Play Gearsystem Nestopia Beetle-PCE-Fast bsnes-mercury; do
+            unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q "assets/core-licenses/${license}-LICENSE.txt"
+          done
       - name: Run contract tests
         shell: bash
         run: |

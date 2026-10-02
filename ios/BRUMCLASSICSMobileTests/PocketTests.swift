@@ -32,6 +32,22 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(CoreRegistry.core(for: .gameBoyAdvance)?.id, "mgba")
         XCTAssertEqual(CoreRegistry.core(for: .gameBoyAdvance)?.libraryName, "mgba_libretro_ios.dylib")
         XCTAssertEqual(CoreRegistry.core(for: .gameBoyAdvance)?.license, "MPL-2.0")
+        XCTAssertEqual(CoreRegistry.core(for: .nintendoDS)?.id, "skyemu")
+        XCTAssertEqual(CoreRegistry.core(for: .nintendoDS)?.libraryName, "skyemu_libretro_ios.dylib")
+        XCTAssertEqual(CoreRegistry.core(for: .neoGeo)?.id, "geolith")
+        XCTAssertEqual(CoreRegistry.core(for: .neoGeo)?.libraryName, "geolith_libretro_ios.dylib")
+        XCTAssertEqual(CoreRegistry.core(for: .neoGeo)?.license, "BSD-3-Clause")
+        XCTAssertEqual(ROMContentInspector.detectSystem(header: Data([1]), filename: "Metal Slug.neo")?.system, .neoGeo)
+        XCTAssertEqual(CoreRegistry.core(for: .masterSystem)?.id, "gearsystem")
+        XCTAssertEqual(CoreRegistry.core(for: .gameGear)?.libraryName, "gearsystem_libretro_ios.dylib")
+        XCTAssertEqual(CoreRegistry.core(for: .gameGear)?.license, "GPL-3.0-or-later")
+        XCTAssertEqual(ROMContentInspector.detectSystem(header: Data([1]), filename: "Sonic.gg")?.system, .gameGear)
+        XCTAssertEqual(CoreRegistry.core(for: .nintendoEntertainmentSystem)?.id, "nestopia")
+        XCTAssertEqual(CoreRegistry.core(for: .nintendoEntertainmentSystem)?.license, "GPL-2.0-or-later")
+        XCTAssertEqual(CoreRegistry.core(for: .pcEngine)?.id, "beetle-pce-fast")
+        XCTAssertEqual(CoreRegistry.core(for: .pcEngine)?.libraryName, "mednafen_pce_fast_libretro_ios.dylib")
+        XCTAssertEqual(CoreRegistry.core(for: .superNintendo)?.id, "bsnes-mercury-performance")
+        XCTAssertEqual(CoreRegistry.core(for: .superNintendo)?.license, "GPL-3.0")
     }
 
     func testSaveManifestOnlyAdvancesGenerationWhenPayloadChanges() {
@@ -127,6 +143,7 @@ final class PocketTests: XCTestCase {
         try Data([2]).write(to: root.appendingPathComponent("notes.txt"))
         try Data([3]).write(to: root.appendingPathComponent("duplicate.nes"))
         try Data([4]).write(to: root.appendingPathComponent("nested/duplicate.nes"))
+        try Data([5]).write(to: root.appendingPathComponent("neogeo.zip"))
         let result = try ROMFolderScanner.scan(root)
         XCTAssertEqual(result.games.map(\.filename), ["Pokemon.gba"])
         XCTAssertEqual(result.duplicateFilenames, 2)
@@ -160,11 +177,16 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(ROMTitleRules.clean("1636 - Pokemon Fire Red (U)(Squirrels).gba"), "Pokemon Fire Red")
         XCTAssertEqual(ROMTitleRules.clean("Pokemon_FireRed_Version.gba"), "Pokemon Fire Red")
     }
-    func testIntegratedCoreSupportsOnlyFirstValidatedSystems() {
+    func testIntegratedCoreSupportsValidatedSystemsOnly() {
         XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Pokemon.gba", filename: "Pokemon.gba", title: "Pokemon", fileSize: 1)))
         XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Tetris.gb", filename: "Tetris.gb", title: "Tetris", fileSize: 1)))
         XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Zelda.gbc", filename: "Zelda.gbc", title: "Zelda", fileSize: 1)))
-        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "Mario.sfc", filename: "Mario.sfc", title: "Mario", fileSize: 1)))
+        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Metal Slug.neo", filename: "Metal Slug.neo", title: "Metal Slug", fileSize: 1)))
+        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Sonic.sms", filename: "Sonic.sms", title: "Sonic", fileSize: 1)))
+        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Sonic.gg", filename: "Sonic.gg", title: "Sonic", fileSize: 1)))
+        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Mario.nes", filename: "Mario.nes", title: "Mario", fileSize: 1)))
+        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Bonk.pce", filename: "Bonk.pce", title: "Bonk", fileSize: 1)))
+        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Mario.sfc", filename: "Mario.sfc", title: "Mario", fileSize: 1)))
         XCTAssertEqual(IntegratedEmulatorSupport.routeLabel(.init(relativePath: "Pokemon.gba", filename: "Pokemon.gba", title: "Pokemon", fileSize: 1)), "JOGAR · BRUM CORE · MGBA")
     }
     func testROMArtworkMatchesSceneNameWithinPlatformAndKeepsOtherGamesOut() {
@@ -172,6 +194,7 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(ROMArtworkRules.match(filename: "1636 - Pokemon Fire Red (U)(Squirrels).gba", paths: paths), paths[0])
         XCTAssertNil(ROMArtworkRules.match(filename: "Pokemon Emerald.gba", paths: paths))
         XCTAssertNil(ROMArtworkRules.repository(filename: "game.iso"))
+        XCTAssertEqual(ROMArtworkRules.repository(filename: "Metal Slug.neo"), "SNK_-_Neo_Geo")
         XCTAssertNotEqual(ROMArtworkRules.repository(filename: "game.gba"), ROMArtworkRules.repository(filename: "game.gb"))
     }
 }

@@ -1,9 +1,15 @@
 {
-  "version": "0.14.0",
-  "build": 33,
+  "version": "0.15.0",
+  "build": 34,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.14.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.0",
   "notes": [
+    "O código do aplicativo móvel e do BRUM Core passa a ser distribuído sob GPL-3.0-or-later, sem alterar a licença proprietária do launcher de PC nem a licença separada da marca e das artes.",
+    "NES/Famicom agora abre no BRUM Core com Nestopia UE em Android e iOS.",
+    "Master System e Game Gear agora abrem no BRUM Core com Gearsystem em Android e iOS.",
+    "Cartuchos PC Engine/TurboGrafx-16 .pce agora abrem no BRUM Core com Beetle PCE Fast em Android e iOS; jogos em CD continuam no fallback até o fluxo de múltiplos arquivos e BIOS ser validado.",
+    "SNES/Super Famicom .sfc e .smc agora abrem no BRUM Core com bsnes-mercury Performance em Android e iOS, sem incorporar o núcleo Snes9x de licença não comercial.",
+    "Os novos núcleos possuem revisões fixadas, builds reproduzíveis, licenças empacotadas, saves e três slots rápidos.",
     "Gaming Mode agora inicia jogos instalados no computador e prepara a sessão para Sunshine e Moonlight.",
     "O aplicativo informa claramente se Sunshine está pronto, parado ou ausente.",
     "O QR de pareamento guarda endereços local e Tailscale sob o mesmo certificado TLS para reconexão remota protegida.",

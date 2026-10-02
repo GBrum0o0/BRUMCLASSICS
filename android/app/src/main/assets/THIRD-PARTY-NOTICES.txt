@@ -7,6 +7,50 @@ Pinned source revision: 7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6
 Source: https://github.com/libretro/mgba
 License text: https://www.mozilla.org/MPL/2.0/
 
+SkyEmu Libretro core
+Copyright © SkyEmu authors and contributors.
+License: MIT
+Pinned source revision: 36771a16bfde7eb5c1c0315877b5e465e6f38858
+Source: https://github.com/skylersaleh/SkyEmu
+
+Geolith Libretro core
+Copyright © Geolith authors and contributors.
+License: BSD-3-Clause
+Pinned source revision: 194024931935eff2092e36fc4f8e53e62ed11097
+Source: https://github.com/libretro/geolith-libretro
+
+Play! Libretro core (Android only)
+Copyright © Play! authors and contributors.
+License: BSD-2-Clause
+Pinned source revision: 83700b2c31e593bc94e845b4b31b797be84dda59
+Source: https://github.com/jpd002/Play-
+
+Gearsystem Libretro core
+Copyright © Gearsystem authors and contributors.
+License: GNU GPL 3.0 or later (GPL-3.0-or-later)
+Pinned source revision: 2d9106f2063d1a6e0661cc8938bb7f8eb737bcae
+Source: https://github.com/drhelius/Gearsystem
+
+Nestopia UE Libretro core
+Copyright © Nestopia authors and contributors.
+License: GNU GPL 2.0 or later (GPL-2.0-or-later)
+Pinned source revision: 8f00f500912a847062de432e38765c7285483e62
+Source: https://github.com/libretro/nestopia
+
+Beetle PCE Fast Libretro core
+Copyright © Mednafen and Libretro authors and contributors.
+License: GNU GPL 2.0 or later (GPL-2.0-or-later)
+Pinned source revision: 3f946f277aef3aa99a95551618bbcd1dd2bda0d9
+Source: https://github.com/libretro/beetle-pce-fast-libretro
+
+bsnes-mercury Performance Libretro core
+Copyright © bsnes-mercury authors and contributors.
+License: GNU GPL 3.0 (GPL-3.0)
+Pinned source revision: 79d7f9de218b6ffa65a80bbdc5828532bc239232
+Source: https://github.com/libretro/bsnes-mercury
+
+The complete license texts are packaged in assets/core-licenses/.
+
 Libretro API
 License: MIT
 Source: https://github.com/libretro/libretro-common/blob/master/include/libretro.h

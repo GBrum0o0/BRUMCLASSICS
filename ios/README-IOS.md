@@ -1,6 +1,6 @@
 # BRUMCLASSICS MÓVEL para iOS
 
-Versão 0.14.0: o Gaming Mode inicia jogos instalados no PC e entrega a sessão ao Moonlight quando Sunshine está pronto. O pareamento preserva endereços local e Tailscale com a mesma validação TLS. GB, GBC e GBA continuam no BRUM Core; outros sistemas permanecem claramente no RetroArch. O IPA sem assinatura é anexado à versão `ios-v0.14.0`.
+Versão 0.15.0: o BRUM Core integra NES/Famicom, SNES/Super Famicom, Master System, Game Gear, PC Engine/TurboGrafx-16, GB, GBC, GBA, Nintendo DS e Neo Geo AES/MVS. O app móvel é GPL-3.0-or-later; launcher de PC e marca mantêm licenças separadas. O IPA sem assinatura é anexado à versão `ios-v0.15.0` após validação no CI macOS.
 
 Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o protocolo local seguro versão 10, mantém o cache anterior para leitura offline e não altera dados fora das ações explícitas do usuário.
 
@@ -19,7 +19,7 @@ Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o protocolo local
 - B-CARD separado entre Jogos e CLASSICS, com a preferência Novo jogo / Auto Save / Save Manual nas configurações do app.
 - Horas do BRUM Core medidas diretamente; jogos do fallback RetroArch continuam aceitando logs agregados para medição precisa.
 - Consulta entre aplicativos pela URL `retroarch://library`, com retorno ao BRUMCLASSICS e cache da biblioteca real do emulador. O esquema de URL não autentica o remetente; essa resposta não comprova propriedade ou conquistas.
-- Abertura interna de GB, GBC e GBA; outros sistemas ainda podem ser entregues ao RetroArch com a permissão do iOS no primeiro uso.
+- Abertura interna de NES/Famicom, SNES/Super Famicom, Master System, Game Gear, PC Engine/TurboGrafx-16, GB, GBC, GBA, Nintendo DS e Neo Geo AES/MVS; outros sistemas podem ser entregues ao RetroArch externo, sem contar como suporte nativo.
 - Três slots locais para salvar ou retomar instantaneamente uma sessão no BRUM Core, sem substituir o save normal do jogo.
 - Registro multicore compartilhado pela preparação, interface, saves e estados rápidos, sem caminhos fixos para mGBA no host.
 - Capas locais prioritárias; fallback no catálogo público Libretro da mesma plataforma, com imagens e índices salvos para consulta offline. A busca da capa não estabelece vínculos de conquistas.

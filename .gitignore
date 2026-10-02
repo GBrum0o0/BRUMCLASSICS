@@ -33,6 +33,8 @@ android/build/
 android/app/build/
 android/app/.cxx/
 android/app/src/main/cpp/vendor/
+android/app/src/main/jniLibs/arm64-v8a/play_libretro_android.so
+android/app/src/main/assets/core-licenses/
 android/release-*/
 android/local.properties
 __pycache__/

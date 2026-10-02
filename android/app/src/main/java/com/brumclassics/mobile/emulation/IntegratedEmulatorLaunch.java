@@ -13,13 +13,14 @@ public final class IntegratedEmulatorLaunch {
     public final String coreVersion;
     public final String coreLibraryName;
     public final File romFile;
+    public final String romUri;
     public final File saveFile;
     public final File manifestFile;
     public final File systemDirectory;
 
     public IntegratedEmulatorLaunch(String gameId, String title, String canonicalGameId, String systemId,
                                     String contentSha256, String coreId, String coreDisplayName,
-                                    String coreVersion, String coreLibraryName, File romFile, File saveFile,
+                                    String coreVersion, String coreLibraryName, File romFile, String romUri, File saveFile,
                                     File manifestFile, File systemDirectory) {
         this.gameId = gameId;
         this.title = title;
@@ -31,6 +32,7 @@ public final class IntegratedEmulatorLaunch {
         this.coreVersion = coreVersion;
         this.coreLibraryName = coreLibraryName;
         this.romFile = romFile;
+        this.romUri = romUri == null ? "" : romUri;
         this.saveFile = saveFile;
         this.manifestFile = manifestFile;
         this.systemDirectory = systemDirectory;
