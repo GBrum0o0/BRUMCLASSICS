@@ -239,6 +239,16 @@ jobs:
           git clone --filter=blob:none https://github.com/libretro/beetle-pce-fast-libretro.git build/beetle-pce-fast-core
           git -C build/beetle-pce-fast-core checkout --detach "$CORE_COMMIT"
           test "$(git -C build/beetle-pce-fast-core rev-parse HEAD)" = "$CORE_COMMIT"
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("build/beetle-pce-fast-core/deps/zlib-1.2.11/zutil.h")
+          source = path.read_text(encoding="utf-8")
+          old = "#if defined(MACOS) || defined(TARGET_OS_MAC)"
+          new = "#if defined(MACOS) /* Classic Mac only; modern iOS SDK provides fdopen. */"
+          if source.count(old) != 1:
+              raise SystemExit("Unexpected Beetle PCE Fast zlib Apple guard")
+          path.write_text(source.replace(old, new), encoding="utf-8")
+          PY
           IOSSDK=$(xcrun --sdk iphoneos --show-sdk-path)
           make -C build/beetle-pce-fast-core platform=ios-arm64 IOSSDK="$IOSSDK" -j"$(sysctl -n hw.ncpu)"
           CORE_PATH="build/beetle-pce-fast-core/mednafen_pce_fast_libretro_ios.dylib"
