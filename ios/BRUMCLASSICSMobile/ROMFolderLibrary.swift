@@ -299,7 +299,7 @@ actor ROMFolderAccess {
             let values = try source.resourceValues(forKeys: Set(keys))
             guard values.isRegularFile == true, values.isSymbolicLink != true,
                   let size = values.fileSize, size > 0, size <= 64 * 1_024 * 1_024 else { continue }
-            let destination = systemRoot.appendingPathComponent(filename)
+            var destination = systemRoot.appendingPathComponent(filename)
             if let installedSize = try? destination.resourceValues(forKeys: [.fileSizeKey]).fileSize,
                installedSize == size { continue }
             let data = try CoordinatedFileAccess.read(source) { try Data(contentsOf: $0, options: .mappedIfSafe) }
