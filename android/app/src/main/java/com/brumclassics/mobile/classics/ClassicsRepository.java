@@ -172,7 +172,7 @@ public final class ClassicsRepository {
         save();
         return new IntegratedEmulatorLaunch(
             stored.id, stored.title, stored.canonicalGameId, stored.systemId, stored.contentSha256,
-            core.id, core.displayName, core.version, core.androidLibraryName,
+            core.id, core.displayName, core.version, core.androidLibraryName, stored.raGameId,
             rom, directDocument ? stored.uri : "", new File(saveDirectory, stored.contentSha256 + ".srm"),
             new File(saveDirectory, stored.contentSha256 + ".save.json"), systemDirectory
         );

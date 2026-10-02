@@ -130,6 +130,9 @@ for (const marker of ['CORE_COMMIT="3f946f277aef3aa99a95551618bbcd1dd2bda0d9"', 
 for (const marker of ['CORE_COMMIT="79d7f9de218b6ffa65a80bbdc5828532bc239232"', 'bsnes_mercury_performance_libretro_ios.dylib', 'bsnes-mercury-LICENSE.txt']) {
   if (!workflow.includes(marker)) throw new Error(`Build reproduzível do core bsnes-mercury incompleto: ${marker}`);
 }
+for (const marker of ['CORE_COMMIT="4b01295838ea89e3f1355bbe4cb5cf98aa6108cd"', 'mednafen_wswan_libretro_ios.dylib', 'Beetle-WonderSwan-LICENSE.txt']) {
+  if (!workflow.includes(marker)) throw new Error(`Build reproduzível do core Beetle WonderSwan incompleto: ${marker}`);
+}
 if (!/^\d+\.\d+\.\d+$/.test(updateManifest.version)) throw new Error('Versão inválida em ios-update.json.');
 if (!String(updateManifest.buildUrl || '').startsWith('https://github.com/GBrum0o0/BRUMCLASSICS/')) throw new Error('URL do build pessoal inválida.');
 if (publishedUpdateManifest.version !== updateManifest.version || publishedUpdateManifest.build !== updateManifest.build || publishedUpdateManifest.buildUrl !== updateManifest.buildUrl) throw new Error('Manifesto público de atualização diverge do pacote iOS.');

@@ -2,7 +2,7 @@
 
 > Documento de compatibilidade externa. NES/Famicom, SNES/Super Famicom, Master System, Game Gear, PC Engine/TurboGrafx-16 (cartuchos), GB, GBC, GBA, Nintendo DS e Neo Geo AES/MVS usam o BRUM Core; este fluxo não conta como suporte nativo.
 
-No BRUMCLASSICS MÓVEL 0.15.0, os sistemas listados acima abrem diretamente no **BRUM Core** e não usam este procedimento. Para formatos sem núcleo integrado, **CLASSICS Everywhere** ainda pode criar uma cópia temporária legível e abrir a folha de compartilhamento no primeiro uso. Isso é interoperabilidade com um aplicativo separado, não suporte nativo do BRUM Core. A ROM original é preservada.
+No BRUMCLASSICS MÓVEL 0.15.1, os sistemas listados acima abrem diretamente no **BRUM Core** e não usam este procedimento. Para formatos sem núcleo integrado, **CLASSICS Everywhere** ainda pode criar uma cópia temporária legível e abrir a folha de compartilhamento no primeiro uso. Isso é interoperabilidade com um aplicativo separado, não suporte nativo do BRUM Core. A ROM original é preservada.
 
 ## Versão necessária
 

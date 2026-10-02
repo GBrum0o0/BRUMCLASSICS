@@ -11,7 +11,7 @@ class PackageValidationTests(unittest.TestCase):
     def fixture(self, folder, *, executable="BRUMCLASSICSMobile", include_binary=True,
                 app="BRUMCLASSICSMobile", cpu=0x0100000C, executable_mode=True, include_core=True,
                 include_skyemu=True, include_geolith=True, include_gearsystem=True,
-                include_nestopia=True, include_beetle_pce=True, include_bsnes=True, include_licenses=True):
+                include_nestopia=True, include_beetle_pce=True, include_beetle_wswan=True, include_bsnes=True, include_licenses=True):
         path = Path(folder) / "test.ipa"
         root = f"Payload/{app}.app/"
         info = {"CFBundleIdentifier": "com.brumclassics.mobile.ios",
@@ -61,6 +61,11 @@ class PackageValidationTests(unittest.TestCase):
                 core.create_system = 3
                 core.external_attr = (stat.S_IFREG | 0o755) << 16
                 archive.writestr(core, struct.pack("<IIIIIIII", 0xFEEDFACF, 0x0100000C, 0, 6, 0, 0, 0, 0))
+            if include_beetle_wswan:
+                core = zipfile.ZipInfo(root + "Frameworks/mednafen_wswan_libretro_ios.dylib")
+                core.create_system = 3
+                core.external_attr = (stat.S_IFREG | 0o755) << 16
+                archive.writestr(core, struct.pack("<IIIIIIII", 0xFEEDFACF, 0x0100000C, 0, 6, 0, 0, 0, 0))
             if include_licenses:
                 archive.writestr(root + "Frameworks/BRUMCLASSICS-Mobile-GPL-3.0.txt", "GPLv3\n" + "x" * 2_000)
                 archive.writestr(root + "Frameworks/mGBA-LICENSE.txt", "MPL2\n" + "x" * 2_000)
@@ -69,6 +74,7 @@ class PackageValidationTests(unittest.TestCase):
                 archive.writestr(root + "Frameworks/Gearsystem-LICENSE.txt", "GPLv3\n" + "x" * 2_000)
                 archive.writestr(root + "Frameworks/Nestopia-LICENSE.txt", "GPLv2+\n" + "x" * 2_000)
                 archive.writestr(root + "Frameworks/Beetle-PCE-Fast-LICENSE.txt", "GPLv2+\n" + "x" * 2_000)
+                archive.writestr(root + "Frameworks/Beetle-WonderSwan-LICENSE.txt", "GPLv2+\n" + "x" * 2_000)
                 archive.writestr(root + "Frameworks/bsnes-mercury-LICENSE.txt", "GPLv3\n" + "x" * 2_000)
         return path
 
@@ -145,6 +151,11 @@ class PackageValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             with self.assertRaisesRegex(ValueError, "bsnes-mercury core is absent"):
                 validate_ipa(self.fixture(folder, include_bsnes=False))
+
+    def test_rejects_missing_beetle_wswan_core(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaisesRegex(ValueError, "Beetle WonderSwan core is absent"):
+                validate_ipa(self.fixture(folder, include_beetle_wswan=False))
 
 if __name__ == "__main__":
     unittest.main()

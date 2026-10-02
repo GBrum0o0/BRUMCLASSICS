@@ -13,7 +13,7 @@ public final class ClassicsRules {
     private static final Set<String> EXTENSIONS = new HashSet<>(Arrays.asList(
         "gba", "gb", "gbc", "nes", "sfc", "smc", "n64", "z64", "v64", "nds",
         "sms", "gg", "md", "gen", "pce", "chd", "pbp", "iso", "cso", "rvz",
-        "cue", "m3u", "gdi", "wad", "zip", "elf", "isz", "neo"
+        "cue", "m3u", "gdi", "wad", "zip", "elf", "isz", "neo", "ws", "wsc"
     ));
 
     private ClassicsRules() {}
@@ -82,6 +82,7 @@ public final class ClassicsRules {
             case "pce": return "NEC_-_PC_Engine_-_TurboGrafx_16";
             case "elf": case "isz": return "Sony_-_PlayStation_2";
             case "neo": return "SNK_-_Neo_Geo";
+            case "ws": case "wsc": return "Bandai_-_WonderSwan_Color";
             default: return null;
         }
     }

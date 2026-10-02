@@ -69,7 +69,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: BRUMCLASSICS-IOS-TESTES-0.15.0
+          name: BRUMCLASSICS-IOS-TESTES-0.15.1
           path: ios/build/iOS-Tests.xcresult
           retention-days: 7
           if-no-files-found: warn
@@ -280,6 +280,26 @@ jobs:
           chmod 755 "$APP/Frameworks/bsnes_mercury_performance_libretro_ios.dylib"
           file "$APP/Frameworks/bsnes_mercury_performance_libretro_ios.dylib" | grep -q arm64
 
+      - name: Compilar núcleo integrado Beetle WonderSwan
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE_COMMIT="4b01295838ea89e3f1355bbe4cb5cf98aa6108cd"
+          git clone --filter=blob:none https://github.com/libretro/beetle-wswan-libretro.git build/beetle-wswan-core
+          git -C build/beetle-wswan-core checkout --detach "$CORE_COMMIT"
+          test "$(git -C build/beetle-wswan-core rev-parse HEAD)" = "$CORE_COMMIT"
+          IOSSDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          make -C build/beetle-wswan-core platform=ios-arm64 IOSSDK="$IOSSDK" -j"$(sysctl -n hw.ncpu)"
+          CORE_PATH="build/beetle-wswan-core/mednafen_wswan_libretro_ios.dylib"
+          test -f "$CORE_PATH"
+          APP="build/DerivedData/Build/Products/Release-iphoneos/BRUMCLASSICSMobile.app"
+          mkdir -p "$APP/Frameworks"
+          cp "$CORE_PATH" "$APP/Frameworks/mednafen_wswan_libretro_ios.dylib"
+          cp build/beetle-wswan-core/COPYING "$APP/Frameworks/Beetle-WonderSwan-LICENSE.txt"
+          chmod 755 "$APP/Frameworks/mednafen_wswan_libretro_ios.dylib"
+          file "$APP/Frameworks/mednafen_wswan_libretro_ios.dylib" | grep -q arm64
+
       - name: Empacotar IPA pessoal
         working-directory: ios
         shell: bash
@@ -290,7 +310,7 @@ jobs:
       - name: Guardar build pessoal
         uses: actions/upload-artifact@v4
         with:
-          name: BRUMCLASSICS-MOVEL-IOS-PESSOAL-0.15.0
+          name: BRUMCLASSICS-MOVEL-IOS-PESSOAL-0.15.1
           path: |
             ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa
             ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa.sha256

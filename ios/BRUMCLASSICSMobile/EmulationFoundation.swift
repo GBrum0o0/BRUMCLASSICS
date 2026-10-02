@@ -12,6 +12,27 @@ enum EmulatedSystemID: String, Codable, CaseIterable, Sendable {
     case nintendoEntertainmentSystem = "nes"
     case pcEngine = "pce"
     case superNintendo = "sfc"
+    case wonderSwan = "ws"
+    case wonderSwanColor = "wsc"
+}
+
+extension EmulatedSystemID {
+    /// Numeric identifiers from the official rcheevos rc_consoles.h contract.
+    var retroAchievementsConsoleID: UInt32 {
+        switch self {
+        case .superNintendo: return 3
+        case .gameBoy: return 4
+        case .gameBoyAdvance: return 5
+        case .gameBoyColor: return 6
+        case .nintendoEntertainmentSystem: return 7
+        case .pcEngine: return 8
+        case .masterSystem: return 11
+        case .gameGear: return 15
+        case .nintendoDS: return 18
+        case .neoGeo: return 27
+        case .wonderSwan, .wonderSwanColor: return 53
+        }
+    }
 }
 
 enum ROMDetectionSource: String, Codable, Sendable {
@@ -104,7 +125,16 @@ enum CoreRegistry {
         supportedSystems: [.superNintendo]
     )
 
-    static let all = [mgba, skyEmu, geolith, gearsystem, nestopia, beetlePCEFast, bsnesMercury]
+    static let beetleWonderSwan = CoreDescriptor(
+        id: "beetle-wswan",
+        displayName: "Beetle WonderSwan",
+        version: "4b01295838ea89e3f1355bbe4cb5cf98aa6108cd",
+        license: "GPL-2.0-or-later",
+        libraryName: "mednafen_wswan_libretro_ios.dylib",
+        supportedSystems: [.wonderSwan, .wonderSwanColor]
+    )
+
+    static let all = [mgba, skyEmu, geolith, gearsystem, nestopia, beetlePCEFast, bsnesMercury, beetleWonderSwan]
 
     static func core(for system: EmulatedSystemID) -> CoreDescriptor? {
         all.first { $0.supportedSystems.contains(system) }
@@ -117,6 +147,7 @@ struct EmulationLaunchDescriptor: Equatable, Sendable {
     let identity: CanonicalGameIdentity
     let core: CoreDescriptor
     let legacySaveBasename: String
+    let retroAchievementsGameID: Int
 
     var saveIdentifier: String {
         "\(identity.systemID.rawValue)-\(identity.contentSHA256)"
@@ -182,13 +213,15 @@ enum ROMContentInspector {
         case "nes": return (.nintendoEntertainmentSystem, .extensionFallback)
         case "pce": return (.pcEngine, .extensionFallback)
         case "sfc", "smc": return (.superNintendo, .extensionFallback)
+        case "ws": return (.wonderSwan, .extensionFallback)
+        case "wsc": return (.wonderSwanColor, .extensionFallback)
         default: return nil
         }
     }
 }
 
 enum EmulationLaunchBuilder {
-    static func prepare(romURL: URL, title: String, originalFilename: String) throws -> EmulationLaunchDescriptor {
+    static func prepare(romURL: URL, title: String, originalFilename: String, retroAchievementsGameID: Int = 0) throws -> EmulationLaunchDescriptor {
         let identity = try ROMContentInspector.inspect(url: romURL, filename: originalFilename)
         guard let core = CoreRegistry.core(for: identity.systemID) else {
             throw PocketError.message("Nenhum núcleo compatível está instalado para este sistema.")
@@ -198,7 +231,8 @@ enum EmulationLaunchBuilder {
             title: title,
             identity: identity,
             core: core,
-            legacySaveBasename: (originalFilename as NSString).deletingPathExtension
+            legacySaveBasename: (originalFilename as NSString).deletingPathExtension,
+            retroAchievementsGameID: max(0, retroAchievementsGameID)
         )
     }
 }

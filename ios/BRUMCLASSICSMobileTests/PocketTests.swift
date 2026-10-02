@@ -48,6 +48,11 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(CoreRegistry.core(for: .pcEngine)?.libraryName, "mednafen_pce_fast_libretro_ios.dylib")
         XCTAssertEqual(CoreRegistry.core(for: .superNintendo)?.id, "bsnes-mercury-performance")
         XCTAssertEqual(CoreRegistry.core(for: .superNintendo)?.license, "GPL-3.0")
+        XCTAssertEqual(EmulatedSystemID.gameBoyAdvance.retroAchievementsConsoleID, 5)
+        XCTAssertEqual(EmulatedSystemID.neoGeo.retroAchievementsConsoleID, 27)
+        XCTAssertEqual(CoreRegistry.core(for: .wonderSwanColor)?.id, "beetle-wswan")
+        XCTAssertEqual(ROMContentInspector.detectSystem(header: Data([1]), filename: "Judgment Silversword.wsc")?.system, .wonderSwanColor)
+        XCTAssertEqual(EmulatedSystemID.wonderSwan.retroAchievementsConsoleID, 53)
     }
 
     func testSaveManifestOnlyAdvancesGenerationWhenPayloadChanges() {

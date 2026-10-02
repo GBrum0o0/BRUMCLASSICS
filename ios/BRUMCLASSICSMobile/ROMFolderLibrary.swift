@@ -58,7 +58,8 @@ enum RetroArchAppStoreLaunchRules {
         "nes": "mesen.libretro", "sfc": "snes9x.libretro", "smc": "snes9x.libretro",
         "n64": "mupen64plus.next.libretro", "z64": "mupen64plus.next.libretro", "v64": "mupen64plus.next.libretro",
         "nds": "melondsds.libretro", "sms": "genesis.plus.gx.libretro", "gg": "genesis.plus.gx.libretro",
-        "md": "genesis.plus.gx.libretro", "gen": "genesis.plus.gx.libretro", "pce": "mednafen.pce.fast.libretro"
+        "md": "genesis.plus.gx.libretro", "gen": "genesis.plus.gx.libretro", "pce": "mednafen.pce.fast.libretro",
+        "ws": "mednafen.wswan.libretro", "wsc": "mednafen.wswan.libretro"
     ]
 
     static func supports(filename: String) -> Bool {

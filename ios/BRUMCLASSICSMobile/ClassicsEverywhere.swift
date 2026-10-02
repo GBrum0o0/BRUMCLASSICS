@@ -43,7 +43,7 @@ enum PocketError: LocalizedError {
 }
 
 enum PocketRules {
-    static let extensions: Set<String> = ["gba", "gb", "gbc", "nes", "sfc", "smc", "n64", "z64", "v64", "nds", "sms", "gg", "md", "gen", "pce", "neo", "chd", "pbp", "iso", "cso", "rvz", "cue", "m3u", "gdi", "wad", "zip"]
+    static let extensions: Set<String> = ["gba", "gb", "gbc", "nes", "sfc", "smc", "n64", "z64", "v64", "nds", "sms", "gg", "md", "gen", "pce", "neo", "ws", "wsc", "chd", "pbp", "iso", "cso", "rvz", "cue", "m3u", "gdi", "wad", "zip"]
     static func safeFilename(_ value: String) -> Bool {
         !value.isEmpty && value != "." && value != ".." && !value.contains("/") && !value.contains("\\") && !value.contains("\0")
     }
@@ -97,7 +97,7 @@ actor PocketRAClient {
         var url = URLComponents(string: "https://retroachievements.org/API/API_GetGameInfoAndUserProgress.php")!
         url.queryItems = [URLQueryItem(name: "y", value: key), URLQueryItem(name: "u", value: username), URLQueryItem(name: "g", value: String(gameID))]
         var request = URLRequest(url: url.url!, timeoutInterval: 20)
-        request.setValue("BRUMCLASSICS-iOS/0.15.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("BRUMCLASSICS-iOS/0.15.1", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200, data.count <= 12 * 1024 * 1024 else { throw PocketError.message("RetroAchievements indisponível ou credencial inválida. Tente mais tarde; o progresso salvo foi mantido.") }
         return try PocketProgress.decode(data, username: username, expectedID: gameID)
@@ -280,7 +280,12 @@ actor PocketRAClient {
         try await playSessions.begin(record, integrated: true)
         await recordLaunch(record, launcher: launcher)
         return try await Task.detached(priority: .userInitiated) {
-            try EmulationLaunchBuilder.prepare(romURL: staged, title: rom.title, originalFilename: rom.filename)
+            try EmulationLaunchBuilder.prepare(
+                romURL: staged,
+                title: rom.title,
+                originalFilename: rom.filename,
+                retroAchievementsGameID: Int(record.retroAchievementID) ?? 0
+            )
         }.value
     }
     func finishIntegratedPlay(launcher: AppStore) async {
@@ -479,7 +484,7 @@ struct ClassicsEverywhereView: View {
                     .buttonStyle(PrimaryButtonStyle())
                     .accessibilityIdentifier("rom-folder-refresh")
             }
-            Text("A biblioteca mostra somente arquivos da pasta autorizada. GB, GBC, GBA, Nintendo DS e cartuchos Neo Geo .neo abrem diretamente no BRUM Core, sem importação. Outros sistemas usam o RetroArch enquanto recebem suporte interno. Para trocar a pasta, use Perfil → Configurações do app → CLASSICS.").font(.caption).foregroundStyle(BrumTheme.muted)
+            Text("A biblioteca mostra somente arquivos da pasta autorizada. Os sistemas marcados como BRUM Core — incluindo WonderSwan e WonderSwan Color — abrem diretamente, sem importação. Outros usam o RetroArch enquanto recebem suporte interno. Para trocar a pasta, use Perfil → Configurações do app → CLASSICS.").font(.caption).foregroundStyle(BrumTheme.muted)
             if !pocket.romFolderConfigured {
                 Text("Nenhuma pasta autorizada. Abra Perfil → Configurações do app → CLASSICS e selecione uma pasta de ROMs uma vez.").foregroundStyle(BrumTheme.muted)
             } else if pocket.romFolderGames.isEmpty {
@@ -681,7 +686,7 @@ struct PocketSetupView: View {
     var body: some View {
         Form {
             Section("1 · Emulação no iPhone") {
-                Text("GB, GBC, GBA, Nintendo DS e cartuchos Neo Geo .neo já abrem dentro do BRUMCLASSICS pelo BRUM Core. Não é necessário instalar nem importar esses jogos no RetroArch.")
+                Text("GB/GBC/GBA, DS, NES, SNES, Master System, Game Gear, PC Engine, Neo Geo .neo e WonderSwan/Color abrem dentro do BRUMCLASSICS pelo BRUM Core. Não é necessário importar esses jogos no RetroArch.")
                 Link("Baixar RetroArch compatível · Libretro", destination: URL(string: "https://buildbot.libretro.com/nightly/apple/ios-arm64/RetroArch.ipa")!)
                 Button("Abrir RetroArch") { UIApplication.shared.open(URL(string: "retroarch://start")!) { opened in if !opened { Task { @MainActor in feedback = "RetroArch não encontrado. Instale o IPA compatível indicado acima." } } } }
                 Text("Use a edição compatível indicada acima. A versão estável 1.22.2 da App Store abre o emulador, mas ainda não oferece ao BRUMCLASSICS consulta da biblioteca e abertura de um jogo específico.")

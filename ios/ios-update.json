@@ -1,9 +1,14 @@
 {
-  "version": "0.15.0",
-  "build": 34,
+  "version": "0.15.1",
+  "build": 35,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.1",
   "notes": [
+    "WonderSwan e WonderSwan Color .ws/.wsc agora abrem no BRUM Core com Beetle WonderSwan em Android e iOS.",
+    "Corrige a sincronização da fila de áudio do Android e valida taxas de amostragem informadas pelos núcleos.",
+    "O iOS agora ativa corretamente a sessão de áudio, trata interrupções e mostra erros de inicialização da saída sonora.",
+    "Quando um núcleo encerra a emulação, o app mantém a tela aberta e mostra a causa provável em vez de fechar silenciosamente.",
+    "O ID oficial e o console RetroAchievements agora acompanham a sessão nativa como primeira etapa da integração com rcheevos; desbloqueios ainda não estão ativos.",
     "O código do aplicativo móvel e do BRUM Core passa a ser distribuído sob GPL-3.0-or-later, sem alterar a licença proprietária do launcher de PC nem a licença separada da marca e das artes.",
     "NES/Famicom agora abre no BRUM Core com Nestopia UE em Android e iOS.",
     "Master System e Game Gear agora abrem no BRUM Core com Gearsystem em Android e iOS.",

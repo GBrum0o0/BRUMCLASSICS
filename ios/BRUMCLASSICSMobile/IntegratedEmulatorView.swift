@@ -18,6 +18,8 @@ enum IntegratedEmulatorSupport {
         case "nes": system = .nintendoEntertainmentSystem
         case "pce": system = .pcEngine
         case "sfc", "smc": system = .superNintendo
+        case "ws": system = .wonderSwan
+        case "wsc": system = .wonderSwanColor
         default: system = nil
         }
         return system.flatMap(CoreRegistry.core(for:))
@@ -117,6 +119,7 @@ private struct BrumLibretroController: UIViewControllerRepresentable {
             coreVersion: launch.core.version,
             coreDisplayName: launch.core.displayName,
             coreLibraryName: launch.core.libraryName,
+            retroAchievementsGameID: launch.retroAchievementsGameID,
             saveIdentifier: launch.saveIdentifier,
             legacySaveBasename: launch.legacySaveBasename,
             onExit: onExit

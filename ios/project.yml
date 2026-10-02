@@ -8,8 +8,8 @@ settings:
     SWIFT_VERSION: "5.9"
     SWIFT_OBJC_BRIDGING_HEADER: BRUMCLASSICSMobile/BRUMCLASSICSMobile-Bridging-Header.h
     CLANG_CXX_LANGUAGE_STANDARD: c++17
-    CURRENT_PROJECT_VERSION: 34
-    MARKETING_VERSION: 0.15.0
+    CURRENT_PROJECT_VERSION: 35
+    MARKETING_VERSION: 0.15.1
 targets:
   BRUMCLASSICSMobile:
     type: application
@@ -18,6 +18,7 @@ targets:
       - path: BRUMCLASSICSMobile
     dependencies:
       - sdk: AudioToolbox.framework
+      - sdk: AVFoundation.framework
       - sdk: GameController.framework
       - sdk: QuartzCore.framework
     settings:

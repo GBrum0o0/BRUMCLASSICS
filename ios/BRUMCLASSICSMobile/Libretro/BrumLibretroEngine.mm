@@ -2,6 +2,7 @@
 #import "BrumLibretroAPI.h"
 
 #import <AudioToolbox/AudioToolbox.h>
+#import <AVFoundation/AVFoundation.h>
 #import <CommonCrypto/CommonDigest.h>
 #import <GameController/GameController.h>
 #import <QuartzCore/QuartzCore.h>
@@ -82,6 +83,7 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     BOOL _fastForwardEnabled;
     BOOL _suppressVideo;
     BOOL _screenFillsDisplay;
+    BOOL _shutdownRequested;
     unsigned _pixelFormat;
     uint32_t _inputMask;
     int16_t _pointerX;
@@ -109,6 +111,7 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     NSString *_coreVersion;
     NSString *_coreDisplayName;
     NSString *_coreLibraryName;
+    NSInteger _retroAchievementsGameID;
     NSString *_saveIdentifier;
     NSString *_legacySaveBasename;
     NSMutableDictionary<NSString *, NSString *> *_variables;
@@ -131,6 +134,8 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
 - (void)saveStateAtSlot:(NSInteger)slot;
 - (void)loadStateAtSlot:(NSInteger)slot;
 - (void)showStateStatus:(NSString *)text error:(BOOL)error;
+- (BOOL)startAudio:(double)sampleRate error:(NSError **)error;
+- (void)handleCoreShutdown;
 @end
 
 static void *BrumLoadSymbol(void *handle, const char *name) {
@@ -212,7 +217,8 @@ static bool BrumEnvironment(unsigned command, void *data) {
             return true;
         }
         case BRUM_RETRO_ENVIRONMENT_SHUTDOWN: {
-            dispatch_async(dispatch_get_main_queue(), ^{ [host closeEmulator]; });
+            host->_shutdownRequested = YES;
+            dispatch_async(dispatch_get_main_queue(), ^{ [host handleCoreShutdown]; });
             return true;
         }
         case BRUM_RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL:
@@ -357,6 +363,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
                     coreVersion:(NSString *)coreVersion
                 coreDisplayName:(NSString *)coreDisplayName
                 coreLibraryName:(NSString *)coreLibraryName
+        retroAchievementsGameID:(NSInteger)retroAchievementsGameID
                 saveIdentifier:(NSString *)saveIdentifier
             legacySaveBasename:(NSString *)legacySaveBasename
                         onExit:(BrumEmulatorExitHandler)onExit {
@@ -371,6 +378,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _coreVersion = [coreVersion copy];
     _coreDisplayName = [coreDisplayName copy];
     _coreLibraryName = [coreLibraryName copy];
+    _retroAchievementsGameID = MAX(0, retroAchievementsGameID);
     _saveIdentifier = [saveIdentifier copy];
     _legacySaveBasename = [legacySaveBasename copy];
     _onExit = [onExit copy];
@@ -480,12 +488,44 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
                                                  selector:@selector(applicationWillResignActive:)
                                                      name:UIApplicationWillResignActiveNotification
                                                    object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(applicationDidBecomeActive:)
+                                                     name:UIApplicationDidBecomeActiveNotification
+                                                   object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(audioSessionInterrupted:)
+                                                     name:AVAudioSessionInterruptionNotification
+                                                   object:AVAudioSession.sharedInstance];
     }
 }
 
 - (void)applicationWillResignActive:(NSNotification *)notification {
     (void)notification;
+    if (_audioQueue) AudioQueuePause(_audioQueue);
+    os_unfair_lock_lock(&_audioLock); _audioRead = 0; _audioWrite = 0; _audioCount = 0; os_unfair_lock_unlock(&_audioLock);
     [self persistSaveRAM];
+}
+
+- (void)applicationDidBecomeActive:(NSNotification *)notification {
+    (void)notification;
+    if (_stopped || !_audioQueue) return;
+    NSError *error = nil;
+    if (![AVAudioSession.sharedInstance setActive:YES error:&error]) {
+        [self showStateStatus:[NSString stringWithFormat:@"ÁUDIO INDISPONÍVEL: %@", error.localizedDescription] error:YES];
+        return;
+    }
+    OSStatus status = AudioQueueStart(_audioQueue, NULL);
+    if (status != noErr) [self showStateStatus:[NSString stringWithFormat:@"ÁUDIO INDISPONÍVEL (%d)", (int)status] error:YES];
+}
+
+- (void)audioSessionInterrupted:(NSNotification *)notification {
+    AVAudioSessionInterruptionType type = [notification.userInfo[AVAudioSessionInterruptionTypeKey] unsignedIntegerValue];
+    if (type == AVAudioSessionInterruptionTypeBegan) {
+        if (_audioQueue) AudioQueuePause(_audioQueue);
+        return;
+    }
+    AVAudioSessionInterruptionOptions options = [notification.userInfo[AVAudioSessionInterruptionOptionKey] unsignedIntegerValue];
+    if ((options & AVAudioSessionInterruptionOptionShouldResume) != 0) [self applicationDidBecomeActive:notification];
 }
 
 - (void)buildInterface {
@@ -538,7 +578,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 
     _statusLabel = [[UILabel alloc] init];
     _statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    _statusLabel.text = [NSString stringWithFormat:@"BRUM CORE · %@", _coreDisplayName];
+    _statusLabel.text = _retroAchievementsGameID > 0
+        ? [NSString stringWithFormat:@"BRUM CORE · %@ · RA ID %ld (PREPARAÇÃO)", _coreDisplayName, (long)_retroAchievementsGameID]
+        : [NSString stringWithFormat:@"BRUM CORE · %@", _coreDisplayName];
     _statusLabel.textColor = [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:1];
     _statusLabel.font = [UIFont monospacedSystemFontOfSize:10 weight:UIFontWeightBold];
     [self.view addSubview:_statusLabel];
@@ -799,7 +841,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [self restoreSaveRAM];
     brum_retro_system_av_info avInfo = {};
     _core.getAVInfo(&avInfo);
-    [self startAudio:avInfo.timing.sample_rate];
+    if (![self startAudio:avInfo.timing.sample_rate error:error]) return NO;
     _displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(runFrame)];
     if (@available(iOS 15.0, *)) {
         float fps = (float)MAX(30.0, MIN(120.0, avInfo.timing.fps));
@@ -809,23 +851,46 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     return YES;
 }
 
-- (void)startAudio:(double)sampleRate {
-    if (sampleRate <= 0) return;
+- (BOOL)startAudio:(double)sampleRate error:(NSError **)error {
+    if (!isfinite(sampleRate) || sampleRate < 8000.0 || sampleRate > 192000.0) sampleRate = 48000.0;
+    AVAudioSession *session = AVAudioSession.sharedInstance;
+    if (![session setCategory:AVAudioSessionCategoryPlayback mode:AVAudioSessionModeDefault options:0 error:error] ||
+        ![session setActive:YES error:error]) return NO;
+    NSError *preferredRateError = nil;
+    if (![session setPreferredSampleRate:sampleRate error:&preferredRateError]) {
+        NSLog(@"BRUM Core: taxa de áudio preferida não aceita: %@", preferredRateError.localizedDescription);
+    }
     AudioStreamBasicDescription format = {};
     format.mSampleRate = sampleRate;
     format.mFormatID = kAudioFormatLinearPCM;
     format.mFormatFlags = kLinearPCMFormatFlagIsSignedInteger | kLinearPCMFormatFlagIsPacked;
     format.mBytesPerPacket = 4; format.mFramesPerPacket = 1; format.mBytesPerFrame = 4;
     format.mChannelsPerFrame = 2; format.mBitsPerChannel = 16;
-    if (AudioQueueNewOutput(&format, BrumAudioQueueOutput, (__bridge void *)self, NULL, NULL, 0, &_audioQueue) != noErr) return;
+    OSStatus status = AudioQueueNewOutput(&format, BrumAudioQueueOutput, (__bridge void *)self, NULL, NULL, 0, &_audioQueue);
+    if (status != noErr) {
+        if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:6 userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"O iOS não conseguiu criar a saída de áudio (%d).", (int)status]}];
+        return NO;
+    }
+    NSUInteger allocated = 0;
     for (NSUInteger index = 0; index < 3; index++) {
         AudioQueueBufferRef buffer = NULL;
         if (AudioQueueAllocateBuffer(_audioQueue, 8192, &buffer) == noErr) {
             memset(buffer->mAudioData, 0, 8192); buffer->mAudioDataByteSize = 8192;
-            AudioQueueEnqueueBuffer(_audioQueue, buffer, 0, NULL);
+            if (AudioQueueEnqueueBuffer(_audioQueue, buffer, 0, NULL) == noErr) allocated++;
         }
     }
-    AudioQueueStart(_audioQueue, NULL);
+    if (allocated < 2) {
+        AudioQueueDispose(_audioQueue, true); _audioQueue = NULL;
+        if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:7 userInfo:@{NSLocalizedDescriptionKey: @"O iOS não reservou buffers suficientes para o áudio."}];
+        return NO;
+    }
+    status = AudioQueueStart(_audioQueue, NULL);
+    if (status != noErr) {
+        AudioQueueDispose(_audioQueue, true); _audioQueue = NULL;
+        if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:8 userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"O iOS recusou iniciar o áudio (%d).", (int)status]}];
+        return NO;
+    }
+    return YES;
 }
 
 - (void)runFrame {
@@ -834,6 +899,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     for (NSUInteger frame = 0; frame < frameCount; frame++) {
         _suppressVideo = frame + 1 < frameCount;
         _core.run();
+        if (_shutdownRequested) break;
     }
     _suppressVideo = NO;
 }
@@ -901,11 +967,27 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     if (_onExit) _onExit();
 }
 
+- (void)handleCoreShutdown {
+    if (_stopped || self.presentedViewController) return;
+    [_displayLink invalidate]; _displayLink = nil;
+    _statusLabel.text = @"O NÚCLEO INTERROMPEU O JOGO";
+    _statusLabel.textColor = UIColor.systemRedColor;
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"O jogo foi interrompido"
+                                                                   message:@"O núcleo encerrou a emulação. Verifique se a ROM e as BIOS exigidas são válidas. A tela foi mantida aberta para mostrar a causa."
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    __weak BrumLibretroViewController *weakSelf = self;
+    [alert addAction:[UIAlertAction actionWithTitle:@"Voltar" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+        [weakSelf closeEmulator];
+    }]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
 - (void)stopCore {
     if (_stopped) return;
     _stopped = YES;
     [_displayLink invalidate]; _displayLink = nil;
     if (_audioQueue) { AudioQueueStop(_audioQueue, true); AudioQueueDispose(_audioQueue, true); _audioQueue = NULL; }
+    [AVAudioSession.sharedInstance setActive:NO withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:nil];
     [self persistSaveRAM];
     if (_gameLoaded) { _core.unloadGame(); _gameLoaded = NO; }
     if (_coreInitialized) { _core.deinitialize(); _coreInitialized = NO; }

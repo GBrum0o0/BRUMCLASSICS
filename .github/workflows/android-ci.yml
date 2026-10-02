@@ -65,6 +65,12 @@ jobs:
           git -C android/app/src/main/cpp/vendor/beetle-pce-fast checkout --detach 3f946f277aef3aa99a95551618bbcd1dd2bda0d9
           test "$(git -C android/app/src/main/cpp/vendor/beetle-pce-fast rev-parse HEAD)" = "3f946f277aef3aa99a95551618bbcd1dd2bda0d9"
           cp android/app/src/main/cpp/vendor/beetle-pce-fast/COPYING android/app/src/main/assets/core-licenses/Beetle-PCE-Fast-LICENSE.txt
+      - name: Fetch pinned Beetle WonderSwan core
+        run: |
+          git clone --filter=blob:none https://github.com/libretro/beetle-wswan-libretro.git android/app/src/main/cpp/vendor/beetle-wswan
+          git -C android/app/src/main/cpp/vendor/beetle-wswan checkout --detach 4b01295838ea89e3f1355bbe4cb5cf98aa6108cd
+          test "$(git -C android/app/src/main/cpp/vendor/beetle-wswan rev-parse HEAD)" = "4b01295838ea89e3f1355bbe4cb5cf98aa6108cd"
+          cp android/app/src/main/cpp/vendor/beetle-wswan/COPYING android/app/src/main/assets/core-licenses/Beetle-WonderSwan-LICENSE.txt
       - name: Fetch pinned bsnes-mercury core
         run: |
           git clone --filter=blob:none https://github.com/libretro/bsnes-mercury.git android/app/src/main/cpp/vendor/bsnes-mercury
@@ -109,10 +115,11 @@ jobs:
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libgearsystem_libretro.so'
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libnestopia_libretro.so'
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libmednafen_pce_fast_libretro.so'
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libmednafen_wswan_libretro.so'
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libbsnes_mercury_performance_libretro.so'
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/play_libretro_android.so'
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/GPL-3.0.txt'
-          for license in mGBA SkyEmu Geolith Play Gearsystem Nestopia Beetle-PCE-Fast bsnes-mercury; do
+          for license in mGBA SkyEmu Geolith Play Gearsystem Nestopia Beetle-PCE-Fast Beetle-WonderSwan bsnes-mercury; do
             unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q "assets/core-licenses/${license}-LICENSE.txt"
           done
       - name: Run contract tests

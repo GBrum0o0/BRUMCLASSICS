@@ -103,6 +103,48 @@ else()
     message(FATAL_ERROR "bsnes-mercury pinned source is missing. Run android/fetch-bsnes-mercury-core.ps1 or clone it in CI.")
 endif()
 
+set(BEETLE_WSWAN_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vendor/beetle-wswan")
+if(EXISTS "${BEETLE_WSWAN_SOURCE_DIR}/libretro.c")
+    set(BEETLE_WSWAN_MEDNAFEN_DIR "${BEETLE_WSWAN_SOURCE_DIR}/mednafen")
+    set(BEETLE_WSWAN_CORE_DIR "${BEETLE_WSWAN_MEDNAFEN_DIR}/wswan")
+    set(BEETLE_WSWAN_COMMON_DIR "${BEETLE_WSWAN_SOURCE_DIR}/libretro-common")
+    add_library(mednafen_wswan_libretro SHARED
+        "${BEETLE_WSWAN_SOURCE_DIR}/libretro.c"
+        "${BEETLE_WSWAN_CORE_DIR}/sound.c"
+        "${BEETLE_WSWAN_CORE_DIR}/interrupt.c"
+        "${BEETLE_WSWAN_CORE_DIR}/comm.c"
+        "${BEETLE_WSWAN_CORE_DIR}/rtc.c"
+        "${BEETLE_WSWAN_CORE_DIR}/tcache.c"
+        "${BEETLE_WSWAN_CORE_DIR}/gfx.c"
+        "${BEETLE_WSWAN_CORE_DIR}/wswan-memory.c"
+        "${BEETLE_WSWAN_CORE_DIR}/v30mz.c"
+        "${BEETLE_WSWAN_CORE_DIR}/eeprom.c"
+        "${BEETLE_WSWAN_MEDNAFEN_DIR}/sound/Blip_Buffer.c"
+        "${BEETLE_WSWAN_MEDNAFEN_DIR}/mempatcher.c"
+        "${BEETLE_WSWAN_MEDNAFEN_DIR}/state.c"
+        "${BEETLE_WSWAN_MEDNAFEN_DIR}/settings.c"
+        "${BEETLE_WSWAN_COMMON_DIR}/compat/compat_strl.c"
+        "${BEETLE_WSWAN_COMMON_DIR}/compat/compat_snprintf.c")
+    target_include_directories(mednafen_wswan_libretro PRIVATE
+        "${BEETLE_WSWAN_SOURCE_DIR}"
+        "${BEETLE_WSWAN_MEDNAFEN_DIR}"
+        "${BEETLE_WSWAN_MEDNAFEN_DIR}/include"
+        "${BEETLE_WSWAN_MEDNAFEN_DIR}/hw_sound"
+        "${BEETLE_WSWAN_MEDNAFEN_DIR}/hw_cpu"
+        "${BEETLE_WSWAN_MEDNAFEN_DIR}/hw_misc"
+        "${BEETLE_WSWAN_COMMON_DIR}/include")
+    target_compile_definitions(mednafen_wswan_libretro PRIVATE
+        WANT_STEREO_SOUND FRONTEND_SUPPORTS_RGB565 SIZEOF_DOUBLE=8 MPC_FIXED_POINT MEDNAFEN_VERSION_NUMERIC=931
+        STDC_HEADERS __STDC_LIMIT_MACROS __LIBRETRO__ _LOW_ACCURACY_ INLINE=inline
+        GIT_VERSION="4b01295838ea89e3f1355bbe4cb5cf98aa6108cd")
+    target_compile_options(mednafen_wswan_libretro PRIVATE -Wno-unused-function -Wno-unused-variable)
+    target_link_libraries(mednafen_wswan_libretro PRIVATE m)
+    set_target_properties(mednafen_wswan_libretro PROPERTIES PREFIX "lib")
+    add_dependencies(brumcore mednafen_wswan_libretro)
+else()
+    message(FATAL_ERROR "Beetle WonderSwan pinned source is missing. Run android/fetch-beetle-wswan-core.ps1 or clone it in CI.")
+endif()
+
 set(BEETLE_PCE_FAST_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vendor/beetle-pce-fast")
 if(EXISTS "${BEETLE_PCE_FAST_SOURCE_DIR}/libretro.c")
     set(BEETLE_PCE_FAST_MEDNAFEN_DIR "${BEETLE_PCE_FAST_SOURCE_DIR}/mednafen")

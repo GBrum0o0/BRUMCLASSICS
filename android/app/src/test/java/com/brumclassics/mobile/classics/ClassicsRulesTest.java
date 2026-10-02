@@ -37,6 +37,8 @@ public final class ClassicsRulesTest {
         if (!"libmednafen_pce_fast_libretro.so".equals(CoreRegistry.integratedCore("pce", "game.pce").androidLibraryName)) throw new AssertionError("PC Engine deveria usar Beetle PCE Fast");
         if (!"libbsnes_mercury_performance_libretro.so".equals(CoreRegistry.integratedCore("sfc", "game.sfc").androidLibraryName)) throw new AssertionError("SNES deveria usar bsnes-mercury Performance");
         if (!CoreRegistry.supportsIntegrated("smc", "game.smc")) throw new AssertionError("Super Famicom .smc deveria usar o BRUM Core");
+        if (!"libmednafen_wswan_libretro.so".equals(CoreRegistry.integratedCore("wsc", "game.wsc").androidLibraryName)) throw new AssertionError("WonderSwan Color deveria usar Beetle WonderSwan");
+        if (com.brumclassics.mobile.emulation.RetroAchievementsConsole.idForSystem("ws") != 53) throw new AssertionError("Console RA do WonderSwan incorreto");
         SaveManifest manifest = SaveManifest.next(null, first, "mgba", "save-a", 32, 1000, "phone");
         SaveManifest same = SaveManifest.next(manifest, first, "mgba", "save-a", 32, 2000, "phone");
         SaveManifest changed = SaveManifest.next(same, first, "mgba", "save-b", 32, 3000, "phone");

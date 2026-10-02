@@ -53,11 +53,15 @@ public final class CoreRegistry {
         "beetle-pce-fast", "Beetle PCE Fast", "3f946f277aef3aa99a95551618bbcd1dd2bda0d9", "GPL-2.0-or-later",
         "libmednafen_pce_fast_libretro.so", "pce"
     );
+    public static final Descriptor BEETLE_WSWAN = new Descriptor(
+        "beetle-wswan", "Beetle WonderSwan", "4b01295838ea89e3f1355bbe4cb5cf98aa6108cd", "GPL-2.0-or-later",
+        "libmednafen_wswan_libretro.so", "ws", "wsc"
+    );
     public static final Descriptor BSNES_MERCURY = new Descriptor(
         "bsnes-mercury-performance", "bsnes-mercury Performance", "79d7f9de218b6ffa65a80bbdc5828532bc239232", "GPL-3.0",
         "libbsnes_mercury_performance_libretro.so", "sfc", "smc"
     );
-    private static final Descriptor[] INTEGRATED = { MGBA, SKYEMU, PLAY, GEOLITH, GEARSYSTEM, NESTOPIA, BEETLE_PCE_FAST, BSNES_MERCURY };
+    private static final Descriptor[] INTEGRATED = { MGBA, SKYEMU, PLAY, GEOLITH, GEARSYSTEM, NESTOPIA, BEETLE_PCE_FAST, BEETLE_WSWAN, BSNES_MERCURY };
 
     private CoreRegistry() {}
 
@@ -75,6 +79,7 @@ public final class CoreRegistry {
         if ("sms".equals(extension) || "gg".equals(extension)) return "gearsystem";
         if ("md".equals(extension) || "gen".equals(extension)) return "genesis_plus_gx";
         if ("pce".equals(extension)) return "mednafen_pce_fast";
+        if ("ws".equals(extension) || "wsc".equals(extension)) return "mednafen_wswan";
         if ("elf".equals(extension) || "isz".equals(extension) || "ps2".equals(systemId)) return "play";
         if ("neo".equals(extension) || "neogeo".equals(systemId)) return "geolith";
         return null;

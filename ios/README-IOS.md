@@ -1,6 +1,6 @@
 # BRUMCLASSICS MÓVEL para iOS
 
-Versão 0.15.0: o BRUM Core integra NES/Famicom, SNES/Super Famicom, Master System, Game Gear, PC Engine/TurboGrafx-16, GB, GBC, GBA, Nintendo DS e Neo Geo AES/MVS. O app móvel é GPL-3.0-or-later; launcher de PC e marca mantêm licenças separadas. O IPA sem assinatura é anexado à versão `ios-v0.15.0` após validação no CI macOS.
+Versão 0.15.1: o BRUM Core integra também WonderSwan/Color, corrige áudio e torna encerramentos de núcleo visíveis. O app móvel é GPL-3.0-or-later; launcher de PC e marca mantêm licenças separadas. O IPA sem assinatura é anexado à versão `ios-v0.15.1` após validação no CI macOS.
 
 Cliente iOS nativo em SwiftUI para o BRUMCLASSICS. Ele utiliza o protocolo local seguro versão 10, mantém o cache anterior para leitura offline e não altera dados fora das ações explícitas do usuário.
 

@@ -1,6 +1,6 @@
 # BRUMCLASSICS MÓVEL para Android
 
-Cliente Android nativo complementar ao BRUMCLASSICS. A versão atual é a **0.24.0** (`versionCode 36`) e requer Android 8.0/API 26 ou superior.
+Cliente Android nativo complementar ao BRUMCLASSICS. A versão atual é a **0.25.0** (`versionCode 37`) e requer Android 8.0/API 26 ou superior.
 
 Em jogos cuja conexão não oferece leitura oficial completa, a aba **Conquistas** pesquisa jogos e mostra imagem, título e descrição do catálogo carregado pelo launcher. Toque em um item para marcar ou desfazer o progresso manual. O launcher 1.62.0 mantém esses registros por perfil e protege confirmações oficiais.
 
@@ -12,7 +12,7 @@ Em jogos cuja conexão não oferece leitura oficial completa, a aba **Conquistas
 - Fila offline para mudanças feitas longe do launcher.
 - Atualização pelo próprio aplicativo usando releases oficiais assinadas.
 - **CLASSICS Everywhere** com pasta de ROMs autorizada pelo seletor nativo do Android.
-- BRUM Core integrado para NES/Famicom, SNES/Super Famicom, Master System, Game Gear, PC Engine/TurboGrafx-16, GB, GBC, GBA, Nintendo DS, Neo Geo AES/MVS e PlayStation 2 experimental.
+- BRUM Core integrado para NES/Famicom, SNES/Super Famicom, Master System, Game Gear, PC Engine/TurboGrafx-16, GB, GBC, GBA, Nintendo DS, Neo Geo AES/MVS, WonderSwan/Color e PlayStation 2 experimental.
 - Três slots de estado rápido locais por jogo, separados do save normal e protegidos por identidade de ROM e núcleo.
 - Registro multicore com seleção dinâmica de biblioteca, nome, versão e licença; jogos sem núcleo interno aprovado permanecem no RetroArch.
 - Consulta oficial do RetroAchievements, com usuário e Web API Key protegidos pelo Android Keystore.
@@ -58,4 +58,4 @@ O workflow `Android CI` compila o aplicativo e executa os testes de contrato sem
 
 NES, SNES, Master System, Game Gear, PC Engine/TurboGrafx-16, GB, GBC, GBA, Nintendo DS, Neo Geo e PS2 experimental rodam diretamente no **BRUM Core** conforme a matriz de plataformas. Sistemas restantes podem ser encaminhados ao RetroArch externo, sem serem anunciados como nativos.
 
-Veja o [guia de uso](../docs/MOVEL.md), o [licenciamento móvel](../MOBILE-LICENSING.md), as [notas da versão](../releases/android-v0.24.0/RELEASE-NOTES.md) e a [validação](../releases/android-v0.24.0/VALIDACAO.md).
+Veja o [guia de uso](../docs/MOVEL.md), o [licenciamento móvel](../MOBILE-LICENSING.md), as [notas da versão](../releases/android-v0.25.0/RELEASE-NOTES.md) e a [validação](../releases/android-v0.25.0/VALIDACAO.md).

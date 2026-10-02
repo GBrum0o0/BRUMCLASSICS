@@ -6,11 +6,13 @@
 #include <EGL/egl.h>
 #include <GLES3/gl3.h>
 #include <algorithm>
+#include <cmath>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
 #include <deque>
 #include <fstream>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -205,7 +207,10 @@ public:
             if (!info.need_fullpath) { game.data = rom.data(); game.size = rom.size(); }
             if (!core.loadGame(&game)) throw std::runtime_error("O núcleo integrado recusou este arquivo.");
             gameLoaded = true; hardware.resetCore(); restoreSave();
-            brum_retro_system_av_info av{}; core.getAVInfo(&av); sampleRate = static_cast<int>(av.timing.sample_rate);
+            brum_retro_system_av_info av{}; core.getAVInfo(&av);
+            const double reportedSampleRate = av.timing.sample_rate;
+            sampleRate = std::isfinite(reportedSampleRate) && reportedSampleRate >= 8000.0 && reportedSampleRate <= 192000.0
+                ? static_cast<int>(std::lround(reportedSampleRate)) : 48000;
         } catch (...) {
             if (hardware.active()) hardware.makeCurrent();
             if (gameLoaded) core.unloadGame();
@@ -229,11 +234,13 @@ public:
     }
 
     void runFrames(int count, uint32_t mask) {
+        if (shutdownRequested) throw std::runtime_error("O núcleo encerrou a emulação. Verifique se a ROM e as BIOS exigidas são válidas.");
         inputMask = mask;
         if (hardware.active()) hardware.makeCurrent();
         for (int index = 0; index < count; index++) { suppressVideo = index + 1 < count; core.run(); }
         suppressVideo = false;
         if (hardware.active()) hardware.releaseCurrent();
+        if (shutdownRequested) throw std::runtime_error("O núcleo encerrou a emulação. Verifique se a ROM e as BIOS exigidas são válidas.");
     }
 
     void setPointer(int16_t x, int16_t y, bool pressed) {
@@ -279,8 +286,24 @@ public:
         file.read(reinterpret_cast<char *>(state.data()), static_cast<std::streamsize>(expected));
         if (!file) return false;
         bool restored = core.unserialize(state.data(), expected);
-        if (restored) audio.clear();
+        if (restored) clearAudio();
         return restored;
+    }
+
+    void clearAudio() {
+        std::lock_guard<std::mutex> guard(audioMutex);
+        audio.clear();
+    }
+
+    int drainAudio(jshort *target, int capacity) {
+        if (!target || capacity <= 0) return 0;
+        std::lock_guard<std::mutex> guard(audioMutex);
+        const int count = static_cast<int>(std::min<size_t>(audio.size(), static_cast<size_t>(capacity)));
+        for (int index = 0; index < count; index++) {
+            target[index] = audio.front();
+            audio.pop_front();
+        }
+        return count;
     }
 
     CoreFunctions core{};
@@ -290,11 +313,13 @@ public:
     unsigned frameWidth = 0, frameHeight = 0;
     std::vector<uint32_t> frame;
     std::deque<int16_t> audio;
+    std::mutex audioMutex;
     std::unordered_map<std::string, std::string> variables;
     std::string systemDirectory, saveDirectory;
     int sampleRate = 48000;
     int16_t pointerX = 0, pointerY = 0;
     bool pointerPressed = false;
+    bool shutdownRequested = false;
     HardwareContext hardware;
 
 private:
@@ -363,6 +388,9 @@ private:
                 callback->log = coreLog; return true;
             }
             case BRUM_RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE: *static_cast<int *>(data) = 3; return true;
+            case BRUM_RETRO_ENVIRONMENT_SHUTDOWN:
+                session->shutdownRequested = true;
+                return true;
             case BRUM_RETRO_ENVIRONMENT_SET_HW_RENDER:
                 return session->hardware.configure(static_cast<brum_retro_hw_render_callback *>(data));
             case BRUM_RETRO_ENVIRONMENT_SET_HW_SHARED_CONTEXT:
@@ -402,6 +430,7 @@ private:
     static void pushAudio(const int16_t *samples, size_t count) {
         CoreSession *session = activeSession; if (!session || !samples) return;
         constexpr size_t capacity = 262144;
+        std::lock_guard<std::mutex> guard(session->audioMutex);
         for (size_t index = 0; index < count; index++) { if (session->audio.size() >= capacity) session->audio.pop_front(); session->audio.push_back(samples[index]); }
     }
     static void audioSample(int16_t left, int16_t right) { int16_t pair[] = {left, right}; pushAudio(pair, 2); }
@@ -444,8 +473,11 @@ Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeCreate(JNIEnv *env, 
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeRunFrames(JNIEnv *, jclass, jlong handle, jint count, jint inputMask) {
-    auto *session = reinterpret_cast<CoreSession *>(handle); if (session) session->runFrames(count, static_cast<uint32_t>(inputMask));
+Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeRunFrames(JNIEnv *env, jclass, jlong handle, jint count, jint inputMask) {
+    auto *session = reinterpret_cast<CoreSession *>(handle);
+    if (!session) return;
+    try { session->runFrames(count, static_cast<uint32_t>(inputMask)); }
+    catch (const std::exception &error) { throwJava(env, error); }
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -464,11 +496,17 @@ Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeCopyFrame(JNIEnv *en
 
 extern "C" JNIEXPORT jint JNICALL
 Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeDrainAudio(JNIEnv *env, jclass, jlong handle, jshortArray target) {
-    auto *session = reinterpret_cast<CoreSession *>(handle); if (!session || !target || session->audio.empty()) return 0;
-    jsize capacity = env->GetArrayLength(target); jsize count = static_cast<jsize>(std::min<size_t>(session->audio.size(), static_cast<size_t>(capacity)));
-    std::vector<jshort> values(static_cast<size_t>(count));
-    for (jsize index = 0; index < count; index++) { values[static_cast<size_t>(index)] = session->audio.front(); session->audio.pop_front(); }
+    auto *session = reinterpret_cast<CoreSession *>(handle); if (!session || !target) return 0;
+    jsize capacity = env->GetArrayLength(target);
+    std::vector<jshort> values(static_cast<size_t>(capacity));
+    jsize count = static_cast<jsize>(session->drainAudio(values.data(), capacity));
+    if (!count) return 0;
     env->SetShortArrayRegion(target, 0, count, values.data()); return count;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeClearAudio(JNIEnv *, jclass, jlong handle) {
+    auto *session = reinterpret_cast<CoreSession *>(handle); if (session) session->clearAudio();
 }
 
 extern "C" JNIEXPORT jint JNICALL

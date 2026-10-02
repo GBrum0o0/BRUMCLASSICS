@@ -22,6 +22,7 @@ public final class BrumCoreBridge implements AutoCloseable {
     }
     public long copyFrame(int[] target) { ensureOpen(); return nativeCopyFrame(handle, target); }
     public int drainAudio(short[] target) { ensureOpen(); return nativeDrainAudio(handle, target); }
+    public void clearAudio() { if (handle != 0) nativeClearAudio(handle); }
     public int sampleRate() { ensureOpen(); return nativeSampleRate(handle); }
     public void persist() { if (handle != 0) nativePersist(handle); }
     public boolean saveState(String path) { ensureOpen(); return nativeSaveState(handle, path); }
@@ -40,6 +41,7 @@ public final class BrumCoreBridge implements AutoCloseable {
     private static native void nativeSetPointer(long handle, int x, int y, boolean pressed);
     private static native long nativeCopyFrame(long handle, int[] target);
     private static native int nativeDrainAudio(long handle, short[] target);
+    private static native void nativeClearAudio(long handle);
     private static native int nativeSampleRate(long handle);
     private static native void nativePersist(long handle);
     private static native boolean nativeSaveState(long handle, String path);

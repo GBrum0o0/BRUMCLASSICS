@@ -50,6 +50,6 @@ O runtime Libretro integrado é multicore e usa a mesma identidade canônica, re
 1. Slots manuais e estados rápidos separados do save de bateria: concluído.
 2. Sessão remota autenticada e transporte protegido: concluído por orquestração Sunshine/Moonlight/Tailscale.
 3. Sincronização automática de saves entre aparelhos: planejada; conflitos nunca serão sobrescritos silenciosamente.
-4. RetroAchievements ligado ao ID do conteúdo: em evolução por sistema compatível.
+4. RetroAchievements ligado ao ID do conteúdo: o ID oficial e o console já chegam ao host integrado; hash RA, leitura de memória, login por token e processamento por frame seguem a implantação descrita em `RETROACHIEVEMENTS-BRUM-CORE.md`.
 
 ROMs, BIOS e conteúdo protegido não fazem parte do aplicativo. Cada core só entra no produto depois de revisão técnica e de licença.

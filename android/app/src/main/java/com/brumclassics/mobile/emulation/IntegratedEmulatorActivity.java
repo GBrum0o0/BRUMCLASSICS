@@ -48,6 +48,7 @@ public final class IntegratedEmulatorActivity extends Activity {
         intent.putExtra("contentSha256", launch.contentSha256); intent.putExtra("coreId", launch.coreId);
         intent.putExtra("coreDisplayName", launch.coreDisplayName); intent.putExtra("coreVersion", launch.coreVersion);
         intent.putExtra("coreLibraryName", launch.coreLibraryName);
+        intent.putExtra("raGameId", launch.retroAchievementsGameId);
         intent.putExtra("romFile", launch.romFile == null ? "" : launch.romFile.getAbsolutePath()); intent.putExtra("romUri", launch.romUri); intent.putExtra("saveFile", launch.saveFile.getAbsolutePath());
         intent.putExtra("manifestFile", launch.manifestFile.getAbsolutePath()); intent.putExtra("systemDirectory", launch.systemDirectory.getAbsolutePath());
         return intent;
@@ -70,7 +71,7 @@ public final class IntegratedEmulatorActivity extends Activity {
                 romPath = "/proc/self/fd/" + romDescriptor.getFd();
             }
             BrumCoreBridge bridge = new BrumCoreBridge(corePath, romPath, launch);
-            emulatorView = new BrumCoreView(this, bridge);
+            emulatorView = new BrumCoreView(this, bridge, this::showRuntimeFailure);
             setContentView(buildInterface());
         } catch (Throwable error) {
             showFailure(error.getMessage() == null ? "O BRUM Core não conseguiu abrir este jogo." : error.getMessage());
@@ -156,7 +157,8 @@ public final class IntegratedEmulatorActivity extends Activity {
         FrameLayout.LayoutParams selectParams = frame(82, 40, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL); selectParams.setMargins(0, 0, dp(47), dp(18)); root.addView(select, selectParams);
         FrameLayout.LayoutParams startParams = frame(82, 40, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL); startParams.setMargins(dp(47), 0, 0, dp(18)); root.addView(start, startParams);
 
-        TextView status = label("BRUM CORE · " + launch.coreDisplayName + " · " + launch.systemId.toUpperCase(), 9, ACCENT, true);
+        String raStatus = launch.retroAchievementsGameId > 0 ? " · RA ID " + launch.retroAchievementsGameId + " (PREPARAÇÃO)" : "";
+        TextView status = label("BRUM CORE · " + launch.coreDisplayName + " · " + launch.systemId.toUpperCase() + raStatus, 9, ACCENT, true);
         FrameLayout.LayoutParams statusParams = frame(260, 28, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL); statusParams.bottomMargin = dp(65); root.addView(status, statusParams);
         return root;
     }
@@ -248,10 +250,20 @@ public final class IntegratedEmulatorActivity extends Activity {
         setContentView(page);
     }
 
+    private void showRuntimeFailure(String message) {
+        if (isFinishing() || isDestroyed()) return;
+        new AlertDialog.Builder(this)
+            .setTitle("O JOGO FOI INTERROMPIDO")
+            .setMessage(message + "\n\nO BRUM Core manteve esta tela aberta para mostrar a causa, em vez de fechar silenciosamente.")
+            .setCancelable(false)
+            .setPositiveButton("Voltar", (dialog, which) -> closeEmulator())
+            .show();
+    }
+
     private IntegratedEmulatorLaunch readLaunch(Intent intent) {
         return new IntegratedEmulatorLaunch(intent.getStringExtra("gameId"), intent.getStringExtra("title"), intent.getStringExtra("canonicalGameId"),
             intent.getStringExtra("systemId"), intent.getStringExtra("contentSha256"), intent.getStringExtra("coreId"),
-            intent.getStringExtra("coreDisplayName"), intent.getStringExtra("coreVersion"), intent.getStringExtra("coreLibraryName"),
+            intent.getStringExtra("coreDisplayName"), intent.getStringExtra("coreVersion"), intent.getStringExtra("coreLibraryName"), intent.getIntExtra("raGameId", 0),
             intent.getStringExtra("romFile").isEmpty() ? null : new File(intent.getStringExtra("romFile")), intent.getStringExtra("romUri"), new File(intent.getStringExtra("saveFile")),
             new File(intent.getStringExtra("manifestFile")), new File(intent.getStringExtra("systemDirectory")));
     }

@@ -46,6 +46,7 @@ def validate_ipa(path, expected_version=None):
             "Gearsystem": root + "Frameworks/gearsystem_libretro_ios.dylib",
             "Nestopia": root + "Frameworks/nestopia_libretro_ios.dylib",
             "Beetle PCE Fast": root + "Frameworks/mednafen_pce_fast_libretro_ios.dylib",
+            "Beetle WonderSwan": root + "Frameworks/mednafen_wswan_libretro_ios.dylib",
             "bsnes-mercury": root + "Frameworks/bsnes_mercury_performance_libretro_ios.dylib",
         }
         for core_name, core_path in integrated_cores.items():
@@ -68,6 +69,7 @@ def validate_ipa(path, expected_version=None):
             root + "Frameworks/Gearsystem-LICENSE.txt",
             root + "Frameworks/Nestopia-LICENSE.txt",
             root + "Frameworks/Beetle-PCE-Fast-LICENSE.txt",
+            root + "Frameworks/Beetle-WonderSwan-LICENSE.txt",
             root + "Frameworks/bsnes-mercury-LICENSE.txt",
         ]
         for license_path in required_licenses:
@@ -83,7 +85,7 @@ def validate_ipa(path, expected_version=None):
             raise ValueError("ZIP CRC check failed")
         return {"ok": True, "version": info.get("CFBundleShortVersionString"),
                 "build": info.get("CFBundleVersion"), "bundleId": info["CFBundleIdentifier"],
-                "executable": executable_path, "architecture": "arm64", "integratedCores": ["mGBA arm64", "SkyEmu arm64", "Geolith arm64", "Gearsystem arm64", "Nestopia arm64", "Beetle PCE Fast arm64", "bsnes-mercury arm64"],
+                "executable": executable_path, "architecture": "arm64", "integratedCores": ["mGBA arm64", "SkyEmu arm64", "Geolith arm64", "Gearsystem arm64", "Nestopia arm64", "Beetle PCE Fast arm64", "Beetle WonderSwan arm64", "bsnes-mercury arm64"],
                 "signing": "unsigned; requires AltStore or Sideloadly", "entries": len(names)}
 
 if __name__ == "__main__":

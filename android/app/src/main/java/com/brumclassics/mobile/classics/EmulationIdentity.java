@@ -61,7 +61,7 @@ public final class EmulationIdentity {
         switch (extension) {
             case "gb": case "gbc": case "gba": case "nes": case "sfc": case "smc":
             case "n64": case "z64": case "v64": case "nds": case "sms": case "gg":
-            case "md": case "gen": case "pce":
+            case "md": case "gen": case "pce": case "ws": case "wsc":
                 return new DetectedSystem(extension, "extension");
             case "elf": case "isz":
                 return new DetectedSystem("ps2", "extension");

@@ -85,6 +85,14 @@ O código próprio do aplicativo móvel e do BRUM Core é GPL-3.0-or-later. O la
 - Android: `libbsnes_mercury_performance_libretro.so`.
 - iOS: `bsnes_mercury_performance_libretro_ios.dylib`.
 
+### Beetle WonderSwan
+
+- Sistemas: WonderSwan e WonderSwan Color em cartuchos `.ws` e `.wsc`.
+- Licença: GPL-2.0-or-later, distribuído no aplicativo móvel sob GPLv3 ou posterior.
+- Revisão: `4b01295838ea89e3f1355bbe4cb5cf98aa6108cd`.
+- Android: `libmednafen_wswan_libretro.so`.
+- iOS: `mednafen_wswan_libretro_ios.dylib`.
+
 ## Matriz dos 20 grupos solicitados
 
 | # | Sistema | Android | iOS | Situação atual |
@@ -105,7 +113,7 @@ O código próprio do aplicativo móvel e do BRUM Core é GPL-3.0-or-later. O la
 | 14 | Neo Geo | **BRUM Core · Geolith** | **BRUM Core · Geolith** | AES/MVS `.neo` integrado; BIOS é responsabilidade do usuário. CD ainda permanece no fallback. |
 | 15 | Arcade (FBNeo/MAME) | RetroArch | RetroArch | FBNeo foi rejeitado pela restrição não comercial; MAME exige auditoria arquivo a arquivo e testes móveis antes de distribuição. |
 | 16 | Atari 2600/5200/7800/Lynx | RetroArch | RetroArch | O grupo exige vários núcleos, revisões compatíveis e uma validação conjunta ainda não concluída. |
-| 17 | WonderSwan/Color | RetroArch | RetroArch | Núcleo GPL ainda precisa de confirmação de variante de licença, build e testes móveis. |
+| 17 | WonderSwan/Color | **BRUM Core · Beetle WonderSwan** | **BRUM Core · Beetle WonderSwan** | Integrado sob GPL-2.0-or-later/GPLv3+ para `.ws` e `.wsc`. |
 | 18 | PlayStation 2 | **BRUM Core · Play! experimental** | Indisponível no BRUM Core | Android usa o núcleo permissivo Play!; no iOS ele exige JIT. |
 | 19 | Nintendo 3DS | RetroArch | RetroArch/indisponível | Família Citra/Lime3DS exige recursos elevados e auditoria da revisão; iOS é especialmente limitado sem JIT comum. |
 | 20 | GameCube | RetroArch | RetroArch/indisponível | Dolphin exige integração gráfica/JIT; iOS depende de permissões especiais para desempenho prático. |
@@ -127,6 +135,7 @@ Referências oficiais:
 - <https://github.com/libretro/nestopia>
 - <https://github.com/libretro/beetle-pce-fast-libretro>
 - <https://github.com/libretro/bsnes-mercury>
+- <https://github.com/libretro/beetle-wswan-libretro>
 - <https://github.com/jpd002/Play->
 - <https://docs.libretro.com/library/play/>
 - <https://docs.libretro.com/guides/install-ios/>

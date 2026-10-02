@@ -12,6 +12,7 @@ public final class IntegratedEmulatorLaunch {
     public final String coreDisplayName;
     public final String coreVersion;
     public final String coreLibraryName;
+    public final int retroAchievementsGameId;
     public final File romFile;
     public final String romUri;
     public final File saveFile;
@@ -20,7 +21,7 @@ public final class IntegratedEmulatorLaunch {
 
     public IntegratedEmulatorLaunch(String gameId, String title, String canonicalGameId, String systemId,
                                     String contentSha256, String coreId, String coreDisplayName,
-                                    String coreVersion, String coreLibraryName, File romFile, String romUri, File saveFile,
+                                    String coreVersion, String coreLibraryName, int retroAchievementsGameId, File romFile, String romUri, File saveFile,
                                     File manifestFile, File systemDirectory) {
         this.gameId = gameId;
         this.title = title;
@@ -31,6 +32,7 @@ public final class IntegratedEmulatorLaunch {
         this.coreDisplayName = coreDisplayName;
         this.coreVersion = coreVersion;
         this.coreLibraryName = coreLibraryName;
+        this.retroAchievementsGameId = Math.max(0, retroAchievementsGameId);
         this.romFile = romFile;
         this.romUri = romUri == null ? "" : romUri;
         this.saveFile = saveFile;

@@ -15,6 +15,7 @@ typedef void (^BrumEmulatorExitHandler)(void);
                     coreVersion:(NSString *)coreVersion
                 coreDisplayName:(NSString *)coreDisplayName
                 coreLibraryName:(NSString *)coreLibraryName
+        retroAchievementsGameID:(NSInteger)retroAchievementsGameID
                 saveIdentifier:(NSString *)saveIdentifier
             legacySaveBasename:(NSString *)legacySaveBasename
                         onExit:(BrumEmulatorExitHandler)onExit NS_DESIGNATED_INITIALIZER;

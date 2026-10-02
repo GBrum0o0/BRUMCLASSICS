@@ -18,7 +18,10 @@ import android.view.MotionEvent;
 import java.util.concurrent.atomic.AtomicInteger;
 
 final class BrumCoreView extends View implements Runnable {
+    interface RuntimeErrorListener { void onRuntimeError(String message); }
+
     private final BrumCoreBridge core;
+    private final RuntimeErrorListener errorListener;
     private final AtomicInteger inputMask = new AtomicInteger();
     private final int[] pixels = new int[2048 * 2048];
     private final short[] audioSamples = new short[16 * 1024];
@@ -33,9 +36,10 @@ final class BrumCoreView extends View implements Runnable {
     private long playedNanos;
     private final RectF displayTarget = new RectF();
 
-    BrumCoreView(Context context, BrumCoreBridge core) {
+    BrumCoreView(Context context, BrumCoreBridge core, RuntimeErrorListener errorListener) {
         super(context);
         this.core = core;
+        this.errorListener = errorListener;
         setBackgroundColor(Color.BLACK);
         paint.setAntiAlias(false);
         paint.setFilterBitmap(false);
@@ -52,12 +56,13 @@ final class BrumCoreView extends View implements Runnable {
 
     void pauseEmulation() {
         running = false;
+        if (audioTrack != null) { audioTrack.pause(); audioTrack.flush(); }
         Thread thread = emulationThread;
         if (thread != null && thread != Thread.currentThread()) {
-            try { thread.join(1200); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+            try { thread.join(3000); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
         }
         emulationThread = null;
-        if (audioTrack != null) { audioTrack.pause(); audioTrack.flush(); }
+        core.clearAudio();
         core.persist();
     }
 
@@ -79,7 +84,7 @@ final class BrumCoreView extends View implements Runnable {
     void setFastForward(boolean enabled) {
         fastForward = enabled;
         if (audioTrack == null) return;
-        if (enabled) { audioTrack.pause(); audioTrack.flush(); }
+        if (enabled) { audioTrack.pause(); audioTrack.flush(); core.clearAudio(); }
         else if (running) audioTrack.play();
     }
 
@@ -106,34 +111,45 @@ final class BrumCoreView extends View implements Runnable {
     @Override public void run() {
         final long frameDuration = 16_666_667L;
         long lastAccounting = System.nanoTime();
-        while (running) {
-            long started = System.nanoTime();
-            core.runFrames(fastForward ? 5 : 1, inputMask.get());
-            long dimensions = core.copyFrame(pixels);
-            int width = (int) (dimensions >>> 32); int height = (int) dimensions;
-            if (width > 0 && height > 0 && (long) width * height <= pixels.length) {
-                synchronized (bitmapLock) {
-                    if (bitmap == null || bitmap.getWidth() != width || bitmap.getHeight() != height) {
-                        if (bitmap != null) bitmap.recycle();
-                        bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-                        bitmap.setHasAlpha(false);
+        try {
+            while (running) {
+                long started = System.nanoTime();
+                core.runFrames(fastForward ? 5 : 1, inputMask.get());
+                long dimensions = core.copyFrame(pixels);
+                int width = (int) (dimensions >>> 32); int height = (int) dimensions;
+                if (width > 0 && height > 0 && (long) width * height <= pixels.length) {
+                    synchronized (bitmapLock) {
+                        if (bitmap == null || bitmap.getWidth() != width || bitmap.getHeight() != height) {
+                            if (bitmap != null) bitmap.recycle();
+                            bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                            bitmap.setHasAlpha(false);
+                        }
+                        bitmap.setPixels(pixels, 0, width, 0, 0, width, height);
                     }
-                    bitmap.setPixels(pixels, 0, width, 0, 0, width, height);
+                    postInvalidateOnAnimation();
                 }
-                postInvalidateOnAnimation();
+                if (!fastForward && audioTrack != null) {
+                    int count;
+                    while ((count = core.drainAudio(audioSamples)) > 0) {
+                        int written = audioTrack.write(audioSamples, 0, count, AudioTrack.WRITE_BLOCKING);
+                        if (written < 0) throw new IllegalStateException("A saída de áudio do Android falhou (código " + written + ").");
+                    }
+                } else {
+                    core.clearAudio();
+                }
+                long elapsed = System.nanoTime() - started;
+                long now = System.nanoTime();
+                playedNanos += Math.max(0L, Math.min(5_000_000_000L, now - lastAccounting));
+                lastAccounting = now;
+                long remaining = frameDuration - elapsed;
+                if (remaining > 0) SystemClock.sleep(Math.max(0L, remaining / 1_000_000L));
             }
-            if (!fastForward && audioTrack != null) {
-                int count;
-                while ((count = core.drainAudio(audioSamples)) > 0) audioTrack.write(audioSamples, 0, count, AudioTrack.WRITE_BLOCKING);
-            } else {
-                core.drainAudio(audioSamples);
-            }
-            long elapsed = System.nanoTime() - started;
-            long now = System.nanoTime();
-            playedNanos += Math.max(0L, Math.min(5_000_000_000L, now - lastAccounting));
-            lastAccounting = now;
-            long remaining = frameDuration - elapsed;
-            if (remaining > 0) SystemClock.sleep(Math.max(0L, remaining / 1_000_000L));
+        } catch (Throwable error) {
+            boolean unexpected = running;
+            running = false;
+            core.clearAudio();
+            String message = error.getMessage() == null ? "O núcleo encontrou uma falha durante a emulação." : error.getMessage();
+            if (unexpected) post(() -> errorListener.onRuntimeError(message));
         }
     }
 
@@ -166,7 +182,8 @@ final class BrumCoreView extends View implements Runnable {
     }
 
     private void prepareAudio() {
-        int sampleRate = Math.max(8000, core.sampleRate());
+        int reportedRate = core.sampleRate();
+        int sampleRate = reportedRate >= 8000 && reportedRate <= 192000 ? reportedRate : 48000;
         int minimum = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT);
         if (minimum <= 0) return;
         AudioAttributes attributes = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build();
