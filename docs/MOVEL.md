@@ -1,4 +1,4 @@
-# BRUMCLASSICS MÓVEL Android 0.23.0 e iOS 0.14.0
+# BRUMCLASSICS MÓVEL Android 0.23.1 e iOS 0.14.0
 
 Jogos cadastrados no launcher como **não oficiais** são sincronizados como itens locais instalados. O aplicativo recebe somente a classificação e o SteamID de referência quando houver; o caminho do executável nunca sai do computador. B-CARD, anotações e BRUMCOMPANION continuam usando a identidade segura enviada pelo launcher.
 
@@ -6,7 +6,7 @@ O **Gaming Mode** reúne ROMs autorizadas e jogos instalados no PC. GB, GBC e GB
 
 ## Instalar e atualizar
 
-Instale o APK 0.23.0 da release oficial sobre o aplicativo existente, sem limpar seus dados. No iPhone, assine o IPA 0.14.0 com Sideloadly ou AltStore. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente.
+Instale o APK 0.23.1 da release oficial sobre o aplicativo existente, sem limpar seus dados. No iPhone, assine o IPA 0.14.0 com Sideloadly ou AltStore. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente.
 
 Em fontes sem leitura oficial completa, abra a nova aba **Conquistas**, pesquise o jogo e toque no item oficial para marcar ou desfazer o progresso manual. Imagem, título e descrição vêm do catálogo carregado pelo launcher 1.62.0; não há formulário de data nem cadastro livre.
 

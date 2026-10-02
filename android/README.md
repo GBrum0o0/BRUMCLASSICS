@@ -1,6 +1,6 @@
 # BRUMCLASSICS MÓVEL para Android
 
-Cliente Android nativo complementar ao BRUMCLASSICS. A versão atual é a **0.23.0** (`versionCode 34`) e requer Android 8.0/API 26 ou superior.
+Cliente Android nativo complementar ao BRUMCLASSICS. A versão atual é a **0.23.1** (`versionCode 35`) e requer Android 8.0/API 26 ou superior.
 
 Em jogos cuja conexão não oferece leitura oficial completa, a aba **Conquistas** pesquisa jogos e mostra imagem, título e descrição do catálogo carregado pelo launcher. Toque em um item para marcar ou desfazer o progresso manual. O launcher 1.62.0 mantém esses registros por perfil e protege confirmações oficiais.
 
@@ -49,4 +49,4 @@ O workflow `Android CI` compila o aplicativo e executa os testes de contrato sem
 
 GB, GBC e GBA agora rodam diretamente no **BRUM Core**, com mGBA integrado, tela horizontal, controles virtuais e Bluetooth, save local e avanço rápido 5×. Os demais sistemas continuam usando o RetroArch como fallback.
 
-Veja o [guia de uso](../docs/MOVEL.md), o [guia de streaming](../docs/STREAMING.md), as [notas da versão](../releases/android-v0.23.0/RELEASE-NOTES.md) e a [validação](../releases/android-v0.23.0/VALIDACAO.md).
+Veja o [guia de uso](../docs/MOVEL.md), o [guia de streaming](../docs/STREAMING.md), as [notas da versão](../releases/android-v0.23.1/RELEASE-NOTES.md) e a [validação](../releases/android-v0.23.1/VALIDACAO.md).

@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.75.1"><strong>Windows 1.75.1</strong></a> ·
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.23.0"><strong>Android 0.23.0</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.23.1"><strong>Android 0.23.1</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.14.0"><strong>iOS 0.14.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
   <a href="PRIVACY.md">Privacidade</a> ·
@@ -83,12 +83,12 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
 | Windows | 1.75.1 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.75.1) |
-| Android | 0.23.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.23.0) · [Guia](docs/MOVEL.md) |
+| Android | 0.23.1 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.23.1) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.14.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.14.0) · [Guia](ios/README-IOS.md) |
 
 Os hashes SHA-256 acompanham os arquivos publicados. O GitHub hospeda executáveis, APKs e IPAs somente em Releases; esses binários não entram no histórico do repositório.
 
-A versão pessoal para iPhone é compilada separadamente em **Actions → Build iOS pessoal**. O artefato contém um IPA sem assinatura para instalação com AltStore ou Sideloadly. Android 0.23.0 e iOS 0.14.0 incluem Gaming Mode, BRUM Core, biblioteca unificada e início de jogos do PC por Sunshine/Moonlight. Consulte [o guia de streaming](docs/STREAMING.md), [as instruções do iOS](ios/README-IOS.md) e a [política de cores integrados](docs/CORES-INTEGRADOS.md).
+A versão pessoal para iPhone é compilada separadamente em **Actions → Build iOS pessoal**. O artefato contém um IPA sem assinatura para instalação com AltStore ou Sideloadly. Android 0.23.1 e iOS 0.14.0 incluem Gaming Mode, BRUM Core, biblioteca unificada e início de jogos do PC por Sunshine/Moonlight. Consulte [o guia de streaming](docs/STREAMING.md), [as instruções do iOS](ios/README-IOS.md) e a [política de cores integrados](docs/CORES-INTEGRADOS.md).
 
 ## Versões atuais
 
