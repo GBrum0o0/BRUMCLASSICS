@@ -23,6 +23,9 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(a.systemID, .gameBoyColor)
         XCTAssertEqual(a.detectionSource, .header)
         XCTAssertEqual(a.canonicalGameID, b.canonicalGameID)
+        let hinted = try ROMContentInspector.inspect(url: first, filename: "wrong.gba", expectedSystem: .playStation)
+        XCTAssertEqual(hinted.systemID, .gameBoyColor)
+        XCTAssertEqual(hinted.detectionSource, .header)
     }
 
     func testEmulationIdentityFallsBackToExtensionForSyntheticGBA() throws {
@@ -53,6 +56,24 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(CoreRegistry.core(for: .wonderSwanColor)?.id, "beetle-wswan")
         XCTAssertEqual(ROMContentInspector.detectSystem(header: Data([1]), filename: "Judgment Silversword.wsc")?.system, .wonderSwanColor)
         XCTAssertEqual(EmulatedSystemID.wonderSwan.retroAchievementsConsoleID, 53)
+        XCTAssertEqual(CoreRegistry.candidate(for: .nintendo64)?.id, "mupen64plus-next")
+        XCTAssertEqual(CoreRegistry.candidate(for: .playStation)?.id, "beetle-psx")
+        XCTAssertEqual(CoreRegistry.candidate(for: .saturn)?.id, "beetle-saturn")
+        XCTAssertEqual(CoreRegistry.candidate(for: .atari2600)?.id, "stella2014")
+        XCTAssertEqual(CoreRegistry.candidate(for: .playStationPortable)?.id, "ppsspp")
+        XCTAssertEqual(CoreRegistry.candidate(for: .dreamcast)?.id, "flycast")
+        XCTAssertEqual(CoreRegistry.candidate(for: .nintendo3DS)?.id, "citra")
+        XCTAssertEqual(CoreRegistry.candidate(for: .gameCube)?.id, "dolphin")
+        XCTAssertEqual(CoreRegistry.candidate(for: .playStation2)?.id, "play")
+        for candidate in CoreRegistry.candidates {
+            for system in candidate.supportedSystems { XCTAssertNil(CoreRegistry.core(for: system)) }
+        }
+        XCTAssertEqual(EmulatedSystemID.nintendo64.retroAchievementsConsoleID, 2)
+        XCTAssertEqual(EmulatedSystemID.playStation.retroAchievementsConsoleID, 12)
+        XCTAssertEqual(EmulatedSystemID.playStationPortable.retroAchievementsConsoleID, 41)
+        XCTAssertEqual(EmulatedSystemID.dreamcast.retroAchievementsConsoleID, 40)
+        XCTAssertEqual(EmulatedSystemID.nintendo3DS.retroAchievementsConsoleID, 62)
+        XCTAssertEqual(EmulatedSystemID.gameCube.retroAchievementsConsoleID, 16)
     }
 
     func testSaveManifestOnlyAdvancesGenerationWhenPayloadChanges() {
@@ -192,7 +213,54 @@ final class PocketTests: XCTestCase {
         XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Mario.nes", filename: "Mario.nes", title: "Mario", fileSize: 1)))
         XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Bonk.pce", filename: "Bonk.pce", title: "Bonk", fileSize: 1)))
         XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Mario.sfc", filename: "Mario.sfc", title: "Mario", fileSize: 1)))
-        XCTAssertEqual(IntegratedEmulatorSupport.routeLabel(.init(relativePath: "Pokemon.gba", filename: "Pokemon.gba", title: "Pokemon", fileSize: 1)), "JOGAR · BRUM CORE · MGBA")
+        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "N64/Mario.z64", filename: "Mario.z64", title: "Mario", fileSize: 1)))
+        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "MegaDrive/Sonic.md", filename: "Sonic.md", title: "Sonic", fileSize: 1)))
+        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "32X/Knuckles.32x", filename: "Knuckles.32x", title: "Knuckles", fileSize: 1)))
+        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "PS1/Ridge Racer.cue", filename: "Ridge Racer.cue", title: "Ridge Racer", fileSize: 1)))
+        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "Saturn/Nights.chd", filename: "Nights.chd", title: "Nights", fileSize: 1)))
+        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "Arcade/mslug.zip", filename: "mslug.zip", title: "Metal Slug", fileSize: 1)))
+        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "Atari/Pitfall.a26", filename: "Pitfall.a26", title: "Pitfall", fileSize: 1)))
+        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "PSP/Game.cso", filename: "Game.cso", title: "Game", fileSize: 1)))
+        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "Dreamcast/Sonic.gdi", filename: "Sonic.gdi", title: "Sonic", fileSize: 1)))
+        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "3DS/Mario.3ds", filename: "Mario.3ds", title: "Mario", fileSize: 1)))
+        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "GameCube/Melee.rvz", filename: "Melee.rvz", title: "Melee", fileSize: 1)))
+        XCTAssertEqual(IntegratedEmulatorSupport.routeLabel(.init(relativePath: "Pokemon.gba", filename: "Pokemon.gba", title: "Pokemon", fileSize: 1)), "JOGAR · BRUM CORE")
+    }
+    func testAmbiguousDiscRoutingRequiresFolderAndMatchingFormat() {
+        func system(_ path: String) -> EmulatedSystemID? {
+            IntegratedEmulatorSupport.system(for: .init(relativePath: path, filename: (path as NSString).lastPathComponent, title: "test", fileSize: 1))
+        }
+        XCTAssertNil(system("game.iso"))
+        XCTAssertNil(system("PS1/readme.txt"))
+        XCTAssertNil(system("Arcade/game.iso"))
+        XCTAssertEqual(system("PS1/game.cue"), .playStation)
+        XCTAssertEqual(system("PS2/game.iso"), .playStation2)
+        XCTAssertEqual(system("Sega CD/game.chd"), .segaCD)
+        XCTAssertEqual(system("nested/PSP/game.iso"), .playStationPortable)
+        XCTAssertEqual(system("PS1/PS2/game.iso"), .playStation2)
+    }
+    func testDiscStagingCopiesTracksAndRemovesOnlyFailedPrivateCopy() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let source = root.appendingPathComponent("source")
+        let output = root.appendingPathComponent("output")
+        try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cue = source.appendingPathComponent("disc.cue")
+        let track = source.appendingPathComponent("track 01.bin")
+        try Data("FILE \"track 01.bin\" BINARY\n TRACK 01 MODE2/2352\n".utf8).write(to: cue)
+        try Data([1, 2, 3]).write(to: track)
+        let playlist = source.appendingPathComponent("game.m3u")
+        try Data("disc.cue\n".utf8).write(to: playlist)
+        let staged = try ROMExportStager.stageDiscSet(source: playlist, filename: "game.m3u", root: output, id: UUID())
+        XCTAssertEqual(try Data(contentsOf: staged.deletingLastPathComponent().appendingPathComponent("track 01.bin")), Data([1, 2, 3]))
+        for reference in ["../outside.bin", "missing.bin"] {
+            try Data("FILE \"\(reference)\" BINARY\n".utf8).write(to: cue)
+            let id = UUID()
+            XCTAssertThrowsError(try ROMExportStager.stageDiscSet(source: cue, filename: "disc.cue", root: output, id: id))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: output.appendingPathComponent(id.uuidString).path))
+            XCTAssertTrue(FileManager.default.fileExists(atPath: cue.path))
+            XCTAssertTrue(FileManager.default.fileExists(atPath: track.path))
+        }
     }
     func testROMArtworkMatchesSceneNameWithinPlatformAndKeepsOtherGamesOut() {
         let paths = ["Named_Boxarts/Pokemon - FireRed Version (USA, Europe).png", "Named_Boxarts/Pokemon - LeafGreen Version (USA).png", "Named_Snaps/Pokemon - FireRed Version (USA, Europe).png"]

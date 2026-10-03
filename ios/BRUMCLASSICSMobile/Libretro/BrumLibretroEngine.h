@@ -1,10 +1,11 @@
 #import <UIKit/UIKit.h>
+#import "BrumBackend.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
 typedef void (^BrumEmulatorExitHandler)(void);
 
-@interface BrumLibretroViewController : UIViewController
+@interface BrumLibretroViewController : UIViewController <BrumBackendSession>
 
 - (instancetype)initWithROMURL:(NSURL *)romURL
                          title:(NSString *)title

@@ -1,0 +1,207 @@
+name: Validate BRUM backends
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["codex/brum-backends"]
+
+permissions:
+  contents: read
+
+jobs:
+  build-classic-candidates:
+    name: Compilar ${{ matrix.core }} para iOS
+    runs-on: macos-15
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - core: mupen64plus-next
+            repo: libretro/mupen64plus-libretro-nx
+            commit: 12edd2c74a517ff86dfa8cfc71ad75e4c10486d5
+            library: mupen64plus_next_libretro_ios.dylib
+            license: LICENSE
+          - core: beetle-psx
+            repo: libretro/beetle-psx-libretro
+            commit: 5ec9909f2654fb2041315a13fac0b704c5065c0e
+            library: mednafen_psx_libretro_ios.dylib
+            license: COPYING
+          - core: beetle-saturn
+            repo: libretro/beetle-saturn-libretro
+            commit: 65f05fa66f83e65e33be83aa433d883b4fd9509a
+            library: mednafen_saturn_libretro_ios.dylib
+            license: COPYING
+          - core: stella2014
+            repo: libretro/stella2014-libretro
+            commit: 7d1361e407e63f29e52892655069e5fb4096e691
+            library: stella2014_libretro_ios.dylib
+            license: stella/license.txt
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build pinned arm64 candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none "https://github.com/${{ matrix.repo }}.git" "$RUNNER_TEMP/core"
+          git -C "$RUNNER_TEMP/core" checkout --detach "${{ matrix.commit }}"
+          git -C "$RUNNER_TEMP/core" submodule update --init --recursive --depth 1
+          IOSSDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          make -C "$RUNNER_TEMP/core" platform=ios-arm64 IOSSDK="$IOSSDK" -j"$(sysctl -n hw.ncpu)"
+          mkdir -p candidate
+          cp "$RUNNER_TEMP/core/${{ matrix.library }}" candidate/
+          cp "$RUNNER_TEMP/core/${{ matrix.license }}" "candidate/${{ matrix.core }}-LICENSE.txt"
+          file "candidate/${{ matrix.library }}" | grep arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: brum-ios-core-${{ matrix.core }}
+          path: candidate/
+          retention-days: 7
+          if-no-files-found: error
+
+  build-heavy-cores:
+    name: Compilar ${{ matrix.core }} para iOS
+    runs-on: macos-15
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        core: [ppsspp, flycast, citra, dolphin]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compilar core arm64 fixado
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="${{ matrix.core }}"
+          OUT="$PWD/build/heavy-out"
+          SOURCE="$PWD/build/${CORE}-core"
+          BUILD="$PWD/build/${CORE}-ios"
+          mkdir -p "$OUT/CoreAssets"
+
+          case "$CORE" in
+            ppsspp)
+              REPOSITORY=https://github.com/libretro/ppsspp.git
+              COMMIT=7b4ddb426bbe9e287bb7f19b0cfaebb4ea0d41d8
+              TARGET=ppsspp_libretro
+              LIBRARY=ppsspp_libretro_ios.dylib
+              LICENSE=LICENSE.TXT
+              LICENSE_OUT=PPSSPP-LICENSE.txt
+              ;;
+            flycast)
+              REPOSITORY=https://github.com/flyinghead/flycast.git
+              COMMIT=59ed35a7ea7c1940d4c8ac221a662d0e6d6dc9ea
+              TARGET=flycast_libretro
+              LIBRARY=flycast_libretro_ios.dylib
+              LICENSE=LICENSE
+              LICENSE_OUT=Flycast-LICENSE.txt
+              ;;
+            citra)
+              REPOSITORY=https://github.com/libretro/citra.git
+              COMMIT=a0483e9abe8134ae6b290cdca7d49cb77689f05b
+              TARGET=citra_libretro
+              LIBRARY=citra_libretro_ios.dylib
+              LICENSE=license.txt
+              LICENSE_OUT=Citra-LICENSE.txt
+              ;;
+            dolphin)
+              REPOSITORY=https://github.com/libretro/dolphin.git
+              COMMIT=4d23cf151640eb810cb1b8e9d9fc922cf59c0b87
+              TARGET=dolphin_libretro
+              LIBRARY=dolphin_libretro_ios.dylib
+              LICENSE=COPYING
+              LICENSE_OUT=Dolphin-LICENSE.txt
+              ;;
+          esac
+
+          git clone --filter=blob:none "$REPOSITORY" "$SOURCE"
+          git -C "$SOURCE" checkout --detach "$COMMIT"
+          test "$(git -C "$SOURCE" rev-parse HEAD)" = "$COMMIT"
+          git -C "$SOURCE" submodule update --init --recursive --depth 1
+
+          COMMON_FLAGS=(
+            -G Xcode
+            -DCMAKE_SYSTEM_NAME=iOS
+            -DCMAKE_OSX_SYSROOT=iphoneos
+            -DCMAKE_OSX_ARCHITECTURES=arm64
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO
+          )
+          case "$CORE" in
+            ppsspp)
+              git -C "$SOURCE" apply "$GITHUB_WORKSPACE/ios/patches/ppsspp-ios-libretro.patch"
+              cmake -S "$SOURCE" -B "$BUILD" "${COMMON_FLAGS[@]}" \
+                -DIOS=ON -DLIBRETRO=ON -DUSING_GLES2=ON -DMOBILE_DEVICE=ON \
+                '-DOPENGL_LIBRARIES=-framework OpenGLES'
+              ;;
+            flycast)
+              cmake -S "$SOURCE" -B "$BUILD" "${COMMON_FLAGS[@]}" \
+                -DIOS=ON -DLIBRETRO=ON -DUSE_VULKAN=OFF \
+                -DUSE_HOST_LIBZIP=OFF -DUSE_HOST_GLSLANG=OFF -DENABLE_CTEST=OFF
+              ;;
+            citra)
+              cmake -S "$SOURCE" -B "$BUILD" "${COMMON_FLAGS[@]}" \
+                -DIOS=ON -DENABLE_LIBRETRO=ON -DENABLE_QT=OFF \
+                -DENABLE_WEB_SERVICE=OFF -DENABLE_SCRIPTING=OFF -DENABLE_LTO=OFF \
+                -DCITRA_USE_PRECOMPILED_HEADERS=OFF -DCITRA_WARNINGS_AS_ERRORS=OFF
+              ;;
+            dolphin)
+              cmake -S "$SOURCE" -B "$BUILD" "${COMMON_FLAGS[@]}" \
+                -DIOS=ON -DLIBRETRO=ON -DENABLE_LTO=OFF -DENABLE_VULKAN=OFF
+              ;;
+          esac
+
+          cmake --build "$BUILD" --config Release --target "$TARGET" --parallel "$(sysctl -n hw.ncpu)"
+          CORE_PATH=$(find "$BUILD" -type f -name "${TARGET}*.dylib" -print -quit)
+          test -n "$CORE_PATH"
+          cp "$CORE_PATH" "$OUT/$LIBRARY"
+          cp "$SOURCE/$LICENSE" "$OUT/$LICENSE_OUT"
+          chmod 755 "$OUT/$LIBRARY"
+          file "$OUT/$LIBRARY" | grep arm64 >/dev/null
+
+          if [ "$CORE" = ppsspp ]; then
+            mkdir -p "$OUT/CoreAssets/PPSSPP"
+            ditto "$SOURCE/assets" "$OUT/CoreAssets/PPSSPP"
+          elif [ "$CORE" = dolphin ]; then
+            mkdir -p "$OUT/CoreAssets/dolphin-emu/Sys"
+            ditto "$SOURCE/Data/Sys" "$OUT/CoreAssets/dolphin-emu/Sys"
+          fi
+
+      - name: Guardar core pesado
+        uses: actions/upload-artifact@v4
+        with:
+          name: brum-ios-core-${{ matrix.core }}
+          path: ios/build/heavy-out
+          retention-days: 7
+          if-no-files-found: error
+
+
+  validate-host:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test portable screen and input contracts
+        run: |
+          clang++ -std=c++17 -Wall -Wextra -Werror shared/brum-core/tests.cpp -o "$RUNNER_TEMP/brum-core-tests"
+          "$RUNNER_TEMP/brum-core-tests"
+      - name: Validate packaging
+        working-directory: ios
+        run: |
+          node validate-ios-project.js
+          python3 -m unittest -v test_validate_ipa.py
+      - name: Generate Xcode project
+        working-directory: ios
+        run: |
+          brew install xcodegen
+          xcodegen generate
+      - name: Test iOS host
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          SIMULATOR_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for devices in d["devices"].values() for x in devices if "iPhone" in x["name"] and x.get("isAvailable")))')
+          xcodebuild -project BRUMCLASSICSMobile.xcodeproj -scheme BRUMCLASSICSMobile -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -derivedDataPath build/Simulator -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test

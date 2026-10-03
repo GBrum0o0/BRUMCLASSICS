@@ -6,27 +6,55 @@ enum IntegratedEmulatorSupport {
     }
 
     static func core(for rom: ROMFolderGame) -> CoreDescriptor? {
-        let system: EmulatedSystemID?
-        switch (rom.filename as NSString).pathExtension.lowercased() {
-        case "gb": system = .gameBoy
-        case "gbc": system = .gameBoyColor
-        case "gba": system = .gameBoyAdvance
-        case "nds": system = .nintendoDS
-        case "neo": system = .neoGeo
-        case "sms": system = .masterSystem
-        case "gg": system = .gameGear
-        case "nes": system = .nintendoEntertainmentSystem
-        case "pce": system = .pcEngine
-        case "sfc", "smc": system = .superNintendo
-        case "ws": system = .wonderSwan
-        case "wsc": system = .wonderSwanColor
-        default: system = nil
+        system(for: rom).flatMap(CoreRegistry.core(for:))
+    }
+
+    static func system(for rom: ROMFolderGame) -> EmulatedSystemID? {
+        let ext = (rom.filename as NSString).pathExtension.lowercased()
+        switch ext {
+        case "gb": return .gameBoy
+        case "gbc": return .gameBoyColor
+        case "gba": return .gameBoyAdvance
+        case "nds": return .nintendoDS
+        case "neo": return .neoGeo
+        case "sms": return .masterSystem
+        case "gg": return .gameGear
+        case "nes": return .nintendoEntertainmentSystem
+        case "pce": return .pcEngine
+        case "sfc", "smc": return .superNintendo
+        case "ws": return .wonderSwan
+        case "wsc": return .wonderSwanColor
+        case "n64", "z64", "v64": return .nintendo64
+        case "md", "gen", "smd": return .megaDrive
+        case "32x": return .sega32X
+        case "a26": return .atari2600
+        case "gdi": return .dreamcast
+        case "cso": return .playStationPortable
+        case "3ds", "3dsx", "cci", "cxi": return .nintendo3DS
+        case "rvz", "gcz": return .gameCube
+        default: break
         }
-        return system.flatMap(CoreRegistry.core(for:))
+        let folders = rom.relativePath.lowercased().replacingOccurrences(of: "\\", with: "/")
+            .split(separator: "/").dropLast()
+        // Nearest recognized directory wins, but only for a supported format.
+        for folder in folders.reversed() {
+            switch folder {
+            case "ps1", "psx": return ["cue", "chd", "pbp", "m3u", "bin", "iso"].contains(ext) ? .playStation : nil
+            case "ps2" where ["iso", "bin", "chd", "m3u"].contains(ext): return .playStation2
+            case "saturn" where ["cue", "chd", "m3u"].contains(ext): return .saturn
+            case "sega cd", "segacd", "mega cd", "megacd": return ["cue", "chd", "m3u", "iso"].contains(ext) ? .segaCD : nil
+            case "arcade", "fbneo", "mame": return ["zip", "7z"].contains(ext) ? .arcade : nil
+            case "psp" where ["iso", "pbp"].contains(ext): return .playStationPortable
+            case "dreamcast" where ["chd", "cdi", "m3u"].contains(ext): return .dreamcast
+            case "gamecube" where ["iso", "ciso", "gcm"].contains(ext): return .gameCube
+            default: continue
+            }
+        }
+        return nil
     }
 
     static func routeLabel(_ rom: ROMFolderGame) -> String {
-        core(for: rom).map { "JOGAR · BRUM CORE · \($0.displayName.uppercased())" } ?? "JOGAR · RETROARCH"
+        core(for: rom) != nil ? "JOGAR · BRUM CORE" : "JOGAR · RETROARCH"
     }
 }
 

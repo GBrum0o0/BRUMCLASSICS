@@ -81,7 +81,13 @@ enum RetroArchAppStoreLaunchRules {
 
 enum ROMFolderScanner {
     static let maximumFiles = 10_000
-    static let firmwareFilenames: Set<String> = ["aes.zip", "neogeo.zip", "neocd.zip", "neocdz.zip"]
+    static let firmwareFilenames: Set<String> = [
+        "aes.zip", "neogeo.zip", "neocd.zip", "neocdz.zip",
+        "bios_cd_e.bin", "bios_cd_u.bin", "bios_cd_j.bin",
+        "scph5500.bin", "scph5501.bin", "scph5502.bin",
+        "mpr-17933.bin", "sega_101.bin", "dc_boot.bin", "dc_flash.bin",
+        "aes_keys.txt", "seeddb.bin"
+    ]
 
     static func scan(_ root: URL, allowedExtensions: Set<String> = PocketRules.extensions) throws -> ROMFolderScan {
         try CoordinatedFileAccess.read(root) { coordinatedRoot in
@@ -148,6 +154,67 @@ enum ROMExportStager {
         } catch {
             try? FileManager.default.removeItem(at: directory)
             throw error
+        }
+    }
+
+    static func stageDiscSet(source: URL, filename: String, root: URL, id: UUID) throws -> URL {
+        let main = try stage(source: source, filename: filename, root: root, id: id)
+        var visited: Set<String> = [filename.lowercased()]
+        do {
+            try copyReferences(from: source, to: main.deletingLastPathComponent(), visited: &visited)
+            return main
+        } catch {
+            // Remove only this invocation's private staging directory, never the source.
+            try? FileManager.default.removeItem(at: main.deletingLastPathComponent())
+            throw error
+        }
+    }
+
+    private static func copyReferences(from descriptor: URL, to destination: URL, visited: inout Set<String>) throws {
+        let ext = descriptor.pathExtension.lowercased()
+        guard ["cue", "m3u", "gdi"].contains(ext) else { return }
+        let text = try CoordinatedFileAccess.read(descriptor) { url in
+            let values = try url.resourceValues(forKeys: [.fileSizeKey])
+            guard let size = values.fileSize, size > 0, size <= 1_048_576 else {
+                throw PocketError.message("O descritor de disco é inválido ou grande demais.")
+            }
+            return String(decoding: try Data(contentsOf: url), as: UTF8.self)
+        }
+        let references: [String]
+        if ext == "m3u" {
+            references = text.components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty && !$0.hasPrefix("#") }
+        } else {
+            let pattern = ext == "cue"
+                ? #"(?im)^\s*FILE\s+(?:\"([^\"]+)\"|(\S+))"#
+                : #"(?m)^\s*\d+\s+\d+\s+\d+\s+\d+\s+(?:\"([^\"]+)\"|(\S+))"#
+            let regex = try NSRegularExpression(pattern: pattern)
+            let range = NSRange(text.startIndex..<text.endIndex, in: text)
+            references = regex.matches(in: text, range: range).compactMap { match in
+                for index in 1..<match.numberOfRanges where match.range(at: index).location != NSNotFound {
+                    if let range = Range(match.range(at: index), in: text) { return String(text[range]) }
+                }
+                return nil
+            }
+        }
+        for reference in references {
+            let name = (reference as NSString).lastPathComponent
+            guard name == reference, PocketRules.safeFilename(name) else {
+                throw PocketError.message("O descritor de disco contém um caminho externo não permitido: \(reference)")
+            }
+            let key = name.lowercased()
+            if !visited.insert(key).inserted { continue }
+            let source = descriptor.deletingLastPathComponent().appendingPathComponent(name)
+            let target = destination.appendingPathComponent(name)
+            try CoordinatedFileAccess.read(source) { url in
+                let sourceValues = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+                guard sourceValues.isRegularFile == true, sourceValues.isSymbolicLink != true, (sourceValues.fileSize ?? 0) > 0 else {
+                    throw PocketError.message("Faixa ou disco referenciado não encontrado: \(name)")
+                }
+                try FileManager.default.copyItem(at: url, to: target)
+            }
+            try copyReferences(from: source, to: destination, visited: &visited)
         }
     }
 }
@@ -254,8 +321,18 @@ actor ROMFolderAccess {
             throw PocketError.message("O caminho da ROM não pertence mais à pasta autorizada.")
         }
         try installNeoGeoFirmware(in: root)
-        if source.pathExtension.lowercased() == "neo" && !hasNeoGeoCartridgeFirmware() {
+        let system = IntegratedEmulatorSupport.system(for: game)
+        if system == .neoGeo && !hasFirmware(["aes.zip", "neogeo.zip"]) {
             throw PocketError.message("Para iniciar Neo Geo, coloque aes.zip ou neogeo.zip na pasta de jogos. O BRUM Core copia somente a BIOS fornecida por você e não distribui arquivos protegidos.")
+        }
+        if system == .segaCD && !hasFirmware(["bios_cd_e.bin", "bios_cd_u.bin", "bios_cd_j.bin"]) {
+            throw PocketError.message("Para iniciar Sega CD, coloque a BIOS da sua região (bios_CD_E.bin, bios_CD_U.bin ou bios_CD_J.bin) na pasta de jogos.")
+        }
+        if system == .playStation && !hasFirmware(["scph5500.bin", "scph5501.bin", "scph5502.bin"]) {
+            throw PocketError.message("Para iniciar PS1, coloque uma BIOS válida (scph5500.bin, scph5501.bin ou scph5502.bin) na pasta de jogos.")
+        }
+        if system == .saturn && !hasFirmware(["mpr-17933.bin", "sega_101.bin"]) {
+            throw PocketError.message("Para iniciar Saturn, coloque mpr-17933.bin ou sega_101.bin na pasta de jogos.")
         }
         try removeExpiredFiles(in: integratedRoot)
         do {
@@ -263,9 +340,9 @@ actor ROMFolderAccess {
                 let refreshed = try root.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
                 UserDefaults.standard.set(refreshed, forKey: bookmarkKey)
             }
-            return try ROMExportStager.stage(source: source, filename: game.filename, root: integratedRoot, id: UUID())
+            return try ROMExportStager.stageDiscSet(source: source, filename: game.filename, root: integratedRoot, id: UUID())
         } catch {
-            throw PocketError.message("O iOS não liberou a leitura desta ROM. Se ela estiver no iCloud, baixe-a no iPhone. Se já estiver local, reautorize a pasta em Perfil → Configurações do app → CLASSICS.")
+            throw PocketError.message("Não foi possível preparar a ROM: \(error.localizedDescription). Se estiver no iCloud, baixe todos os arquivos do jogo; se necessário, reautorize a pasta em Configurações → CLASSICS.")
         }
     }
 
@@ -275,10 +352,11 @@ actor ROMFolderAccess {
     }
 
     private func hasNeoGeoCartridgeFirmware() -> Bool {
-        let manager = FileManager.default
-        return ["aes.zip", "neogeo.zip"].contains {
-            manager.fileExists(atPath: systemRoot.appendingPathComponent($0).path)
-        }
+        hasFirmware(["aes.zip", "neogeo.zip"])
+    }
+
+    private func hasFirmware(_ names: [String]) -> Bool {
+        names.contains { FileManager.default.fileExists(atPath: systemRoot.appendingPathComponent($0).path) }
     }
 
     private func installNeoGeoFirmware(in root: URL) throws {

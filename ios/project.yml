@@ -20,6 +20,7 @@ targets:
       - sdk: AudioToolbox.framework
       - sdk: AVFoundation.framework
       - sdk: GameController.framework
+      - sdk: OpenGLES.framework
       - sdk: QuartzCore.framework
     settings:
       base:

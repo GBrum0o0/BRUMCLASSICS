@@ -1,10 +1,15 @@
 #import "BrumLibretroEngine.h"
 #import "BrumLibretroAPI.h"
+#include "BrumScreenProfiles.hpp"
+#include "../../../shared/brum-core/InputState.hpp"
 
 #import <AudioToolbox/AudioToolbox.h>
 #import <AVFoundation/AVFoundation.h>
 #import <CommonCrypto/CommonDigest.h>
 #import <GameController/GameController.h>
+#import <OpenGLES/ES3/gl.h>
+#import <OpenGLES/ES3/glext.h>
+#import <OpenGLES/EAGL.h>
 #import <QuartzCore/QuartzCore.h>
 #import <dlfcn.h>
 #import <math.h>
@@ -85,7 +90,14 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     BOOL _screenFillsDisplay;
     BOOL _shutdownRequested;
     unsigned _pixelFormat;
-    uint32_t _inputMask;
+    brum::InputState _input;
+    brum::ScreenManager _screenManager;
+    std::vector<brum::Placement> _screenPlacements;
+    NSMutableArray<CALayer *> *_screenLayers;
+    BOOL _paused;
+    BOOL _explicitlyPaused;
+    BOOL _backgrounded;
+    BOOL _audioInterrupted;
     int16_t _pointerX;
     int16_t _pointerY;
     BOOL _pointerPressed;
@@ -101,6 +113,7 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     NSData *_romData;
     NSString *_gameTitle;
     NSString *_systemDirectory;
+    NSString *_coreAssetsDirectory;
     NSString *_saveDirectory;
     NSString *_savePath;
     NSString *_saveManifestPath;
@@ -124,6 +137,14 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     size_t _audioWrite;
     size_t _audioCount;
     os_unfair_lock _audioLock;
+    EAGLContext *_hardwareContext;
+    brum_retro_hw_render_callback _hardwareCallback;
+    GLuint _hardwareFramebuffer;
+    GLuint _hardwareColorTexture;
+    GLuint _hardwareDepthStencil;
+    GLsizei _hardwareSurfaceSize;
+    BOOL _hardwarePending;
+    BOOL _hardwareInitialized;
 }
 
 - (void)closeEmulator;
@@ -135,6 +156,12 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
 - (void)loadStateAtSlot:(NSInteger)slot;
 - (void)showStateStatus:(NSString *)text error:(BOOL)error;
 - (BOOL)startAudio:(double)sampleRate error:(NSError **)error;
+- (void)presentFrame:(CGImageRef)image;
+- (void)layoutScreens;
+- (void)showScreenMenu;
+- (BOOL)configureHardware:(brum_retro_hw_render_callback *)callback;
+- (BOOL)initializeHardware:(NSError **)error;
+- (void)destroyHardware;
 - (void)handleCoreShutdown;
 @end
 
@@ -150,6 +177,37 @@ static void BrumCoreLog(int level, const char *format, ...) {
     vsnprintf(message, sizeof(message), format, arguments);
     va_end(arguments);
     NSLog(@"BRUM Core [%d] %s", level, message);
+}
+
+static uintptr_t BrumCurrentFramebuffer(void) {
+    BrumLibretroViewController *host = BrumCurrentHost;
+    return host && host->_hardwareInitialized ? host->_hardwareFramebuffer : 0;
+}
+
+static brum_retro_proc_address_t BrumGetProcAddress(const char *name) {
+    return name ? (brum_retro_proc_address_t)dlsym(RTLD_DEFAULT, name) : NULL;
+}
+
+static void BrumRegisterCoreOption(BrumLibretroViewController *host, const char *key, const char *defaultValue, const char *firstValue) {
+    if (!key) return;
+    NSString *optionKey = [NSString stringWithUTF8String:key];
+    const char *selected = defaultValue ?: firstValue;
+    if (optionKey.length && selected && !host->_variables[optionKey]) {
+        host->_variables[optionKey] = [NSString stringWithUTF8String:selected];
+    }
+}
+
+static void BrumRegisterCoreOptions(BrumLibretroViewController *host, const brum_retro_core_option_definition *definitions) {
+    for (const brum_retro_core_option_definition *option = definitions; option && option->key; option++) {
+        BrumRegisterCoreOption(host, option->key, option->default_value, option->values[0].value);
+    }
+}
+
+static void BrumRegisterCoreOptionsV2(BrumLibretroViewController *host, const brum_retro_core_options_v2 *options) {
+    const brum_retro_core_option_v2_definition *definitions = options ? options->definitions : NULL;
+    for (const brum_retro_core_option_v2_definition *option = definitions; option && option->key; option++) {
+        BrumRegisterCoreOption(host, option->key, option->default_value, option->values[0].value);
+    }
 }
 
 static bool BrumEnvironment(unsigned command, void *data) {
@@ -169,8 +227,10 @@ static bool BrumEnvironment(unsigned command, void *data) {
             *(const char **)data = host->_systemDirectory.fileSystemRepresentation;
             return true;
         case BRUM_RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY:
-        case BRUM_RETRO_ENVIRONMENT_GET_CORE_ASSETS_DIRECTORY:
             *(const char **)data = host->_saveDirectory.fileSystemRepresentation;
+            return true;
+        case BRUM_RETRO_ENVIRONMENT_GET_CORE_ASSETS_DIRECTORY:
+            *(const char **)data = host->_coreAssetsDirectory.fileSystemRepresentation;
             return true;
         case BRUM_RETRO_ENVIRONMENT_GET_LANGUAGE:
             *(unsigned *)data = 9; // Portuguese (Brazil)
@@ -206,7 +266,28 @@ static bool BrumEnvironment(unsigned command, void *data) {
         case BRUM_RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE:
             *(int *)data = 3;
             return true;
-        case BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2_INTL:
+        case BRUM_RETRO_ENVIRONMENT_SET_HW_RENDER:
+            return [host configureHardware:(brum_retro_hw_render_callback *)data];
+        case BRUM_RETRO_ENVIRONMENT_SET_HW_SHARED_CONTEXT:
+            return true;
+        case BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS:
+            BrumRegisterCoreOptions(host, (const brum_retro_core_option_definition *)data);
+            return true;
+        case BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS_INTL: {
+            const brum_retro_core_options_intl *options = (const brum_retro_core_options_intl *)data;
+            BrumRegisterCoreOptions(host, options ? (options->local ?: options->us) : NULL);
+            return true;
+        }
+        case BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2:
+            BrumRegisterCoreOptionsV2(host, (const brum_retro_core_options_v2 *)data);
+            return true;
+        case BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2_INTL: {
+            const brum_retro_core_options_v2_intl *options = (const brum_retro_core_options_v2_intl *)data;
+            BrumRegisterCoreOptionsV2(host, options ? (options->local ?: options->us) : NULL);
+            return true;
+        }
+        case BRUM_RETRO_ENVIRONMENT_GET_PREFERRED_HW_RENDER:
+            *(unsigned *)data = BRUM_RETRO_HW_CONTEXT_OPENGLES3;
             return true;
         case BRUM_RETRO_ENVIRONMENT_SET_MESSAGE: {
             const brum_retro_message *message = (const brum_retro_message *)data;
@@ -232,12 +313,31 @@ static bool BrumEnvironment(unsigned command, void *data) {
 
 static void BrumVideo(const void *data, unsigned width, unsigned height, size_t pitch) {
     BrumLibretroViewController *host = BrumCurrentHost;
-    if (!host || host->_suppressVideo || !data || data == BrumHardwareFrameBuffer || !width || !height) return;
+    if (!host || host->_suppressVideo || !data || !width || !height) return;
+    if (width > 4096 || height > 4096) return;
+    const size_t bytesPerPixel = host->_pixelFormat == BRUM_RETRO_PIXEL_FORMAT_XRGB8888 ? 4 : 2;
+    if (data != BrumHardwareFrameBuffer && (pitch < (size_t)width * bytesPerPixel || pitch > SIZE_MAX / height)) return;
     host->_frameWidth = width;
     host->_frameHeight = height;
     NSMutableData *pixels = [NSMutableData dataWithLength:(NSUInteger)width * height * 4];
     uint32_t *target = (uint32_t *)pixels.mutableBytes;
-    for (unsigned y = 0; y < height; y++) {
+    if (data == BrumHardwareFrameBuffer) {
+        if (!host->_hardwareInitialized || width > (unsigned)host->_hardwareSurfaceSize || height > (unsigned)host->_hardwareSurfaceSize) return;
+        glBindFramebuffer(GL_FRAMEBUFFER, host->_hardwareFramebuffer);
+        NSMutableData *rgba = [NSMutableData dataWithLength:(NSUInteger)width * height * 4];
+        glPixelStorei(GL_PACK_ALIGNMENT, 1);
+        glReadPixels(0, 0, (GLsizei)width, (GLsizei)height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.mutableBytes);
+        if (glGetError() != GL_NO_ERROR) return;
+        const uint8_t *source = (const uint8_t *)rgba.bytes;
+        for (unsigned y = 0; y < height; y++) {
+            unsigned sourceY = host->_hardwareCallback.bottom_left_origin ? height - 1 - y : y;
+            for (unsigned x = 0; x < width; x++) {
+                size_t offset = ((size_t)sourceY * width + x) * 4;
+                target[(size_t)y * width + x] = ((uint32_t)source[offset] << 16) |
+                    ((uint32_t)source[offset + 1] << 8) | source[offset + 2];
+            }
+        }
+    } else for (unsigned y = 0; y < height; y++) {
         if (host->_pixelFormat == BRUM_RETRO_PIXEL_FORMAT_XRGB8888) {
             const uint32_t *source = (const uint32_t *)((const uint8_t *)data + y * pitch);
             memcpy(target + (size_t)y * width, source, (size_t)width * 4);
@@ -264,8 +364,7 @@ static void BrumVideo(const void *data, unsigned width, unsigned height, size_t 
     CGBitmapInfo bitmap = kCGBitmapByteOrder32Little | kCGImageAlphaNoneSkipFirst;
     CGImageRef image = CGImageCreate(width, height, 8, 32, (size_t)width * 4, colorSpace, bitmap, provider, NULL, false, kCGRenderingIntentDefault);
     if (image) {
-        host->_screen.layer.contents = (__bridge id)image;
-        host->_screen.layer.contentsGravity = host->_screenFillsDisplay ? kCAGravityResizeAspectFill : kCAGravityResizeAspect;
+        [host presentFrame:image];
         CGImageRelease(image);
     }
     CGDataProviderRelease(provider);
@@ -299,7 +398,18 @@ static size_t BrumAudioBatch(const int16_t *data, size_t frames) {
     return frames;
 }
 
-static void BrumInputPoll(void) {}
+static void BrumInputPoll(void) {
+    BrumLibretroViewController *host = BrumCurrentHost;
+    if (!host) return;
+    host->_input.release(brum::InputSource::controller);
+    GCExtendedGamepad *pad = GCController.controllers.firstObject.extendedGamepad;
+    if (!pad) return;
+    NSArray<GCControllerButtonInput *> *buttons = @[pad.buttonB, pad.buttonY, pad.buttonOptions ?: pad.buttonMenu, pad.buttonMenu,
+        pad.dpad.up, pad.dpad.down, pad.dpad.left, pad.dpad.right, pad.buttonA, pad.buttonX,
+        pad.leftShoulder, pad.rightShoulder, pad.leftTrigger, pad.rightTrigger];
+    for (NSUInteger i = 0; i < buttons.count; i++) host->_input.set(brum::InputSource::controller, (unsigned)i, buttons[i].isPressed);
+    host->_input.set(brum::InputSource::controller, 2, pad.buttonOptions.isPressed);
+}
 
 static int16_t BrumInputState(unsigned port, unsigned device, unsigned index, unsigned identifier) {
     BrumLibretroViewController *host = BrumCurrentHost;
@@ -311,27 +421,8 @@ static int16_t BrumInputState(unsigned port, unsigned device, unsigned index, un
         return 0;
     }
     if (device != BRUM_RETRO_DEVICE_JOYPAD || identifier > 15) return 0;
-    BOOL pressed = (host->_inputMask & (1u << identifier)) != 0;
-    GCExtendedGamepad *gamepad = GCController.controllers.firstObject.extendedGamepad;
-    if (gamepad) {
-        switch (identifier) {
-            case BRUM_RETRO_DEVICE_ID_JOYPAD_UP: pressed |= gamepad.dpad.up.isPressed; break;
-            case BRUM_RETRO_DEVICE_ID_JOYPAD_DOWN: pressed |= gamepad.dpad.down.isPressed; break;
-            case BRUM_RETRO_DEVICE_ID_JOYPAD_LEFT: pressed |= gamepad.dpad.left.isPressed; break;
-            case BRUM_RETRO_DEVICE_ID_JOYPAD_RIGHT: pressed |= gamepad.dpad.right.isPressed; break;
-            case BRUM_RETRO_DEVICE_ID_JOYPAD_A: pressed |= gamepad.buttonA.isPressed; break;
-            case BRUM_RETRO_DEVICE_ID_JOYPAD_B: pressed |= gamepad.buttonB.isPressed; break;
-            case BRUM_RETRO_DEVICE_ID_JOYPAD_X: pressed |= gamepad.buttonX.isPressed; break;
-            case BRUM_RETRO_DEVICE_ID_JOYPAD_Y: pressed |= gamepad.buttonY.isPressed; break;
-            case BRUM_RETRO_DEVICE_ID_JOYPAD_L: pressed |= gamepad.leftShoulder.isPressed; break;
-            case BRUM_RETRO_DEVICE_ID_JOYPAD_R: pressed |= gamepad.rightShoulder.isPressed; break;
-            case BRUM_RETRO_DEVICE_ID_JOYPAD_START: pressed |= gamepad.buttonMenu.isPressed; break;
-            case BRUM_RETRO_DEVICE_ID_JOYPAD_SELECT:
-                if (@available(iOS 13.0, *)) pressed |= gamepad.buttonOptions.isPressed;
-                break;
-            default: break;
-        }
-    }
+    BOOL pressed = host->_input.pressed(identifier);
+
     return pressed ? 1 : 0;
 }
 
@@ -387,11 +478,18 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _variables[@"system_gb_bios_enable"] = @"ON";
     _variables[@"system_gba_bios_enable"] = @"ON";
     _variables[@"system_nds_bios_enable"] = @"ON";
+    _variables[@"citra_layout_option"] = @"Default Top-Bottom Screen";
+    _variables[@"citra_resolution_factor"] = @"1x (Native)";
+    _variables[@"citra_touch_touchscreen"] = @"enabled";
+    _screenLayers = [NSMutableArray array];
     _pixelFormat = BRUM_RETRO_PIXEL_FORMAT_0RGB1555;
     _screenFillsDisplay = YES;
     _audioLock = OS_UNFAIR_LOCK_INIT;
     _audioCapacity = 262144;
     _audioRing = (int16_t *)calloc(_audioCapacity, sizeof(int16_t));
+    // 2048x2048 covers native output from the integrated GLES cores while
+    // avoiding a 128+ MB color/depth allocation that can terminate the app.
+    _hardwareSurfaceSize = 2048;
     NSError *startupError = nil;
     if (![self prepareDirectories:&startupError]) {
         _startupError = startupError;
@@ -418,6 +516,33 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     if (![[NSFileManager defaultManager] createDirectoryAtURL:saves withIntermediateDirectories:YES attributes:nil error:error]) return NO;
     _systemDirectory = system.path;
     _saveDirectory = saves.path;
+    NSString *frameworks = NSBundle.mainBundle.privateFrameworksPath ?: NSBundle.mainBundle.bundlePath;
+    NSURL *bundledAssets = [[NSURL fileURLWithPath:frameworks isDirectory:YES] URLByAppendingPathComponent:@"CoreAssets" isDirectory:YES];
+    _coreAssetsDirectory = bundledAssets.path;
+
+    // These two cores require their data below the libretro system directory.
+    // Copy only once, keeping the signed application bundle read-only.
+    NSFileManager *manager = NSFileManager.defaultManager;
+    for (NSString *folder in @[@"PPSSPP", @"dolphin-emu"]) {
+        NSURL *source = [bundledAssets URLByAppendingPathComponent:folder isDirectory:YES];
+        NSURL *destination = [system URLByAppendingPathComponent:folder isDirectory:YES];
+        if ([manager fileExistsAtPath:source.path] && ![manager fileExistsAtPath:destination.path]) {
+            if (![manager copyItemAtURL:source toURL:destination error:error]) return NO;
+        }
+    }
+
+    // Citra looks for user-supplied keys in Saves/3ds/Citra/sysdata.
+    if ([_emulatedSystemID isEqualToString:@"3ds"]) {
+        NSURL *sysdata = [[saves URLByAppendingPathComponent:@"Citra" isDirectory:YES] URLByAppendingPathComponent:@"sysdata" isDirectory:YES];
+        if (![manager createDirectoryAtURL:sysdata withIntermediateDirectories:YES attributes:nil error:error]) return NO;
+        for (NSString *filename in @[@"aes_keys.txt", @"seeddb.bin"]) {
+            NSURL *source = [system URLByAppendingPathComponent:filename];
+            NSURL *destination = [sysdata URLByAppendingPathComponent:filename];
+            if ([manager fileExistsAtPath:source.path] && ![manager fileExistsAtPath:destination.path]) {
+                if (![manager copyItemAtURL:source toURL:destination error:error]) return NO;
+            }
+        }
+    }
     NSString *saveName = [_contentSHA256 stringByAppendingPathExtension:@"srm"];
     _savePath = [[saves URLByAppendingPathComponent:saveName] path];
     _saveManifestPath = [[saves URLByAppendingPathComponent:[_contentSHA256 stringByAppendingPathExtension:@"save.json"]] path];
@@ -426,7 +551,6 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     // antigo uma única vez; nunca o apagamos, para que a migração seja reversível.
     NSString *legacyName = [_legacySaveBasename stringByAppendingPathExtension:@"srm"];
     NSString *legacyPath = [[savesRoot URLByAppendingPathComponent:legacyName] path];
-    NSFileManager *manager = NSFileManager.defaultManager;
     if (![manager fileExistsAtPath:_savePath] && [manager fileExistsAtPath:legacyPath]) {
         if (![manager copyItemAtPath:legacyPath toPath:_savePath error:error]) return NO;
     }
@@ -470,6 +594,77 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     return YES;
 }
 
+- (BOOL)configureHardware:(brum_retro_hw_render_callback *)callback {
+    if (!callback) return NO;
+    BOOL supported = callback->context_type == BRUM_RETRO_HW_CONTEXT_OPENGLES2 ||
+        callback->context_type == BRUM_RETRO_HW_CONTEXT_OPENGLES3 ||
+        callback->context_type == BRUM_RETRO_HW_CONTEXT_OPENGLES_VERSION;
+    if (!supported || callback->version_major > 3 || (callback->version_major == 3 && callback->version_minor > 0)) return NO;
+    _hardwareCallback = *callback;
+    _hardwareCallback.get_current_framebuffer = BrumCurrentFramebuffer;
+    _hardwareCallback.get_proc_address = BrumGetProcAddress;
+    callback->get_current_framebuffer = BrumCurrentFramebuffer;
+    callback->get_proc_address = BrumGetProcAddress;
+    _hardwarePending = YES;
+    return YES;
+}
+
+- (BOOL)initializeHardware:(NSError **)error {
+    if (!_hardwarePending || _hardwareInitialized) return YES;
+    EAGLRenderingAPI api = _hardwareCallback.context_type == BRUM_RETRO_HW_CONTEXT_OPENGLES2
+        ? kEAGLRenderingAPIOpenGLES2 : kEAGLRenderingAPIOpenGLES3;
+    _hardwareContext = [[EAGLContext alloc] initWithAPI:api];
+    if (!_hardwareContext || ![EAGLContext setCurrentContext:_hardwareContext]) {
+        if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:9 userInfo:@{NSLocalizedDescriptionKey: @"Este aparelho não conseguiu criar o contexto OpenGL ES exigido pelo núcleo."}];
+        return NO;
+    }
+    GLint maximumTextureSize = 0;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maximumTextureSize);
+    if (maximumTextureSize < _hardwareSurfaceSize) _hardwareSurfaceSize = maximumTextureSize;
+    if (_hardwareSurfaceSize < 1024) {
+        if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:10 userInfo:@{NSLocalizedDescriptionKey: @"A GPU não oferece uma superfície grande o suficiente para este núcleo."}];
+        return NO;
+    }
+    glGenFramebuffers(1, &_hardwareFramebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, _hardwareFramebuffer);
+    glGenTextures(1, &_hardwareColorTexture);
+    glBindTexture(GL_TEXTURE_2D, _hardwareColorTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, api == kEAGLRenderingAPIOpenGLES2 ? GL_RGBA : GL_RGBA8, _hardwareSurfaceSize, _hardwareSurfaceSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _hardwareColorTexture, 0);
+    if (_hardwareCallback.depth || _hardwareCallback.stencil) {
+        glGenRenderbuffers(1, &_hardwareDepthStencil);
+        glBindRenderbuffer(GL_RENDERBUFFER, _hardwareDepthStencil);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, _hardwareSurfaceSize, _hardwareSurfaceSize);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, _hardwareDepthStencil);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, _hardwareDepthStencil);
+    }
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:11 userInfo:@{NSLocalizedDescriptionKey: @"A GPU recusou a superfície gráfica do BRUM Core."}];
+        [self destroyHardware];
+        return NO;
+    }
+    _hardwareInitialized = YES;
+    if (_hardwareCallback.context_reset) _hardwareCallback.context_reset();
+    return YES;
+}
+
+- (void)destroyHardware {
+    if (_hardwareContext) [EAGLContext setCurrentContext:_hardwareContext];
+    if (_hardwareInitialized && _hardwareCallback.context_destroy) _hardwareCallback.context_destroy();
+    if (_hardwareDepthStencil) glDeleteRenderbuffers(1, &_hardwareDepthStencil);
+    if (_hardwareColorTexture) glDeleteTextures(1, &_hardwareColorTexture);
+    if (_hardwareFramebuffer) glDeleteFramebuffers(1, &_hardwareFramebuffer);
+    _hardwareDepthStencil = 0;
+    _hardwareColorTexture = 0;
+    _hardwareFramebuffer = 0;
+    _hardwareInitialized = NO;
+    _hardwarePending = NO;
+    if ([EAGLContext currentContext] == _hardwareContext) [EAGLContext setCurrentContext:nil];
+    _hardwareContext = nil;
+}
+
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.backgroundColor = UIColor.blackColor;
@@ -501,14 +696,55 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 
 - (void)applicationWillResignActive:(NSNotification *)notification {
     (void)notification;
-    if (_audioQueue) AudioQueuePause(_audioQueue);
-    os_unfair_lock_lock(&_audioLock); _audioRead = 0; _audioWrite = 0; _audioCount = 0; os_unfair_lock_unlock(&_audioLock);
-    [self persistSaveRAM];
+    _backgrounded = YES;
+    [self updatePauseState];
 }
 
 - (void)applicationDidBecomeActive:(NSNotification *)notification {
     (void)notification;
-    if (_stopped || !_audioQueue) return;
+    _backgrounded = NO;
+    [self updatePauseState];
+}
+
+- (BOOL)isPaused { return _paused; }
+
+- (BrumBackendCapabilities)capabilities {
+    if (!_gameLoaded || _stopped) return 0;
+    BrumBackendCapabilities result = BrumBackendVideo | BrumBackendController | BrumBackendFastForward;
+    if (_audioQueue) result |= BrumBackendAudio;
+    if (_screenManager.screens.size() > 1) result |= BrumBackendMultipleScreens;
+    for (const auto& screen : _screenManager.screens) if (screen.touch) result |= BrumBackendTouch;
+    if (_core.getMemoryData(BRUM_RETRO_MEMORY_SAVE_RAM) && _core.getMemorySize(BRUM_RETRO_MEMORY_SAVE_RAM)) result |= BrumBackendSave;
+    const size_t size = _core.serializeSize ? _core.serializeSize() : 0;
+    if (size && size <= 64 * 1024 * 1024 && _core.serialize && _core.unserialize) result |= BrumBackendSaveState;
+    return result;
+}
+
+- (void)pause {
+    _explicitlyPaused = YES;
+    [self updatePauseState];
+}
+
+- (void)resume {
+    _explicitlyPaused = NO;
+    [self updatePauseState];
+}
+
+- (void)updatePauseState {
+    if (_stopped || !_gameLoaded) return;
+    const BOOL shouldPause = _explicitlyPaused || _backgrounded || _audioInterrupted;
+    if (_paused == shouldPause) return;
+    _paused = shouldPause;
+    _displayLink.paused = shouldPause;
+    if (shouldPause) {
+        _input.clear();
+        _pointerPressed = NO;
+        if (_audioQueue) AudioQueuePause(_audioQueue);
+        os_unfair_lock_lock(&_audioLock); _audioRead = 0; _audioWrite = 0; _audioCount = 0; os_unfair_lock_unlock(&_audioLock);
+        [self persistSaveRAM];
+        return;
+    }
+    if (!_audioQueue) return;
     NSError *error = nil;
     if (![AVAudioSession.sharedInstance setActive:YES error:&error]) {
         [self showStateStatus:[NSString stringWithFormat:@"ÁUDIO INDISPONÍVEL: %@", error.localizedDescription] error:YES];
@@ -523,13 +759,13 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         [notification.userInfo[AVAudioSessionInterruptionTypeKey] unsignedIntegerValue]
     );
     if (type == AVAudioSessionInterruptionTypeBegan) {
-        if (_audioQueue) AudioQueuePause(_audioQueue);
+        _audioInterrupted = YES;
+        [self updatePauseState];
         return;
     }
-    AVAudioSessionInterruptionOptions options = static_cast<AVAudioSessionInterruptionOptions>(
-        [notification.userInfo[AVAudioSessionInterruptionOptionKey] unsignedIntegerValue]
-    );
-    if ((options & AVAudioSessionInterruptionOptionShouldResume) != 0) [self applicationDidBecomeActive:notification];
+    _audioInterrupted = NO;
+    // Foreground gameplay owns the audio session. Never clear a user/menu pause.
+    [self updatePauseState];
 }
 
 - (void)buildInterface {
@@ -682,8 +918,20 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 }
 
 - (void)screenTouch:(UILongPressGestureRecognizer *)gesture {
-    if (!_frameWidth || !_frameHeight) return;
+    if (_paused || !_frameWidth || !_frameHeight || !(self.capabilities & BrumBackendTouch)) {
+        _pointerPressed = NO;
+        return;
+    }
     CGPoint point = [gesture locationInView:_screen];
+    if (_screenManager.screens.size() > 1) {
+        const auto touch = brum::ScreenManager::hitTest({point.x, point.y}, _screenPlacements);
+        _pointerPressed = touch.pressed && (gesture.state == UIGestureRecognizerStateBegan || gesture.state == UIGestureRecognizerStateChanged);
+        _pointerX = (int16_t)lrint((touch.atlas.x * 2 - 1) * 32767);
+        _pointerY = (int16_t)lrint((touch.atlas.y * 2 - 1) * 32767);
+        // SkyEmu treats Y == 0 as pen-up, including the first lower-screen row.
+        if (_pointerPressed && [_coreID isEqualToString:@"skyemu"]) _pointerY = MAX(1, _pointerY);
+        return;
+    }
     CGSize bounds = _screen.bounds.size;
     CGFloat scaleX = bounds.width / (CGFloat)_frameWidth;
     CGFloat scaleY = bounds.height / (CGFloat)_frameHeight;
@@ -697,8 +945,87 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _pointerPressed = (gesture.state == UIGestureRecognizerStateBegan || gesture.state == UIGestureRecognizerStateChanged) && CGRectContainsPoint(target, point);
 }
 
-- (void)inputDown:(UIButton *)sender { if (sender.tag >= 0) _inputMask |= 1u << sender.tag; }
-- (void)inputUp:(UIButton *)sender { if (sender.tag >= 0) _inputMask &= ~(1u << sender.tag); }
+- (void)inputDown:(UIButton *)sender { if (!_paused && sender.tag >= 0) _input.set(brum::InputSource::virtualPad, (unsigned)sender.tag, true); }
+- (void)inputUp:(UIButton *)sender { if (sender.tag >= 0) _input.set(brum::InputSource::virtualPad, (unsigned)sender.tag, false); }
+
+- (void)presentFrame:(CGImageRef)image {
+    _screenManager.screens = brum::libretroScreens(_coreID.UTF8String, _frameWidth, _frameHeight);
+    if (_screenManager.screens.size() == 1) {
+        for (CALayer *layer in _screenLayers) layer.hidden = YES;
+        _screen.layer.contents = (__bridge id)image;
+        _screen.layer.contentsGravity = _screenFillsDisplay ? kCAGravityResizeAspectFill : kCAGravityResizeAspect;
+        return;
+    }
+    _screen.layer.contents = nil;
+    while (_screenLayers.count < _screenManager.screens.size()) {
+        CALayer *layer = [CALayer layer];
+        layer.magnificationFilter = kCAFilterNearest;
+        layer.contentsGravity = kCAGravityResize;
+        [_screen.layer addSublayer:layer];
+        [_screenLayers addObject:layer];
+    }
+    [self layoutScreens];
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    for (CALayer *layer in _screenLayers) layer.contents = (__bridge id)image;
+    [CATransaction commit];
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    [self layoutScreens];
+}
+
+- (void)layoutScreens {
+    if (_screenManager.screens.size() < 2) return;
+    const CGSize size = _screen.bounds.size;
+    _screenPlacements = _screenManager.place({0, 0, size.width, size.height});
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    for (CALayer *layer in _screenLayers) layer.hidden = YES;
+    for (NSUInteger i = 0; i < _screenPlacements.size() && i < _screenLayers.count; i++) {
+        CALayer *layer = _screenLayers[i];
+        const auto& p = _screenPlacements[i];
+        layer.hidden = NO;
+        layer.affineTransform = CGAffineTransformIdentity;
+        const BOOL rotated = p.quarterTurns % 2 != 0;
+        layer.bounds = CGRectMake(0, 0, rotated ? p.frame.height : p.frame.width, rotated ? p.frame.width : p.frame.height);
+        layer.position = CGPointMake(p.frame.x + p.frame.width / 2, p.frame.y + p.frame.height / 2);
+        layer.contentsRect = CGRectMake(p.screen.crop.x, p.screen.crop.y, p.screen.crop.width, p.screen.crop.height);
+        layer.affineTransform = CGAffineTransformMakeRotation(p.quarterTurns * M_PI_2);
+    }
+    [CATransaction commit];
+}
+
+- (void)showScreenMenu {
+    if (self.presentedViewController) return;
+    const BOOL wasPaused = _explicitlyPaused;
+    [self pause];
+    UIAlertController *menu = [UIAlertController alertControllerWithTitle:@"TELAS" message:nil preferredStyle:UIAlertControllerStyleActionSheet];
+    NSArray<NSString *> *titles = @[@"Superior em cima", @"Inferior em cima", @"Superior à esquerda", @"Inferior à esquerda", @"Somente superior", @"Somente inferior"];
+    for (NSUInteger i = 0; i < titles.count; i++) {
+        [menu addAction:[UIAlertAction actionWithTitle:titles[i] style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+            self->_screenManager.layout = static_cast<brum::Layout>(i);
+            self->_pointerPressed = NO;
+            [self layoutScreens];
+            if (!wasPaused) [self resume];
+        }]];
+    }
+    [menu addAction:[UIAlertAction actionWithTitle:@"Girar telas 90°" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+        self->_screenManager.quarterTurns = (self->_screenManager.quarterTurns + 1) % 4;
+        [self layoutScreens];
+        if (!wasPaused) [self resume];
+    }]];
+    [menu addAction:[UIAlertAction actionWithTitle:@"Alternar escala 75% / 100%" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+        self->_screenManager.scale = self->_screenManager.scale == 1 ? 0.75 : 1;
+        [self layoutScreens];
+        if (!wasPaused) [self resume];
+    }]];
+    [menu addAction:[UIAlertAction actionWithTitle:@"Voltar ao jogo" style:UIAlertActionStyleCancel handler:^(__unused UIAlertAction *action) { if (!wasPaused) [self resume]; }]];
+    menu.popoverPresentationController.sourceView = _displayModeButton;
+    menu.popoverPresentationController.sourceRect = _displayModeButton.bounds;
+    [self presentViewController:menu animated:YES completion:nil];
+}
 
 - (void)toggleFastForward {
     _fastForwardEnabled = !_fastForwardEnabled;
@@ -716,6 +1043,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 }
 
 - (void)toggleDisplayMode {
+    if (self.capabilities & BrumBackendMultipleScreens) { [self showScreenMenu]; return; }
     _screenFillsDisplay = !_screenFillsDisplay;
     [self updateDisplayModeButton];
 }
@@ -735,7 +1063,10 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 }
 
 - (void)showStateMenu {
-    if (!_gameLoaded || _stopped) return;
+    if (!_gameLoaded || _stopped || self.presentedViewController) return;
+    if (!(self.capabilities & BrumBackendSaveState)) { [self showStateStatus:@"ESTADO RÁPIDO INDISPONÍVEL" error:YES]; return; }
+    const BOOL wasPaused = _explicitlyPaused;
+    [self pause];
     UIAlertController *menu = [UIAlertController alertControllerWithTitle:@"ESTADOS RÁPIDOS"
                                                                    message:@"O save normal continua separado. Escolha um dos três slots locais."
                                                             preferredStyle:UIAlertControllerStyleActionSheet];
@@ -743,14 +1074,14 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         NSInteger selected = slot;
         [menu addAction:[UIAlertAction actionWithTitle:[NSString stringWithFormat:@"Salvar no slot %ld", (long)slot]
                                                  style:UIAlertActionStyleDefault
-                                               handler:^(__unused UIAlertAction *action) { [self saveStateAtSlot:selected]; }]];
+                                               handler:^(__unused UIAlertAction *action) { [self saveStateAtSlot:selected]; if (!wasPaused) [self resume]; }]];
         UIAlertAction *load = [UIAlertAction actionWithTitle:[NSString stringWithFormat:@"Carregar slot %ld", (long)slot]
                                                        style:UIAlertActionStyleDefault
-                                                     handler:^(__unused UIAlertAction *action) { [self loadStateAtSlot:selected]; }];
+                                                     handler:^(__unused UIAlertAction *action) { [self loadStateAtSlot:selected]; if (!wasPaused) [self resume]; }];
         load.enabled = [NSFileManager.defaultManager fileExistsAtPath:[self statePathForSlot:slot]];
         [menu addAction:load];
     }
-    [menu addAction:[UIAlertAction actionWithTitle:@"Cancelar" style:UIAlertActionStyleCancel handler:nil]];
+    [menu addAction:[UIAlertAction actionWithTitle:@"Cancelar" style:UIAlertActionStyleCancel handler:^(__unused UIAlertAction *action) { if (!wasPaused) [self resume]; }]];
     if (menu.popoverPresentationController) {
         menu.popoverPresentationController.sourceView = _stateButton;
         menu.popoverPresentationController.sourceRect = _stateButton.bounds;
@@ -808,6 +1139,12 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 }
 
 - (BOOL)startCore:(NSError **)error {
+    if (_gameLoaded) return YES;
+    if (_stopped || !_coreHandle) return NO;
+    if (BrumCurrentHost && BrumCurrentHost != self) {
+        if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:12 userInfo:@{NSLocalizedDescriptionKey: @"Encerre a sessão atual antes de abrir outro jogo."}];
+        return NO;
+    }
     BrumCurrentHost = self;
     _core.setEnvironment(BrumEnvironment);
     _core.setVideo(BrumVideo);
@@ -842,9 +1179,12 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         return NO;
     }
     _gameLoaded = YES;
+    if (![self initializeHardware:error]) return NO;
     [self restoreSaveRAM];
     brum_retro_system_av_info avInfo = {};
     _core.getAVInfo(&avInfo);
+    _screenManager.screens = brum::libretroScreens(_coreID.UTF8String, avInfo.geometry.base_width, avInfo.geometry.base_height);
+    _stateButton.enabled = (self.capabilities & BrumBackendSaveState) != 0;
     if (![self startAudio:avInfo.timing.sample_rate error:error]) return NO;
     _displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(runFrame)];
     if (@available(iOS 15.0, *)) {
@@ -898,7 +1238,8 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 }
 
 - (void)runFrame {
-    if (_stopped || !_gameLoaded) return;
+    if (_stopped || !_gameLoaded || _paused || _shutdownRequested) return;
+    if (_hardwareInitialized) [EAGLContext setCurrentContext:_hardwareContext];
     NSUInteger frameCount = _fastForwardEnabled ? 5 : 1;
     for (NSUInteger frame = 0; frame < frameCount; frame++) {
         _suppressVideo = frame + 1 < frameCount;
@@ -989,10 +1330,14 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 - (void)stopCore {
     if (_stopped) return;
     _stopped = YES;
+    _input.clear();
+    _pointerPressed = NO;
     [_displayLink invalidate]; _displayLink = nil;
     if (_audioQueue) { AudioQueueStop(_audioQueue, true); AudioQueueDispose(_audioQueue, true); _audioQueue = NULL; }
     [AVAudioSession.sharedInstance setActive:NO withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:nil];
     [self persistSaveRAM];
+    if (_hardwareInitialized) [EAGLContext setCurrentContext:_hardwareContext];
+    [self destroyHardware];
     if (_gameLoaded) { _core.unloadGame(); _gameLoaded = NO; }
     if (_coreInitialized) { _core.deinitialize(); _coreInitialized = NO; }
     if (BrumCurrentHost == self) BrumCurrentHost = nil;

@@ -43,7 +43,7 @@ enum PocketError: LocalizedError {
 }
 
 enum PocketRules {
-    static let extensions: Set<String> = ["gba", "gb", "gbc", "nes", "sfc", "smc", "n64", "z64", "v64", "nds", "sms", "gg", "md", "gen", "pce", "neo", "ws", "wsc", "chd", "pbp", "iso", "cso", "rvz", "cue", "m3u", "gdi", "wad", "zip"]
+    static let extensions: Set<String> = ["gba", "gb", "gbc", "nes", "sfc", "smc", "n64", "z64", "v64", "nds", "sms", "gg", "md", "gen", "smd", "32x", "pce", "neo", "ws", "wsc", "a26", "bin", "chd", "pbp", "iso", "cso", "rvz", "gcz", "cue", "m3u", "gdi", "wad", "zip", "3ds", "3dsx", "cci", "cxi"]
     static func safeFilename(_ value: String) -> Bool {
         !value.isEmpty && value != "." && value != ".." && !value.contains("/") && !value.contains("\\") && !value.contains("\0")
     }
@@ -284,6 +284,7 @@ actor PocketRAClient {
                 romURL: staged,
                 title: rom.title,
                 originalFilename: rom.filename,
+                expectedSystem: IntegratedEmulatorSupport.system(for: rom),
                 retroAchievementsGameID: Int(record.retroAchievementID) ?? 0
             )
         }.value

@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - "ios/**"
+      - "shared/brum-core/**"
       - "LICENSES/**"
       - "MOBILE-LICENSING.md"
       - ".github/workflows/build-ios-personal.yml"
@@ -20,6 +21,11 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+
+      - name: Validar componentes compartilhados
+        run: |
+          clang++ -std=c++17 -Wall -Wextra -Werror shared/brum-core/tests.cpp -o "$RUNNER_TEMP/brum-core-tests"
+          "$RUNNER_TEMP/brum-core-tests"
 
       - name: Validar projeto e testes do pacote
         working-directory: ios
