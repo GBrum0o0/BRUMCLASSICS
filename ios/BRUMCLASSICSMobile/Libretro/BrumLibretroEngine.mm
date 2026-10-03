@@ -519,12 +519,16 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 }
 
 - (void)audioSessionInterrupted:(NSNotification *)notification {
-    AVAudioSessionInterruptionType type = [notification.userInfo[AVAudioSessionInterruptionTypeKey] unsignedIntegerValue];
+    AVAudioSessionInterruptionType type = static_cast<AVAudioSessionInterruptionType>(
+        [notification.userInfo[AVAudioSessionInterruptionTypeKey] unsignedIntegerValue]
+    );
     if (type == AVAudioSessionInterruptionTypeBegan) {
         if (_audioQueue) AudioQueuePause(_audioQueue);
         return;
     }
-    AVAudioSessionInterruptionOptions options = [notification.userInfo[AVAudioSessionInterruptionOptionKey] unsignedIntegerValue];
+    AVAudioSessionInterruptionOptions options = static_cast<AVAudioSessionInterruptionOptions>(
+        [notification.userInfo[AVAudioSessionInterruptionOptionKey] unsignedIntegerValue]
+    );
     if ((options & AVAudioSessionInterruptionOptionShouldResume) != 0) [self applicationDidBecomeActive:notification];
 }
 
