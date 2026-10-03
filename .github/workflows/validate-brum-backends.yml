@@ -48,8 +48,9 @@ jobs:
           # These revisions vendor their build dependencies. Some include stale
           # gnulib gitlinks without .gitmodules, which are not needed to compile.
           IOSSDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          EXTRA=()
+          EXTRA=(DEBUG=0)
           if [ "${{ matrix.core }}" = mupen64plus-next ]; then
+            git -C "$RUNNER_TEMP/core" apply --unidiff-zero "$GITHUB_WORKSPACE/ios/patches/mupen64-ios-libpng.patch"
             # GLES GLideN64 + HLE RSP; no Vulkan/parallel JIT path for sideload.
             EXTRA=(HAVE_PARALLEL_RSP=0 HAVE_PARALLEL_RDP=0 HAVE_THR_AL=0 LLE=0 WITH_DYNAREC=)
           fi
@@ -148,6 +149,7 @@ jobs:
             flycast)
               cmake -S "$SOURCE" -B "$BUILD" "${COMMON_FLAGS[@]}" \
                 -DIOS=ON -DLIBRETRO=ON -DUSE_VULKAN=OFF \
+                -DCMAKE_C_FLAGS=-DIOS=1 -DCMAKE_CXX_FLAGS=-DIOS=1 \
                 -DUSE_HOST_LIBZIP=OFF -DUSE_HOST_GLSLANG=OFF -DENABLE_CTEST=OFF
               ;;
             citra)
