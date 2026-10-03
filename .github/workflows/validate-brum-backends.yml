@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: brum-backends-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-classic-candidates:
     name: Compilar ${{ matrix.core }} para iOS
@@ -163,6 +167,7 @@ jobs:
               cp "$MOLTENVK/MoltenVK/LICENSE" "$OUT/MoltenVK-LICENSE.txt"
               cmake -S "$SOURCE" -B "$BUILD" "${COMMON_FLAGS[@]}" \
                 -DIOS=ON -DENABLE_LIBRETRO=ON -DENABLE_QT=OFF \
+                -DENABLE_OPT=OFF \
                 -DUSE_SYSTEM_MOLTENVK=ON \
                 "-DMOLTENVK_LIBRARY=$MOLTENVK/MoltenVK/MoltenVK/static/MoltenVK.xcframework/ios-arm64/libMoltenVK.a" \
                 '-DCMAKE_SHARED_LINKER_FLAGS=-framework Metal -framework QuartzCore' \

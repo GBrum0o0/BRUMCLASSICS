@@ -129,7 +129,10 @@ PC/celular são passos futuros, sem necessidade de mudar os cálculos de layout.
 - **Solução:** primeiro fixar MoltenVK 1.2.8, SHA-256 e slice estático ios-arm64;
   depois adaptar a negociação gráfica. Não reduzir artificialmente a versão
   solicitada nem anunciar que o host oferece uma API que não implementa.
-- **Status:** dependência corrigida na receita; renderer ainda em desenvolvimento.
+- **Status:** a segunda tentativa encontrou o slice MoltenVK e avançou até
+  glslang, cujo otimizador exigia SPIRV-Tools ausente. A receita desliga apenas
+  esse otimizador (`ENABLE_OPT=OFF`), preservando a compilação de shaders.
+  Renderer ainda em desenvolvimento.
 
 ### GameCube: arquitetura não detectada
 
