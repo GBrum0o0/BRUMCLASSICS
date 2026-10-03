@@ -45,9 +45,15 @@ jobs:
           set -euo pipefail
           git clone --filter=blob:none "https://github.com/${{ matrix.repo }}.git" "$RUNNER_TEMP/core"
           git -C "$RUNNER_TEMP/core" checkout --detach "${{ matrix.commit }}"
-          git -C "$RUNNER_TEMP/core" submodule update --init --recursive --depth 1
+          # These revisions vendor their build dependencies. Some include stale
+          # gnulib gitlinks without .gitmodules, which are not needed to compile.
           IOSSDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          make -C "$RUNNER_TEMP/core" platform=ios-arm64 IOSSDK="$IOSSDK" -j"$(sysctl -n hw.ncpu)"
+          EXTRA=()
+          if [ "${{ matrix.core }}" = mupen64plus-next ]; then
+            # GLES GLideN64 + HLE RSP; no Vulkan/parallel JIT path for sideload.
+            EXTRA=(HAVE_PARALLEL_RSP=0 HAVE_PARALLEL_RDP=0 HAVE_THR_AL=0 LLE=0 WITH_DYNAREC=)
+          fi
+          make -C "$RUNNER_TEMP/core" platform=ios-arm64 IOSSDK="$IOSSDK" "${EXTRA[@]}" -j"$(sysctl -n hw.ncpu)"
           mkdir -p candidate
           cp "$RUNNER_TEMP/core/${{ matrix.library }}" candidate/
           cp "$RUNNER_TEMP/core/${{ matrix.license }}" "candidate/${{ matrix.core }}-LICENSE.txt"
@@ -124,6 +130,8 @@ jobs:
           COMMON_FLAGS=(
             -G Xcode
             -DCMAKE_SYSTEM_NAME=iOS
+            -DCMAKE_SYSTEM_PROCESSOR=arm64
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
             -DCMAKE_OSX_SYSROOT=iphoneos
             -DCMAKE_OSX_ARCHITECTURES=arm64
             -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0
@@ -143,14 +151,25 @@ jobs:
                 -DUSE_HOST_LIBZIP=OFF -DUSE_HOST_GLSLANG=OFF -DENABLE_CTEST=OFF
               ;;
             citra)
+              # Upstream searches a legacy dylib directory; pin the actual iOS
+              # XCFramework slice instead of downloading a changing "latest".
+              MOLTENVK="$RUNNER_TEMP/moltenvk"
+              mkdir -p "$MOLTENVK"
+              curl --fail --location --retry 3 https://github.com/KhronosGroup/MoltenVK/releases/download/v1.2.8/MoltenVK-ios.tar -o "$MOLTENVK/ios.tar"
+              echo "778980f84f1afe7f5058df469fe9715d767a9891afb5497dd90ff29a7fa384a1  $MOLTENVK/ios.tar" | shasum -a 256 -c -
+              tar -xf "$MOLTENVK/ios.tar" -C "$MOLTENVK"
+              cp "$MOLTENVK/MoltenVK/LICENSE" "$OUT/MoltenVK-LICENSE.txt"
               cmake -S "$SOURCE" -B "$BUILD" "${COMMON_FLAGS[@]}" \
                 -DIOS=ON -DENABLE_LIBRETRO=ON -DENABLE_QT=OFF \
+                -DUSE_SYSTEM_MOLTENVK=ON \
+                "-DMOLTENVK_LIBRARY=$MOLTENVK/MoltenVK/MoltenVK/static/MoltenVK.xcframework/ios-arm64/libMoltenVK.a" \
+                '-DCMAKE_SHARED_LINKER_FLAGS=-framework Metal -framework QuartzCore' \
                 -DENABLE_WEB_SERVICE=OFF -DENABLE_SCRIPTING=OFF -DENABLE_LTO=OFF \
                 -DCITRA_USE_PRECOMPILED_HEADERS=OFF -DCITRA_WARNINGS_AS_ERRORS=OFF
               ;;
             dolphin)
               cmake -S "$SOURCE" -B "$BUILD" "${COMMON_FLAGS[@]}" \
-                -DIOS=ON -DLIBRETRO=ON -DENABLE_LTO=OFF -DENABLE_VULKAN=OFF
+                -DIOS=ON -DLIBRETRO=ON -DENABLE_LTO=OFF -DENABLE_VULKAN=OFF -DENABLE_GENERIC=ON
               ;;
           esac
 

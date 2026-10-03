@@ -159,6 +159,7 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
 - (void)presentFrame:(CGImageRef)image;
 - (void)layoutScreens;
 - (void)showScreenMenu;
+- (void)updatePauseState;
 - (BOOL)configureHardware:(brum_retro_hw_render_callback *)callback;
 - (BOOL)initializeHardware:(NSError **)error;
 - (void)destroyHardware;
@@ -487,7 +488,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _audioLock = OS_UNFAIR_LOCK_INIT;
     _audioCapacity = 262144;
     _audioRing = (int16_t *)calloc(_audioCapacity, sizeof(int16_t));
-    // 2048x2048 covers native output from the integrated GLES cores while
+    // 2048x2048 bounds the experimental GLES adapter's native output while
     // avoiding a 128+ MB color/depth allocation that can terminate the app.
     _hardwareSurfaceSize = 2048;
     NSError *startupError = nil;
@@ -676,6 +677,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     }
     NSError *error = nil;
     if (![self startCore:&error]) {
+        [self stopCore];
         _statusLabel.text = error.localizedDescription ?: @"Não foi possível iniciar o jogo.";
         _statusLabel.textColor = UIColor.systemRedColor;
     } else {
@@ -945,8 +947,17 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _pointerPressed = (gesture.state == UIGestureRecognizerStateBegan || gesture.state == UIGestureRecognizerStateChanged) && CGRectContainsPoint(target, point);
 }
 
-- (void)inputDown:(UIButton *)sender { if (!_paused && sender.tag >= 0) _input.set(brum::InputSource::virtualPad, (unsigned)sender.tag, true); }
-- (void)inputUp:(UIButton *)sender { if (sender.tag >= 0) _input.set(brum::InputSource::virtualPad, (unsigned)sender.tag, false); }
+- (void)setButton:(NSUInteger)button source:(BrumInputSource)source pressed:(BOOL)pressed {
+    if (button >= 16 || source > BrumInputRemote || (_paused && pressed)) return;
+    _input.set(static_cast<brum::InputSource>(source), (unsigned)button, pressed);
+}
+
+- (void)releaseInputSource:(BrumInputSource)source {
+    if (source <= BrumInputRemote) _input.release(static_cast<brum::InputSource>(source));
+}
+
+- (void)inputDown:(UIButton *)sender { if (sender.tag >= 0) [self setButton:(NSUInteger)sender.tag source:BrumInputVirtualPad pressed:YES]; }
+- (void)inputUp:(UIButton *)sender { if (sender.tag >= 0) [self setButton:(NSUInteger)sender.tag source:BrumInputVirtualPad pressed:NO]; }
 
 - (void)presentFrame:(CGImageRef)image {
     _screenManager.screens = brum::libretroScreens(_coreID.UTF8String, _frameWidth, _frameHeight);

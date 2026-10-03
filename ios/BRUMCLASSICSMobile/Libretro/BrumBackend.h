@@ -1,6 +1,9 @@
 #import <Foundation/Foundation.h>
 
 NS_ASSUME_NONNULL_BEGIN
+typedef NS_ENUM(NSUInteger, BrumInputSource) {
+    BrumInputVirtualPad, BrumInputController, BrumInputKeyboard, BrumInputRemote,
+};
 typedef NS_OPTIONS(NSUInteger, BrumBackendCapabilities) {
     BrumBackendVideo = 1 << 0,
     BrumBackendAudio = 1 << 1,
@@ -27,6 +30,10 @@ typedef NS_OPTIONS(NSUInteger, BrumBackendCapabilities) {
 - (void)pause;
 - (void)resume;
 - (void)stopCore;
+// Standard 16-button joypad order. Call on the session thread. Releasing one
+// source preserves the others; keyboard/remote transports are not yet wired.
+- (void)setButton:(NSUInteger)button source:(BrumInputSource)source pressed:(BOOL)pressed;
+- (void)releaseInputSource:(BrumInputSource)source;
 - (void)persistSaveRAM;
 - (void)saveStateAtSlot:(NSInteger)slot;
 - (void)loadStateAtSlot:(NSInteger)slot;
