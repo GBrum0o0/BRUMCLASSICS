@@ -101,26 +101,26 @@ jobs:
             android/app/src/main/jniLibs/arm64-v8a/play_libretro_android.so
           cp "$CORE_DIR/License.txt" android/app/src/main/assets/core-licenses/Play-LICENSE.txt
           "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" --dyn-syms \
-            android/app/src/main/jniLibs/arm64-v8a/play_libretro_android.so | grep -q 'retro_load_game'
+            android/app/src/main/jniLibs/arm64-v8a/play_libretro_android.so | grep 'retro_load_game' >/dev/null
       - name: Compile Android application
         working-directory: android
         run: ./gradlew :app:assembleDebug --no-daemon
       - name: Verify integrated native core
         shell: bash
         run: |
-          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libbrumcore.so'
-          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libmgba_libretro.so'
-          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libskyemu_libretro.so'
-          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libgeolith_libretro.so'
-          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libgearsystem_libretro.so'
-          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libnestopia_libretro.so'
-          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libmednafen_pce_fast_libretro.so'
-          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libmednafen_wswan_libretro.so'
-          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libbsnes_mercury_performance_libretro.so'
-          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/play_libretro_android.so'
-          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q 'assets/GPL-3.0.txt'
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/libbrumcore.so' >/dev/null
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/libmgba_libretro.so' >/dev/null
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/libskyemu_libretro.so' >/dev/null
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/libgeolith_libretro.so' >/dev/null
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/libgearsystem_libretro.so' >/dev/null
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/libnestopia_libretro.so' >/dev/null
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/libmednafen_pce_fast_libretro.so' >/dev/null
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/libmednafen_wswan_libretro.so' >/dev/null
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/libbsnes_mercury_performance_libretro.so' >/dev/null
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/play_libretro_android.so' >/dev/null
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/GPL-3.0.txt' >/dev/null
           for license in mGBA SkyEmu Geolith Play Gearsystem Nestopia Beetle-PCE-Fast Beetle-WonderSwan bsnes-mercury; do
-            unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -q "assets/core-licenses/${license}-LICENSE.txt"
+            unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep "assets/core-licenses/${license}-LICENSE.txt" >/dev/null
           done
       - name: Run contract tests
         shell: bash
