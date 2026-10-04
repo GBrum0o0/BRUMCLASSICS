@@ -102,5 +102,18 @@ int main() {
     check(!input.pressed(0) && !input.pressed(16));
     input.clear();
     for (unsigned i = 0; i < 16; ++i) check(!input.pressed(i));
+    input.setAxis(InputSource::controller, 0, 0, 2);
+    check(input.analog(0, 0) == 32767);
+    input.setAxis(InputSource::virtualPad, 0, 0, -0.5);
+    input.release(InputSource::controller);
+    check(input.analog(0, 0) == -16384);
+    input.setAxis(InputSource::controller, 1, 1, -2);
+    check(input.analog(1, 1) == -32767);
+    input.setAxis(InputSource::controller, 1, 1, std::numeric_limits<double>::quiet_NaN());
+    check(input.analog(1, 1) == 0);
+    input.setAxis(InputSource::count, 0, 0, 1);
+    check(input.analog(2, 0) == 0 && input.analog(0, 2) == 0);
+    input.clear();
+    check(input.analog(0, 0) == 0);
     std::cout << "BRUM screen/input: " << checks << " checks passed\n";
 }

@@ -66,8 +66,11 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(CoreRegistry.candidate(for: .gameCube)?.id, "dolphin")
         XCTAssertEqual(CoreRegistry.candidate(for: .playStation2)?.id, "play")
         for candidate in CoreRegistry.candidates {
-            for system in candidate.supportedSystems { XCTAssertNil(CoreRegistry.core(for: system)) }
+            for system in candidate.supportedSystems { XCTAssertNil(CoreRegistry.core(for: system, includeExperimental: false)) }
         }
+        XCTAssertEqual(CoreRegistry.core(for: .playStation, includeExperimental: true)?.id, "beetle-psx")
+        XCTAssertEqual(CoreRegistry.core(for: .atari2600, includeExperimental: true)?.id, "stella2014")
+        XCTAssertNil(CoreRegistry.core(for: .nintendo64, includeExperimental: true))
         XCTAssertEqual(EmulatedSystemID.nintendo64.retroAchievementsConsoleID, 2)
         XCTAssertEqual(EmulatedSystemID.playStation.retroAchievementsConsoleID, 12)
         XCTAssertEqual(EmulatedSystemID.playStationPortable.retroAchievementsConsoleID, 41)
@@ -253,6 +256,12 @@ final class PocketTests: XCTestCase {
         try Data("disc.cue\n".utf8).write(to: playlist)
         let staged = try ROMExportStager.stageDiscSet(source: playlist, filename: "game.m3u", root: output, id: UUID())
         XCTAssertEqual(try Data(contentsOf: staged.deletingLastPathComponent().appendingPathComponent("track 01.bin")), Data([1, 2, 3]))
+        let firstIdentity = try ROMContentInspector.inspect(url: playlist, filename: "game.m3u", expectedSystem: .playStation)
+        try Data([4, 5, 6]).write(to: track)
+        let secondIdentity = try ROMContentInspector.inspect(url: playlist, filename: "game.m3u", expectedSystem: .playStation)
+        XCTAssertNotEqual(firstIdentity.contentSHA256, secondIdentity.contentSHA256)
+        try Data("game.m3u\n".utf8).write(to: playlist)
+        XCTAssertThrowsError(try ROMExportStager.contentFiles(for: playlist))
         for reference in ["../outside.bin", "missing.bin"] {
             try Data("FILE \"\(reference)\" BINARY\n".utf8).write(to: cue)
             let id = UUID()

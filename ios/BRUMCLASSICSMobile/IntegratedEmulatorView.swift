@@ -6,7 +6,7 @@ enum IntegratedEmulatorSupport {
     }
 
     static func core(for rom: ROMFolderGame) -> CoreDescriptor? {
-        system(for: rom).flatMap(CoreRegistry.core(for:))
+        system(for: rom).flatMap { CoreRegistry.core(for: $0) }
     }
 
     static func system(for rom: ROMFolderGame) -> EmulatedSystemID? {
@@ -54,7 +54,8 @@ enum IntegratedEmulatorSupport {
     }
 
     static func routeLabel(_ rom: ROMFolderGame) -> String {
-        core(for: rom) != nil ? "JOGAR · BRUM CORE" : "JOGAR · RETROARCH"
+        guard let core = core(for: rom) else { return "JOGAR · RETROARCH" }
+        return CoreRegistry.experimental.contains(core) ? "TESTAR · BRUM CORE" : "JOGAR · BRUM CORE"
     }
 }
 

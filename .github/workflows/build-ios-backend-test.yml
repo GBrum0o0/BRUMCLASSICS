@@ -1,0 +1,20 @@
+name: Build iOS backend test IPA
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/brum-backends]
+    paths:
+      - ios/**
+      - shared/brum-core/**
+      - .github/workflows/build-ios-personal.yml
+      - .github/workflows/build-ios-backend-test.yml
+permissions:
+  contents: write
+concurrency:
+  group: brum-test-ipa-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test-ipa:
+    uses: ./.github/workflows/build-ios-personal.yml
+    with:
+      experimental: true

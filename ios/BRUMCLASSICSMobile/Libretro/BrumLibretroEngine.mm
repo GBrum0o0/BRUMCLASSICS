@@ -410,11 +410,25 @@ static void BrumInputPoll(void) {
         pad.leftShoulder, pad.rightShoulder, pad.leftTrigger, pad.rightTrigger];
     for (NSUInteger i = 0; i < buttons.count; i++) host->_input.set(brum::InputSource::controller, (unsigned)i, buttons[i].isPressed);
     host->_input.set(brum::InputSource::controller, 2, pad.buttonOptions.isPressed);
+    if ([host->_emulatedSystemID isEqualToString:@"psx"]) {
+        host->_input.set(brum::InputSource::controller, 0, pad.buttonA.isPressed);
+        host->_input.set(brum::InputSource::controller, 8, pad.buttonB.isPressed);
+        host->_input.set(brum::InputSource::controller, 1, pad.buttonX.isPressed);
+        host->_input.set(brum::InputSource::controller, 9, pad.buttonY.isPressed);
+    }
+    host->_input.setAxis(brum::InputSource::controller, 0, 0, pad.leftThumbstick.xAxis.value);
+    host->_input.setAxis(brum::InputSource::controller, 0, 1, -pad.leftThumbstick.yAxis.value);
+    host->_input.setAxis(brum::InputSource::controller, 1, 0, pad.rightThumbstick.xAxis.value);
+    host->_input.setAxis(brum::InputSource::controller, 1, 1, -pad.rightThumbstick.yAxis.value);
+    host->_input.set(brum::InputSource::controller, 14, pad.leftThumbstickButton.isPressed);
+    host->_input.set(brum::InputSource::controller, 15, pad.rightThumbstickButton.isPressed);
 }
 
 static int16_t BrumInputState(unsigned port, unsigned device, unsigned index, unsigned identifier) {
     BrumLibretroViewController *host = BrumCurrentHost;
-    if (!host || port != 0 || index != 0) return 0;
+    if (!host || port != 0 || host->_paused) return 0;
+    if (device == BRUM_RETRO_DEVICE_ANALOG) return host->_input.analog(index, identifier);
+    if (index != 0) return 0;
     if (device == BRUM_RETRO_DEVICE_POINTER) {
         if (identifier == BRUM_RETRO_DEVICE_ID_POINTER_X) return host->_pointerX;
         if (identifier == BRUM_RETRO_DEVICE_ID_POINTER_Y) return host->_pointerY;
@@ -835,11 +849,24 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     ]];
     UIButton *leftShoulder = [self controlButton:@"L" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_L];
     UIButton *rightShoulder = [self controlButton:@"R" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_R];
+    [self.view addSubview:leftShoulder]; [self.view addSubview:rightShoulder];
+    if ([_emulatedSystemID isEqualToString:@"psx"]) {
+        [leftShoulder setTitle:@"L1" forState:UIControlStateNormal];
+        [rightShoulder setTitle:@"R1" forState:UIControlStateNormal];
+        UIButton *l2 = [self controlButton:@"L2" identifier:12];
+        UIButton *r2 = [self controlButton:@"R2" identifier:13];
+        [self.view addSubview:l2]; [self.view addSubview:r2];
+        [NSLayoutConstraint activateConstraints:@[
+            [l2.leadingAnchor constraintEqualToAnchor:leftShoulder.trailingAnchor constant:8],
+            [l2.centerYAnchor constraintEqualToAnchor:leftShoulder.centerYAnchor],
+            [r2.trailingAnchor constraintEqualToAnchor:rightShoulder.leadingAnchor constant:-8],
+            [r2.centerYAnchor constraintEqualToAnchor:rightShoulder.centerYAnchor]
+        ]];
+    }
     menu.translatesAutoresizingMaskIntoConstraints = NO;
     menu.axis = UILayoutConstraintAxisHorizontal;
     menu.spacing = 10;
     [self.view addSubview:up]; [self.view addSubview:actions]; [self.view addSubview:menu];
-    [self.view addSubview:leftShoulder]; [self.view addSubview:rightShoulder];
 
     UILayoutGuide *safe = self.view.safeAreaLayoutGuide;
     [NSLayoutConstraint activateConstraints:@[
@@ -910,6 +937,12 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     UIButton *x = [self controlButton:@"X" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_X];
     UIButton *b = [self controlButton:@"B" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_B];
     UIButton *a = [self controlButton:@"A" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_A];
+    if ([_emulatedSystemID isEqualToString:@"psx"]) {
+        [y setTitle:@"□" forState:UIControlStateNormal];
+        [x setTitle:@"△" forState:UIControlStateNormal];
+        [b setTitle:@"×" forState:UIControlStateNormal];
+        [a setTitle:@"○" forState:UIControlStateNormal];
+    }
     for (UIButton *button in @[y, x, b, a]) { button.layer.cornerRadius = 26; [button.widthAnchor constraintEqualToConstant:52].active = YES; [button.heightAnchor constraintEqualToConstant:52].active = YES; }
     UIStackView *top = [[UIStackView alloc] initWithArrangedSubviews:@[y, x]];
     UIStackView *bottom = [[UIStackView alloc] initWithArrangedSubviews:@[b, a]];
@@ -954,6 +987,11 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 
 - (void)releaseInputSource:(BrumInputSource)source {
     if (source <= BrumInputRemote) _input.release(static_cast<brum::InputSource>(source));
+}
+
+- (void)setAnalogStick:(NSUInteger)stick axis:(NSUInteger)axis value:(double)value source:(BrumInputSource)source {
+    if (_paused || _stopped || source > BrumInputRemote || stick > 1 || axis > 1) return;
+    _input.setAxis(static_cast<brum::InputSource>(source), (unsigned)stick, (unsigned)axis, value);
 }
 
 - (void)inputDown:(UIButton *)sender { if (sender.tag >= 0) [self setButton:(NSUInteger)sender.tag source:BrumInputVirtualPad pressed:YES]; }

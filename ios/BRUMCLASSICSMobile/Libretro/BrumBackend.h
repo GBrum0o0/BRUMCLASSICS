@@ -34,6 +34,7 @@ typedef NS_OPTIONS(NSUInteger, BrumBackendCapabilities) {
 // source preserves the others; keyboard/remote transports are not yet wired.
 - (void)setButton:(NSUInteger)button source:(BrumInputSource)source pressed:(BOOL)pressed;
 - (void)releaseInputSource:(BrumInputSource)source;
+- (void)setAnalogStick:(NSUInteger)stick axis:(NSUInteger)axis value:(double)value source:(BrumInputSource)source;
 - (void)persistSaveRAM;
 - (void)saveStateAtSlot:(NSInteger)slot;
 - (void)loadStateAtSlot:(NSInteger)slot;

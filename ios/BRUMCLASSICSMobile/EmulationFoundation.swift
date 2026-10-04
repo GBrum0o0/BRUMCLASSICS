@@ -221,13 +221,17 @@ enum CoreRegistry {
     // while new engines pass independent builds and device acceptance tests.
     static let all = [mgba, skyEmu, geolith, gearsystem, nestopia, beetlePCEFast, bsnesMercury, beetleWonderSwan]
     static let candidates = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, ppsspp, flycast, citra, dolphin, play]
+    static let experimental = [beetlePSX, stella2014]
+    static var experimentalBuild: Bool {
+        Bundle.main.object(forInfoDictionaryKey: "BRUMExperimentalBackends") as? Bool == true
+    }
 
     static func candidate(for system: EmulatedSystemID) -> CoreDescriptor? {
         candidates.first { $0.supportedSystems.contains(system) }
     }
 
-    static func core(for system: EmulatedSystemID) -> CoreDescriptor? {
-        all.first { $0.supportedSystems.contains(system) }
+    static func core(for system: EmulatedSystemID, includeExperimental: Bool = experimentalBuild) -> CoreDescriptor? {
+        (all + (includeExperimental ? experimental : [])).first { $0.supportedSystems.contains(system) }
     }
 }
 
@@ -270,6 +274,20 @@ enum ROMContentInspector {
         }
         guard !header.isEmpty else {
             throw PocketError.message("A ROM está vazia e não pode ser identificada.")
+        }
+
+        if ["cue", "m3u", "gdi"].contains(url.pathExtension.lowercased()) {
+            // Versioned disc-set hash; cartridge identities remain unchanged.
+            var discHasher = SHA256()
+            discHasher.update(data: Data("BRUM-DISC-SET-v1\0".utf8))
+            for file in try ROMExportStager.contentFiles(for: url) {
+                let input = try FileHandle(forReadingFrom: file)
+                defer { try? input.close() }
+                var fileHasher = SHA256()
+                while let chunk = try input.read(upToCount: 1_048_576), !chunk.isEmpty { fileHasher.update(data: chunk) }
+                discHasher.update(data: Data(fileHasher.finalize()))
+            }
+            hasher = discHasher
         }
 
         let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()

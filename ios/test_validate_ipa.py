@@ -11,7 +11,8 @@ class PackageValidationTests(unittest.TestCase):
     def fixture(self, folder, *, executable="BRUMCLASSICSMobile", include_binary=True,
                 app="BRUMCLASSICSMobile", cpu=0x0100000C, executable_mode=True, include_core=True,
                 include_skyemu=True, include_geolith=True, include_gearsystem=True,
-                include_nestopia=True, include_beetle_pce=True, include_beetle_wswan=True, include_bsnes=True, include_licenses=True):
+                include_nestopia=True, include_beetle_pce=True, include_beetle_wswan=True, include_bsnes=True, include_licenses=True,
+                experimental=False, include_psx=True, include_stella=True, candidate_cpu=0x0100000C, candidate_licenses=True):
         path = Path(folder) / "test.ipa"
         root = f"Payload/{app}.app/"
         info = {"CFBundleIdentifier": "com.brumclassics.mobile.ios",
@@ -19,8 +20,21 @@ class PackageValidationTests(unittest.TestCase):
                 "CFBundleSupportedPlatforms": ["iPhoneOS"]}
         if executable is not None:
             info["CFBundleExecutable"] = executable
+        info["BRUMExperimentalBackends"] = experimental
         with zipfile.ZipFile(path, "w") as archive:
             archive.writestr(root + "Info.plist", plistlib.dumps(info))
+            if experimental is True:
+                for enabled, filename, license_name in [
+                    (include_psx, "mednafen_psx_libretro_ios.dylib", "Beetle-PSX-LICENSE.txt"),
+                    (include_stella, "stella2014_libretro_ios.dylib", "Stella2014-LICENSE.txt"),
+                ]:
+                    if enabled:
+                        entry = zipfile.ZipInfo(root + "Frameworks/" + filename)
+                        entry.create_system = 3
+                        entry.external_attr = (stat.S_IFREG | 0o755) << 16
+                        archive.writestr(entry, struct.pack("<IIIIIIII", 0xFEEDFACF, candidate_cpu, 0, 6, 0, 0, 0, 0))
+                    if candidate_licenses:
+                        archive.writestr(root + "Frameworks/" + license_name, "license fixture " * 100)
             if include_binary:
                 entry = zipfile.ZipInfo(root + "BRUMCLASSICSMobile")
                 entry.create_system = 3
@@ -81,6 +95,24 @@ class PackageValidationTests(unittest.TestCase):
     def test_valid_package(self):
         with tempfile.TemporaryDirectory() as folder:
             self.assertTrue(validate_ipa(self.fixture(folder), "0.2.1")["ok"])
+
+    def test_experimental_package_requires_both_candidates(self):
+        with tempfile.TemporaryDirectory() as folder:
+            result = validate_ipa(self.fixture(folder, experimental=True))
+            self.assertTrue(result["experimentalBackends"])
+            self.assertEqual(len(result["integratedCores"]), 10)
+            for option in ["include_psx", "include_stella"]:
+                with self.assertRaisesRegex(ValueError, "core is absent"):
+                    validate_ipa(self.fixture(folder, experimental=True, **{option: False}))
+
+    def test_experimental_package_rejects_wrong_cpu_and_missing_license(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaisesRegex(ValueError, "arm64"):
+                validate_ipa(self.fixture(folder, experimental=True, candidate_cpu=0x01000007))
+            with self.assertRaisesRegex(ValueError, "license is absent"):
+                validate_ipa(self.fixture(folder, experimental=True, candidate_licenses=False))
+            with self.assertRaisesRegex(ValueError, "Invalid experimental"):
+                validate_ipa(self.fixture(folder, experimental="true"))
 
     def test_rejects_missing_executable_key(self):
         with tempfile.TemporaryDirectory() as folder:

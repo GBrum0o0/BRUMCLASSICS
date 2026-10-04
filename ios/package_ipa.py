@@ -18,7 +18,8 @@ if not executable or not (app / executable).is_file():
     raise SystemExit("CFBundleExecutable does not resolve to a file")
 version = info["CFBundleShortVersionString"]
 output.mkdir(parents=True, exist_ok=True)
-ipa = output / f"BRUMCLASSICS-MOVEL-IOS-{version}.ipa"
+suffix = "-BACKENDS-TESTE" if info.get("BRUMExperimentalBackends") is True else ""
+ipa = output / f"BRUMCLASSICS-MOVEL-IOS-{version}{suffix}.ipa"
 with zipfile.ZipFile(ipa, "w", zipfile.ZIP_DEFLATED) as archive:
     for file in sorted(app.rglob("*")):
         if file.is_symlink():

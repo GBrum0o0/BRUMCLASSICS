@@ -170,9 +170,9 @@ enum ROMExportStager {
         }
     }
 
-    private static func copyReferences(from descriptor: URL, to destination: URL, visited: inout Set<String>) throws {
+    private static func references(in descriptor: URL) throws -> [String] {
         let ext = descriptor.pathExtension.lowercased()
-        guard ["cue", "m3u", "gdi"].contains(ext) else { return }
+        guard ["cue", "m3u", "gdi"].contains(ext) else { return [] }
         let text = try CoordinatedFileAccess.read(descriptor) { url in
             let values = try url.resourceValues(forKeys: [.fileSizeKey])
             guard let size = values.fileSize, size > 0, size <= 1_048_576 else {
@@ -198,11 +198,48 @@ enum ROMExportStager {
                 return nil
             }
         }
+        guard !references.isEmpty else { throw PocketError.message("O descritor não contém faixas ou discos.") }
         for reference in references {
             let name = (reference as NSString).lastPathComponent
             guard name == reference, PocketRules.safeFilename(name) else {
                 throw PocketError.message("O descritor de disco contém um caminho externo não permitido: \(reference)")
             }
+        }
+        return references
+    }
+
+    // Ordered dependency traversal for disc identity. Include track bytes, not
+    // just the often-identical CUE text, and reject cycles/deep playlists.
+    static func contentFiles(for source: URL) throws -> [URL] {
+        var visiting = Set<String>()
+        var visited = Set<String>()
+        var files = [URL]()
+        func visit(_ url: URL, depth: Int) throws {
+            let key = url.standardizedFileURL.path.lowercased()
+            guard depth <= 8, !visiting.contains(key) else {
+                throw PocketError.message("A lista de discos contém um ciclo ou níveis demais.")
+            }
+            if visited.contains(key) { return }
+            guard visited.count < 512 else { throw PocketError.message("Há arquivos demais na lista de discos.") }
+            let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+            guard values.isRegularFile == true, values.isSymbolicLink != true, (values.fileSize ?? 0) > 0 else {
+                throw PocketError.message("Faixa ou disco inválido: \(url.lastPathComponent)")
+            }
+            visiting.insert(key)
+            visited.insert(key)
+            files.append(url)
+            for reference in try references(in: url) {
+                try visit(url.deletingLastPathComponent().appendingPathComponent(reference), depth: depth + 1)
+            }
+            visiting.remove(key)
+        }
+        try visit(source, depth: 0)
+        return files
+    }
+
+    private static func copyReferences(from descriptor: URL, to destination: URL, visited: inout Set<String>, depth: Int = 0) throws {
+        guard depth <= 8, visited.count <= 512 else { throw PocketError.message("A lista de discos é grande demais.") }
+        for name in try references(in: descriptor) {
             let key = name.lowercased()
             if !visited.insert(key).inserted { continue }
             let source = descriptor.deletingLastPathComponent().appendingPathComponent(name)
@@ -214,7 +251,7 @@ enum ROMExportStager {
                 }
                 try FileManager.default.copyItem(at: url, to: target)
             }
-            try copyReferences(from: source, to: destination, visited: &visited)
+            try copyReferences(from: source, to: destination, visited: &visited, depth: depth + 1)
         }
     }
 }
