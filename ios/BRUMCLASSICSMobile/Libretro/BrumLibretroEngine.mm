@@ -856,7 +856,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         [self persistSaveRAM];
         return;
     }
-    _virtualStick.enabled = YES;
+    _virtualStick.enabled = !_n64DpadMode;
     if (!_audioQueue) return;
     NSError *error = nil;
     if (![AVAudioSession.sharedInstance setActive:YES error:&error]) {
@@ -1089,8 +1089,8 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 }
 
 - (void)virtualStickChanged:(BrumVirtualStick *)stick {
-    [self setAnalogStick:0 axis:0 value:stick.horizontal source:BrumInputVirtualPad];
-    [self setAnalogStick:0 axis:1 value:stick.vertical source:BrumInputVirtualPad];
+    [self setAnalogStick:0 axis:0 value:_n64DpadMode ? 0 : stick.horizontal source:BrumInputVirtualPad];
+    [self setAnalogStick:0 axis:1 value:_n64DpadMode ? 0 : stick.vertical source:BrumInputVirtualPad];
 }
 
 - (void)toggleN64PadMode {
@@ -1099,6 +1099,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     for (unsigned direction = 4; direction <= 7; ++direction)
         _input.set(brum::InputSource::virtualPad, direction, false);
     _virtualStick.hidden = _n64DpadMode;
+    _virtualStick.enabled = !_n64DpadMode && !_paused;
     _n64DigitalPad.hidden = !_n64DpadMode;
     [_n64PadModeButton setTitle:_n64DpadMode ? @"STICK" : @"D-PAD" forState:UIControlStateNormal];
     _n64PadModeButton.accessibilityValue = _n64DpadMode ? @"D-pad ativo" : @"Analógico ativo";
