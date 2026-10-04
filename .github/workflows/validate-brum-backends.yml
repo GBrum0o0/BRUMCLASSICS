@@ -145,7 +145,7 @@ jobs:
           )
           case "$CORE" in
             ppsspp)
-              git -C "$SOURCE" apply "$GITHUB_WORKSPACE/ios/patches/ppsspp-ios-libretro.patch"
+              git -C "$SOURCE" apply --unidiff-zero "$GITHUB_WORKSPACE/ios/patches/ppsspp-ios-libretro.patch"
               # Xcode's explicit Core target can race the generated version file.
               cmake -DSOURCE_DIR="$SOURCE" -P "$SOURCE/git-version.cmake"
               test -f "$SOURCE/git-version.cpp"
@@ -160,6 +160,7 @@ jobs:
                 -DUSE_HOST_LIBZIP=OFF -DUSE_HOST_GLSLANG=OFF -DENABLE_CTEST=OFF
               ;;
             citra)
+              git -C "$SOURCE" apply "$GITHUB_WORKSPACE/ios/patches/citra-ios-deployment-target.patch"
               # Upstream searches a legacy dylib directory; pin the actual iOS
               # XCFramework slice instead of downloading a changing "latest".
               MOLTENVK="$RUNNER_TEMP/moltenvk"

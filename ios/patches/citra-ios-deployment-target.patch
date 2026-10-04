@@ -1,0 +1,12 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -35,6 +35,6 @@
+ 
+     if (IOS)
+-        # Minimum iOS 14
+-        set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0")
++        # std::to_chars in this revision requires the iOS 16.3 libc++ API.
++        set(CMAKE_OSX_DEPLOYMENT_TARGET "16.3")
+ 
+         # Enable searching CMAKE_PREFIX_PATH for bundled dependencies.
