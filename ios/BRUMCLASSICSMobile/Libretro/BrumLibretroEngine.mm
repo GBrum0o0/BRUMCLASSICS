@@ -2,6 +2,7 @@
 #import "BrumLibretroAPI.h"
 #include "BrumScreenProfiles.hpp"
 #include "../../../shared/brum-core/InputState.hpp"
+#include "../../../shared/brum-core/N64Input.hpp"
 
 #import <AudioToolbox/AudioToolbox.h>
 #import <AVFoundation/AVFoundation.h>
@@ -75,6 +76,80 @@ typedef struct {
     retro_unserialize_fn unserialize;
 } BrumRetroFunctions;
 
+@interface BrumVirtualStick : UIControl
+@property(nonatomic, readonly) double horizontal;
+@property(nonatomic, readonly) double vertical;
+- (void)reset;
+@end
+
+@implementation BrumVirtualStick {
+    UIView *_thumb;
+    double _horizontal;
+    double _vertical;
+}
+
+- (instancetype)initWithFrame:(CGRect)frame {
+    self = [super initWithFrame:frame];
+    if (!self) return nil;
+    self.backgroundColor = [UIColor colorWithWhite:0.10 alpha:0.84];
+    self.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.35].CGColor;
+    self.layer.borderWidth = 2;
+    _thumb = [[UIView alloc] init];
+    _thumb.backgroundColor = [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:0.92];
+    _thumb.userInteractionEnabled = NO;
+    [self addSubview:_thumb];
+    self.isAccessibilityElement = YES;
+    self.accessibilityLabel = @"Analógico do Nintendo 64";
+    self.accessibilityHint = @"Arraste para mover o personagem. Toque em D-PAD para usar as setas.";
+    return self;
+}
+
+- (double)horizontal { return _horizontal; }
+- (double)vertical { return _vertical; }
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    self.layer.cornerRadius = MIN(self.bounds.size.width, self.bounds.size.height) / 2;
+    const CGFloat diameter = 48;
+    const CGFloat radius = MAX(1, MIN(self.bounds.size.width, self.bounds.size.height) / 2 - diameter / 2 - 5);
+    _thumb.frame = CGRectMake(0, 0, diameter, diameter);
+    _thumb.layer.cornerRadius = diameter / 2;
+    _thumb.center = CGPointMake(CGRectGetMidX(self.bounds) + _horizontal * radius,
+                                CGRectGetMidY(self.bounds) + _vertical * radius);
+}
+
+- (void)updateWithTouch:(UITouch *)touch {
+    const CGPoint point = [touch locationInView:self];
+    const double radius = MAX(1, MIN(self.bounds.size.width, self.bounds.size.height) / 2 - 29);
+    const auto position = brum::virtualStick(point.x - CGRectGetMidX(self.bounds),
+                                              point.y - CGRectGetMidY(self.bounds), radius);
+    _horizontal = position.x;
+    _vertical = position.y;
+    [self setNeedsLayout];
+    [self sendActionsForControlEvents:UIControlEventValueChanged];
+}
+
+- (BOOL)beginTrackingWithTouch:(UITouch *)touch withEvent:(UIEvent *)event {
+    [self updateWithTouch:touch];
+    return YES;
+}
+
+- (BOOL)continueTrackingWithTouch:(UITouch *)touch withEvent:(UIEvent *)event {
+    [self updateWithTouch:touch];
+    return YES;
+}
+
+- (void)endTrackingWithTouch:(UITouch *)touch withEvent:(UIEvent *)event { [self reset]; }
+- (void)cancelTrackingWithEvent:(UIEvent *)event { [self reset]; }
+
+- (void)reset {
+    _horizontal = 0;
+    _vertical = 0;
+    [self setNeedsLayout];
+    [self sendActionsForControlEvents:UIControlEventValueChanged];
+}
+@end
+
 @class BrumLibretroViewController;
 static __weak BrumLibretroViewController *BrumCurrentHost;
 
@@ -109,6 +184,11 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     UIButton *_fastForwardButton;
     UIButton *_displayModeButton;
     UIButton *_stateButton;
+    BrumVirtualStick *_virtualStick;
+    UIView *_n64DigitalPad;
+    UIButton *_n64PadModeButton;
+    BOOL _n64DpadMode;
+    uint8_t _n64CButtonMask;
     NSURL *_romURL;
     NSData *_romData;
     NSString *_gameTitle;
@@ -164,6 +244,11 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
 - (BOOL)initializeHardware:(NSError **)error;
 - (void)destroyHardware;
 - (void)handleCoreShutdown;
+- (BrumVirtualStick *)n64AnalogPad;
+- (UIStackView *)n64ActionPad;
+- (void)virtualStickChanged:(BrumVirtualStick *)stick;
+- (void)toggleN64PadMode;
+- (void)updateN64CButtons;
 @end
 
 static void *BrumLoadSymbol(void *handle, const char *name) {
@@ -417,10 +502,16 @@ static void BrumInputPoll(void) {
         host->_input.set(brum::InputSource::controller, 8, pad.buttonB.isPressed);
         host->_input.set(brum::InputSource::controller, 1, pad.buttonX.isPressed);
         host->_input.set(brum::InputSource::controller, 9, pad.buttonY.isPressed);
+    } else if ([host->_emulatedSystemID isEqualToString:@"n64"]) {
+        // Mupen's default map reads Libretro B/Y as N64 A/B.
+        host->_input.set(brum::InputSource::controller, 0, pad.buttonA.isPressed);
+        host->_input.set(brum::InputSource::controller, 1, pad.buttonB.isPressed);
     }
     host->_input.setAxis(brum::InputSource::controller, 0, 0, pad.leftThumbstick.xAxis.value);
     host->_input.setAxis(brum::InputSource::controller, 0, 1, -pad.leftThumbstick.yAxis.value);
-    host->_input.setAxis(brum::InputSource::controller, 1, 0, pad.rightThumbstick.xAxis.value);
+    // This pinned Mupen revision reverses right-stick X when decoding C buttons.
+    host->_input.setAxis(brum::InputSource::controller, 1, 0,
+                         [host->_emulatedSystemID isEqualToString:@"n64"] ? -pad.rightThumbstick.xAxis.value : pad.rightThumbstick.xAxis.value);
     host->_input.setAxis(brum::InputSource::controller, 1, 1, -pad.rightThumbstick.yAxis.value);
     host->_input.set(brum::InputSource::controller, 14, pad.leftThumbstickButton.isPressed);
     host->_input.set(brum::InputSource::controller, 15, pad.rightThumbstickButton.isPressed);
@@ -756,12 +847,16 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _displayLink.paused = shouldPause;
     if (shouldPause) {
         _input.clear();
+        _n64CButtonMask = 0;
+        [_virtualStick reset];
+        _virtualStick.enabled = NO;
         _pointerPressed = NO;
         if (_audioQueue) AudioQueuePause(_audioQueue);
         os_unfair_lock_lock(&_audioLock); _audioRead = 0; _audioWrite = 0; _audioCount = 0; os_unfair_lock_unlock(&_audioLock);
         [self persistSaveRAM];
         return;
     }
+    _virtualStick.enabled = YES;
     if (!_audioQueue) return;
     NSError *error = nil;
     if (![AVAudioSession.sharedInstance setActive:YES error:&error]) {
@@ -843,10 +938,11 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _statusLabel.font = [UIFont monospacedSystemFontOfSize:10 weight:UIFontWeightBold];
     [self.view addSubview:_statusLabel];
 
-    UIStackView *up = [self directionPad];
-    UIStackView *actions = [self actionPad];
+    const BOOL isN64 = [_emulatedSystemID isEqualToString:@"n64"];
+    UIView *up = isN64 ? [self n64AnalogPad] : [self directionPad];
+    UIView *actions = isN64 ? [self n64ActionPad] : [self actionPad];
     UIStackView *menu = [[UIStackView alloc] initWithArrangedSubviews:@[
-        [self controlButton:@"SELECT" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_SELECT],
+        [self controlButton:isN64 ? @"Z" : @"SELECT" identifier:isN64 ? BRUM_RETRO_DEVICE_ID_JOYPAD_L2 : BRUM_RETRO_DEVICE_ID_JOYPAD_SELECT],
         [self controlButton:@"START" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_START]
     ]];
     UIButton *leftShoulder = [self controlButton:@"L" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_L];
@@ -855,8 +951,8 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     if ([_emulatedSystemID isEqualToString:@"psx"]) {
         [leftShoulder setTitle:@"L1" forState:UIControlStateNormal];
         [rightShoulder setTitle:@"R1" forState:UIControlStateNormal];
-        UIButton *l2 = [self controlButton:@"L2" identifier:12];
-        UIButton *r2 = [self controlButton:@"R2" identifier:13];
+        UIButton *l2 = [self controlButton:@"L2" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_L2];
+        UIButton *r2 = [self controlButton:@"R2" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_R2];
         [self.view addSubview:l2]; [self.view addSubview:r2];
         [NSLayoutConstraint activateConstraints:@[
             [l2.leadingAnchor constraintEqualToAnchor:leftShoulder.trailingAnchor constant:8],
@@ -869,6 +965,22 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     menu.axis = UILayoutConstraintAxisHorizontal;
     menu.spacing = 10;
     [self.view addSubview:up]; [self.view addSubview:actions]; [self.view addSubview:menu];
+    if (isN64) {
+        _n64DigitalPad = [self directionPad];
+        _n64DigitalPad.hidden = YES;
+        [self.view addSubview:_n64DigitalPad];
+        _n64PadModeButton = [UIButton buttonWithType:UIButtonTypeSystem];
+        _n64PadModeButton.translatesAutoresizingMaskIntoConstraints = NO;
+        [_n64PadModeButton setTitle:@"D-PAD" forState:UIControlStateNormal];
+        [_n64PadModeButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+        _n64PadModeButton.titleLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightBold];
+        _n64PadModeButton.backgroundColor = [UIColor colorWithWhite:0.1 alpha:0.82];
+        _n64PadModeButton.layer.cornerRadius = 12;
+        _n64PadModeButton.accessibilityLabel = @"Alternar analógico e direcional digital do N64";
+        _n64PadModeButton.accessibilityValue = @"Analógico ativo";
+        [_n64PadModeButton addTarget:self action:@selector(toggleN64PadMode) forControlEvents:UIControlEventTouchUpInside];
+        [self.view addSubview:_n64PadModeButton];
+    }
 
     UILayoutGuide *safe = self.view.safeAreaLayoutGuide;
     [NSLayoutConstraint activateConstraints:@[
@@ -896,6 +1008,16 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         [leftShoulder.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:18], [leftShoulder.topAnchor constraintEqualToAnchor:safe.topAnchor constant:66],
         [rightShoulder.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-18], [rightShoulder.topAnchor constraintEqualToAnchor:safe.topAnchor constant:66]
     ]];
+    if (isN64) {
+        [NSLayoutConstraint activateConstraints:@[
+            [_n64DigitalPad.centerXAnchor constraintEqualToAnchor:up.centerXAnchor],
+            [_n64DigitalPad.centerYAnchor constraintEqualToAnchor:up.centerYAnchor],
+            [_n64PadModeButton.leadingAnchor constraintEqualToAnchor:up.leadingAnchor],
+            [_n64PadModeButton.bottomAnchor constraintEqualToAnchor:up.topAnchor constant:-8],
+            [_n64PadModeButton.widthAnchor constraintEqualToConstant:66],
+            [_n64PadModeButton.heightAnchor constraintEqualToConstant:32]
+        ]];
+    }
   }
 
 - (UIButton *)controlButton:(NSString *)text identifier:(NSInteger)identifier {
@@ -932,6 +1054,60 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     pad.translatesAutoresizingMaskIntoConstraints = NO; pad.axis = UILayoutConstraintAxisVertical; pad.distribution = UIStackViewDistributionFillEqually;
     [pad.widthAnchor constraintEqualToConstant:166].active = YES; [pad.heightAnchor constraintEqualToConstant:132].active = YES;
     return pad;
+}
+
+- (BrumVirtualStick *)n64AnalogPad {
+    _virtualStick = [[BrumVirtualStick alloc] initWithFrame:CGRectZero];
+    _virtualStick.translatesAutoresizingMaskIntoConstraints = NO;
+    [_virtualStick.widthAnchor constraintEqualToConstant:146].active = YES;
+    [_virtualStick.heightAnchor constraintEqualToConstant:146].active = YES;
+    [_virtualStick addTarget:self action:@selector(virtualStickChanged:) forControlEvents:UIControlEventValueChanged];
+    return _virtualStick;
+}
+
+- (UIStackView *)n64ActionPad {
+    UIButton *cUp = [self controlButton:@"C▲" identifier:16];
+    UIButton *cRight = [self controlButton:@"C▶" identifier:19];
+    UIButton *b = [self controlButton:@"B" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_Y];
+    UIButton *a = [self controlButton:@"A" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_B];
+    UIButton *cLeft = [self controlButton:@"C◀" identifier:18];
+    UIButton *cDown = [self controlButton:@"C▼" identifier:17];
+    UIStackView *top = [[UIStackView alloc] initWithArrangedSubviews:@[cUp, cRight]];
+    UIStackView *middle = [[UIStackView alloc] initWithArrangedSubviews:@[b, a]];
+    UIStackView *bottom = [[UIStackView alloc] initWithArrangedSubviews:@[cLeft, cDown]];
+    for (UIStackView *row in @[top, middle, bottom]) {
+        row.axis = UILayoutConstraintAxisHorizontal;
+        row.spacing = 8;
+        row.distribution = UIStackViewDistributionFillEqually;
+    }
+    UIStackView *pad = [[UIStackView alloc] initWithArrangedSubviews:@[top, middle, bottom]];
+    pad.translatesAutoresizingMaskIntoConstraints = NO;
+    pad.axis = UILayoutConstraintAxisVertical;
+    pad.spacing = 4;
+    [pad.widthAnchor constraintEqualToConstant:116].active = YES;
+    return pad;
+}
+
+- (void)virtualStickChanged:(BrumVirtualStick *)stick {
+    [self setAnalogStick:0 axis:0 value:stick.horizontal source:BrumInputVirtualPad];
+    [self setAnalogStick:0 axis:1 value:stick.vertical source:BrumInputVirtualPad];
+}
+
+- (void)toggleN64PadMode {
+    _n64DpadMode = !_n64DpadMode;
+    [_virtualStick reset];
+    for (unsigned direction = 4; direction <= 7; ++direction)
+        _input.set(brum::InputSource::virtualPad, direction, false);
+    _virtualStick.hidden = _n64DpadMode;
+    _n64DigitalPad.hidden = !_n64DpadMode;
+    [_n64PadModeButton setTitle:_n64DpadMode ? @"STICK" : @"D-PAD" forState:UIControlStateNormal];
+    _n64PadModeButton.accessibilityValue = _n64DpadMode ? @"D-pad ativo" : @"Analógico ativo";
+}
+
+- (void)updateN64CButtons {
+    const auto axes = brum::n64CButtons(_n64CButtonMask);
+    [self setAnalogStick:1 axis:0 value:axes.x source:BrumInputVirtualPad];
+    [self setAnalogStick:1 axis:1 value:axes.y source:BrumInputVirtualPad];
 }
 
 - (UIStackView *)actionPad {
@@ -996,8 +1172,27 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _input.setAxis(static_cast<brum::InputSource>(source), (unsigned)stick, (unsigned)axis, value);
 }
 
-- (void)inputDown:(UIButton *)sender { if (sender.tag >= 0) [self setButton:(NSUInteger)sender.tag source:BrumInputVirtualPad pressed:YES]; }
-- (void)inputUp:(UIButton *)sender { if (sender.tag >= 0) [self setButton:(NSUInteger)sender.tag source:BrumInputVirtualPad pressed:NO]; }
+- (void)inputDown:(UIButton *)sender {
+    if (sender.tag < 0) return;
+    if (sender.tag >= 16 && sender.tag <= 19 && [_emulatedSystemID isEqualToString:@"n64"]) {
+        if (!_paused && !_stopped) {
+            _n64CButtonMask |= (uint8_t)(1u << (sender.tag - 16));
+            [self updateN64CButtons];
+        }
+        return;
+    }
+    [self setButton:(NSUInteger)sender.tag source:BrumInputVirtualPad pressed:YES];
+}
+
+- (void)inputUp:(UIButton *)sender {
+    if (sender.tag < 0) return;
+    if (sender.tag >= 16 && sender.tag <= 19 && [_emulatedSystemID isEqualToString:@"n64"]) {
+        _n64CButtonMask &= (uint8_t)~(1u << (sender.tag - 16));
+        [self updateN64CButtons];
+        return;
+    }
+    [self setButton:(NSUInteger)sender.tag source:BrumInputVirtualPad pressed:NO];
+}
 
 - (void)presentFrame:(CGImageRef)image {
     _screenManager.screens = brum::libretroScreens(_coreID.UTF8String, _frameWidth, _frameHeight);

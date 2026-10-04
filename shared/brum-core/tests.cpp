@@ -1,5 +1,6 @@
 #include "ScreenManager.hpp"
 #include "InputState.hpp"
+#include "N64Input.hpp"
 #include "../../ios/BRUMCLASSICSMobile/Libretro/BrumScreenProfiles.hpp"
 #include <cstdlib>
 #include <iostream>
@@ -115,5 +116,21 @@ int main() {
     check(input.analog(2, 0) == 0 && input.analog(0, 2) == 0);
     input.clear();
     check(input.analog(0, 0) == 0);
+    auto center = virtualStick(3, 2, 100);
+    check(near(center.x, 0) && near(center.y, 0));
+    auto partial = virtualStick(50, 0, 100);
+    check(partial.x > 0.4 && partial.x < 0.5 && near(partial.y, 0));
+    auto diagonal = virtualStick(100, -100, 100);
+    check(near(std::hypot(diagonal.x, diagonal.y), 1));
+    check(diagonal.x > 0 && diagonal.y < 0);
+    check(near(virtualStick(0, 1, 0).y, 0));
+    check(near(virtualStick(std::numeric_limits<double>::quiet_NaN(), 0, 100).x, 0));
+    const auto cRightUp = n64CButtons(cRight | cUp);
+    check(near(cRightUp.x, -1) && near(cRightUp.y, -1));
+    const auto opposing = n64CButtons(cLeft | cRight | cUp | cDown);
+    check(near(opposing.x, 0) && near(opposing.y, 0));
+    input.setAxis(InputSource::virtualPad, 0, 0, partial.x);
+    input.setAxis(InputSource::virtualPad, 0, 1, diagonal.y);
+    check(input.analog(0, 0) > 0 && input.analog(0, 1) < 0);
     std::cout << "BRUM screen/input: " << checks << " checks passed\n";
 }

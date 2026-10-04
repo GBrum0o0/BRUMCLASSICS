@@ -63,6 +63,8 @@
 #define BRUM_RETRO_DEVICE_ID_JOYPAD_X 9
 #define BRUM_RETRO_DEVICE_ID_JOYPAD_L 10
 #define BRUM_RETRO_DEVICE_ID_JOYPAD_R 11
+#define BRUM_RETRO_DEVICE_ID_JOYPAD_L2 12
+#define BRUM_RETRO_DEVICE_ID_JOYPAD_R2 13
 
 typedef bool (*brum_retro_environment_t)(unsigned command, void *data);
 typedef void (*brum_retro_video_refresh_t)(const void *data, unsigned width, unsigned height, size_t pitch);

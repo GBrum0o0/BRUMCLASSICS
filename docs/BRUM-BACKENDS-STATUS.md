@@ -56,6 +56,17 @@ PC/celular são passos futuros, sem necessidade de mudar os cálculos de layout.
 - Os builds são isolados por núcleo. Uma falha nativa dentro de um núcleo
   carregado ainda pode encerrar o processo iOS: não há isolamento por processo.
 
+## Controle do N64 no build experimental
+
+O padrão do N64 usa agora um stick virtual circular: arrastar envia eixos
+analógicos graduais para o Mupen64Plus-Next; soltar recentraliza. O botão
+`D-PAD` alterna para as setas digitais quando um jogo precisa delas, e
+`STICK` retorna ao analógico. Os botões visíveis são A/B, Z, L/R, Start e
+quatro C. A/B e o eixo X dos botões C são mapeados especificamente para a
+revisão fixada do núcleo; controle físico mantém analógico esquerdo e direito.
+Alternar pad, pausar ou encerrar libera os eixos para evitar movimento preso.
+Ainda é necessário validar sensibilidade e ergonomia em aparelho.
+
 ## Situação por sistema
 
 | Sistema | Backend | Situação nesta etapa |
