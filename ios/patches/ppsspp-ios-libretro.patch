@@ -7,12 +7,25 @@ diff --git a/CMakeLists.txt b/CMakeLists.txt
 @@ -46 +46 @@
 -	elseif(${CMAKE_SYSTEM_PROCESSOR} MATCHES "^aarch64")
 +	elseif(${CMAKE_SYSTEM_PROCESSOR} MATCHES "^aarch64" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm64")
+@@ -148,0 +149,3 @@
++	if(IOS)
++		add_definitions(-DPNG_ARM_NEON_OPT=0)
++	endif()
 @@ -736 +736 @@
 -elseif(IOS)
 +elseif(IOS AND NOT LIBRETRO)
 @@ -2039 +2039 @@
 -if(IOS)
 +if(IOS AND NOT LIBRETRO)
+diff --git a/ext/native/thin3d/GLQueueRunner.cpp b/ext/native/thin3d/GLQueueRunner.cpp
+--- a/ext/native/thin3d/GLQueueRunner.cpp
++++ b/ext/native/thin3d/GLQueueRunner.cpp
+@@ -18 +18 @@
+-#ifdef IOS
++#if defined(IOS) && !defined(__LIBRETRO__)
+@@ -1546 +1546 @@
+-#ifdef IOS
++#if defined(IOS) && !defined(__LIBRETRO__)
 diff --git a/libretro/CMakeLists.txt b/libretro/CMakeLists.txt
 --- a/libretro/CMakeLists.txt
 +++ b/libretro/CMakeLists.txt

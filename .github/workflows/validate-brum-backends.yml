@@ -175,7 +175,7 @@ jobs:
                 -DENABLE_OPT=OFF \
                 -DUSE_SYSTEM_MOLTENVK=ON \
                 "-DMOLTENVK_LIBRARY=$MOLTENVK/MoltenVK/MoltenVK/static/MoltenVK.xcframework/ios-arm64/libMoltenVK.a" \
-                '-DCMAKE_SHARED_LINKER_FLAGS=-framework Metal -framework QuartzCore' \
+                '-DCMAKE_SHARED_LINKER_FLAGS=-framework Metal -framework QuartzCore -framework Foundation -framework UIKit -framework CoreGraphics' \
                 -DENABLE_WEB_SERVICE=OFF -DENABLE_SCRIPTING=OFF -DENABLE_LTO=OFF \
                 -DCITRA_USE_PRECOMPILED_HEADERS=OFF -DCITRA_WARNINGS_AS_ERRORS=OFF
               ;;

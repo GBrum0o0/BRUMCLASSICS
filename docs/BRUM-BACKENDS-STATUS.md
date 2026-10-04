@@ -62,11 +62,11 @@ PC/celular são passos futuros, sem necessidade de mudar os cálculos de layout.
 |---|---|---|
 | GB/GBC/GBA, NES e demais núcleos anteriores | mGBA, Nestopia, Geolith, Gearsystem, PCE Fast, bsnes, WonderSwan | Mantidos na lista ativa e no empacotamento anterior; regressão em aparelho pendente |
 | DS | SkyEmu | Conectado ao Screen Manager; testes de geometria/toque passaram; teste de jogo no iPhone pendente |
-| N64 | Mupen64Plus-Next | Compilação arm64 GLES/HLE sem dynarec passou; não empacotado; teste em aparelho pendente |
+| N64 | Mupen64Plus-Next | Empacotado apenas no IPA experimental build 37 com GLES/HLE sem dynarec; teste em aparelho pendente |
 | PS1 | Beetle PSX | Empacotado apenas no IPA experimental com BIOS do usuário; teste em aparelho pendente |
-| Saturn | Beetle Saturn | Compilação arm64 passou; não empacotado; desempenho e BIOS pendentes |
+| Saturn | Beetle Saturn | Empacotado apenas no IPA experimental build 37; desempenho, BIOS do usuário e teste em aparelho pendentes |
 | Atari 2600 | Stella2014 | Empacotado apenas no IPA experimental; teste em aparelho pendente |
-| PSP / Dreamcast | PPSSPP / Flycast | Flycast compilou arm64, mas renderização/execução pendentes; PPSSPP ainda tem falha de link em investigação |
+| PSP / Dreamcast | PPSSPP / Flycast | Flycast compilou arm64, mas renderização/execução pendentes; PPSSPP avançou ao link e ainda não está no IPA |
 | 3DS | Citra | Perfil de telas preparado; dependências e API gráfica ainda bloqueiam integração jogável |
 | GameCube | Dolphin | Compilação arm64 genérica sem JIT passou; não empacotado, desempenho não validado |
 | PS2 | Play! | Descriptor preparado reaproveitando revisão Android; adapter/renderização e execução sem JIT iOS não validados |
@@ -119,7 +119,11 @@ PC/celular são passos futuros, sem necessidade de mudar os cálculos de layout.
 - **Status:** a configuração/compilação chegou ao linker, que revelou
   símbolos `Native*` do aplicativo iOS e funções NEON ausentes. O patch de
   teste exclui o frontend iOS do alvo Libretro e reconhece `arm64` como
-  ARM64; nova compilação em andamento. JIT/renderização/input pendentes.
+  ARM64. A etapa seguinte chegou ao linker e encontrou apenas a chamada de
+  framebuffer do app iOS (`bindDefaultFBO`) e o filtro NEON do libpng. O
+  primeiro não pertence ao Libretro (que já define seu framebuffer), e o
+  segundo foi desativado para este build; correção ainda em validação.
+  JIT/renderização/input pendentes.
 
 ### 3DS: MoltenVK e API de renderização
 
@@ -138,9 +142,11 @@ PC/celular são passos futuros, sem necessidade de mudar os cálculos de layout.
   esse otimizador (`ENABLE_OPT=OFF`), preservando a compilação de shaders.
   A etapa seguinte revelou que CMake upstream sobrescreve o deployment
   target 16.3 para 14.0, deixando `std::to_chars` indisponível. O patch
-  experimental preserva 16.3 e está em compilação. O app de produção ainda
-  suporta iOS 16.0; promover Citra exigiria resolver essa diferença, além do
-  renderer. Renderer ainda em desenvolvimento.
+  experimental preserva 16.3. O build avançou ao linker, onde MoltenVK
+  revelou os frameworks Foundation, UIKit e CoreGraphics ausentes. Eles foram
+  adicionados à receita experimental, ainda sem resultado novo. O app de
+  produção suporta iOS 16.0; promover Citra exigiria resolver essa diferença,
+  além do renderer. Renderer ainda em desenvolvimento.
 
 ### GameCube: arquitetura não detectada
 
@@ -167,8 +173,12 @@ PC/celular são passos futuros, sem necessidade de mudar os cálculos de layout.
 
 O [IPA experimental 0.15.1 build 36](https://github.com/GBrum0o0/BRUMCLASSICS/actions/runs/37191135993)
 foi gerado sem assinatura para Sideloadly, com PS1 e Atari 2600 além dos oito
-núcleos estáveis. A validação estrutural local passou: arm64, bibliotecas,
+núcleos previamente integrados. A validação estrutural local passou: arm64, bibliotecas,
 licenças e hash SHA-256 `f8b261d54a87797af9c7e8659a2ee18b8f616942162bc2c159ae0d10603fc4fa`.
+O [IPA experimental build 37](https://github.com/GBrum0o0/BRUMCLASSICS/actions/runs/37209353162)
+acrescenta N64 e Saturn. Passou nos testes do simulador e na validação local
+dos 12 núcleos, suas licenças e integridade ZIP/Mach-O. Seu SHA-256 é
+`79913b3ea35fd4ab3560509ba8dd3b0aae6149eab55e14097eb17133aeca71db`.
 O host compilou e passou testes de modelos/UI no simulador; o contrato
 portátil passou 19.191 verificações em MSVC/Windows. Os 18 testes Python
 do validador passaram. Esses testes não executam ROMs comerciais nem
