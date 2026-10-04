@@ -146,6 +146,9 @@ jobs:
           case "$CORE" in
             ppsspp)
               git -C "$SOURCE" apply "$GITHUB_WORKSPACE/ios/patches/ppsspp-ios-libretro.patch"
+              # Xcode's explicit Core target can race the generated version file.
+              cmake -DSOURCE_DIR="$SOURCE" -P "$SOURCE/git-version.cmake"
+              test -f "$SOURCE/git-version.cpp"
               cmake -S "$SOURCE" -B "$BUILD" "${COMMON_FLAGS[@]}" \
                 -DIOS=ON -DLIBRETRO=ON -DUSING_GLES2=ON -DMOBILE_DEVICE=ON \
                 '-DOPENGL_LIBRARIES=-framework OpenGLES'
@@ -167,6 +170,7 @@ jobs:
               cp "$MOLTENVK/MoltenVK/LICENSE" "$OUT/MoltenVK-LICENSE.txt"
               cmake -S "$SOURCE" -B "$BUILD" "${COMMON_FLAGS[@]}" \
                 -DIOS=ON -DENABLE_LIBRETRO=ON -DENABLE_QT=OFF \
+                -DCMAKE_OSX_DEPLOYMENT_TARGET=16.3 \
                 -DENABLE_OPT=OFF \
                 -DUSE_SYSTEM_MOLTENVK=ON \
                 "-DMOLTENVK_LIBRARY=$MOLTENVK/MoltenVK/MoltenVK/static/MoltenVK.xcframework/ios-arm64/libMoltenVK.a" \
@@ -175,6 +179,7 @@ jobs:
                 -DCITRA_USE_PRECOMPILED_HEADERS=OFF -DCITRA_WARNINGS_AS_ERRORS=OFF
               ;;
             dolphin)
+              git -C "$SOURCE" apply --unidiff-zero "$GITHUB_WORKSPACE/ios/patches/dolphin-generic-memtools.patch"
               cmake -S "$SOURCE" -B "$BUILD" "${COMMON_FLAGS[@]}" \
                 -DIOS=ON -DLIBRETRO=ON -DENABLE_LTO=OFF -DENABLE_VULKAN=OFF -DENABLE_GENERIC=ON
               ;;
