@@ -270,7 +270,9 @@ static bool BrumEnvironment(unsigned command, void *data) {
         case BRUM_RETRO_ENVIRONMENT_SET_HW_RENDER:
             return [host configureHardware:(brum_retro_hw_render_callback *)data];
         case BRUM_RETRO_ENVIRONMENT_SET_HW_SHARED_CONTEXT:
-            return true;
+            // The EAGL adapter owns one context per session, not a shared
+            // context. Never tell a backend that cross-context resources work.
+            return false;
         case BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS:
             BrumRegisterCoreOptions(host, (const brum_retro_core_option_definition *)data);
             return true;

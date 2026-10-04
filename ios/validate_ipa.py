@@ -52,10 +52,19 @@ def validate_ipa(path, expected_version=None):
         experimental = info.get("BRUMExperimentalBackends", False)
         if not isinstance(experimental, bool):
             raise ValueError("Invalid experimental backend flag")
+        build_number = info.get("CFBundleVersion", "")
+        if experimental and (not isinstance(build_number, str) or not build_number.isdecimal() or int(build_number) < 36):
+            raise ValueError("Invalid experimental build number")
+        expanded_experimental = experimental and int(build_number) >= 37
         if experimental:
             integrated_cores.update({
                 "Beetle PSX": root + "Frameworks/mednafen_psx_libretro_ios.dylib",
                 "Stella2014": root + "Frameworks/stella2014_libretro_ios.dylib",
+            })
+        if expanded_experimental:
+            integrated_cores.update({
+                "Mupen64Plus-Next": root + "Frameworks/mupen64plus_next_libretro_ios.dylib",
+                "Beetle Saturn": root + "Frameworks/mednafen_saturn_libretro_ios.dylib",
             })
         for core_name, core_path in integrated_cores.items():
             if core_path not in names:
@@ -83,6 +92,9 @@ def validate_ipa(path, expected_version=None):
         if experimental:
             required_licenses += [root + "Frameworks/Beetle-PSX-LICENSE.txt",
                                   root + "Frameworks/Stella2014-LICENSE.txt"]
+        if expanded_experimental:
+            required_licenses += [root + "Frameworks/Mupen64Plus-Next-LICENSE.txt",
+                                  root + "Frameworks/Beetle-Saturn-LICENSE.txt"]
         for license_path in required_licenses:
             if license_path not in names or len(archive.read(license_path)) < 1_000:
                 raise ValueError("Required mobile or core license is absent")

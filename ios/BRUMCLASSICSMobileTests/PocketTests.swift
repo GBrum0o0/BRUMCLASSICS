@@ -70,6 +70,8 @@ final class PocketTests: XCTestCase {
         }
         XCTAssertEqual(CoreRegistry.core(for: .playStation, includeExperimental: true)?.id, "beetle-psx")
         XCTAssertEqual(CoreRegistry.core(for: .atari2600, includeExperimental: true)?.id, "stella2014")
+        XCTAssertEqual(CoreRegistry.core(for: .nintendo64, includeExperimental: true)?.id, "mupen64plus-next")
+        XCTAssertEqual(CoreRegistry.core(for: .saturn, includeExperimental: true)?.id, "beetle-saturn")
         XCTAssertNil(CoreRegistry.core(for: .nintendo64, includeExperimental: true))
         XCTAssertEqual(EmulatedSystemID.nintendo64.retroAchievementsConsoleID, 2)
         XCTAssertEqual(EmulatedSystemID.playStation.retroAchievementsConsoleID, 12)

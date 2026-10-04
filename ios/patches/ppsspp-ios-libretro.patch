@@ -10,6 +10,9 @@ diff --git a/CMakeLists.txt b/CMakeLists.txt
 @@ -736 +736 @@
 -elseif(IOS)
 +elseif(IOS AND NOT LIBRETRO)
+@@ -2039 +2039 @@
+-if(IOS)
++if(IOS AND NOT LIBRETRO)
 diff --git a/libretro/CMakeLists.txt b/libretro/CMakeLists.txt
 --- a/libretro/CMakeLists.txt
 +++ b/libretro/CMakeLists.txt

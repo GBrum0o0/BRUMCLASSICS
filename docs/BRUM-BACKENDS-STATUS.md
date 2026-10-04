@@ -1,6 +1,6 @@
 # BRUM Core: integração incremental de backends
 
-Estado em 03/10/2026, branch `codex/brum-backends`. Este documento distingue
+Estado em 04/10/2026, branch `codex/brum-backends`. Este documento distingue
 infraestrutura implementada, compilação e validação real de jogos. Compilar um
 núcleo não o promove automaticamente a suporte do BRUM Core.
 
@@ -62,13 +62,13 @@ PC/celular são passos futuros, sem necessidade de mudar os cálculos de layout.
 |---|---|---|
 | GB/GBC/GBA, NES e demais núcleos anteriores | mGBA, Nestopia, Geolith, Gearsystem, PCE Fast, bsnes, WonderSwan | Mantidos na lista ativa e no empacotamento anterior; regressão em aparelho pendente |
 | DS | SkyEmu | Conectado ao Screen Manager; testes de geometria/toque passaram; teste de jogo no iPhone pendente |
-| N64 | Mupen64Plus-Next | Candidato; build GLES/HLE sem dynarec em validação |
-| PS1 | Beetle PSX | Candidato; build sem Lightrec em validação; exige BIOS do usuário |
-| Saturn | Beetle Saturn | Candidato; build independente; desempenho e BIOS pendentes |
-| Atari 2600 | Stella2014 | Compilação arm64 passou; ainda não empacotado nem validado jogando |
-| PSP / Dreamcast | PPSSPP / Flycast | Candidatos; toolchains iOS em validação |
+| N64 | Mupen64Plus-Next | Compilação arm64 GLES/HLE sem dynarec passou; não empacotado; teste em aparelho pendente |
+| PS1 | Beetle PSX | Empacotado apenas no IPA experimental com BIOS do usuário; teste em aparelho pendente |
+| Saturn | Beetle Saturn | Compilação arm64 passou; não empacotado; desempenho e BIOS pendentes |
+| Atari 2600 | Stella2014 | Empacotado apenas no IPA experimental; teste em aparelho pendente |
+| PSP / Dreamcast | PPSSPP / Flycast | Flycast compilou arm64, mas renderização/execução pendentes; PPSSPP ainda tem falha de link em investigação |
 | 3DS | Citra | Perfil de telas preparado; dependências e API gráfica ainda bloqueiam integração jogável |
-| GameCube | Dolphin | Candidato; configurando build genérico sem JIT, desempenho não validado |
+| GameCube | Dolphin | Compilação arm64 genérica sem JIT passou; não empacotado, desempenho não validado |
 | PS2 | Play! | Descriptor preparado reaproveitando revisão Android; adapter/renderização e execução sem JIT iOS não validados |
 | Mega Drive, Sega CD/32X, arcade genérico | Em avaliação | Sem backend aprovado nesta etapa; não entram como suporte integrado |
 
@@ -82,10 +82,10 @@ PC/celular são passos futuros, sem necessidade de mudar os cálculos de layout.
 - **Alternativas:** reconstruir dependências do JIT ou usar dependências vendorizadas.
 - **Solução:** usar fontes vendorizadas. N64 usa GLideN64/HLE sem paraLLEl/Vulkan
   e sem dynarec; PS1 já desliga Lightrec no alvo iOS upstream.
-- **Status:** checkout corrigido; a segunda tentativa de N64 chegou ao
-  compilador e encontrou headers clássicos de Mac (`fp.h`) em libpng. Patch
-  remove o teste inadequado de `TARGET_OS_MAC` em libpng/zlib, preservando
-  suporte Classic Mac. Ainda sem teste de jogos.
+- **Status:** checkout corrigido; N64 exigiu corrigir teste de headers Classic
+  Mac (`fp.h`) em libpng/zlib. A compilação arm64 de N64 e PS1 passou no
+  [workflow 37191135796](https://github.com/GBrum0o0/BRUMCLASSICS/actions/runs/37191135796).
+  PS1 está no IPA experimental; N64 ainda não. Sem teste de jogos.
 
 ### Dreamcast: header gráfico de desktop
 
@@ -95,7 +95,8 @@ PC/celular são passos futuros, sem necessidade de mudar os cálculos de layout.
 - **Impacto:** apenas Flycast.
 - **Alternativas:** corrigir definição de plataforma ou atualizar libretro-common.
 - **Solução:** fornecer `IOS=1` ao compilador, mantendo o ramo de link OpenGLES.
-- **Status:** correção na receita; negociação gráfica e execução ainda pendentes.
+- **Status:** compilação arm64 passou no workflow 37191135796; negociação
+  gráfica e execução ainda pendentes.
 
 ### Receita de build: Bash do macOS
 
@@ -115,7 +116,10 @@ PC/celular são passos futuros, sem necessidade de mudar os cálculos de layout.
 - **Alternativas:** atualizar dependência, adaptar política ou fixar CMake antigo.
 - **Solução:** testar política mínima 3.5; patch também retira `-Bsymbolic` do
   linker Apple, onde essa opção ELF não é válida.
-- **Status:** nova configuração em validação; JIT/renderização/input pendentes.
+- **Status:** a configuração/compilação chegou ao linker, que revelou
+  símbolos `Native*` do aplicativo iOS e funções NEON ausentes. O patch de
+  teste exclui o frontend iOS do alvo Libretro e reconhece `arm64` como
+  ARM64; nova compilação em andamento. JIT/renderização/input pendentes.
 
 ### 3DS: MoltenVK e API de renderização
 
@@ -132,7 +136,11 @@ PC/celular são passos futuros, sem necessidade de mudar os cálculos de layout.
 - **Status:** a segunda tentativa encontrou o slice MoltenVK e avançou até
   glslang, cujo otimizador exigia SPIRV-Tools ausente. A receita desliga apenas
   esse otimizador (`ENABLE_OPT=OFF`), preservando a compilação de shaders.
-  Renderer ainda em desenvolvimento.
+  A etapa seguinte revelou que CMake upstream sobrescreve o deployment
+  target 16.3 para 14.0, deixando `std::to_chars` indisponível. O patch
+  experimental preserva 16.3 e está em compilação. O app de produção ainda
+  suporta iOS 16.0; promover Citra exigiria resolver essa diferença, além do
+  renderer. Renderer ainda em desenvolvimento.
 
 ### GameCube: arquitetura não detectada
 
@@ -141,7 +149,8 @@ PC/celular são passos futuros, sem necessidade de mudar os cálculos de layout.
 - **Impacto:** somente Dolphin.
 - **Alternativas:** toolchain iOS completo ou parâmetros explícitos.
 - **Solução:** informar arm64 e testar `ENABLE_GENERIC=ON` sem JIT.
-- **Status:** nova compilação em validação; desempenho de jogos ainda desconhecido.
+- **Status:** compilação arm64 genérica passou no workflow 37191135796;
+  desempenho de jogos ainda desconhecido.
 
 ### Mega Drive / CD / 32X / arcade: licenciamento
 
@@ -156,11 +165,14 @@ PC/celular são passos futuros, sem necessidade de mudar os cálculos de layout.
 
 ## Evidência e aceitação
 
-Primeiro build: [GitHub Actions 37137257052](https://github.com/GBrum0o0/BRUMCLASSICS/actions/runs/37137257052).
-O host compilou e passou 41 testes de modelos + 2 testes de UI no simulador.
-O contrato portátil passou 19.185 verificações em MSVC/Windows e Clang/macOS.
-O validador de projeto e os 16 testes Python do empacotador passaram.
-Esses testes não executam ROMs comerciais nem comprovam áudio em aparelho.
+O [IPA experimental 0.15.1 build 36](https://github.com/GBrum0o0/BRUMCLASSICS/actions/runs/37191135993)
+foi gerado sem assinatura para Sideloadly, com PS1 e Atari 2600 além dos oito
+núcleos estáveis. A validação estrutural local passou: arm64, bibliotecas,
+licenças e hash SHA-256 `f8b261d54a87797af9c7e8659a2ee18b8f616942162bc2c159ae0d10603fc4fa`.
+O host compilou e passou testes de modelos/UI no simulador; o contrato
+portátil passou 19.191 verificações em MSVC/Windows. Os 18 testes Python
+do validador passaram. Esses testes não executam ROMs comerciais nem
+comprovam áudio em aparelho.
 
 Antes de ativar cada candidato: iniciar ROM legal de teste, verificar vídeo e
 áudio contínuos, pad virtual/físico, pausa/menu/background/interrupção, retorno
