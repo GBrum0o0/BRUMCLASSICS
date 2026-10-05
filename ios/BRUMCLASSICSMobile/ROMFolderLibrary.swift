@@ -431,10 +431,11 @@ actor ROMFolderAccess {
             guard values.isRegularFile == true, values.isSymbolicLink != true,
                   let size = values.fileSize, size > 0, size <= 64 * 1_024 * 1_024 else { continue }
             var destination = systemRoot.appendingPathComponent(ROMFolderScanner.firmwareDestinationNames[filename] ?? filename)
-            if let installedSize = try? destination.resourceValues(forKeys: [.fileSizeKey]).fileSize,
-               installedSize == size { continue }
             let data = try CoordinatedFileAccess.read(source) { try Data(contentsOf: $0, options: .mappedIfSafe) }
             guard data.count == size else { continue }
+            // BIOS images often share the same length. Compare contents so a
+            // corrected user-supplied file replaces a stale invalid copy.
+            if let installed = try? Data(contentsOf: destination, options: .mappedIfSafe), installed == data { continue }
             try data.write(to: destination, options: [.atomic, .completeFileProtectionUnlessOpen])
             var destinationValues = URLResourceValues()
             destinationValues.isExcludedFromBackup = true

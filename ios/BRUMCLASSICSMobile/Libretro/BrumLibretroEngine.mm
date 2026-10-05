@@ -651,8 +651,12 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         for (NSString *filename in @[@"dc_boot.bin", @"dc_flash.bin"]) {
             NSURL *source = [system URLByAppendingPathComponent:filename];
             NSURL *destination = [dc URLByAppendingPathComponent:filename];
-            if ([manager fileExistsAtPath:source.path] && ![manager fileExistsAtPath:destination.path]) {
-                if (![manager copyItemAtURL:source toURL:destination error:error]) return NO;
+            if ([manager fileExistsAtPath:source.path]) {
+                NSData *firmware = [NSData dataWithContentsOfURL:source options:NSDataReadingMappedIfSafe error:error];
+                if (!firmware) return NO;
+                NSData *installed = [NSData dataWithContentsOfURL:destination options:NSDataReadingMappedIfSafe error:nil];
+                if (![installed isEqualToData:firmware] &&
+                    ![firmware writeToURL:destination options:NSDataWritingAtomic error:error]) return NO;
             }
         }
     }

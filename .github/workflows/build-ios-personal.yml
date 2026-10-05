@@ -361,7 +361,7 @@ jobs:
           bash build-heavy-experimental.sh flycast "$APP"
           /usr/libexec/PlistBuddy -c 'Add :BRUMExperimentalBackends bool true' "$APP/Info.plist"
           /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName BRUM Core Teste' "$APP/Info.plist"
-          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 40' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 41' "$APP/Info.plist"
 
       - name: Empacotar IPA pessoal
         working-directory: ios

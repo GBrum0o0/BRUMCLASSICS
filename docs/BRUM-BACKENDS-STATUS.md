@@ -77,11 +77,11 @@ Ainda é necessário validar sensibilidade e ergonomia em aparelho.
 | PS1 | Beetle PSX | Empacotado apenas no IPA experimental com BIOS do usuário; teste em aparelho pendente |
 | Saturn | Beetle Saturn | Empacotado apenas no IPA experimental build 37; desempenho, BIOS do usuário e teste em aparelho pendentes |
 | Atari 2600 | Stella2014 | Empacotado apenas no IPA experimental; teste em aparelho pendente |
-| PSP / Dreamcast | PPSSPP / Flycast | Ambos compilaram arm64; receita de IPA experimental e controles conectados no build 40, ainda sem comprovação de execução/áudio em aparelho |
+| PSP / Dreamcast | PPSSPP / Flycast | Empacotados em IPA experimental arm64 com analógico e botões próprios; ainda sem comprovação de execução/áudio em aparelho |
 | 3DS | Citra | Compilou arm64 e tem perfil de telas; host ainda não oferece a API gráfica exigida, portanto não está no IPA |
 | GameCube | Dolphin | Compilou arm64 genérico sem JIT; não empacotado, renderer e desempenho não validados |
 | PS2 | Play! | Descriptor preparado reaproveitando revisão Android; adapter/renderização e execução sem JIT iOS não validados |
-| Mega Drive, Sega CD/32X | BlastEm | Revisão GPL-3.0+ com alvo iOS e mapeamento de BIOS/botões incluída na receita experimental build 40; compilação do pacote e jogos em aparelho pendentes |
+| Mega Drive, Sega CD/32X | BlastEm | Revisão GPL-3.0+ e mapeamento de BIOS/botões empacotados no IPA experimental build 40; jogos em aparelho pendentes |
 | Arcade genérico | Em avaliação | Sem backend aprovado nesta etapa; não entra como suporte integrado |
 
 ## Registro de problemas e alternativas
@@ -184,8 +184,8 @@ Ainda é necessário validar sensibilidade e ergonomia em aparelho.
   `1e0de94dc7e669c0925a22c0fccf6cdc837af0a0`, cujo alvo `ios-arm64` não
   exige JIT. A receita inclui COPYING e avisos de zlib/libchdr/LZMA. O núcleo
   pede BIOS do usuário com nomes exatos para Sega CD e 32X.
-- **Status:** ligado ao build experimental 40, mas ainda sem resultado da IPA
-  ou teste de jogo. Arcade permanece sem backend aprovado.
+- **Status:** compilou e foi empacotado no IPA experimental 40; ainda sem
+  teste de jogo. Arcade permanece sem backend aprovado.
 
 ## Evidência e aceitação
 
@@ -205,7 +205,12 @@ comprovam áudio em aparelho.
 O [IPA experimental build 38](https://github.com/GBrum0o0/BRUMCLASSICS/actions/runs/37231008787)
 passou novamente com controle analógico N64 e 12 núcleos. SHA-256:
 `687b2a09bd9d1d5d4d20ddcb10dc7b356bb9f6a23078f4c2469f4835c651823c`.
-Os builds 39/40 ainda são receitas em validação, não resultados jogáveis.
+O [IPA experimental build 40](https://github.com/GBrum0o0/BRUMCLASSICS/actions/runs/37250085938)
+passou no simulador e empacotou 15 núcleos arm64, incluindo PPSSPP, Flycast e
+BlastEm, além dos recursos do PSP e avisos de licença. SHA-256:
+`851e9d159ff05ee23f0e6435a39226b0a448d2d1922bb6106d5f5fa28821bba0`.
+Isto valida integridade e compilação, não compatibilidade real de jogos nem
+ausência de falhas de áudio ou encerramento no iPhone.
 
 Antes de ativar cada candidato: iniciar ROM legal de teste, verificar vídeo e
 áudio contínuos, pad virtual/físico, pausa/menu/background/interrupção, retorno
