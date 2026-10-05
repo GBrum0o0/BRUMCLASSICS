@@ -14,6 +14,8 @@ class PackageValidationTests(unittest.TestCase):
                 include_nestopia=True, include_beetle_pce=True, include_beetle_wswan=True, include_bsnes=True, include_licenses=True,
                 experimental=False, include_n64=True, include_psx=True, include_saturn=True,
                 include_stella=True, include_ppsspp=True, include_flycast=True, include_blastem=True,
+                include_mame=True, include_dolphin=True, include_dolphin_assets=True,
+                include_arcade_gc_notices=True,
                 include_ppsspp_assets=True, candidate_cpu=0x0100000C, candidate_licenses=True,
                 include_blastem_vendor_licenses=True,
                 experimental_build="37"):
@@ -47,6 +49,20 @@ class PackageValidationTests(unittest.TestCase):
                     candidates.append((include_blastem, "blastem_libretro_ios.dylib", "BlastEm-LICENSE.txt"))
                     if include_blastem_vendor_licenses:
                         for notice in ["BlastEm-libchdr-LICENSE.txt", "BlastEm-LZMA-LICENSE.txt", "BlastEm-zlib-LICENSE.txt"]:
+                            archive.writestr(root + "Frameworks/" + notice, "license fixture")
+                if int(experimental_build) >= 44:
+                    candidates += [
+                        (include_mame, "mamearcade2016_libretro_ios.dylib", "MAME2016-LICENSE.md"),
+                        (include_dolphin, "dolphin_libretro_ios.dylib", "Dolphin-LICENSE.txt"),
+                    ]
+                    if include_dolphin_assets:
+                        archive.writestr(root + "Frameworks/CoreAssets/dolphin-emu/Sys/GC/font_sjis.bin", "asset fixture")
+                    if include_arcade_gc_notices:
+                        for notice in ("MAME2016-THIRD-PARTY.md", "MAME2016-softfloat-NOTICE.txt",
+                                       "MAME2016-expat-LICENSE.txt", "MAME2016-FLAC-LICENSE.txt",
+                                       "MAME2016-libuv-LICENSE.txt", "MAME2016-http-parser-LICENSE.txt",
+                                       "MAME2016-LZMA-NOTICE.txt", "Dolphin-COPYING.txt",
+                                       "Dolphin-BSD-3-Clause.txt", "Dolphin-CC0-1.0.txt", "Dolphin-MIT.txt"):
                             archive.writestr(root + "Frameworks/" + notice, "license fixture")
                 for enabled, filename, license_name in candidates:
                     if enabled:
@@ -150,6 +166,18 @@ class PackageValidationTests(unittest.TestCase):
                 validate_ipa(self.fixture(folder, experimental=True, experimental_build="40", include_blastem=False))
             with self.assertRaisesRegex(ValueError, "BlastEm-libchdr-LICENSE.txt is absent"):
                 validate_ipa(self.fixture(folder, experimental=True, experimental_build="40", include_blastem_vendor_licenses=False))
+
+    def test_arcade_gamecube_experimental_build_requires_cores_assets_and_notices(self):
+        with tempfile.TemporaryDirectory() as folder:
+            result = validate_ipa(self.fixture(folder, experimental=True, experimental_build="44"))
+            self.assertEqual(len(result["integratedCores"]), 17)
+            for option in ["include_mame", "include_dolphin"]:
+                with self.assertRaisesRegex(ValueError, "core is absent"):
+                    validate_ipa(self.fixture(folder, experimental=True, experimental_build="44", **{option: False}))
+            with self.assertRaisesRegex(ValueError, "Dolphin core assets are absent"):
+                validate_ipa(self.fixture(folder, experimental=True, experimental_build="44", include_dolphin_assets=False))
+            with self.assertRaisesRegex(ValueError, "MAME2016-THIRD-PARTY.md is absent"):
+                validate_ipa(self.fixture(folder, experimental=True, experimental_build="44", include_arcade_gc_notices=False))
 
     def test_experimental_package_rejects_wrong_cpu_and_missing_license(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build the two GLES candidates from pinned sources in the same job as the IPA.
+# Build pinned heavy candidates in the same job as the IPA.
 # A candidate is still experimental until gameplay, audio and saves pass on an
 # actual iPhone. Never fetch an expiring artifact from another workflow run.
 if [ "$#" -ne 2 ]; then
-  echo "usage: $0 <ppsspp|flycast> <app-directory>" >&2
+  echo "usage: $0 <ppsspp|flycast|dolphin> <app-directory>" >&2
   exit 2
 fi
 
@@ -30,6 +30,14 @@ case "$CORE" in
     LIBRARY=flycast_libretro_ios.dylib
     LICENSE=LICENSE
     LICENSE_OUT=Flycast-LICENSE.txt
+    ;;
+  dolphin)
+    REPOSITORY=https://github.com/libretro/dolphin.git
+    COMMIT=4d23cf151640eb810cb1b8e9d9fc922cf59c0b87
+    TARGET=dolphin_libretro
+    LIBRARY=dolphin_libretro_ios.dylib
+    LICENSE=LICENSES/GPL-2.0-or-later.txt
+    LICENSE_OUT=Dolphin-LICENSE.txt
     ;;
   *) echo "unknown core: $CORE" >&2; exit 2 ;;
 esac
@@ -67,6 +75,12 @@ case "$CORE" in
       -DCMAKE_C_FLAGS=-DIOS=1 -DCMAKE_CXX_FLAGS=-DIOS=1 \
       -DUSE_HOST_LIBZIP=OFF -DUSE_HOST_GLSLANG=OFF -DENABLE_CTEST=OFF
     ;;
+  dolphin)
+    git -C "$SOURCE" apply --unidiff-zero "$SCRIPT_DIR/patches/dolphin-generic-memtools.patch"
+    cmake -S "$SOURCE" -B "$BUILD" "${COMMON_FLAGS[@]}" \
+      -DIOS=ON -DLIBRETRO=ON -DENABLE_LTO=OFF \
+      -DENABLE_VULKAN=OFF -DENABLE_GENERIC=ON
+    ;;
 esac
 
 cmake --build "$BUILD" --config Release --target "$TARGET" --parallel "$(sysctl -n hw.ncpu)"
@@ -81,4 +95,12 @@ if [ "$CORE" = ppsspp ]; then
   mkdir -p "$APP/Frameworks/CoreAssets/PPSSPP"
   ditto "$SOURCE/assets" "$APP/Frameworks/CoreAssets/PPSSPP"
   test -n "$(find "$APP/Frameworks/CoreAssets/PPSSPP" -type f -print -quit)"
+elif [ "$CORE" = dolphin ]; then
+  mkdir -p "$APP/Frameworks/CoreAssets/dolphin-emu/Sys"
+  ditto "$SOURCE/Data/Sys" "$APP/Frameworks/CoreAssets/dolphin-emu/Sys"
+  test -n "$(find "$APP/Frameworks/CoreAssets/dolphin-emu/Sys" -type f -print -quit)"
+  cp "$SOURCE/COPYING" "$APP/Frameworks/Dolphin-COPYING.txt"
+  cp "$SOURCE/LICENSES/BSD-3-Clause.txt" "$APP/Frameworks/Dolphin-BSD-3-Clause.txt"
+  cp "$SOURCE/LICENSES/CC0-1.0.txt" "$APP/Frameworks/Dolphin-CC0-1.0.txt"
+  cp "$SOURCE/LICENSES/MIT.txt" "$APP/Frameworks/Dolphin-MIT.txt"
 fi

@@ -47,6 +47,8 @@ declaração de jogos validados em iPhone. Os fontes e receitas fixados estão e
 - PPSSPP (PSP), GPL-2.0-or-later, revisão `7b4ddb426bbe9e287bb7f19b0cfaebb4ea0d41d8`: https://github.com/libretro/ppsspp
 - Flycast (Dreamcast), GPL-2.0-or-later, revisão `59ed35a7ea7c1940d4c8ac221a662d0e6d6dc9ea`: https://github.com/flyinghead/flycast
 - BlastEm (Mega Drive, Sega CD, 32X), GPL-3.0-or-later, revisão `1e0de94dc7e669c0925a22c0fccf6cdc837af0a0`: https://github.com/libretro/blastem. A IPA inclui também os avisos de libchdr, LZMA e zlib incluídos nesse núcleo.
+- MAME 2016 (arcade, somente IPA experimental), GPL-2.0-or-later no núcleo principal, revisão `ae07c2f88ff2482ba9f50ffc8c9e7e6fbfe97d0a`: https://github.com/libretro/mame2016-libretro. Fontes individuais e bibliotecas vinculadas podem ter avisos próprios; a IPA inclui o resumo de terceiros e avisos de softfloat, expat, FLAC, libuv, http-parser e LZMA. Compatibilidade de ROM sets e jogos ainda requer validação em aparelho.
+- Dolphin (GameCube, somente IPA experimental), GPL-2.0-or-later e componentes com licenças individuais, revisão `4d23cf151640eb810cb1b8e9d9fc922cf59c0b87`: https://github.com/libretro/dolphin. A IPA inclui COPYING, textos BSD/MIT/CC0 e a pasta `Sys` necessária ao núcleo. Execução em aparelho ainda requer validação.
 
 ## Electron, Node.js, Three.js e bibliotecas JavaScript
 

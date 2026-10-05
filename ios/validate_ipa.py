@@ -58,6 +58,7 @@ def validate_ipa(path, expected_version=None):
         expanded_experimental = experimental and int(build_number) >= 37
         heavy_experimental = experimental and int(build_number) >= 39
         sega_experimental = experimental and int(build_number) >= 40
+        arcade_gc_experimental = experimental and int(build_number) >= 44
         if experimental:
             integrated_cores.update({
                 "Beetle PSX": root + "Frameworks/mednafen_psx_libretro_ios.dylib",
@@ -75,6 +76,11 @@ def validate_ipa(path, expected_version=None):
             })
         if sega_experimental:
             integrated_cores["BlastEm"] = root + "Frameworks/blastem_libretro_ios.dylib"
+        if arcade_gc_experimental:
+            integrated_cores.update({
+                "MAME 2016": root + "Frameworks/mamearcade2016_libretro_ios.dylib",
+                "Dolphin": root + "Frameworks/dolphin_libretro_ios.dylib",
+            })
         for core_name, core_path in integrated_cores.items():
             if core_path not in names:
                 raise ValueError(f"Integrated {core_name} core is absent")
@@ -109,6 +115,9 @@ def validate_ipa(path, expected_version=None):
                                   root + "Frameworks/Flycast-LICENSE.txt"]
         if sega_experimental:
             required_licenses += [root + "Frameworks/BlastEm-LICENSE.txt"]
+        if arcade_gc_experimental:
+            required_licenses += [root + "Frameworks/MAME2016-LICENSE.md",
+                                  root + "Frameworks/Dolphin-LICENSE.txt"]
         for license_path in required_licenses:
             if license_path not in names or len(archive.read(license_path)) < 1_000:
                 raise ValueError("Required mobile or core license is absent")
@@ -117,6 +126,18 @@ def validate_ipa(path, expected_version=None):
             raise ValueError("PPSSPP core assets are absent")
         if sega_experimental:
             for notice in ("BlastEm-libchdr-LICENSE.txt", "BlastEm-LZMA-LICENSE.txt", "BlastEm-zlib-LICENSE.txt"):
+                notice_path = root + "Frameworks/" + notice
+                if notice_path not in names or not archive.read(notice_path):
+                    raise ValueError(f"{notice} is absent or empty")
+        if arcade_gc_experimental:
+            if not any(name.startswith(root + "Frameworks/CoreAssets/dolphin-emu/Sys/")
+                       and not name.endswith("/") for name in names):
+                raise ValueError("Dolphin core assets are absent")
+            for notice in ("MAME2016-THIRD-PARTY.md", "MAME2016-softfloat-NOTICE.txt",
+                           "MAME2016-expat-LICENSE.txt", "MAME2016-FLAC-LICENSE.txt",
+                           "MAME2016-libuv-LICENSE.txt", "MAME2016-http-parser-LICENSE.txt",
+                           "MAME2016-LZMA-NOTICE.txt", "Dolphin-COPYING.txt",
+                           "Dolphin-BSD-3-Clause.txt", "Dolphin-CC0-1.0.txt", "Dolphin-MIT.txt"):
                 notice_path = root + "Frameworks/" + notice
                 if notice_path not in names or not archive.read(notice_path):
                     raise ValueError(f"{notice} is absent or empty")

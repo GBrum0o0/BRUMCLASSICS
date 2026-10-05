@@ -185,6 +185,7 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     UIButton *_displayModeButton;
     UIButton *_stateButton;
     BrumVirtualStick *_virtualStick;
+    BrumVirtualStick *_rightVirtualStick;
     UIView *_digitalPad;
     UIButton *_padModeButton;
     BOOL _dpadMode;
@@ -252,6 +253,7 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
 - (UIStackView *)n64ActionPad;
 - (UIStackView *)segaActionPad;
 - (void)virtualStickChanged:(BrumVirtualStick *)stick;
+- (void)rightVirtualStickChanged:(BrumVirtualStick *)stick;
 - (void)toggleAnalogPadMode;
 - (void)updateN64CButtons;
 @end
@@ -897,6 +899,8 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         _n64CButtonMask = 0;
         [_virtualStick reset];
         _virtualStick.enabled = NO;
+        [_rightVirtualStick reset];
+        _rightVirtualStick.enabled = NO;
         _pointerPressed = NO;
         if (_audioQueue) AudioQueuePause(_audioQueue);
         os_unfair_lock_lock(&_audioLock); _audioRead = 0; _audioWrite = 0; _audioCount = 0; os_unfair_lock_unlock(&_audioLock);
@@ -904,6 +908,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         return;
     }
     _virtualStick.enabled = !_dpadMode;
+    _rightVirtualStick.enabled = YES;
     if (!_audioQueue) return;
     NSError *error = nil;
     if (![AVAudioSession.sharedInstance setActive:YES error:&error]) {
@@ -987,20 +992,29 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 
     const BOOL isN64 = [_emulatedSystemID isEqualToString:@"n64"];
     const BOOL isDreamcast = [_emulatedSystemID isEqualToString:@"dreamcast"];
+    const BOOL isGameCube = [_emulatedSystemID isEqualToString:@"gamecube"];
     const BOOL isSega = [@[@"md", @"segacd", @"32x"] containsObject:_emulatedSystemID];
-    const BOOL hasAnalogPad = isN64 || isDreamcast || [_emulatedSystemID isEqualToString:@"psp"];
+    const BOOL hasAnalogPad = isN64 || isDreamcast || isGameCube || [_emulatedSystemID isEqualToString:@"psp"];
     UIView *up = hasAnalogPad ? [self analogPad] : [self directionPad];
     UIView *actions = isN64 ? [self n64ActionPad] : isSega ? [self segaActionPad] : [self actionPad];
     UIButton *start = [self controlButton:@"START" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_START];
-    NSArray<UIButton *> *menuButtons = isDreamcast ? @[start] : @[
+    NSArray<UIButton *> *menuButtons = (isDreamcast || isGameCube) ? @[start] : @[
         [self controlButton:isN64 ? @"Z" : isSega ? @"MODE" : @"SELECT" identifier:isN64 ? BRUM_RETRO_DEVICE_ID_JOYPAD_L2 : BRUM_RETRO_DEVICE_ID_JOYPAD_SELECT], start
     ];
     UIStackView *menu = [[UIStackView alloc] initWithArrangedSubviews:menuButtons];
-    UIButton *leftShoulder = [self controlButton:isDreamcast ? @"LT" : @"L" identifier:isDreamcast ? BRUM_RETRO_DEVICE_ID_JOYPAD_L2 : BRUM_RETRO_DEVICE_ID_JOYPAD_L];
-    UIButton *rightShoulder = [self controlButton:isDreamcast ? @"RT" : @"R" identifier:isDreamcast ? BRUM_RETRO_DEVICE_ID_JOYPAD_R2 : BRUM_RETRO_DEVICE_ID_JOYPAD_R];
+    UIButton *leftShoulder = [self controlButton:isDreamcast ? @"LT" : @"L" identifier:(isDreamcast || isGameCube) ? BRUM_RETRO_DEVICE_ID_JOYPAD_L2 : BRUM_RETRO_DEVICE_ID_JOYPAD_L];
+    UIButton *rightShoulder = [self controlButton:isDreamcast ? @"RT" : @"R" identifier:(isDreamcast || isGameCube) ? BRUM_RETRO_DEVICE_ID_JOYPAD_R2 : BRUM_RETRO_DEVICE_ID_JOYPAD_R];
     leftShoulder.hidden = isSega;
     rightShoulder.hidden = isSega;
     [self.view addSubview:leftShoulder]; [self.view addSubview:rightShoulder];
+    if (isGameCube) {
+        UIButton *z = [self controlButton:@"Z" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_R];
+        [self.view addSubview:z];
+        [NSLayoutConstraint activateConstraints:@[
+            [z.trailingAnchor constraintEqualToAnchor:rightShoulder.leadingAnchor constant:-8],
+            [z.centerYAnchor constraintEqualToAnchor:rightShoulder.centerYAnchor]
+        ]];
+    }
     if ([_emulatedSystemID isEqualToString:@"psx"]) {
         [leftShoulder setTitle:@"L1" forState:UIControlStateNormal];
         [rightShoulder setTitle:@"R1" forState:UIControlStateNormal];
@@ -1018,6 +1032,19 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     menu.axis = UILayoutConstraintAxisHorizontal;
     menu.spacing = 10;
     [self.view addSubview:up]; [self.view addSubview:actions]; [self.view addSubview:menu];
+    if (isGameCube) {
+        _rightVirtualStick = [[BrumVirtualStick alloc] initWithFrame:CGRectZero];
+        _rightVirtualStick.translatesAutoresizingMaskIntoConstraints = NO;
+        _rightVirtualStick.accessibilityLabel = @"Stick C";
+        [_rightVirtualStick addTarget:self action:@selector(rightVirtualStickChanged:) forControlEvents:UIControlEventValueChanged];
+        [self.view addSubview:_rightVirtualStick];
+        [NSLayoutConstraint activateConstraints:@[
+            [_rightVirtualStick.widthAnchor constraintEqualToConstant:106],
+            [_rightVirtualStick.heightAnchor constraintEqualToConstant:106],
+            [_rightVirtualStick.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor constant:-102],
+            [_rightVirtualStick.bottomAnchor constraintEqualToAnchor:actions.topAnchor constant:-10]
+        ]];
+    }
     if (hasAnalogPad) {
         _digitalPad = [self directionPad];
         _digitalPad.hidden = YES;
@@ -1168,6 +1195,11 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 - (void)virtualStickChanged:(BrumVirtualStick *)stick {
     [self setAnalogStick:0 axis:0 value:_dpadMode ? 0 : stick.horizontal source:BrumInputVirtualPad];
     [self setAnalogStick:0 axis:1 value:_dpadMode ? 0 : stick.vertical source:BrumInputVirtualPad];
+}
+
+- (void)rightVirtualStickChanged:(BrumVirtualStick *)stick {
+    [self setAnalogStick:1 axis:0 value:stick.horizontal source:BrumInputVirtualPad];
+    [self setAnalogStick:1 axis:1 value:stick.vertical source:BrumInputVirtualPad];
 }
 
 - (void)toggleAnalogPadMode {

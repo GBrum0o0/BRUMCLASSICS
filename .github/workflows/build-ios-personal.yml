@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       experimental:
-        description: "Build de teste com N64/PS1/Saturn/Atari/PSP/Dreamcast/Mega Drive/CD/32X; não publicar release"
+        description: "Build de teste com Arcade/GameCube e demais backends experimentais; não publicar release"
         type: boolean
         default: false
   push:
@@ -316,7 +316,7 @@ jobs:
           chmod 755 "$APP/Frameworks/mednafen_wswan_libretro_ios.dylib"
           file "$APP/Frameworks/mednafen_wswan_libretro_ios.dylib" | grep -q arm64
 
-      - name: Incluir N64, PS1, Saturn, Atari, PSP, Dreamcast e Sega no build experimental
+      - name: Incluir backends experimentais iOS
         if: inputs.experimental
         working-directory: ios
         shell: bash
@@ -359,9 +359,11 @@ jobs:
           done
           bash build-heavy-experimental.sh ppsspp "$APP"
           bash build-heavy-experimental.sh flycast "$APP"
+          bash build-heavy-experimental.sh dolphin "$APP"
+          bash build-arcade-experimental.sh "$APP"
           /usr/libexec/PlistBuddy -c 'Add :BRUMExperimentalBackends bool true' "$APP/Info.plist"
           /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName BRUM Core Teste' "$APP/Info.plist"
-          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 42' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 44' "$APP/Info.plist"
 
       - name: Empacotar IPA pessoal
         working-directory: ios

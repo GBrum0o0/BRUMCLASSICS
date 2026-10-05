@@ -1,0 +1,25 @@
+diff --git a/src/osd/retro/libretro.cpp b/src/osd/retro/libretro.cpp
+--- a/src/osd/retro/libretro.cpp
++++ b/src/osd/retro/libretro.cpp
+@@ -421,8 +421,10 @@
+ void update_geometry()
+ {
+-   struct retro_system_av_info system_av_info;
+-   system_av_info.geometry.base_width = fb_width;
+-   system_av_info.geometry.base_height = fb_height;
+-   system_av_info.geometry.aspect_ratio = retro_aspect;
+-   environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &system_av_info);
++   struct retro_game_geometry geometry = {};
++   geometry.base_width = fb_width;
++   geometry.base_height = fb_height;
++   geometry.max_width = fb_width;
++   geometry.max_height = fb_height;
++   geometry.aspect_ratio = retro_aspect;
++   environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &geometry);
+ }
+@@ -599,3 +601,5 @@
+ bool retro_load_game(const struct retro_game_info *info)
+ {
+     char basename[256];
++    if (!info || !info->path || strlen(info->path) >= sizeof(RPATH))
++        return false;
