@@ -1,6 +1,6 @@
 # BRUM Core: integração incremental de backends
 
-Estado em 04/10/2026, branch `codex/brum-backends`. Este documento distingue
+Estado em 05/10/2026, branch `codex/brum-backends`. Este documento distingue
 infraestrutura implementada, compilação e validação real de jogos. Compilar um
 núcleo não o promove automaticamente a suporte do BRUM Core.
 
@@ -76,7 +76,7 @@ Ainda é necessário validar sensibilidade e ergonomia em aparelho.
 |---|---|---|
 | GB/GBC/GBA, NES e demais núcleos anteriores | mGBA, Nestopia, Geolith, Gearsystem, PCE Fast, bsnes, WonderSwan | Mantidos na lista ativa e no empacotamento anterior; regressão em aparelho pendente |
 | DS | SkyEmu | Conectado ao Screen Manager; testes de geometria/toque passaram; teste de jogo no iPhone pendente |
-| N64 | Mupen64Plus-Next | Empacotado apenas no IPA experimental build 38 com GLES/HLE sem dynarec e controle analógico; teste em aparelho pendente |
+| N64 | Mupen64Plus-Next | Empacotado apenas no IPA experimental build 42 com GLES/HLE sem dynarec e controle analógico; teste em aparelho pendente |
 | PS1 | Beetle PSX | Empacotado apenas no IPA experimental com BIOS do usuário; teste em aparelho pendente |
 | Saturn | Beetle Saturn | Empacotado apenas no IPA experimental build 37; desempenho, BIOS do usuário e teste em aparelho pendentes |
 | Atari 2600 | Stella2014 | Empacotado apenas no IPA experimental; teste em aparelho pendente |
@@ -84,8 +84,8 @@ Ainda é necessário validar sensibilidade e ergonomia em aparelho.
 | 3DS | Citra | Compilou arm64 e tem perfil de telas; host ainda não oferece a API gráfica exigida, portanto não está no IPA |
 | GameCube | Dolphin | Compilou arm64 genérico sem JIT; não empacotado, renderer e desempenho não validados |
 | PS2 | Play! | Descriptor preparado reaproveitando revisão Android; adapter/renderização e execução sem JIT iOS não validados |
-| Mega Drive, Sega CD/32X | BlastEm | Revisão GPL-3.0+ e mapeamento de BIOS/botões empacotados no IPA experimental build 40; jogos em aparelho pendentes |
-| Arcade genérico | Em avaliação | Sem backend aprovado nesta etapa; não entra como suporte integrado |
+| Mega Drive, Sega CD/32X | BlastEm | Revisão GPL-3.0+ e mapeamento de BIOS/botões empacotados no IPA experimental build 42; jogos em aparelho pendentes |
+| Arcade genérico | MAME 2016 em avaliação | Núcleo arm64 compilado em probe isolado; ainda não entra no app/IPA: auditoria por componente, compatibilidade de ROM sets e execução segura em iPhone pendentes |
 
 ## Registro de problemas e alternativas
 
@@ -187,10 +187,14 @@ Ainda é necessário validar sensibilidade e ergonomia em aparelho.
   `1e0de94dc7e669c0925a22c0fccf6cdc837af0a0`, cujo alvo `ios-arm64` não
   exige JIT. A receita inclui COPYING e avisos de zlib/libchdr/LZMA. O núcleo
   pede BIOS do usuário com nomes exatos para Sega CD e 32X.
-- **Status:** BlastEm compilou e foi empacotado no IPA experimental 40; ainda
-  sem teste de jogo. Arcade permanece sem backend aprovado. Um workflow separado
-  experimenta MAME 2016 arm64, sem ativá-lo no app ou no pacote antes da
-  auditoria completa e de testes de ROMs legais.
+- **Status:** BlastEm compilou e foi empacotado no IPA experimental 42; ainda
+  sem teste de jogo. O probe separado do MAME 2016, revisão
+  `ae07c2f88ff2482ba9f50ffc8c9e7e6fbfe97d0a`, produziu um dylib arm64 de
+  112.400.384 bytes no [workflow 37283668369](https://github.com/GBrum0o0/BRUMCLASSICS/actions/runs/37283668369).
+  O núcleo pede `zip|chd|7z|cmd` por caminho e inicia a máquina no primeiro
+  frame, após `retro_load_game`. Compilação não valida ROM sets, falhas de
+  inicialização, licença de cada componente incluído nem desempenho. Arcade
+  permanece fora da lista ativa e do IPA até essas verificações.
 
 ## Evidência e aceitação
 
@@ -216,6 +220,11 @@ BlastEm, além dos recursos do PSP e avisos de licença. SHA-256:
 `851e9d159ff05ee23f0e6435a39226b0a448d2d1922bb6106d5f5fa28821bba0`.
 Isto valida integridade e compilação, não compatibilidade real de jogos nem
 ausência de falhas de áudio ou encerramento no iPhone.
+O [IPA experimental build 42](https://github.com/GBrum0o0/BRUMCLASSICS/actions/runs/37282864161)
+passou no simulador e na validação estrutural local dos mesmos 15 núcleos,
+incluindo a mudança no contrato de áudio/vídeo Libretro. SHA-256:
+`1d4fed715437263b255be2a685c4914ae224f4e556fbe27dd4b61e9d78e49842`.
+Permanece sem assinatura para Sideloadly; não há teste de jogo em aparelho.
 
 Antes de ativar cada candidato: iniciar ROM legal de teste, verificar vídeo e
 áudio contínuos, pad virtual/físico, pausa/menu/background/interrupção, retorno
