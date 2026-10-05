@@ -24,8 +24,11 @@ jobs:
           git -C "$SOURCE" checkout --detach ae07c2f88ff2482ba9f50ffc8c9e7e6fbfe97d0a
           test "$(git -C "$SOURCE" rev-parse HEAD)" = ae07c2f88ff2482ba9f50ffc8c9e7e6fbfe97d0a
           grep -q 'GNU General Public License version 2 or later' "$SOURCE/LICENSE.md"
-          make -C "$SOURCE" -f Makefile.libretro platform=ios-arm64 SUBTARGET=arcade IOS_MINVER=16.0 -j"$(sysctl -n hw.ncpu)"
-          CORE="$SOURCE/mame2016_libretro_ios.dylib"
+          # The arcade subtarget links as mamearcade2016_libretro.dylib. The
+          # upstream wrapper's generic post-build rename assumes the default
+          # subtarget name, so disable only that rename for this probe.
+          make -C "$SOURCE" -f Makefile.libretro platform=ios-arm64 SUBTARGET=arcade IOS_MINVER=16.0 CORE_SUFFIX= -j"$(sysctl -n hw.ncpu)"
+          CORE="$SOURCE/mamearcade2016_libretro.dylib"
           test -f "$CORE"
           file "$CORE" | grep -q arm64
           otool -L "$CORE"
