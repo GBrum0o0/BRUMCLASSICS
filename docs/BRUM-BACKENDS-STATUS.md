@@ -85,7 +85,7 @@ Ainda é necessário validar sensibilidade e ergonomia em aparelho.
 | GameCube | Dolphin | Compilou arm64 genérico sem JIT; não empacotado, renderer e desempenho não validados |
 | PS2 | Play! | Descriptor preparado reaproveitando revisão Android; adapter/renderização e execução sem JIT iOS não validados |
 | Mega Drive, Sega CD/32X | BlastEm | Revisão GPL-3.0+ e mapeamento de BIOS/botões empacotados no IPA experimental build 42; jogos em aparelho pendentes |
-| Arcade genérico | MAME 2016 em avaliação | Núcleo arm64 compilado em probe isolado; ainda não entra no app/IPA: auditoria por componente, compatibilidade de ROM sets e execução segura em iPhone pendentes |
+| Arcade genérico | MAME 2016 em avaliação | Núcleo arm64 compilado em probe isolado e descriptor registrado apenas como candidato; ainda não entra na lista jogável ou no IPA: auditoria por componente, compatibilidade de ROM sets e execução segura em iPhone pendentes |
 
 ## Registro de problemas e alternativas
 

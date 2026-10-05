@@ -205,6 +205,14 @@ enum CoreRegistry {
         libraryName: "flycast_libretro_ios.dylib", supportedSystems: [.dreamcast]
     )
 
+    // Compiled for iOS arm64 in the isolated arcade probe. Deliberately not
+    // included in experimental until ROM-set, device and license acceptance.
+    static let mame2016 = CoreDescriptor(
+        id: "mame2016", displayName: "MAME 2016",
+        version: "ae07c2f88ff2482ba9f50ffc8c9e7e6fbfe97d0a", license: "GPL-2.0-or-later",
+        libraryName: "mamearcade2016_libretro_ios.dylib", supportedSystems: [.arcade]
+    )
+
     static let citra = CoreDescriptor(
         id: "citra", displayName: "Citra",
         version: "a0483e9abe8134ae6b290cdca7d49cb77689f05b", license: "GPL-2.0-or-later",
@@ -226,7 +234,7 @@ enum CoreRegistry {
     // A descriptor alone does not enable a backend. Preserve the existing release
     // while new engines pass independent builds and device acceptance tests.
     static let all = [mgba, skyEmu, geolith, gearsystem, nestopia, beetlePCEFast, bsnesMercury, beetleWonderSwan]
-    static let candidates = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, ppsspp, flycast, blastEm, citra, dolphin, play]
+    static let candidates = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, ppsspp, flycast, blastEm, mame2016, citra, dolphin, play]
     static let experimental = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, ppsspp, flycast, blastEm]
     static var experimentalBuild: Bool {
         Bundle.main.object(forInfoDictionaryKey: "BRUMExperimentalBackends") as? Bool == true
