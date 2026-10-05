@@ -13,7 +13,8 @@ class PackageValidationTests(unittest.TestCase):
                 include_skyemu=True, include_geolith=True, include_gearsystem=True,
                 include_nestopia=True, include_beetle_pce=True, include_beetle_wswan=True, include_bsnes=True, include_licenses=True,
                 experimental=False, include_n64=True, include_psx=True, include_saturn=True,
-                include_stella=True, candidate_cpu=0x0100000C, candidate_licenses=True,
+                include_stella=True, include_ppsspp=True, include_flycast=True,
+                include_ppsspp_assets=True, candidate_cpu=0x0100000C, candidate_licenses=True,
                 experimental_build="37"):
         path = Path(folder) / "test.ipa"
         root = f"Payload/{app}.app/"
@@ -28,12 +29,20 @@ class PackageValidationTests(unittest.TestCase):
         with zipfile.ZipFile(path, "w") as archive:
             archive.writestr(root + "Info.plist", plistlib.dumps(info))
             if experimental is True:
-                for enabled, filename, license_name in [
+                candidates = [
                     (include_n64, "mupen64plus_next_libretro_ios.dylib", "Mupen64Plus-Next-LICENSE.txt"),
                     (include_psx, "mednafen_psx_libretro_ios.dylib", "Beetle-PSX-LICENSE.txt"),
                     (include_saturn, "mednafen_saturn_libretro_ios.dylib", "Beetle-Saturn-LICENSE.txt"),
                     (include_stella, "stella2014_libretro_ios.dylib", "Stella2014-LICENSE.txt"),
-                ]:
+                ]
+                if int(experimental_build) >= 39:
+                    candidates += [
+                        (include_ppsspp, "ppsspp_libretro_ios.dylib", "PPSSPP-LICENSE.txt"),
+                        (include_flycast, "flycast_libretro_ios.dylib", "Flycast-LICENSE.txt"),
+                    ]
+                    if include_ppsspp_assets:
+                        archive.writestr(root + "Frameworks/CoreAssets/PPSSPP/lang/en_US.ini", "language fixture")
+                for enabled, filename, license_name in candidates:
                     if enabled:
                         entry = zipfile.ZipInfo(root + "Frameworks/" + filename)
                         entry.create_system = 3
@@ -116,6 +125,16 @@ class PackageValidationTests(unittest.TestCase):
             result = validate_ipa(self.fixture(folder, experimental=True, experimental_build="36",
                                                include_n64=False, include_saturn=False))
             self.assertEqual(len(result["integratedCores"]), 10)
+
+    def test_heavy_experimental_build_requires_both_cores_and_assets(self):
+        with tempfile.TemporaryDirectory() as folder:
+            result = validate_ipa(self.fixture(folder, experimental=True, experimental_build="39"))
+            self.assertEqual(len(result["integratedCores"]), 14)
+            for option in ["include_ppsspp", "include_flycast"]:
+                with self.assertRaisesRegex(ValueError, "core is absent"):
+                    validate_ipa(self.fixture(folder, experimental=True, experimental_build="39", **{option: False}))
+            with self.assertRaisesRegex(ValueError, "assets are absent"):
+                validate_ipa(self.fixture(folder, experimental=True, experimental_build="39", include_ppsspp_assets=False))
 
     def test_experimental_package_rejects_wrong_cpu_and_missing_license(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -56,6 +56,7 @@ def validate_ipa(path, expected_version=None):
         if experimental and (not isinstance(build_number, str) or not build_number.isdecimal() or int(build_number) < 36):
             raise ValueError("Invalid experimental build number")
         expanded_experimental = experimental and int(build_number) >= 37
+        heavy_experimental = experimental and int(build_number) >= 39
         if experimental:
             integrated_cores.update({
                 "Beetle PSX": root + "Frameworks/mednafen_psx_libretro_ios.dylib",
@@ -65,6 +66,11 @@ def validate_ipa(path, expected_version=None):
             integrated_cores.update({
                 "Mupen64Plus-Next": root + "Frameworks/mupen64plus_next_libretro_ios.dylib",
                 "Beetle Saturn": root + "Frameworks/mednafen_saturn_libretro_ios.dylib",
+            })
+        if heavy_experimental:
+            integrated_cores.update({
+                "PPSSPP": root + "Frameworks/ppsspp_libretro_ios.dylib",
+                "Flycast": root + "Frameworks/flycast_libretro_ios.dylib",
             })
         for core_name, core_path in integrated_cores.items():
             if core_path not in names:
@@ -95,9 +101,15 @@ def validate_ipa(path, expected_version=None):
         if expanded_experimental:
             required_licenses += [root + "Frameworks/Mupen64Plus-Next-LICENSE.txt",
                                   root + "Frameworks/Beetle-Saturn-LICENSE.txt"]
+        if heavy_experimental:
+            required_licenses += [root + "Frameworks/PPSSPP-LICENSE.txt",
+                                  root + "Frameworks/Flycast-LICENSE.txt"]
         for license_path in required_licenses:
             if license_path not in names or len(archive.read(license_path)) < 1_000:
                 raise ValueError("Required mobile or core license is absent")
+        if heavy_experimental and not any(name.startswith(root + "Frameworks/CoreAssets/PPSSPP/")
+                                          and not name.endswith("/") for name in names):
+            raise ValueError("PPSSPP core assets are absent")
         if info.get("CFBundleIdentifier") != "com.brumclassics.mobile.ios":
             raise ValueError("Unexpected bundle identifier")
         if "iPhoneOS" not in info.get("CFBundleSupportedPlatforms", []):

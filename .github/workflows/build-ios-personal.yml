@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       experimental:
-        description: "Build de teste com N64/PS1/Saturn/Atari; não publicar release"
+        description: "Build de teste com N64/PS1/Saturn/Atari/PSP/Dreamcast; não publicar release"
         type: boolean
         default: false
   push:
@@ -28,7 +28,7 @@ permissions:
 jobs:
   build-unsigned-ipa:
     runs-on: macos-15
-    timeout-minutes: 90
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
 
@@ -316,7 +316,7 @@ jobs:
           chmod 755 "$APP/Frameworks/mednafen_wswan_libretro_ios.dylib"
           file "$APP/Frameworks/mednafen_wswan_libretro_ios.dylib" | grep -q arm64
 
-      - name: Incluir N64, PS1, Saturn e Atari no build experimental
+      - name: Incluir N64, PS1, Saturn, Atari, PSP e Dreamcast no build experimental
         if: inputs.experimental
         working-directory: ios
         shell: bash
@@ -349,9 +349,11 @@ jobs:
             chmod 755 "$APP/Frameworks/$library"
             file "$APP/Frameworks/$library" | grep -q arm64
           done
+          bash build-heavy-experimental.sh ppsspp "$APP"
+          bash build-heavy-experimental.sh flycast "$APP"
           /usr/libexec/PlistBuddy -c 'Add :BRUMExperimentalBackends bool true' "$APP/Info.plist"
           /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName BRUM Core Teste' "$APP/Info.plist"
-          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 38' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 39' "$APP/Info.plist"
 
       - name: Empacotar IPA pessoal
         working-directory: ios

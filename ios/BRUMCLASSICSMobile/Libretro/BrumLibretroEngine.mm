@@ -99,7 +99,7 @@ typedef struct {
     _thumb.userInteractionEnabled = NO;
     [self addSubview:_thumb];
     self.isAccessibilityElement = YES;
-    self.accessibilityLabel = @"Analógico do Nintendo 64";
+    self.accessibilityLabel = @"Controle analógico";
     self.accessibilityHint = @"Arraste para mover o personagem. Toque em D-PAD para usar as setas.";
     return self;
 }
@@ -185,9 +185,9 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     UIButton *_displayModeButton;
     UIButton *_stateButton;
     BrumVirtualStick *_virtualStick;
-    UIView *_n64DigitalPad;
-    UIButton *_n64PadModeButton;
-    BOOL _n64DpadMode;
+    UIView *_digitalPad;
+    UIButton *_padModeButton;
+    BOOL _dpadMode;
     uint8_t _n64CButtonMask;
     NSURL *_romURL;
     NSData *_romData;
@@ -244,10 +244,10 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
 - (BOOL)initializeHardware:(NSError **)error;
 - (void)destroyHardware;
 - (void)handleCoreShutdown;
-- (BrumVirtualStick *)n64AnalogPad;
+- (BrumVirtualStick *)analogPad;
 - (UIStackView *)n64ActionPad;
 - (void)virtualStickChanged:(BrumVirtualStick *)stick;
-- (void)toggleN64PadMode;
+- (void)toggleAnalogPadMode;
 - (void)updateN64CButtons;
 @end
 
@@ -497,7 +497,9 @@ static void BrumInputPoll(void) {
         pad.leftShoulder, pad.rightShoulder, pad.leftTrigger, pad.rightTrigger];
     for (NSUInteger i = 0; i < buttons.count; i++) host->_input.set(brum::InputSource::controller, (unsigned)i, buttons[i].isPressed);
     host->_input.set(brum::InputSource::controller, 2, pad.buttonOptions.isPressed);
-    if ([host->_emulatedSystemID isEqualToString:@"psx"]) {
+    if ([host->_emulatedSystemID isEqualToString:@"psx"] ||
+        [host->_emulatedSystemID isEqualToString:@"psp"] ||
+        [host->_emulatedSystemID isEqualToString:@"dreamcast"]) {
         host->_input.set(brum::InputSource::controller, 0, pad.buttonA.isPressed);
         host->_input.set(brum::InputSource::controller, 8, pad.buttonB.isPressed);
         host->_input.set(brum::InputSource::controller, 1, pad.buttonX.isPressed);
@@ -636,6 +638,20 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         NSURL *destination = [system URLByAppendingPathComponent:folder isDirectory:YES];
         if ([manager fileExistsAtPath:source.path] && ![manager fileExistsAtPath:destination.path]) {
             if (![manager copyItemAtURL:source toURL:destination error:error]) return NO;
+        }
+    }
+
+    // Flycast's system layout uses System/dc, while the Files-folder firmware
+    // importer intentionally accepts BIOS files anywhere under the ROM root.
+    if ([_emulatedSystemID isEqualToString:@"dreamcast"]) {
+        NSURL *dc = [system URLByAppendingPathComponent:@"dc" isDirectory:YES];
+        if (![manager createDirectoryAtURL:dc withIntermediateDirectories:YES attributes:nil error:error]) return NO;
+        for (NSString *filename in @[@"dc_boot.bin", @"dc_flash.bin"]) {
+            NSURL *source = [system URLByAppendingPathComponent:filename];
+            NSURL *destination = [dc URLByAppendingPathComponent:filename];
+            if ([manager fileExistsAtPath:source.path] && ![manager fileExistsAtPath:destination.path]) {
+                if (![manager copyItemAtURL:source toURL:destination error:error]) return NO;
+            }
         }
     }
 
@@ -856,7 +872,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         [self persistSaveRAM];
         return;
     }
-    _virtualStick.enabled = !_n64DpadMode;
+    _virtualStick.enabled = !_dpadMode;
     if (!_audioQueue) return;
     NSError *error = nil;
     if (![AVAudioSession.sharedInstance setActive:YES error:&error]) {
@@ -939,14 +955,17 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [self.view addSubview:_statusLabel];
 
     const BOOL isN64 = [_emulatedSystemID isEqualToString:@"n64"];
-    UIView *up = isN64 ? [self n64AnalogPad] : [self directionPad];
+    const BOOL isDreamcast = [_emulatedSystemID isEqualToString:@"dreamcast"];
+    const BOOL hasAnalogPad = isN64 || isDreamcast || [_emulatedSystemID isEqualToString:@"psp"];
+    UIView *up = hasAnalogPad ? [self analogPad] : [self directionPad];
     UIView *actions = isN64 ? [self n64ActionPad] : [self actionPad];
-    UIStackView *menu = [[UIStackView alloc] initWithArrangedSubviews:@[
-        [self controlButton:isN64 ? @"Z" : @"SELECT" identifier:isN64 ? BRUM_RETRO_DEVICE_ID_JOYPAD_L2 : BRUM_RETRO_DEVICE_ID_JOYPAD_SELECT],
-        [self controlButton:@"START" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_START]
-    ]];
-    UIButton *leftShoulder = [self controlButton:@"L" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_L];
-    UIButton *rightShoulder = [self controlButton:@"R" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_R];
+    UIButton *start = [self controlButton:@"START" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_START];
+    NSArray<UIButton *> *menuButtons = isDreamcast ? @[start] : @[
+        [self controlButton:isN64 ? @"Z" : @"SELECT" identifier:isN64 ? BRUM_RETRO_DEVICE_ID_JOYPAD_L2 : BRUM_RETRO_DEVICE_ID_JOYPAD_SELECT], start
+    ];
+    UIStackView *menu = [[UIStackView alloc] initWithArrangedSubviews:menuButtons];
+    UIButton *leftShoulder = [self controlButton:isDreamcast ? @"LT" : @"L" identifier:isDreamcast ? BRUM_RETRO_DEVICE_ID_JOYPAD_L2 : BRUM_RETRO_DEVICE_ID_JOYPAD_L];
+    UIButton *rightShoulder = [self controlButton:isDreamcast ? @"RT" : @"R" identifier:isDreamcast ? BRUM_RETRO_DEVICE_ID_JOYPAD_R2 : BRUM_RETRO_DEVICE_ID_JOYPAD_R];
     [self.view addSubview:leftShoulder]; [self.view addSubview:rightShoulder];
     if ([_emulatedSystemID isEqualToString:@"psx"]) {
         [leftShoulder setTitle:@"L1" forState:UIControlStateNormal];
@@ -965,21 +984,21 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     menu.axis = UILayoutConstraintAxisHorizontal;
     menu.spacing = 10;
     [self.view addSubview:up]; [self.view addSubview:actions]; [self.view addSubview:menu];
-    if (isN64) {
-        _n64DigitalPad = [self directionPad];
-        _n64DigitalPad.hidden = YES;
-        [self.view addSubview:_n64DigitalPad];
-        _n64PadModeButton = [UIButton buttonWithType:UIButtonTypeSystem];
-        _n64PadModeButton.translatesAutoresizingMaskIntoConstraints = NO;
-        [_n64PadModeButton setTitle:@"D-PAD" forState:UIControlStateNormal];
-        [_n64PadModeButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
-        _n64PadModeButton.titleLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightBold];
-        _n64PadModeButton.backgroundColor = [UIColor colorWithWhite:0.1 alpha:0.82];
-        _n64PadModeButton.layer.cornerRadius = 12;
-        _n64PadModeButton.accessibilityLabel = @"Alternar analógico e direcional digital do N64";
-        _n64PadModeButton.accessibilityValue = @"Analógico ativo";
-        [_n64PadModeButton addTarget:self action:@selector(toggleN64PadMode) forControlEvents:UIControlEventTouchUpInside];
-        [self.view addSubview:_n64PadModeButton];
+    if (hasAnalogPad) {
+        _digitalPad = [self directionPad];
+        _digitalPad.hidden = YES;
+        [self.view addSubview:_digitalPad];
+        _padModeButton = [UIButton buttonWithType:UIButtonTypeSystem];
+        _padModeButton.translatesAutoresizingMaskIntoConstraints = NO;
+        [_padModeButton setTitle:@"D-PAD" forState:UIControlStateNormal];
+        [_padModeButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+        _padModeButton.titleLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightBold];
+        _padModeButton.backgroundColor = [UIColor colorWithWhite:0.1 alpha:0.82];
+        _padModeButton.layer.cornerRadius = 12;
+        _padModeButton.accessibilityLabel = @"Alternar analógico e direcional digital";
+        _padModeButton.accessibilityValue = @"Analógico ativo";
+        [_padModeButton addTarget:self action:@selector(toggleAnalogPadMode) forControlEvents:UIControlEventTouchUpInside];
+        [self.view addSubview:_padModeButton];
     }
 
     UILayoutGuide *safe = self.view.safeAreaLayoutGuide;
@@ -1008,14 +1027,14 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         [leftShoulder.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:18], [leftShoulder.topAnchor constraintEqualToAnchor:safe.topAnchor constant:66],
         [rightShoulder.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-18], [rightShoulder.topAnchor constraintEqualToAnchor:safe.topAnchor constant:66]
     ]];
-    if (isN64) {
+    if (hasAnalogPad) {
         [NSLayoutConstraint activateConstraints:@[
-            [_n64DigitalPad.centerXAnchor constraintEqualToAnchor:up.centerXAnchor],
-            [_n64DigitalPad.centerYAnchor constraintEqualToAnchor:up.centerYAnchor],
-            [_n64PadModeButton.leadingAnchor constraintEqualToAnchor:up.leadingAnchor],
-            [_n64PadModeButton.bottomAnchor constraintEqualToAnchor:up.topAnchor constant:-8],
-            [_n64PadModeButton.widthAnchor constraintEqualToConstant:66],
-            [_n64PadModeButton.heightAnchor constraintEqualToConstant:32]
+            [_digitalPad.centerXAnchor constraintEqualToAnchor:up.centerXAnchor],
+            [_digitalPad.centerYAnchor constraintEqualToAnchor:up.centerYAnchor],
+            [_padModeButton.leadingAnchor constraintEqualToAnchor:up.leadingAnchor],
+            [_padModeButton.bottomAnchor constraintEqualToAnchor:up.topAnchor constant:-8],
+            [_padModeButton.widthAnchor constraintEqualToConstant:66],
+            [_padModeButton.heightAnchor constraintEqualToConstant:32]
         ]];
     }
   }
@@ -1056,7 +1075,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     return pad;
 }
 
-- (BrumVirtualStick *)n64AnalogPad {
+- (BrumVirtualStick *)analogPad {
     _virtualStick = [[BrumVirtualStick alloc] initWithFrame:CGRectZero];
     _virtualStick.translatesAutoresizingMaskIntoConstraints = NO;
     [_virtualStick.widthAnchor constraintEqualToConstant:146].active = YES;
@@ -1089,20 +1108,20 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 }
 
 - (void)virtualStickChanged:(BrumVirtualStick *)stick {
-    [self setAnalogStick:0 axis:0 value:_n64DpadMode ? 0 : stick.horizontal source:BrumInputVirtualPad];
-    [self setAnalogStick:0 axis:1 value:_n64DpadMode ? 0 : stick.vertical source:BrumInputVirtualPad];
+    [self setAnalogStick:0 axis:0 value:_dpadMode ? 0 : stick.horizontal source:BrumInputVirtualPad];
+    [self setAnalogStick:0 axis:1 value:_dpadMode ? 0 : stick.vertical source:BrumInputVirtualPad];
 }
 
-- (void)toggleN64PadMode {
-    _n64DpadMode = !_n64DpadMode;
+- (void)toggleAnalogPadMode {
+    _dpadMode = !_dpadMode;
     [_virtualStick reset];
     for (unsigned direction = 4; direction <= 7; ++direction)
         _input.set(brum::InputSource::virtualPad, direction, false);
-    _virtualStick.hidden = _n64DpadMode;
-    _virtualStick.enabled = !_n64DpadMode && !_paused;
-    _n64DigitalPad.hidden = !_n64DpadMode;
-    [_n64PadModeButton setTitle:_n64DpadMode ? @"STICK" : @"D-PAD" forState:UIControlStateNormal];
-    _n64PadModeButton.accessibilityValue = _n64DpadMode ? @"D-pad ativo" : @"Analógico ativo";
+    _virtualStick.hidden = _dpadMode;
+    _virtualStick.enabled = !_dpadMode && !_paused;
+    _digitalPad.hidden = !_dpadMode;
+    [_padModeButton setTitle:_dpadMode ? @"STICK" : @"D-PAD" forState:UIControlStateNormal];
+    _padModeButton.accessibilityValue = _dpadMode ? @"D-pad ativo" : @"Analógico ativo";
 }
 
 - (void)updateN64CButtons {
@@ -1116,11 +1135,16 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     UIButton *x = [self controlButton:@"X" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_X];
     UIButton *b = [self controlButton:@"B" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_B];
     UIButton *a = [self controlButton:@"A" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_A];
-    if ([_emulatedSystemID isEqualToString:@"psx"]) {
+    if ([_emulatedSystemID isEqualToString:@"psx"] || [_emulatedSystemID isEqualToString:@"psp"]) {
         [y setTitle:@"□" forState:UIControlStateNormal];
         [x setTitle:@"△" forState:UIControlStateNormal];
         [b setTitle:@"×" forState:UIControlStateNormal];
         [a setTitle:@"○" forState:UIControlStateNormal];
+    } else if ([_emulatedSystemID isEqualToString:@"dreamcast"]) {
+        [y setTitle:@"X" forState:UIControlStateNormal];
+        [x setTitle:@"Y" forState:UIControlStateNormal];
+        [b setTitle:@"A" forState:UIControlStateNormal];
+        [a setTitle:@"B" forState:UIControlStateNormal];
     }
     for (UIButton *button in @[y, x, b, a]) { button.layer.cornerRadius = 26; [button.widthAnchor constraintEqualToConstant:52].active = YES; [button.heightAnchor constraintEqualToConstant:52].active = YES; }
     UIStackView *top = [[UIStackView alloc] initWithArrangedSubviews:@[y, x]];

@@ -221,7 +221,7 @@ enum CoreRegistry {
     // while new engines pass independent builds and device acceptance tests.
     static let all = [mgba, skyEmu, geolith, gearsystem, nestopia, beetlePCEFast, bsnesMercury, beetleWonderSwan]
     static let candidates = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, ppsspp, flycast, citra, dolphin, play]
-    static let experimental = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014]
+    static let experimental = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, ppsspp, flycast]
     static var experimentalBuild: Bool {
         Bundle.main.object(forInfoDictionaryKey: "BRUMExperimentalBackends") as? Bool == true
     }
