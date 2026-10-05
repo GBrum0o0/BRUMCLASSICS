@@ -184,8 +184,10 @@ Ainda é necessário validar sensibilidade e ergonomia em aparelho.
   `1e0de94dc7e669c0925a22c0fccf6cdc837af0a0`, cujo alvo `ios-arm64` não
   exige JIT. A receita inclui COPYING e avisos de zlib/libchdr/LZMA. O núcleo
   pede BIOS do usuário com nomes exatos para Sega CD e 32X.
-- **Status:** compilou e foi empacotado no IPA experimental 40; ainda sem
-  teste de jogo. Arcade permanece sem backend aprovado.
+- **Status:** BlastEm compilou e foi empacotado no IPA experimental 40; ainda
+  sem teste de jogo. Arcade permanece sem backend aprovado. Um workflow separado
+  experimenta MAME 2016 arm64, sem ativá-lo no app ou no pacote antes da
+  auditoria completa e de testes de ROMs legais.
 
 ## Evidência e aceitação
 

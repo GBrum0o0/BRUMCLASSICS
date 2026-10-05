@@ -1,0 +1,40 @@
+name: Probe iOS arcade backend
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/brum-backends]
+    paths: [.github/workflows/probe-ios-arcade.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  mame2016-arm64:
+    runs-on: macos-15
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build pinned GPLv2-or-later MAME arcade candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE="$RUNNER_TEMP/mame2016-core"
+          git clone --filter=blob:none https://github.com/libretro/mame2016-libretro.git "$SOURCE"
+          git -C "$SOURCE" checkout --detach ae07c2f88ff2482ba9f50ffc8c9e7e6fbfe97d0a
+          test "$(git -C "$SOURCE" rev-parse HEAD)" = ae07c2f88ff2482ba9f50ffc8c9e7e6fbfe97d0a
+          grep -q 'GNU General Public License version 2 or later' "$SOURCE/LICENSE.md"
+          make -C "$SOURCE" -f Makefile.libretro platform=ios-arm64 SUBTARGET=arcade IOS_MINVER=16.0 -j"$(sysctl -n hw.ncpu)"
+          CORE="$SOURCE/mame2016_libretro_ios.dylib"
+          test -f "$CORE"
+          file "$CORE" | grep -q arm64
+          otool -L "$CORE"
+          mkdir -p candidate
+          cp "$CORE" candidate/
+          cp "$SOURCE/LICENSE.md" candidate/MAME2016-LICENSE.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: brum-ios-core-mame2016-probe
+          path: candidate/
+          retention-days: 7
+          if-no-files-found: error
