@@ -48,6 +48,9 @@ PC/celular são passos futuros, sem necessidade de mudar os cálculos de layout.
 - Falha na inicialização encerra os recursos parcialmente abertos e mantém o
   erro na tela. Falhas de áudio são reportadas; os relatos em aparelho ainda
   precisam de reprodução com jogo, dispositivo e versão do iOS.
+- Mudanças Libretro de geometria e taxa de áudio são aceitas após validação; a
+  AudioQueue é recriada ao fim do frame quando a taxa muda. Isto corrige o
+  contrato do host exigido pelo Flycast, mas ainda não comprova áudio em aparelho.
 - Descritores CUE/M3U/GDI copiam as faixas locais referenciadas com leitura
   coordenada. Caminhos externos são rejeitados. Falha remove somente a cópia
   temporária daquela tentativa; arquivos originais permanecem intactos.

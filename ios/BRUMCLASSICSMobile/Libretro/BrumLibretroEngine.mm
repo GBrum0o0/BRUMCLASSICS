@@ -211,6 +211,7 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     BrumEmulatorExitHandler _onExit;
     NSError *_startupError;
     AudioQueueRef _audioQueue;
+    double _audioSampleRate;
     int16_t *_audioRing;
     size_t _audioCapacity;
     size_t _audioRead;
@@ -225,6 +226,8 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     GLsizei _hardwareSurfaceSize;
     BOOL _hardwarePending;
     BOOL _hardwareInitialized;
+    brum_retro_system_av_info _pendingAVInfo;
+    BOOL _hasPendingAVInfo;
 }
 
 - (void)closeEmulator;
@@ -236,6 +239,7 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
 - (void)loadStateAtSlot:(NSInteger)slot;
 - (void)showStateStatus:(NSString *)text error:(BOOL)error;
 - (BOOL)startAudio:(double)sampleRate error:(NSError **)error;
+- (void)applyPendingAVInfo;
 - (void)presentFrame:(CGImageRef)image;
 - (void)layoutScreens;
 - (void)showScreenMenu;
@@ -273,6 +277,13 @@ static uintptr_t BrumCurrentFramebuffer(void) {
 
 static brum_retro_proc_address_t BrumGetProcAddress(const char *name) {
     return name ? (brum_retro_proc_address_t)dlsym(RTLD_DEFAULT, name) : NULL;
+}
+
+static bool BrumValidGeometry(const brum_retro_game_geometry *geometry) {
+    return geometry && geometry->base_width > 0 && geometry->base_height > 0 &&
+        geometry->max_width >= geometry->base_width && geometry->max_height >= geometry->base_height &&
+        geometry->max_width <= 4096 && geometry->max_height <= 4096 &&
+        isfinite(geometry->aspect_ratio) && geometry->aspect_ratio >= 0;
 }
 
 static void BrumRegisterCoreOption(BrumLibretroViewController *host, const char *key, const char *defaultValue, const char *firstValue) {
@@ -319,6 +330,20 @@ static bool BrumEnvironment(unsigned command, void *data) {
         case BRUM_RETRO_ENVIRONMENT_GET_CORE_ASSETS_DIRECTORY:
             *(const char **)data = host->_coreAssetsDirectory.fileSystemRepresentation;
             return true;
+        case BRUM_RETRO_ENVIRONMENT_SET_GEOMETRY:
+            // Frame dimensions arrive in the video callback; accept a valid
+            // geometry change without inventing a different rendered size.
+            return BrumValidGeometry((const brum_retro_game_geometry *)data);
+        case BRUM_RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO: {
+            const brum_retro_system_av_info *info = (const brum_retro_system_av_info *)data;
+            if (!info || !BrumValidGeometry(&info->geometry) || !isfinite(info->timing.fps) ||
+                info->timing.fps < 20 || info->timing.fps > 240 ||
+                !isfinite(info->timing.sample_rate) || info->timing.sample_rate < 8000 ||
+                info->timing.sample_rate > 192000) return false;
+            host->_pendingAVInfo = *info;
+            host->_hasPendingAVInfo = YES;
+            return true;
+        }
         case BRUM_RETRO_ENVIRONMENT_GET_LANGUAGE:
             *(unsigned *)data = 9; // Portuguese (Brazil)
             return true;
@@ -1487,12 +1512,13 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [self restoreSaveRAM];
     brum_retro_system_av_info avInfo = {};
     _core.getAVInfo(&avInfo);
+    if (_hasPendingAVInfo) { avInfo = _pendingAVInfo; _hasPendingAVInfo = NO; }
     _screenManager.screens = brum::libretroScreens(_coreID.UTF8String, avInfo.geometry.base_width, avInfo.geometry.base_height);
     _stateButton.enabled = (self.capabilities & BrumBackendSaveState) != 0;
     if (![self startAudio:avInfo.timing.sample_rate error:error]) return NO;
     _displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(runFrame)];
     if (@available(iOS 15.0, *)) {
-        float fps = (float)MAX(30.0, MIN(120.0, avInfo.timing.fps));
+        float fps = (float)MAX(20.0, MIN(120.0, avInfo.timing.fps));
         _displayLink.preferredFrameRateRange = CAFrameRateRangeMake(fps, fps, fps);
     } else { _displayLink.preferredFramesPerSecond = (NSInteger)llround(avInfo.timing.fps); }
     [_displayLink addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
@@ -1538,7 +1564,34 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:8 userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"O iOS recusou iniciar o áudio (%d).", (int)status]}];
         return NO;
     }
+    _audioSampleRate = sampleRate;
     return YES;
+}
+
+- (void)applyPendingAVInfo {
+    if (!_hasPendingAVInfo || _stopped) return;
+    const brum_retro_system_av_info info = _pendingAVInfo;
+    _hasPendingAVInfo = NO;
+    if (_displayLink) {
+        float fps = (float)MAX(20.0, MIN(120.0, info.timing.fps));
+        if (@available(iOS 15.0, *)) {
+            _displayLink.preferredFrameRateRange = CAFrameRateRangeMake(fps, fps, fps);
+        } else {
+            _displayLink.preferredFramesPerSecond = (NSInteger)llround(fps);
+        }
+    }
+    if (!_audioQueue || fabs(info.timing.sample_rate - _audioSampleRate) < 1.0) return;
+    AudioQueueRef oldQueue = _audioQueue;
+    _audioQueue = NULL;
+    AudioQueueStop(oldQueue, true);
+    AudioQueueDispose(oldQueue, true);
+    os_unfair_lock_lock(&_audioLock);
+    _audioRead = 0; _audioWrite = 0; _audioCount = 0;
+    os_unfair_lock_unlock(&_audioLock);
+    NSError *error = nil;
+    if (![self startAudio:info.timing.sample_rate error:&error]) {
+        [self showStateStatus:[NSString stringWithFormat:@"ÁUDIO INDISPONÍVEL: %@", error.localizedDescription ?: @"falha ao mudar a taxa"] error:YES];
+    }
 }
 
 - (void)runFrame {
@@ -1551,6 +1604,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         if (_shutdownRequested) break;
     }
     _suppressVideo = NO;
+    [self applyPendingAVInfo];
 }
 
 - (void)restoreSaveRAM {
@@ -1634,10 +1688,12 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 - (void)stopCore {
     if (_stopped) return;
     _stopped = YES;
+    _hasPendingAVInfo = NO;
     _input.clear();
     _pointerPressed = NO;
     [_displayLink invalidate]; _displayLink = nil;
     if (_audioQueue) { AudioQueueStop(_audioQueue, true); AudioQueueDispose(_audioQueue, true); _audioQueue = NULL; }
+    _audioSampleRate = 0;
     [AVAudioSession.sharedInstance setActive:NO withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:nil];
     [self persistSaveRAM];
     if (_hardwareInitialized) [EAGLContext setCurrentContext:_hardwareContext];
