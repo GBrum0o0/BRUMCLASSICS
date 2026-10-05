@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       experimental:
-        description: "Build de teste com N64/PS1/Saturn/Atari/PSP/Dreamcast; não publicar release"
+        description: "Build de teste com N64/PS1/Saturn/Atari/PSP/Dreamcast/Mega Drive/CD/32X; não publicar release"
         type: boolean
         default: false
   push:
@@ -316,7 +316,7 @@ jobs:
           chmod 755 "$APP/Frameworks/mednafen_wswan_libretro_ios.dylib"
           file "$APP/Frameworks/mednafen_wswan_libretro_ios.dylib" | grep -q arm64
 
-      - name: Incluir N64, PS1, Saturn, Atari, PSP e Dreamcast no build experimental
+      - name: Incluir N64, PS1, Saturn, Atari, PSP, Dreamcast e Sega no build experimental
         if: inputs.experimental
         working-directory: ios
         shell: bash
@@ -345,7 +345,15 @@ jobs:
           make -C build/stella2014-core platform=ios-arm64 IOSSDK="$IOSSDK" -j"$(sysctl -n hw.ncpu)"
           cp build/stella2014-core/stella2014_libretro_ios.dylib "$APP/Frameworks/"
           cp build/stella2014-core/stella/license.txt "$APP/Frameworks/Stella2014-LICENSE.txt"
-          for library in mupen64plus_next_libretro_ios.dylib mednafen_psx_libretro_ios.dylib mednafen_saturn_libretro_ios.dylib stella2014_libretro_ios.dylib; do
+          git clone --filter=blob:none https://github.com/libretro/blastem.git build/blastem-core
+          git -C build/blastem-core checkout --detach 1e0de94dc7e669c0925a22c0fccf6cdc837af0a0
+          make -C build/blastem-core -f Makefile.libretro platform=ios-arm64 core -j"$(sysctl -n hw.ncpu)"
+          cp build/blastem-core/blastem_libretro_ios.dylib "$APP/Frameworks/"
+          cp build/blastem-core/COPYING "$APP/Frameworks/BlastEm-LICENSE.txt"
+          cp build/blastem-core/libchdr/LICENSE.txt "$APP/Frameworks/BlastEm-libchdr-LICENSE.txt"
+          cp build/blastem-core/lzma/LICENSE.txt "$APP/Frameworks/BlastEm-LZMA-LICENSE.txt"
+          cp build/blastem-core/zlib/LICENSE "$APP/Frameworks/BlastEm-zlib-LICENSE.txt"
+          for library in mupen64plus_next_libretro_ios.dylib mednafen_psx_libretro_ios.dylib mednafen_saturn_libretro_ios.dylib stella2014_libretro_ios.dylib blastem_libretro_ios.dylib; do
             chmod 755 "$APP/Frameworks/$library"
             file "$APP/Frameworks/$library" | grep -q arm64
           done
@@ -353,7 +361,7 @@ jobs:
           bash build-heavy-experimental.sh flycast "$APP"
           /usr/libexec/PlistBuddy -c 'Add :BRUMExperimentalBackends bool true' "$APP/Info.plist"
           /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName BRUM Core Teste' "$APP/Info.plist"
-          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 39' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 40' "$APP/Info.plist"
 
       - name: Empacotar IPA pessoal
         working-directory: ios

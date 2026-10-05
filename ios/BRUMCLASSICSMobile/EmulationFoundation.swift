@@ -187,6 +187,12 @@ enum CoreRegistry {
         libraryName: "stella2014_libretro_ios.dylib", supportedSystems: [.atari2600]
     )
 
+    static let blastEm = CoreDescriptor(
+        id: "blastem", displayName: "BlastEm",
+        version: "1e0de94dc7e669c0925a22c0fccf6cdc837af0a0", license: "GPL-3.0-or-later",
+        libraryName: "blastem_libretro_ios.dylib", supportedSystems: [.megaDrive, .segaCD, .sega32X]
+    )
+
     static let ppsspp = CoreDescriptor(
         id: "ppsspp", displayName: "PPSSPP",
         version: "7b4ddb426bbe9e287bb7f19b0cfaebb4ea0d41d8", license: "GPL-2.0-or-later",
@@ -220,8 +226,8 @@ enum CoreRegistry {
     // A descriptor alone does not enable a backend. Preserve the existing release
     // while new engines pass independent builds and device acceptance tests.
     static let all = [mgba, skyEmu, geolith, gearsystem, nestopia, beetlePCEFast, bsnesMercury, beetleWonderSwan]
-    static let candidates = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, ppsspp, flycast, citra, dolphin, play]
-    static let experimental = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, ppsspp, flycast]
+    static let candidates = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, ppsspp, flycast, blastEm, citra, dolphin, play]
+    static let experimental = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, ppsspp, flycast, blastEm]
     static var experimentalBuild: Bool {
         Bundle.main.object(forInfoDictionaryKey: "BRUMExperimentalBackends") as? Bool == true
     }

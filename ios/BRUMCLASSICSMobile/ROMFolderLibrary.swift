@@ -84,9 +84,18 @@ enum ROMFolderScanner {
     static let firmwareFilenames: Set<String> = [
         "aes.zip", "neogeo.zip", "neocd.zip", "neocdz.zip",
         "bios_cd_e.bin", "bios_cd_u.bin", "bios_cd_j.bin",
+        "32x_g_bios.bin", "32x_m_bios.bin", "32x_s_bios.bin",
         "scph5500.bin", "scph5501.bin", "scph5502.bin",
         "mpr-17933.bin", "sega_101.bin", "dc_boot.bin", "dc_flash.bin",
         "aes_keys.txt", "seeddb.bin"
+    ]
+    static let firmwareDestinationNames: [String: String] = [
+        "bios_cd_e.bin": "bios_CD_E.bin",
+        "bios_cd_u.bin": "bios_CD_U.bin",
+        "bios_cd_j.bin": "bios_CD_J.bin",
+        "32x_g_bios.bin": "32X_G_BIOS.bin",
+        "32x_m_bios.bin": "32X_M_BIOS.bin",
+        "32x_s_bios.bin": "32X_S_BIOS.bin"
     ]
 
     static func scan(_ root: URL, allowedExtensions: Set<String> = PocketRules.extensions) throws -> ROMFolderScan {
@@ -282,7 +291,7 @@ actor ROMFolderAccess {
     func configure(_ folder: URL) throws -> ROMFolderScan {
         let accessing = folder.startAccessingSecurityScopedResource()
         defer { if accessing { folder.stopAccessingSecurityScopedResource() } }
-        try installNeoGeoFirmware(in: folder)
+        try installFirmware(in: folder)
         let scan = try ROMFolderScanner.scan(folder)
         let bookmark = try folder.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
         UserDefaults.standard.set(bookmark, forKey: bookmarkKey)
@@ -298,7 +307,7 @@ actor ROMFolderAccess {
         let folder = try URL(resolvingBookmarkData: bookmark, options: [], relativeTo: nil, bookmarkDataIsStale: &stale)
         let accessing = folder.startAccessingSecurityScopedResource()
         defer { if accessing { folder.stopAccessingSecurityScopedResource() } }
-        try installNeoGeoFirmware(in: folder)
+        try installFirmware(in: folder)
         let result = try ROMFolderScanner.scan(folder)
         if stale {
             let refreshed = try folder.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
@@ -357,13 +366,16 @@ actor ROMFolderAccess {
         guard source.path.hasPrefix(prefix), source.lastPathComponent == game.filename else {
             throw PocketError.message("O caminho da ROM não pertence mais à pasta autorizada.")
         }
-        try installNeoGeoFirmware(in: root)
+        try installFirmware(in: root)
         let system = IntegratedEmulatorSupport.system(for: game)
         if system == .neoGeo && !hasFirmware(["aes.zip", "neogeo.zip"]) {
             throw PocketError.message("Para iniciar Neo Geo, coloque aes.zip ou neogeo.zip na pasta de jogos. O BRUM Core copia somente a BIOS fornecida por você e não distribui arquivos protegidos.")
         }
         if system == .segaCD && !hasFirmware(["bios_cd_e.bin", "bios_cd_u.bin", "bios_cd_j.bin"]) {
             throw PocketError.message("Para iniciar Sega CD, coloque a BIOS da sua região (bios_CD_E.bin, bios_CD_U.bin ou bios_CD_J.bin) na pasta de jogos.")
+        }
+        if system == .sega32X && !["32x_g_bios.bin", "32x_m_bios.bin", "32x_s_bios.bin"].allSatisfy({ hasFirmware([$0]) }) {
+            throw PocketError.message("Para iniciar 32X, coloque 32X_G_BIOS.bin, 32X_M_BIOS.bin e 32X_S_BIOS.bin na pasta de jogos.")
         }
         if system == .playStation && !hasFirmware(["scph5500.bin", "scph5501.bin", "scph5502.bin"]) {
             throw PocketError.message("Para iniciar PS1, coloque uma BIOS válida (scph5500.bin, scph5501.bin ou scph5502.bin) na pasta de jogos.")
@@ -393,10 +405,13 @@ actor ROMFolderAccess {
     }
 
     private func hasFirmware(_ names: [String]) -> Bool {
-        names.contains { FileManager.default.fileExists(atPath: systemRoot.appendingPathComponent($0).path) }
+        names.contains { name in
+            let canonical = ROMFolderScanner.firmwareDestinationNames[name] ?? name
+            return FileManager.default.fileExists(atPath: systemRoot.appendingPathComponent(canonical).path)
+        }
     }
 
-    private func installNeoGeoFirmware(in root: URL) throws {
+    private func installFirmware(in root: URL) throws {
         let manager = FileManager.default
         try manager.createDirectory(at: systemRoot, withIntermediateDirectories: true)
         let keys: [URLResourceKey] = [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]
@@ -415,7 +430,7 @@ actor ROMFolderAccess {
             let values = try source.resourceValues(forKeys: Set(keys))
             guard values.isRegularFile == true, values.isSymbolicLink != true,
                   let size = values.fileSize, size > 0, size <= 64 * 1_024 * 1_024 else { continue }
-            var destination = systemRoot.appendingPathComponent(filename)
+            var destination = systemRoot.appendingPathComponent(ROMFolderScanner.firmwareDestinationNames[filename] ?? filename)
             if let installedSize = try? destination.resourceValues(forKeys: [.fileSizeKey]).fileSize,
                installedSize == size { continue }
             let data = try CoordinatedFileAccess.read(source) { try Data(contentsOf: $0, options: .mappedIfSafe) }

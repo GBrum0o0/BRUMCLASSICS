@@ -42,7 +42,7 @@ enum IntegratedEmulatorSupport {
             case "ps1", "psx": return ["cue", "chd", "pbp", "m3u", "bin", "iso"].contains(ext) ? .playStation : nil
             case "ps2" where ["iso", "bin", "chd", "m3u"].contains(ext): return .playStation2
             case "saturn" where ["cue", "chd", "m3u"].contains(ext): return .saturn
-            case "sega cd", "segacd", "mega cd", "megacd": return ["cue", "chd", "m3u", "iso"].contains(ext) ? .segaCD : nil
+            case "sega cd", "segacd", "mega cd", "megacd": return ["cue", "chd", "iso"].contains(ext) ? .segaCD : nil
             case "arcade", "fbneo", "mame": return ["zip", "7z"].contains(ext) ? .arcade : nil
             case "psp" where ["iso", "pbp"].contains(ext): return .playStationPortable
             case "dreamcast" where ["chd", "cdi", "m3u"].contains(ext): return .dreamcast

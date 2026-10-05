@@ -246,6 +246,7 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
 - (void)handleCoreShutdown;
 - (BrumVirtualStick *)analogPad;
 - (UIStackView *)n64ActionPad;
+- (UIStackView *)segaActionPad;
 - (void)virtualStickChanged:(BrumVirtualStick *)stick;
 - (void)toggleAnalogPadMode;
 - (void)updateN64CButtons;
@@ -499,7 +500,8 @@ static void BrumInputPoll(void) {
     host->_input.set(brum::InputSource::controller, 2, pad.buttonOptions.isPressed);
     if ([host->_emulatedSystemID isEqualToString:@"psx"] ||
         [host->_emulatedSystemID isEqualToString:@"psp"] ||
-        [host->_emulatedSystemID isEqualToString:@"dreamcast"]) {
+        [host->_emulatedSystemID isEqualToString:@"dreamcast"] ||
+        [@[@"md", @"segacd", @"32x"] containsObject:host->_emulatedSystemID]) {
         host->_input.set(brum::InputSource::controller, 0, pad.buttonA.isPressed);
         host->_input.set(brum::InputSource::controller, 8, pad.buttonB.isPressed);
         host->_input.set(brum::InputSource::controller, 1, pad.buttonX.isPressed);
@@ -956,16 +958,19 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 
     const BOOL isN64 = [_emulatedSystemID isEqualToString:@"n64"];
     const BOOL isDreamcast = [_emulatedSystemID isEqualToString:@"dreamcast"];
+    const BOOL isSega = [@[@"md", @"segacd", @"32x"] containsObject:_emulatedSystemID];
     const BOOL hasAnalogPad = isN64 || isDreamcast || [_emulatedSystemID isEqualToString:@"psp"];
     UIView *up = hasAnalogPad ? [self analogPad] : [self directionPad];
-    UIView *actions = isN64 ? [self n64ActionPad] : [self actionPad];
+    UIView *actions = isN64 ? [self n64ActionPad] : isSega ? [self segaActionPad] : [self actionPad];
     UIButton *start = [self controlButton:@"START" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_START];
     NSArray<UIButton *> *menuButtons = isDreamcast ? @[start] : @[
-        [self controlButton:isN64 ? @"Z" : @"SELECT" identifier:isN64 ? BRUM_RETRO_DEVICE_ID_JOYPAD_L2 : BRUM_RETRO_DEVICE_ID_JOYPAD_SELECT], start
+        [self controlButton:isN64 ? @"Z" : isSega ? @"MODE" : @"SELECT" identifier:isN64 ? BRUM_RETRO_DEVICE_ID_JOYPAD_L2 : BRUM_RETRO_DEVICE_ID_JOYPAD_SELECT], start
     ];
     UIStackView *menu = [[UIStackView alloc] initWithArrangedSubviews:menuButtons];
     UIButton *leftShoulder = [self controlButton:isDreamcast ? @"LT" : @"L" identifier:isDreamcast ? BRUM_RETRO_DEVICE_ID_JOYPAD_L2 : BRUM_RETRO_DEVICE_ID_JOYPAD_L];
     UIButton *rightShoulder = [self controlButton:isDreamcast ? @"RT" : @"R" identifier:isDreamcast ? BRUM_RETRO_DEVICE_ID_JOYPAD_R2 : BRUM_RETRO_DEVICE_ID_JOYPAD_R];
+    leftShoulder.hidden = isSega;
+    rightShoulder.hidden = isSega;
     [self.view addSubview:leftShoulder]; [self.view addSubview:rightShoulder];
     if ([_emulatedSystemID isEqualToString:@"psx"]) {
         [leftShoulder setTitle:@"L1" forState:UIControlStateNormal];
@@ -1104,6 +1109,30 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     pad.axis = UILayoutConstraintAxisVertical;
     pad.spacing = 4;
     [pad.widthAnchor constraintEqualToConstant:116].active = YES;
+    return pad;
+}
+
+- (UIStackView *)segaActionPad {
+    // BlastEm's pinned Libretro map is B/A/R for A/B/C and Y/X/L for X/Y/Z.
+    UIStackView *top = [[UIStackView alloc] initWithArrangedSubviews:@[
+        [self controlButton:@"X" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_Y],
+        [self controlButton:@"Y" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_X],
+        [self controlButton:@"Z" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_L]
+    ]];
+    UIStackView *bottom = [[UIStackView alloc] initWithArrangedSubviews:@[
+        [self controlButton:@"A" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_B],
+        [self controlButton:@"B" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_A],
+        [self controlButton:@"C" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_R]
+    ]];
+    for (UIStackView *row in @[top, bottom]) {
+        row.axis = UILayoutConstraintAxisHorizontal;
+        row.spacing = 5;
+        row.distribution = UIStackViewDistributionFillEqually;
+    }
+    UIStackView *pad = [[UIStackView alloc] initWithArrangedSubviews:@[top, bottom]];
+    pad.translatesAutoresizingMaskIntoConstraints = NO;
+    pad.axis = UILayoutConstraintAxisVertical;
+    pad.spacing = 5;
     return pad;
 }
 

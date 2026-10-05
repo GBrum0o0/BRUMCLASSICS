@@ -13,8 +13,9 @@ class PackageValidationTests(unittest.TestCase):
                 include_skyemu=True, include_geolith=True, include_gearsystem=True,
                 include_nestopia=True, include_beetle_pce=True, include_beetle_wswan=True, include_bsnes=True, include_licenses=True,
                 experimental=False, include_n64=True, include_psx=True, include_saturn=True,
-                include_stella=True, include_ppsspp=True, include_flycast=True,
+                include_stella=True, include_ppsspp=True, include_flycast=True, include_blastem=True,
                 include_ppsspp_assets=True, candidate_cpu=0x0100000C, candidate_licenses=True,
+                include_blastem_vendor_licenses=True,
                 experimental_build="37"):
         path = Path(folder) / "test.ipa"
         root = f"Payload/{app}.app/"
@@ -42,6 +43,11 @@ class PackageValidationTests(unittest.TestCase):
                     ]
                     if include_ppsspp_assets:
                         archive.writestr(root + "Frameworks/CoreAssets/PPSSPP/lang/en_US.ini", "language fixture")
+                if int(experimental_build) >= 40:
+                    candidates.append((include_blastem, "blastem_libretro_ios.dylib", "BlastEm-LICENSE.txt"))
+                    if include_blastem_vendor_licenses:
+                        for notice in ["BlastEm-libchdr-LICENSE.txt", "BlastEm-LZMA-LICENSE.txt", "BlastEm-zlib-LICENSE.txt"]:
+                            archive.writestr(root + "Frameworks/" + notice, "license fixture")
                 for enabled, filename, license_name in candidates:
                     if enabled:
                         entry = zipfile.ZipInfo(root + "Frameworks/" + filename)
@@ -135,6 +141,15 @@ class PackageValidationTests(unittest.TestCase):
                     validate_ipa(self.fixture(folder, experimental=True, experimental_build="39", **{option: False}))
             with self.assertRaisesRegex(ValueError, "assets are absent"):
                 validate_ipa(self.fixture(folder, experimental=True, experimental_build="39", include_ppsspp_assets=False))
+
+    def test_sega_experimental_build_requires_blastem_and_vendor_notices(self):
+        with tempfile.TemporaryDirectory() as folder:
+            result = validate_ipa(self.fixture(folder, experimental=True, experimental_build="40"))
+            self.assertEqual(len(result["integratedCores"]), 15)
+            with self.assertRaisesRegex(ValueError, "BlastEm core is absent"):
+                validate_ipa(self.fixture(folder, experimental=True, experimental_build="40", include_blastem=False))
+            with self.assertRaisesRegex(ValueError, "BlastEm-libchdr-LICENSE.txt is absent"):
+                validate_ipa(self.fixture(folder, experimental=True, experimental_build="40", include_blastem_vendor_licenses=False))
 
     def test_experimental_package_rejects_wrong_cpu_and_missing_license(self):
         with tempfile.TemporaryDirectory() as folder:

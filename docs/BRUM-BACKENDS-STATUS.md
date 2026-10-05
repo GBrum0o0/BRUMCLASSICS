@@ -73,15 +73,16 @@ Ainda é necessário validar sensibilidade e ergonomia em aparelho.
 |---|---|---|
 | GB/GBC/GBA, NES e demais núcleos anteriores | mGBA, Nestopia, Geolith, Gearsystem, PCE Fast, bsnes, WonderSwan | Mantidos na lista ativa e no empacotamento anterior; regressão em aparelho pendente |
 | DS | SkyEmu | Conectado ao Screen Manager; testes de geometria/toque passaram; teste de jogo no iPhone pendente |
-| N64 | Mupen64Plus-Next | Empacotado apenas no IPA experimental build 37 com GLES/HLE sem dynarec; teste em aparelho pendente |
+| N64 | Mupen64Plus-Next | Empacotado apenas no IPA experimental build 38 com GLES/HLE sem dynarec e controle analógico; teste em aparelho pendente |
 | PS1 | Beetle PSX | Empacotado apenas no IPA experimental com BIOS do usuário; teste em aparelho pendente |
 | Saturn | Beetle Saturn | Empacotado apenas no IPA experimental build 37; desempenho, BIOS do usuário e teste em aparelho pendentes |
 | Atari 2600 | Stella2014 | Empacotado apenas no IPA experimental; teste em aparelho pendente |
-| PSP / Dreamcast | PPSSPP / Flycast | Flycast compilou arm64, mas renderização/execução pendentes; PPSSPP avançou ao link e ainda não está no IPA |
-| 3DS | Citra | Perfil de telas preparado; dependências e API gráfica ainda bloqueiam integração jogável |
-| GameCube | Dolphin | Compilação arm64 genérica sem JIT passou; não empacotado, desempenho não validado |
+| PSP / Dreamcast | PPSSPP / Flycast | Ambos compilaram arm64; receita de IPA experimental e controles conectados no build 40, ainda sem comprovação de execução/áudio em aparelho |
+| 3DS | Citra | Compilou arm64 e tem perfil de telas; host ainda não oferece a API gráfica exigida, portanto não está no IPA |
+| GameCube | Dolphin | Compilou arm64 genérico sem JIT; não empacotado, renderer e desempenho não validados |
 | PS2 | Play! | Descriptor preparado reaproveitando revisão Android; adapter/renderização e execução sem JIT iOS não validados |
-| Mega Drive, Sega CD/32X, arcade genérico | Em avaliação | Sem backend aprovado nesta etapa; não entram como suporte integrado |
+| Mega Drive, Sega CD/32X | BlastEm | Revisão GPL-3.0+ com alvo iOS e mapeamento de BIOS/botões incluída na receita experimental build 40; compilação do pacote e jogos em aparelho pendentes |
+| Arcade genérico | Em avaliação | Sem backend aprovado nesta etapa; não entra como suporte integrado |
 
 ## Registro de problemas e alternativas
 
@@ -133,8 +134,9 @@ Ainda é necessário validar sensibilidade e ergonomia em aparelho.
   ARM64. A etapa seguinte chegou ao linker e encontrou apenas a chamada de
   framebuffer do app iOS (`bindDefaultFBO`) e o filtro NEON do libpng. O
   primeiro não pertence ao Libretro (que já define seu framebuffer), e o
-  segundo foi desativado para este build; correção ainda em validação.
-  JIT/renderização/input pendentes.
+  segundo foi desativado para este build. O workflow 37231008525 compilou
+  o núcleo arm64; build experimental com assets e input está em validação.
+  JIT, renderização e jogos em aparelho pendentes.
 
 ### 3DS: MoltenVK e API de renderização
 
@@ -155,7 +157,8 @@ Ainda é necessário validar sensibilidade e ergonomia em aparelho.
   target 16.3 para 14.0, deixando `std::to_chars` indisponível. O patch
   experimental preserva 16.3. O build avançou ao linker, onde MoltenVK
   revelou os frameworks Foundation, UIKit e CoreGraphics ausentes. Eles foram
-  adicionados à receita experimental, ainda sem resultado novo. O app de
+  adicionados à receita experimental, e o workflow 37231008525 compilou
+  o núcleo arm64. O app de
   produção suporta iOS 16.0; promover Citra exigiria resolver essa diferença,
   além do renderer. Renderer ainda em desenvolvimento.
 
@@ -175,10 +178,14 @@ Ainda é necessário validar sensibilidade e ergonomia em aparelho.
 - **Causa:** os candidatos Genesis Plus GX/PicoDrive/FBNeo avaliados contêm
   restrições incompatíveis com essa política; não basta renomeá-los de backend.
 - **Impacto:** permanecem fora do pacote e da lista ativa.
-- **Alternativas:** avaliar BlastEm/outros engines para MD, MAME moderno para
-  arcade e dependências substituíveis de 32X/CD, com auditoria por componente.
-- **Solução:** selecionar implementação compatível antes de incorporar binários.
-- **Status:** investigação necessária; nenhuma dessas alternativas está declarada pronta.
+- **Alternativas:** BlastEm GPL-3.0+ para Mega Drive, Sega CD e 32X; MAME
+  moderno para arcade, com auditoria por componente.
+- **Solução:** BlastEm foi fixado na revisão
+  `1e0de94dc7e669c0925a22c0fccf6cdc837af0a0`, cujo alvo `ios-arm64` não
+  exige JIT. A receita inclui COPYING e avisos de zlib/libchdr/LZMA. O núcleo
+  pede BIOS do usuário com nomes exatos para Sega CD e 32X.
+- **Status:** ligado ao build experimental 40, mas ainda sem resultado da IPA
+  ou teste de jogo. Arcade permanece sem backend aprovado.
 
 ## Evidência e aceitação
 
@@ -194,6 +201,11 @@ O host compilou e passou testes de modelos/UI no simulador; o contrato
 portátil passou 19.191 verificações em MSVC/Windows. Os 18 testes Python
 do validador passaram. Esses testes não executam ROMs comerciais nem
 comprovam áudio em aparelho.
+
+O [IPA experimental build 38](https://github.com/GBrum0o0/BRUMCLASSICS/actions/runs/37231008787)
+passou novamente com controle analógico N64 e 12 núcleos. SHA-256:
+`687b2a09bd9d1d5d4d20ddcb10dc7b356bb9f6a23078f4c2469f4835c651823c`.
+Os builds 39/40 ainda são receitas em validação, não resultados jogáveis.
 
 Antes de ativar cada candidato: iniciar ROM legal de teste, verificar vídeo e
 áudio contínuos, pad virtual/físico, pausa/menu/background/interrupção, retorno
