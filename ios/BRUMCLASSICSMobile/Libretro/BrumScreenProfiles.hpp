@@ -8,8 +8,8 @@ inline std::vector<Screen> libretroScreens(const std::string& core, unsigned wid
     if (core == "skyemu" && width == 256 && height == 384)
         return {{"primary", "video", {0, 0, 1, 0.5}, 256, 192, false},
                 {"secondary", "video", {0, 0.5, 1, 0.5}, 256, 192, true}};
-    // Citra adapter must fix Default Top-Bottom Screen + native resolution.
-    if (core == "citra" && width == 400 && height == 480)
+    // Azahar software adapter fixes the default top/bottom layout at 1x.
+    if (core == "azahar" && width == 400 && height == 480)
         return {{"primary", "video", {0, 0, 1, 0.5}, 400, 240, false},
                 {"secondary", "video", {0.1, 0.5, 0.8, 0.5}, 320, 240, true}};
     return {{"primary", "video", {0, 0, 1, 1}, static_cast<double>(width), static_cast<double>(height), false}};

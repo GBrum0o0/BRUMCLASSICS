@@ -77,7 +77,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        core: [ppsspp, flycast, citra, dolphin]
+        core: [ppsspp, flycast, azahar, dolphin]
     steps:
       - uses: actions/checkout@v4
 
@@ -109,13 +109,14 @@ jobs:
               LICENSE=LICENSE
               LICENSE_OUT=Flycast-LICENSE.txt
               ;;
-            citra)
-              REPOSITORY=https://github.com/libretro/citra.git
-              COMMIT=a0483e9abe8134ae6b290cdca7d49cb77689f05b
+            azahar)
+              REPOSITORY=https://github.com/azahar-emu/azahar.git
+              COMMIT=9e6f523a57fac9564ac0bf8286db3c3702d301ec
               TARGET=citra_libretro
-              LIBRARY=citra_libretro_ios.dylib
+              OUTPUT_STEM=azahar_libretro
+              LIBRARY=azahar_libretro_ios.dylib
               LICENSE=license.txt
-              LICENSE_OUT=Citra-LICENSE.txt
+              LICENSE_OUT=Azahar-LICENSE.txt
               ;;
             dolphin)
               REPOSITORY=https://github.com/libretro/dolphin.git
@@ -159,24 +160,15 @@ jobs:
                 -DCMAKE_C_FLAGS=-DIOS=1 -DCMAKE_CXX_FLAGS=-DIOS=1 \
                 -DUSE_HOST_LIBZIP=OFF -DUSE_HOST_GLSLANG=OFF -DENABLE_CTEST=OFF
               ;;
-            citra)
-              git -C "$SOURCE" apply "$GITHUB_WORKSPACE/ios/patches/citra-ios-deployment-target.patch"
-              # Upstream searches a legacy dylib directory; pin the actual iOS
-              # XCFramework slice instead of downloading a changing "latest".
-              MOLTENVK="$RUNNER_TEMP/moltenvk"
-              mkdir -p "$MOLTENVK"
-              curl --fail --location --retry 3 https://github.com/KhronosGroup/MoltenVK/releases/download/v1.2.8/MoltenVK-ios.tar -o "$MOLTENVK/ios.tar"
-              echo "778980f84f1afe7f5058df469fe9715d767a9891afb5497dd90ff29a7fa384a1  $MOLTENVK/ios.tar" | shasum -a 256 -c -
-              tar -xf "$MOLTENVK/ios.tar" -C "$MOLTENVK"
-              cp "$MOLTENVK/MoltenVK/LICENSE" "$OUT/MoltenVK-LICENSE.txt"
+            azahar)
               cmake -S "$SOURCE" -B "$BUILD" "${COMMON_FLAGS[@]}" \
-                -DIOS=ON -DENABLE_LIBRETRO=ON -DENABLE_QT=OFF \
-                -DCMAKE_OSX_DEPLOYMENT_TARGET=16.3 \
-                -DENABLE_OPT=OFF \
-                -DUSE_SYSTEM_MOLTENVK=ON \
-                "-DMOLTENVK_LIBRARY=$MOLTENVK/MoltenVK/MoltenVK/static/MoltenVK.xcframework/ios-arm64/libMoltenVK.a" \
-                '-DCMAKE_SHARED_LINKER_FLAGS=-framework Metal -framework QuartzCore -framework Foundation -framework UIKit -framework CoreGraphics' \
-                -DENABLE_WEB_SERVICE=OFF -DENABLE_SCRIPTING=OFF -DENABLE_LTO=OFF \
+                -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+                -DCMAKE_C_FLAGS=-DIOS -DCMAKE_CXX_FLAGS=-DIOS \
+                -DIOS=ON -DENABLE_LIBRETRO=ON \
+                -DENABLE_OPENGL=OFF -DENABLE_VULKAN=OFF \
+                -DENABLE_SOFTWARE_RENDERER=ON -DENABLE_BUILTIN_KEYBLOB=OFF \
+                -DENABLE_OPT=OFF -DENABLE_LTO=OFF \
+                -DENABLE_WEB_SERVICE=OFF -DENABLE_SCRIPTING=OFF \
                 -DCITRA_USE_PRECOMPILED_HEADERS=OFF -DCITRA_WARNINGS_AS_ERRORS=OFF
               ;;
             dolphin)
@@ -187,7 +179,7 @@ jobs:
           esac
 
           cmake --build "$BUILD" --config Release --target "$TARGET" --parallel "$(sysctl -n hw.ncpu)"
-          CORE_PATH=$(find "$BUILD" -type f -name "${TARGET}*.dylib" -print -quit)
+          CORE_PATH=$(find "$BUILD" -type f -name "${OUTPUT_STEM:-$TARGET}*.dylib" -print -quit)
           test -n "$CORE_PATH"
           cp "$CORE_PATH" "$OUT/$LIBRARY"
           cp "$SOURCE/$LICENSE" "$OUT/$LICENSE_OUT"

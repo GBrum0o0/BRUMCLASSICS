@@ -15,6 +15,7 @@ class PackageValidationTests(unittest.TestCase):
                 experimental=False, include_n64=True, include_psx=True, include_saturn=True,
                 include_stella=True, include_ppsspp=True, include_flycast=True, include_blastem=True,
                 include_mame=True, include_dolphin=True, include_dolphin_assets=True,
+                include_azahar=True,
                 include_arcade_gc_notices=True,
                 include_ppsspp_assets=True, candidate_cpu=0x0100000C, candidate_licenses=True,
                 include_blastem_vendor_licenses=True,
@@ -64,6 +65,8 @@ class PackageValidationTests(unittest.TestCase):
                                        "MAME2016-LZMA-NOTICE.txt", "Dolphin-COPYING.txt",
                                        "Dolphin-BSD-3-Clause.txt", "Dolphin-CC0-1.0.txt", "Dolphin-MIT.txt"):
                             archive.writestr(root + "Frameworks/" + notice, "license fixture")
+                if int(experimental_build) >= 45:
+                    candidates.append((include_azahar, "azahar_libretro_ios.dylib", "Azahar-LICENSE.txt"))
                 for enabled, filename, license_name in candidates:
                     if enabled:
                         entry = zipfile.ZipInfo(root + "Frameworks/" + filename)
@@ -178,6 +181,15 @@ class PackageValidationTests(unittest.TestCase):
                 validate_ipa(self.fixture(folder, experimental=True, experimental_build="44", include_dolphin_assets=False))
             with self.assertRaisesRegex(ValueError, "MAME2016-THIRD-PARTY.md is absent"):
                 validate_ipa(self.fixture(folder, experimental=True, experimental_build="44", include_arcade_gc_notices=False))
+
+    def test_azahar_experimental_build_requires_core_and_license(self):
+        with tempfile.TemporaryDirectory() as folder:
+            result = validate_ipa(self.fixture(folder, experimental=True, experimental_build="45"))
+            self.assertEqual(len(result["integratedCores"]), 18)
+            with self.assertRaisesRegex(ValueError, "Azahar core is absent"):
+                validate_ipa(self.fixture(folder, experimental=True, experimental_build="45", include_azahar=False))
+            with self.assertRaisesRegex(ValueError, "license is absent"):
+                validate_ipa(self.fixture(folder, experimental=True, experimental_build="45", candidate_licenses=False))
 
     def test_experimental_package_rejects_wrong_cpu_and_missing_license(self):
         with tempfile.TemporaryDirectory() as folder:

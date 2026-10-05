@@ -66,7 +66,7 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(CoreRegistry.candidate(for: .segaCD)?.id, "blastem")
         XCTAssertEqual(CoreRegistry.candidate(for: .sega32X)?.id, "blastem")
         XCTAssertEqual(CoreRegistry.candidate(for: .arcade)?.id, "mame2016")
-        XCTAssertEqual(CoreRegistry.candidate(for: .nintendo3DS)?.id, "citra")
+        XCTAssertEqual(CoreRegistry.candidate(for: .nintendo3DS)?.id, "azahar")
         XCTAssertEqual(CoreRegistry.candidate(for: .gameCube)?.id, "dolphin")
         XCTAssertEqual(CoreRegistry.candidate(for: .playStation2)?.id, "play")
         for candidate in CoreRegistry.candidates {
@@ -82,7 +82,7 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(CoreRegistry.core(for: .megaDrive, includeExperimental: true)?.id, "blastem")
         XCTAssertEqual(CoreRegistry.core(for: .segaCD, includeExperimental: true)?.id, "blastem")
         XCTAssertEqual(CoreRegistry.core(for: .sega32X, includeExperimental: true)?.id, "blastem")
-        XCTAssertNil(CoreRegistry.core(for: .nintendo3DS, includeExperimental: true))
+        XCTAssertEqual(CoreRegistry.core(for: .nintendo3DS, includeExperimental: true)?.id, "azahar")
         XCTAssertEqual(CoreRegistry.core(for: .gameCube, includeExperimental: true)?.id, "dolphin")
         XCTAssertEqual(EmulatedSystemID.nintendo64.retroAchievementsConsoleID, 2)
         XCTAssertEqual(EmulatedSystemID.playStation.retroAchievementsConsoleID, 12)
@@ -258,6 +258,10 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(system("PS1/game.cue"), .playStation)
         XCTAssertEqual(system("PS2/game.iso"), .playStation2)
         XCTAssertEqual(system("Sega CD/game.chd"), .segaCD)
+        XCTAssertEqual(system("3DS/homebrew.3dsx"), .nintendo3DS)
+        XCTAssertEqual(system("3DS/title.app"), .nintendo3DS)
+        XCTAssertEqual(system("GameCube/game.iso"), .gameCube)
+        XCTAssertEqual(system("Arcade/pacman.zip"), .arcade)
         XCTAssertEqual(system("nested/PSP/game.iso"), .playStationPortable)
         XCTAssertEqual(system("PS1/PS2/game.iso"), .playStation2)
     }

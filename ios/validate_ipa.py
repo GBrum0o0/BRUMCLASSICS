@@ -59,6 +59,7 @@ def validate_ipa(path, expected_version=None):
         heavy_experimental = experimental and int(build_number) >= 39
         sega_experimental = experimental and int(build_number) >= 40
         arcade_gc_experimental = experimental and int(build_number) >= 44
+        azahar_experimental = experimental and int(build_number) >= 45
         if experimental:
             integrated_cores.update({
                 "Beetle PSX": root + "Frameworks/mednafen_psx_libretro_ios.dylib",
@@ -81,6 +82,8 @@ def validate_ipa(path, expected_version=None):
                 "MAME 2016": root + "Frameworks/mamearcade2016_libretro_ios.dylib",
                 "Dolphin": root + "Frameworks/dolphin_libretro_ios.dylib",
             })
+        if azahar_experimental:
+            integrated_cores["Azahar"] = root + "Frameworks/azahar_libretro_ios.dylib"
         for core_name, core_path in integrated_cores.items():
             if core_path not in names:
                 raise ValueError(f"Integrated {core_name} core is absent")
@@ -118,6 +121,8 @@ def validate_ipa(path, expected_version=None):
         if arcade_gc_experimental:
             required_licenses += [root + "Frameworks/MAME2016-LICENSE.md",
                                   root + "Frameworks/Dolphin-LICENSE.txt"]
+        if azahar_experimental:
+            required_licenses += [root + "Frameworks/Azahar-LICENSE.txt"]
         for license_path in required_licenses:
             if license_path not in names or len(archive.read(license_path)) < 1_000:
                 raise ValueError("Required mobile or core license is absent")

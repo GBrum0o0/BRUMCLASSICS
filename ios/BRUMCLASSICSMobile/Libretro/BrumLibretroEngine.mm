@@ -617,9 +617,10 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _variables[@"system_gb_bios_enable"] = @"ON";
     _variables[@"system_gba_bios_enable"] = @"ON";
     _variables[@"system_nds_bios_enable"] = @"ON";
-    _variables[@"citra_layout_option"] = @"Default Top-Bottom Screen";
-    _variables[@"citra_resolution_factor"] = @"1x (Native)";
-    _variables[@"citra_touch_touchscreen"] = @"enabled";
+    _variables[@"citra_graphics_api"] = @"Software";
+    _variables[@"citra_layout_option"] = @"default";
+    _variables[@"citra_resolution_factor"] = @"1";
+    _variables[@"citra_enable_touch_touchscreen"] = @"enabled";
     _screenLayers = [NSMutableArray array];
     _pixelFormat = BRUM_RETRO_PIXEL_FORMAT_0RGB1555;
     _screenFillsDisplay = YES;
@@ -688,9 +689,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         }
     }
 
-    // Citra looks for user-supplied keys in Saves/3ds/Citra/sysdata.
+    // Azahar looks for user-supplied keys in Saves/3ds/Azahar/sysdata.
     if ([_emulatedSystemID isEqualToString:@"3ds"]) {
-        NSURL *sysdata = [[saves URLByAppendingPathComponent:@"Citra" isDirectory:YES] URLByAppendingPathComponent:@"sysdata" isDirectory:YES];
+        NSURL *sysdata = [[saves URLByAppendingPathComponent:@"Azahar" isDirectory:YES] URLByAppendingPathComponent:@"sysdata" isDirectory:YES];
         if (![manager createDirectoryAtURL:sysdata withIntermediateDirectories:YES attributes:nil error:error]) return NO;
         for (NSString *filename in @[@"aes_keys.txt", @"seeddb.bin"]) {
             NSURL *source = [system URLByAppendingPathComponent:filename];
@@ -993,8 +994,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     const BOOL isN64 = [_emulatedSystemID isEqualToString:@"n64"];
     const BOOL isDreamcast = [_emulatedSystemID isEqualToString:@"dreamcast"];
     const BOOL isGameCube = [_emulatedSystemID isEqualToString:@"gamecube"];
+    const BOOL is3DS = [_emulatedSystemID isEqualToString:@"3ds"];
     const BOOL isSega = [@[@"md", @"segacd", @"32x"] containsObject:_emulatedSystemID];
-    const BOOL hasAnalogPad = isN64 || isDreamcast || isGameCube || [_emulatedSystemID isEqualToString:@"psp"];
+    const BOOL hasAnalogPad = isN64 || isDreamcast || isGameCube || is3DS || [_emulatedSystemID isEqualToString:@"psp"];
     UIView *up = hasAnalogPad ? [self analogPad] : [self directionPad];
     UIView *actions = isN64 ? [self n64ActionPad] : isSega ? [self segaActionPad] : [self actionPad];
     UIButton *start = [self controlButton:@"START" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_START];
@@ -1015,6 +1017,17 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
             [z.centerYAnchor constraintEqualToAnchor:rightShoulder.centerYAnchor]
         ]];
     }
+    if (is3DS) {
+        UIButton *zl = [self controlButton:@"ZL" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_L2];
+        UIButton *zr = [self controlButton:@"ZR" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_R2];
+        [self.view addSubview:zl]; [self.view addSubview:zr];
+        [NSLayoutConstraint activateConstraints:@[
+            [zl.leadingAnchor constraintEqualToAnchor:leftShoulder.trailingAnchor constant:8],
+            [zl.centerYAnchor constraintEqualToAnchor:leftShoulder.centerYAnchor],
+            [zr.trailingAnchor constraintEqualToAnchor:rightShoulder.leadingAnchor constant:-8],
+            [zr.centerYAnchor constraintEqualToAnchor:rightShoulder.centerYAnchor]
+        ]];
+    }
     if ([_emulatedSystemID isEqualToString:@"psx"]) {
         [leftShoulder setTitle:@"L1" forState:UIControlStateNormal];
         [rightShoulder setTitle:@"R1" forState:UIControlStateNormal];
@@ -1032,10 +1045,10 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     menu.axis = UILayoutConstraintAxisHorizontal;
     menu.spacing = 10;
     [self.view addSubview:up]; [self.view addSubview:actions]; [self.view addSubview:menu];
-    if (isGameCube) {
+    if (isGameCube || is3DS) {
         _rightVirtualStick = [[BrumVirtualStick alloc] initWithFrame:CGRectZero];
         _rightVirtualStick.translatesAutoresizingMaskIntoConstraints = NO;
-        _rightVirtualStick.accessibilityLabel = @"Stick C";
+        _rightVirtualStick.accessibilityLabel = isGameCube ? @"Stick C" : @"C-Stick";
         [_rightVirtualStick addTarget:self action:@selector(rightVirtualStickChanged:) forControlEvents:UIControlEventValueChanged];
         [self.view addSubview:_rightVirtualStick];
         [NSLayoutConstraint activateConstraints:@[

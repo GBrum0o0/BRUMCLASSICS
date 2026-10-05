@@ -22,7 +22,7 @@ static brum::Point rotated(brum::Point p, unsigned turns) {
 }
 int main() {
     using namespace brum;
-    for (const auto& core : {"skyemu", "citra"}) {
+    for (const auto& core : {"skyemu", "azahar"}) {
         ScreenManager manager;
         manager.screens = libretroScreens(core, core == std::string("skyemu") ? 256 : 400,
                                          core == std::string("skyemu") ? 384 : 480);

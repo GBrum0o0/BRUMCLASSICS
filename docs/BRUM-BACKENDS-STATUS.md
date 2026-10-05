@@ -19,7 +19,7 @@ núcleo não o promove automaticamente a suporte do BRUM Core.
 5. `shared/brum-core/ScreenManager.hpp` calcula posição, proporção, escala,
    rotação e transformação inversa de toque, sem dependências de DS ou UIKit.
 6. `BrumScreenProfiles.hpp` é a parte específica dos adapters: separa o atlas
-   nativo do SkyEmu (256×384) e prepara o do Citra (400×480). Uma saída de
+   nativo do SkyEmu (256×384) e o do Azahar (400×480). Uma saída de
    tamanho inesperado permanece única e sem touch, sem adivinhar coordenadas.
 7. `InputState.hpp` combina botões por origem. Soltar o controle virtual não
    solta um botão ainda pressionado no controle físico. Teclado e rede possuem
@@ -81,11 +81,11 @@ Ainda é necessário validar sensibilidade e ergonomia em aparelho.
 | Saturn | Beetle Saturn | Empacotado apenas no IPA experimental build 37; desempenho, BIOS do usuário e teste em aparelho pendentes |
 | Atari 2600 | Stella2014 | Empacotado apenas no IPA experimental; teste em aparelho pendente |
 | PSP / Dreamcast | PPSSPP / Flycast | Empacotados em IPA experimental arm64 com analógico e botões próprios; ainda sem comprovação de execução/áudio em aparelho |
-| 3DS | Citra | Compilou arm64 e tem perfil de telas; host ainda não oferece a API gráfica exigida, portanto não está no IPA |
-| GameCube | Dolphin | Compilou arm64 genérico sem JIT; não empacotado, renderer e desempenho não validados |
+| 3DS | Azahar | Renderer de software/interpreter compilado arm64, sem chaves embutidas; integração no IPA experimental build 45 em validação. Execução, áudio, controles e desempenho em aparelho pendentes |
+| GameCube | Dolphin | Empacotado no IPA experimental build 44, com assets `Sys`, GLES 3.0 e interpretador sem JIT; execução e desempenho em aparelho pendentes |
 | PS2 | Play! | Descriptor preparado reaproveitando revisão Android; adapter/renderização e execução sem JIT iOS não validados |
 | Mega Drive, Sega CD/32X | BlastEm | Revisão GPL-3.0+ e mapeamento de BIOS/botões empacotados no IPA experimental build 42; jogos em aparelho pendentes |
-| Arcade genérico | MAME 2016 em avaliação | Núcleo arm64 compilado em probe isolado e descriptor registrado apenas como candidato; ainda não entra na lista jogável ou no IPA: auditoria por componente, compatibilidade de ROM sets e execução segura em iPhone pendentes |
+| Arcade genérico | MAME 2016 | Empacotado no IPA experimental build 44, com auditoria inicial de avisos e correções para geometria e limite do caminho; compatibilidade de ROM sets, execução, áudio e desempenho em iPhone pendentes |
 
 ## Registro de problemas e alternativas
 
@@ -141,29 +141,18 @@ Ainda é necessário validar sensibilidade e ergonomia em aparelho.
   o núcleo arm64; build experimental com assets e input está em validação.
   JIT, renderização e jogos em aparelho pendentes.
 
-### 3DS: MoltenVK e API de renderização
+### 3DS: renderer compatível com iOS
 
-- **Problema:** Citra não encontra MoltenVK; o adapter Libretro solicita OpenGL
-  desktop 3.3, ou GLES 3.2 se recompilado com `USING_GLES`.
-- **Causa:** downloader upstream procura diretório dylib antigo; host atual
-  oferece apenas GLES 2/3.0, não OpenGL desktop nem GLES 3.2.
-- **Impacto:** 3DS não está disponível para jogar, mesmo com perfil de duas telas.
-- **Alternativas:** corrigir dependência, adapter Vulkan/Metal, camada de
-  compatibilidade ou outro backend com renderer iOS adequado.
-- **Solução:** primeiro fixar MoltenVK 1.2.8, SHA-256 e slice estático ios-arm64;
-  depois adaptar a negociação gráfica. Não reduzir artificialmente a versão
-  solicitada nem anunciar que o host oferece uma API que não implementa.
-- **Status:** a segunda tentativa encontrou o slice MoltenVK e avançou até
-  glslang, cujo otimizador exigia SPIRV-Tools ausente. A receita desliga apenas
-  esse otimizador (`ENABLE_OPT=OFF`), preservando a compilação de shaders.
-  A etapa seguinte revelou que CMake upstream sobrescreve o deployment
-  target 16.3 para 14.0, deixando `std::to_chars` indisponível. O patch
-  experimental preserva 16.3. O build avançou ao linker, onde MoltenVK
-  revelou os frameworks Foundation, UIKit e CoreGraphics ausentes. Eles foram
-  adicionados à receita experimental, e o workflow 37231008525 compilou
-  o núcleo arm64. O app de
-  produção suporta iOS 16.0; promover Citra exigiria resolver essa diferença,
-  além do renderer. Renderer ainda em desenvolvimento.
+- **Problema:** o Citra anteriormente testado exigia OpenGL desktop ou GLES
+  3.2; o host iOS fornece GLES 3.0 e não deve anunciar uma API inexistente.
+- **Solução em teste:** Azahar na revisão fixada `9e6f523a57fac9564ac0bf8286db3c3702d301ec`,
+  com renderer de software, CPU interpretada sem JIT e sem MoltenVK/OpenGL.
+  O [probe arm64](https://github.com/GBrum0o0/BRUMCLASSICS/actions/runs/37356286389)
+  compilou. O adapter configura layout superior/inferior nativo, Circle Pad,
+  C-Stick, ZL/ZR, touch e diretório de dados `Saves/3ds/Azahar`.
+- **Limite:** o probe comprova compilação, não que jogos 3DS alcancem velocidade
+  jogável ou que saves, áudio e toque funcionem no iPhone. Conteúdo criptografado
+  requer dados fornecidos legalmente pelo usuário; nenhuma chave vem na IPA.
 
 ### GameCube: arquitetura não detectada
 
@@ -172,15 +161,18 @@ Ainda é necessário validar sensibilidade e ergonomia em aparelho.
 - **Impacto:** somente Dolphin.
 - **Alternativas:** toolchain iOS completo ou parâmetros explícitos.
 - **Solução:** informar arm64 e testar `ENABLE_GENERIC=ON` sem JIT.
-- **Status:** compilação arm64 genérica passou no workflow 37191135796;
-  desempenho de jogos ainda desconhecido.
+- **Status:** compilação arm64 genérica passou no workflow 37191135796 e o
+  núcleo com assets `Sys` entrou no IPA experimental build 44. O host oferece
+  GLES 3.0 e responde não à capacidade de JIT; desempenho de jogos ainda
+  desconhecido.
 
 ### Mega Drive / CD / 32X / arcade: licenciamento
 
 - **Problema:** a política do repositório exclui componentes não comerciais.
 - **Causa:** os candidatos Genesis Plus GX/PicoDrive/FBNeo avaliados contêm
   restrições incompatíveis com essa política; não basta renomeá-los de backend.
-- **Impacto:** permanecem fora do pacote e da lista ativa.
+- **Impacto:** esses candidatos específicos permanecem fora do pacote; foram
+  escolhidos BlastEm e MAME 2016 para o IPA experimental.
 - **Alternativas:** BlastEm GPL-3.0+ para Mega Drive, Sega CD e 32X; MAME
   moderno para arcade, com auditoria por componente.
 - **Solução:** BlastEm foi fixado na revisão
@@ -192,9 +184,10 @@ Ainda é necessário validar sensibilidade e ergonomia em aparelho.
   `ae07c2f88ff2482ba9f50ffc8c9e7e6fbfe97d0a`, produziu um dylib arm64 de
   112.400.384 bytes no [workflow 37283668369](https://github.com/GBrum0o0/BRUMCLASSICS/actions/runs/37283668369).
   O núcleo pede `zip|chd|7z|cmd` por caminho e inicia a máquina no primeiro
-  frame, após `retro_load_game`. Compilação não valida ROM sets, falhas de
-  inicialização, licença de cada componente incluído nem desempenho. Arcade
-  permanece fora da lista ativa e do IPA até essas verificações.
+  frame, após `retro_load_game`. O núcleo foi empacotado no IPA experimental
+  build 44, junto com avisos de terceiros e correções de geometria e limite
+  de caminho. Isso não valida ROM sets, jogos reais, falhas de inicialização
+  nem desempenho; Arcade permanece fora da lista de produção.
 
 ## Evidência e aceitação
 
@@ -225,6 +218,12 @@ passou no simulador e na validação estrutural local dos mesmos 15 núcleos,
 incluindo a mudança no contrato de áudio/vídeo Libretro. SHA-256:
 `1d4fed715437263b255be2a685c4914ae224f4e556fbe27dd4b61e9d78e49842`.
 Permanece sem assinatura para Sideloadly; não há teste de jogo em aparelho.
+O [IPA experimental build 44](https://github.com/GBrum0o0/BRUMCLASSICS/actions/runs/37356946600)
+passou no simulador e na validação estrutural de 17 núcleos, incluindo
+MAME 2016 e Dolphin. SHA-256: `84f725980175a97732cfab05e618371b232f9c5a207041e2390a072b3dedaf86`.
+O build 45 adiciona Azahar e só será considerado empacotado após a CI e a
+verificação do artefato; nenhum desses três sistemas teve jogo testado em
+iPhone ainda.
 
 Antes de ativar cada candidato: iniciar ROM legal de teste, verificar vídeo e
 áudio contínuos, pad virtual/físico, pausa/menu/background/interrupção, retorno

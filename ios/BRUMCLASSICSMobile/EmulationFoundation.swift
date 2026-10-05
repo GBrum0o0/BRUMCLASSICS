@@ -213,10 +213,10 @@ enum CoreRegistry {
         libraryName: "mamearcade2016_libretro_ios.dylib", supportedSystems: [.arcade]
     )
 
-    static let citra = CoreDescriptor(
-        id: "citra", displayName: "Citra",
-        version: "a0483e9abe8134ae6b290cdca7d49cb77689f05b", license: "GPL-2.0-or-later",
-        libraryName: "citra_libretro_ios.dylib", supportedSystems: [.nintendo3DS]
+    static let azahar = CoreDescriptor(
+        id: "azahar", displayName: "Azahar (Software)",
+        version: "9e6f523a57fac9564ac0bf8286db3c3702d301ec", license: "GPL-2.0-or-later",
+        libraryName: "azahar_libretro_ios.dylib", supportedSystems: [.nintendo3DS]
     )
 
     static let dolphin = CoreDescriptor(
@@ -234,8 +234,8 @@ enum CoreRegistry {
     // A descriptor alone does not enable a backend. Preserve the existing release
     // while new engines pass independent builds and device acceptance tests.
     static let all = [mgba, skyEmu, geolith, gearsystem, nestopia, beetlePCEFast, bsnesMercury, beetleWonderSwan]
-    static let candidates = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, ppsspp, flycast, blastEm, mame2016, citra, dolphin, play]
-    static let experimental = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, ppsspp, flycast, blastEm, mame2016, dolphin]
+    static let candidates = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, ppsspp, flycast, blastEm, mame2016, azahar, dolphin, play]
+    static let experimental = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, ppsspp, flycast, blastEm, mame2016, azahar, dolphin]
     static var experimentalBuild: Bool {
         Bundle.main.object(forInfoDictionaryKey: "BRUMExperimentalBackends") as? Bool == true
     }
@@ -345,7 +345,7 @@ enum ROMContentInspector {
         case "a26": return (.atari2600, .extensionFallback)
         case "gdi": return (.dreamcast, .extensionFallback)
         case "cso": return (.playStationPortable, .extensionFallback)
-        case "3ds", "3dsx", "cci", "cxi": return (.nintendo3DS, .extensionFallback)
+        case "3ds", "3dsx", "z3dsx", "cci", "zcci", "cxi", "zcxi": return (.nintendo3DS, .extensionFallback)
         case "rvz", "gcz": return (.gameCube, .extensionFallback)
         default: return nil
         }

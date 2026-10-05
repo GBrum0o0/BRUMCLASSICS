@@ -5,7 +5,7 @@ set -euo pipefail
 # A candidate is still experimental until gameplay, audio and saves pass on an
 # actual iPhone. Never fetch an expiring artifact from another workflow run.
 if [ "$#" -ne 2 ]; then
-  echo "usage: $0 <ppsspp|flycast|dolphin> <app-directory>" >&2
+  echo "usage: $0 <ppsspp|flycast|dolphin|azahar> <app-directory>" >&2
   exit 2
 fi
 
@@ -38,6 +38,15 @@ case "$CORE" in
     LIBRARY=dolphin_libretro_ios.dylib
     LICENSE=LICENSES/GPL-2.0-or-later.txt
     LICENSE_OUT=Dolphin-LICENSE.txt
+    ;;
+  azahar)
+    REPOSITORY=https://github.com/azahar-emu/azahar.git
+    COMMIT=9e6f523a57fac9564ac0bf8286db3c3702d301ec
+    TARGET=citra_libretro
+    OUTPUT_STEM=azahar_libretro
+    LIBRARY=azahar_libretro_ios.dylib
+    LICENSE=license.txt
+    LICENSE_OUT=Azahar-LICENSE.txt
     ;;
   *) echo "unknown core: $CORE" >&2; exit 2 ;;
 esac
@@ -81,10 +90,21 @@ case "$CORE" in
       -DIOS=ON -DLIBRETRO=ON -DENABLE_LTO=OFF \
       -DENABLE_VULKAN=OFF -DENABLE_GENERIC=ON
     ;;
+  azahar)
+    cmake -S "$SOURCE" -B "$BUILD" "${COMMON_FLAGS[@]}" \
+      -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+      -DCMAKE_C_FLAGS=-DIOS -DCMAKE_CXX_FLAGS=-DIOS \
+      -DIOS=ON -DENABLE_LIBRETRO=ON \
+      -DENABLE_OPENGL=OFF -DENABLE_VULKAN=OFF \
+      -DENABLE_SOFTWARE_RENDERER=ON -DENABLE_BUILTIN_KEYBLOB=OFF \
+      -DENABLE_OPT=OFF -DENABLE_LTO=OFF \
+      -DENABLE_WEB_SERVICE=OFF -DENABLE_SCRIPTING=OFF \
+      -DCITRA_USE_PRECOMPILED_HEADERS=OFF -DCITRA_WARNINGS_AS_ERRORS=OFF
+    ;;
 esac
 
 cmake --build "$BUILD" --config Release --target "$TARGET" --parallel "$(sysctl -n hw.ncpu)"
-CORE_PATH=$(find "$BUILD" -type f -name "${TARGET}*.dylib" -print -quit)
+CORE_PATH=$(find "$BUILD" -type f -name "${OUTPUT_STEM:-$TARGET}*.dylib" -print -quit)
 test -n "$CORE_PATH"
 cp "$CORE_PATH" "$APP/Frameworks/$LIBRARY"
 cp "$SOURCE/$LICENSE" "$APP/Frameworks/$LICENSE_OUT"

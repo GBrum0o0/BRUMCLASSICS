@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       experimental:
-        description: "Build de teste com Arcade/GameCube e demais backends experimentais; não publicar release"
+        description: "Build de teste com Arcade/3DS/GameCube e demais backends experimentais; não publicar release"
         type: boolean
         default: false
   push:
@@ -360,10 +360,11 @@ jobs:
           bash build-heavy-experimental.sh ppsspp "$APP"
           bash build-heavy-experimental.sh flycast "$APP"
           bash build-heavy-experimental.sh dolphin "$APP"
+          bash build-heavy-experimental.sh azahar "$APP"
           bash build-arcade-experimental.sh "$APP"
           /usr/libexec/PlistBuddy -c 'Add :BRUMExperimentalBackends bool true' "$APP/Info.plist"
           /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName BRUM Core Teste' "$APP/Info.plist"
-          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 44' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 45' "$APP/Info.plist"
 
       - name: Empacotar IPA pessoal
         working-directory: ios

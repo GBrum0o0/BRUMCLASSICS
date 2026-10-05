@@ -30,7 +30,7 @@ enum IntegratedEmulatorSupport {
         case "a26": return .atari2600
         case "gdi": return .dreamcast
         case "cso": return .playStationPortable
-        case "3ds", "3dsx", "cci", "cxi": return .nintendo3DS
+        case "3ds", "3dsx", "z3dsx", "cci", "zcci", "cxi", "zcxi": return .nintendo3DS
         case "rvz", "gcz": return .gameCube
         default: break
         }
@@ -46,6 +46,7 @@ enum IntegratedEmulatorSupport {
             case "arcade", "fbneo", "mame": return ["zip", "7z"].contains(ext) ? .arcade : nil
             case "psp" where ["iso", "pbp"].contains(ext): return .playStationPortable
             case "dreamcast" where ["chd", "cdi", "m3u"].contains(ext): return .dreamcast
+            case "3ds" where ["app", "elf", "axf"].contains(ext): return .nintendo3DS
             case "gamecube" where ["iso", "ciso", "gcm"].contains(ext): return .gameCube
             default: continue
             }
