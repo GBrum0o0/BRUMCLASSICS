@@ -5,8 +5,8 @@ enum IntegratedEmulatorSupport {
         core(for: rom) != nil
     }
 
-    static func core(for rom: ROMFolderGame) -> CoreDescriptor? {
-        system(for: rom).flatMap { CoreRegistry.core(for: $0) }
+    static func core(for rom: ROMFolderGame, includeExperimental: Bool = CoreRegistry.experimentalBuild) -> CoreDescriptor? {
+        system(for: rom).flatMap { CoreRegistry.core(for: $0, includeExperimental: includeExperimental) }
     }
 
     static func system(for rom: ROMFolderGame) -> EmulatedSystemID? {

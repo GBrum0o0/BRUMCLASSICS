@@ -293,6 +293,12 @@ actor PocketRAClient {
         await finishPlaySession(launcher: launcher)
     }
     func launchROM(_ rom: ROMFolderGame, launcher: AppStore) async {
+        if CoreRegistry.isTestPackage,
+           IntegratedEmulatorSupport.system(for: rom) == .nintendo3DS,
+           !IntegratedEmulatorSupport.supports(rom) {
+            message = "Arquivo 3DS reconhecido, mas o Azahar não está ativo nesta instalação. Confira o número da build no Gaming Mode e instale a IPA experimental mais recente pelo Sideloadly."
+            return
+        }
         guard var record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }) else {
             message = "Atualize a pasta de ROMs novamente antes de jogar."
             return
@@ -539,6 +545,13 @@ struct ROMFolderGameTile: View {
     @State private var artwork: ROMArtwork?
     @State private var artworkImage: UIImage?
     private var displayedTitle: String { launcherGame?.title ?? artwork?.title ?? rom.title }
+    private var routeLabel: String {
+        if let integratedCoreName { return "JOGAR · BRUM CORE · \(integratedCoreName.uppercased())" }
+        if CoreRegistry.isTestPackage, IntegratedEmulatorSupport.system(for: rom) == .nintendo3DS {
+            return "3DS · AZAHAR NÃO ATIVO · VERIFIQUE BUILD"
+        }
+        return retroArchReady ? "JOGAR · RETROARCH" : "PRIMEIRO USO · IMPORTAR"
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button(action: play) {
@@ -555,7 +568,7 @@ struct ROMFolderGameTile: View {
                     Text(displayedTitle).font(.system(size: 15, weight: .bold)).foregroundStyle(BrumTheme.text).lineLimit(2).multilineTextAlignment(.leading)
                 }
             }.buttonStyle(.plain).accessibilityLabel("Jogar \(displayedTitle)")
-            Text(integratedCoreName.map { "JOGAR · BRUM CORE · \($0.uppercased())" } ?? (retroArchReady ? "JOGAR · RETROARCH" : "PRIMEIRO USO · IMPORTAR"))
+            Text(routeLabel)
                 .font(.system(size: 10, weight: .bold)).foregroundStyle(BrumTheme.primary)
         }.task(id: rom.id + (launcherGame?.artworkPath ?? "")) {
             guard launcherGame?.artworkPath.isEmpty != false else { return }

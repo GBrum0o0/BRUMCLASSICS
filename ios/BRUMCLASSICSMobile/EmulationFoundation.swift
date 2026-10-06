@@ -236,9 +236,21 @@ enum CoreRegistry {
     static let all = [mgba, skyEmu, geolith, gearsystem, nestopia, beetlePCEFast, bsnesMercury, beetleWonderSwan]
     static let candidates = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, ppsspp, flycast, blastEm, mame2016, azahar, dolphin, play]
     static let experimental = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, ppsspp, flycast, blastEm, mame2016, azahar, dolphin]
-    static var experimentalBuild: Bool {
-        Bundle.main.object(forInfoDictionaryKey: "BRUMExperimentalBackends") as? Bool == true
+    static var isTestPackage: Bool {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String == "BRUM Core Teste"
     }
+    static let experimentalBuild: Bool = {
+        if (Bundle.main.object(forInfoDictionaryKey: "BRUMExperimentalBackends") as? NSNumber)?.boolValue == true {
+            return true
+        }
+        // Some sideload signers rewrite Info.plist. The signed app's bundled
+        // libraries are a second, concrete signal that this is a test package.
+        let frameworks = Bundle.main.privateFrameworksPath
+            ?? (Bundle.main.bundlePath as NSString).appendingPathComponent("Frameworks")
+        return experimental.contains {
+            FileManager.default.fileExists(atPath: (frameworks as NSString).appendingPathComponent($0.libraryName))
+        }
+    }()
 
     static func candidate(for system: EmulatedSystemID) -> CoreDescriptor? {
         candidates.first { $0.supportedSystems.contains(system) }

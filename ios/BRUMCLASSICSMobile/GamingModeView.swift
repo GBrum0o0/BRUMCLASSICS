@@ -29,6 +29,9 @@ struct GamingModeView: View {
                     Spacer()
                     ConnectionDot(state: store.connection)
                 }
+                Text("BRUM Core iOS · build \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?") · 3DS: \(CoreRegistry.core(for: .nintendo3DS)?.displayName ?? "não ativo")")
+                    .font(.caption2).foregroundStyle(BrumTheme.muted)
+                    .accessibilityIdentifier("brum-core-build-status")
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Prontos para jogar").font(.system(size: 32, weight: .black)).foregroundStyle(BrumTheme.text)

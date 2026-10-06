@@ -19,7 +19,7 @@ class PackageValidationTests(unittest.TestCase):
                 include_arcade_gc_notices=True,
                 include_ppsspp_assets=True, candidate_cpu=0x0100000C, candidate_licenses=True,
                 include_blastem_vendor_licenses=True,
-                experimental_build="37"):
+                experimental_build="37", display_name="BRUM Core Teste"):
         path = Path(folder) / "test.ipa"
         root = f"Payload/{app}.app/"
         info = {"CFBundleIdentifier": "com.brumclassics.mobile.ios",
@@ -30,6 +30,8 @@ class PackageValidationTests(unittest.TestCase):
         info["BRUMExperimentalBackends"] = experimental
         if experimental is True:
             info["CFBundleVersion"] = experimental_build
+            if display_name is not None:
+                info["CFBundleDisplayName"] = display_name
         with zipfile.ZipFile(path, "w") as archive:
             archive.writestr(root + "Info.plist", plistlib.dumps(info))
             if experimental is True:
@@ -190,6 +192,14 @@ class PackageValidationTests(unittest.TestCase):
                 validate_ipa(self.fixture(folder, experimental=True, experimental_build="45", include_azahar=False))
             with self.assertRaisesRegex(ValueError, "license is absent"):
                 validate_ipa(self.fixture(folder, experimental=True, experimental_build="45", candidate_licenses=False))
+
+    def test_diagnostic_build_requires_test_display_name(self):
+        with tempfile.TemporaryDirectory() as folder:
+            result = validate_ipa(self.fixture(folder, experimental=True, experimental_build="46"))
+            self.assertEqual(len(result["integratedCores"]), 18)
+            for display_name in (None, "BRUMCLASSICS"):
+                with self.assertRaisesRegex(ValueError, "CFBundleDisplayName"):
+                    validate_ipa(self.fixture(folder, experimental=True, experimental_build="46", display_name=display_name))
 
     def test_experimental_package_rejects_wrong_cpu_and_missing_license(self):
         with tempfile.TemporaryDirectory() as folder:

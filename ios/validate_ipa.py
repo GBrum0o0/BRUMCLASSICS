@@ -60,6 +60,7 @@ def validate_ipa(path, expected_version=None):
         sega_experimental = experimental and int(build_number) >= 40
         arcade_gc_experimental = experimental and int(build_number) >= 44
         azahar_experimental = experimental and int(build_number) >= 45
+        sideload_diagnostic = experimental and int(build_number) >= 46
         if experimental:
             integrated_cores.update({
                 "Beetle PSX": root + "Frameworks/mednafen_psx_libretro_ios.dylib",
@@ -84,6 +85,8 @@ def validate_ipa(path, expected_version=None):
             })
         if azahar_experimental:
             integrated_cores["Azahar"] = root + "Frameworks/azahar_libretro_ios.dylib"
+        if sideload_diagnostic and info.get("CFBundleDisplayName") != "BRUM Core Teste":
+            raise ValueError("Experimental CFBundleDisplayName must be BRUM Core Teste")
         for core_name, core_path in integrated_cores.items():
             if core_path not in names:
                 raise ValueError(f"Integrated {core_name} core is absent")

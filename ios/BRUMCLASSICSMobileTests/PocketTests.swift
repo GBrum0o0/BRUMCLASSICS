@@ -259,9 +259,13 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(system("PS2/game.iso"), .playStation2)
         XCTAssertEqual(system("Sega CD/game.chd"), .segaCD)
         XCTAssertEqual(system("3DS/homebrew.3dsx"), .nintendo3DS)
+        XCTAssertEqual(system("3DS/jogo.3ds"), .nintendo3DS)
         XCTAssertEqual(system("3DS/title.app"), .nintendo3DS)
         XCTAssertEqual(system("GameCube/game.iso"), .gameCube)
         XCTAssertEqual(system("Arcade/pacman.zip"), .arcade)
+        let threeDS = ROMFolderGame(relativePath: "3DS/jogo.3ds", filename: "jogo.3ds", title: "jogo", fileSize: 1)
+        XCTAssertEqual(IntegratedEmulatorSupport.core(for: threeDS, includeExperimental: true)?.id, "azahar")
+        XCTAssertNil(IntegratedEmulatorSupport.core(for: threeDS, includeExperimental: false))
         XCTAssertEqual(system("nested/PSP/game.iso"), .playStationPortable)
         XCTAssertEqual(system("PS1/PS2/game.iso"), .playStation2)
     }

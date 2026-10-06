@@ -364,7 +364,7 @@ jobs:
           bash build-arcade-experimental.sh "$APP"
           /usr/libexec/PlistBuddy -c 'Add :BRUMExperimentalBackends bool true' "$APP/Info.plist"
           /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName BRUM Core Teste' "$APP/Info.plist"
-          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 45' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 46' "$APP/Info.plist"
 
       - name: Empacotar IPA pessoal
         working-directory: ios
