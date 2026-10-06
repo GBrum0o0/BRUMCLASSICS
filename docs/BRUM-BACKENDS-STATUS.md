@@ -81,7 +81,7 @@ Ainda é necessário validar sensibilidade e ergonomia em aparelho.
 | Saturn | Beetle Saturn | Empacotado apenas no IPA experimental build 37; desempenho, BIOS do usuário e teste em aparelho pendentes |
 | Atari 2600 | Stella2014 | Empacotado apenas no IPA experimental; teste em aparelho pendente |
 | PSP / Dreamcast | PPSSPP / Flycast | Empacotados em IPA experimental arm64 com analógico e botões próprios; ainda sem comprovação de execução/áudio em aparelho |
-| 3DS | Azahar | Renderer de software/interpreter compilado arm64, sem chaves embutidas; integração no IPA experimental build 45 em validação. Execução, áudio, controles e desempenho em aparelho pendentes |
+| 3DS | Azahar | Renderer de software/interpreter compilado arm64, sem chaves embutidas; empacotado no IPA experimental build 45. Execução, áudio, controles e desempenho em aparelho pendentes |
 | GameCube | Dolphin | Empacotado no IPA experimental build 44, com assets `Sys`, GLES 3.0 e interpretador sem JIT; execução e desempenho em aparelho pendentes |
 | PS2 | Play! | Descriptor preparado reaproveitando revisão Android; adapter/renderização e execução sem JIT iOS não validados |
 | Mega Drive, Sega CD/32X | BlastEm | Revisão GPL-3.0+ e mapeamento de BIOS/botões empacotados no IPA experimental build 42; jogos em aparelho pendentes |
@@ -221,9 +221,12 @@ Permanece sem assinatura para Sideloadly; não há teste de jogo em aparelho.
 O [IPA experimental build 44](https://github.com/GBrum0o0/BRUMCLASSICS/actions/runs/37356946600)
 passou no simulador e na validação estrutural de 17 núcleos, incluindo
 MAME 2016 e Dolphin. SHA-256: `84f725980175a97732cfab05e618371b232f9c5a207041e2390a072b3dedaf86`.
-O build 45 adiciona Azahar e só será considerado empacotado após a CI e a
-verificação do artefato; nenhum desses três sistemas teve jogo testado em
-iPhone ainda.
+O [IPA experimental build 45](https://github.com/GBrum0o0/BRUMCLASSICS/actions/runs/37376353166)
+passou no simulador e na validação estrutural local com 18 núcleos arm64,
+incluindo MAME 2016, Dolphin e Azahar. SHA-256:
+`a7778afbf8be08d35bbed660088a3ed87252da58c2c6d90cb546521e2ec67e59`.
+É uma IPA sem assinatura para Sideloadly; nenhum desses três sistemas teve
+jogo testado em iPhone ainda.
 
 Antes de ativar cada candidato: iniciar ROM legal de teste, verificar vídeo e
 áudio contínuos, pad virtual/físico, pausa/menu/background/interrupção, retorno
