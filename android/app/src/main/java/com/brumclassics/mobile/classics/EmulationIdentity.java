@@ -20,6 +20,26 @@ public final class EmulationIdentity {
         return "classic:" + systemId + ":sha256:" + contentSha256;
     }
 
+    // Keep canonicalGameId() stable for existing local save manifests. The
+    // normalized transport ID is used only when comparing devices.
+    public String portableGameId() {
+        return portableGameId(systemId, contentSha256);
+    }
+
+    public static String portableGameId(String storedSystemId, String sha256) {
+        String system = storedSystemId == null ? "" : storedSystemId.toLowerCase(Locale.ROOT);
+        switch (system) {
+            case "smc": system = "sfc"; break;
+            case "gen": case "smd": system = "md"; break;
+            case "z64": case "v64": system = "n64"; break;
+            default: break;
+        }
+        if (!system.matches("[a-z0-9]+") || sha256 == null || !sha256.matches("[a-fA-F0-9]{64}")) {
+            throw new IllegalArgumentException("Identidade portátil inválida.");
+        }
+        return "classic:" + system + ":sha256:" + sha256.toLowerCase(Locale.ROOT);
+    }
+
     public static EmulationIdentity inspect(InputStream input, String filename) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         byte[] buffer = new byte[1024 * 1024];
