@@ -3,6 +3,7 @@
 #include "N64Input.hpp"
 #include "VirtualControlProfile.hpp"
 #include "VirtualControlInput.hpp"
+#include "FrameCadence.hpp"
 #include "../../ios/BRUMCLASSICSMobile/Libretro/BrumScreenProfiles.hpp"
 #include <cstdlib>
 #include <iostream>
@@ -200,5 +201,19 @@ int main() {
     input.setAxis(InputSource::virtualPad, 0, 0, partial.x);
     input.setAxis(InputSource::virtualPad, 0, 1, diagonal.y);
     check(input.analog(0, 0) > 0 && input.analog(0, 1) < 0);
+    FrameCadence cadence;
+    cadence.setRate(75);
+    unsigned frames = 0;
+    for (unsigned tick = 0; tick <= 60; ++tick) frames += cadence.framesDue(tick / 60.0);
+    check(frames == 76); // 75 Hz core on a 60 Hz display is not slowed to 60 Hz.
+    cadence.setRate(120);
+    frames = 0;
+    for (unsigned tick = 0; tick <= 60; ++tick) frames += cadence.framesDue(tick / 60.0);
+    check(frames == 121);
+    cadence.reset();
+    check(cadence.framesDue(1000) == 1); // Resume does not replay the pause.
+    check(cadence.framesDue(1001) == 12); // Stale catch-up is bounded to 100 ms.
+    cadence.setRate(std::numeric_limits<double>::quiet_NaN());
+    check(cadence.rate() == 60);
     std::cout << "BRUM screen/input: " << checks << " checks passed\n";
 }

@@ -16,7 +16,7 @@ Estado desta revisão: implementação parcial, com validação estática e test
 | --- | --- | --- |
 | Imagem padrão | FIT e transformação de toque compartilhada; layout DS/3DS vertical/horizontal/foco/swap | FIT, com opção explícita CORTAR |
 | Entrada | D-pad contínuo com diagonais, perfis por sistema, feedback visual e háptico, limpeza ao pausar/sair | Limpeza de estado ao pausar; ponteiro compartilhado com o core sem corrida de dados |
-| Cadência | Ainda depende do `CADisplayLink`/thread principal | Usa FPS declarado pelo core, inclusive 75 Hz ou valores futuros |
+| Cadência | Agenda frames pelo FPS declarado pelo core, mesmo se ele exceder o refresh físico; ainda depende do `CADisplayLink`/thread principal | Usa FPS declarado pelo core, inclusive 75 Hz ou valores futuros |
 | Diagnóstico | HUD local opt-in com FPS, tempo de core+host, tempo do callback de vídeo e estado térmico | Teste da política de cadência; telemetria por etapa ainda pendente |
 
 ## Gargalos e limites ainda abertos

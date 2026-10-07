@@ -5,6 +5,7 @@
 #include "../../../shared/brum-core/N64Input.hpp"
 #include "../../../shared/brum-core/VirtualControlProfile.hpp"
 #include "../../../shared/brum-core/VirtualControlInput.hpp"
+#include "../../../shared/brum-core/FrameCadence.hpp"
 
 #import <AudioToolbox/AudioToolbox.h>
 #import <AVFoundation/AVFoundation.h>
@@ -272,6 +273,7 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     CFTimeInterval _coreRunSeconds;
     CFTimeInterval _hostVideoSeconds;
     NSUInteger _measuredFrames;
+    brum::FrameCadence _frameCadence;
     BOOL _paused;
     BOOL _explicitlyPaused;
     BOOL _backgrounded;
@@ -346,6 +348,7 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
 - (void)showStateStatus:(NSString *)text error:(BOOL)error;
 - (BOOL)startAudio:(double)sampleRate error:(NSError **)error;
 - (void)applyPendingAVInfo;
+- (void)configureDisplayCadence:(double)framesPerSecond;
 - (void)presentFrame:(CGImageRef)image;
 - (void)layoutScreens;
 - (brum::Rect)availableGameRect;
@@ -1017,6 +1020,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     if (_paused == shouldPause) return;
     _paused = shouldPause;
     _displayLink.paused = shouldPause;
+    _frameCadence.reset();
     if (shouldPause) {
         _input.clear();
         _n64CButtonMask = 0;
@@ -1690,6 +1694,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 
 - (void)toggleFastForward {
     _fastForwardEnabled = !_fastForwardEnabled;
+    _frameCadence.reset();
     os_unfair_lock_lock(&_audioLock);
     _audioRead = 0; _audioWrite = 0; _audioCount = 0;
     os_unfair_lock_unlock(&_audioLock);
@@ -1850,12 +1855,22 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _stateButton.enabled = (self.capabilities & BrumBackendSaveState) != 0;
     if (![self startAudio:avInfo.timing.sample_rate error:error]) return NO;
     _displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(runFrame)];
-    if (@available(iOS 15.0, *)) {
-        float fps = (float)MAX(20.0, MIN(120.0, avInfo.timing.fps));
-        _displayLink.preferredFrameRateRange = CAFrameRateRangeMake(fps, fps, fps);
-    } else { _displayLink.preferredFramesPerSecond = (NSInteger)llround(avInfo.timing.fps); }
+    [self configureDisplayCadence:avInfo.timing.fps];
     [_displayLink addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
     return YES;
+}
+
+- (void)configureDisplayCadence:(double)framesPerSecond {
+    _frameCadence.setRate(framesPerSecond);
+    if (!_displayLink) return;
+    const UIScreen *screen = self.view.window.screen ?: UIScreen.mainScreen;
+    const double refresh = MAX(1, screen.maximumFramesPerSecond);
+    const float preferred = (float)MIN(_frameCadence.rate(), refresh);
+    if (@available(iOS 15.0, *)) {
+        _displayLink.preferredFrameRateRange = CAFrameRateRangeMake(preferred, (float)refresh, preferred);
+    } else {
+        _displayLink.preferredFramesPerSecond = (NSInteger)llround(preferred);
+    }
 }
 
 - (BOOL)startAudio:(double)sampleRate error:(NSError **)error {
@@ -1907,14 +1922,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _hasPendingAVInfo = NO;
     _contentAspectRatio = info.geometry.aspect_ratio;
     _screenProfileWidth = 0;
-    if (_displayLink) {
-        float fps = (float)MAX(20.0, MIN(120.0, info.timing.fps));
-        if (@available(iOS 15.0, *)) {
-            _displayLink.preferredFrameRateRange = CAFrameRateRangeMake(fps, fps, fps);
-        } else {
-            _displayLink.preferredFramesPerSecond = (NSInteger)llround(fps);
-        }
-    }
+    [self configureDisplayCadence:info.timing.fps];
     if (!_audioQueue || fabs(info.timing.sample_rate - _audioSampleRate) < 1.0) return;
     AudioQueueRef oldQueue = _audioQueue;
     _audioQueue = NULL;
@@ -1933,7 +1941,8 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     if (_stopped || !_gameLoaded || _paused || _shutdownRequested) return;
     if (_hardwareInitialized) [EAGLContext setCurrentContext:_hardwareContext];
     const CFTimeInterval started = _performanceHUDEnabled ? CACurrentMediaTime() : 0;
-    NSUInteger frameCount = _fastForwardEnabled ? 5 : 1;
+    NSUInteger frameCount = _fastForwardEnabled ? 5 : _frameCadence.framesDue(CACurrentMediaTime());
+    if (frameCount == 0) return;
     for (NSUInteger frame = 0; frame < frameCount; frame++) {
         _suppressVideo = frame + 1 < frameCount;
         _core.run();
