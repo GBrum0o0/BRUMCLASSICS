@@ -1,6 +1,6 @@
 # Auditoria inicial — Brum Classics / Brum Core 2.1 Beta
 
-Esta auditoria precede mudanças de arquitetura. A linha `codex/brum-backends` é experimental; `main` e as releases Stable não devem ser promovidas ou substituídas sem validação e aprovação do usuário. O código-fonte do Launcher nesta máquina está em `H:\BRUMCLASSICS\src` (pacote local 1.76.0), fora do repositório público Mobile; não editá-lo como se fosse uma branch Beta nem publicar seu código por acidente.
+Esta auditoria precede mudanças de arquitetura. A linha `codex/brum-backends` é experimental; `main` e as releases Stable não devem ser promovidas ou substituídas sem validação e aprovação do usuário. O código-fonte do Launcher PC está fora deste repositório público Mobile; não editá-lo como se fosse uma branch Beta nem publicar seu código por acidente.
 
 ## Mapa de execução existente
 
@@ -29,7 +29,7 @@ Esta auditoria precede mudanças de arquitetura. A linha `codex/brum-backends` �
 
 ## Sequência segura e critérios de prova
 
-1. Preservar Stable e criar uma linha Beta versionada para qualquer alteração ao Launcher PC antes de editar `H:\BRUMCLASSICS\src`. Não copiar fontes privadas para o repositório público Mobile.
+1. Preservar Stable e criar uma linha Beta versionada para qualquer alteração ao Launcher PC antes de editar as fontes Stable. Não copiar fontes privadas para o repositório público Mobile.
 2. Consolidar identidade por hash e adaptadores de save nativo; testes de mismatch, interrupção, corrupção e conflito precedem escrita remota.
 3. Estender a ponte autenticada existente com capacidades/versionamento, separando controle de transferência/stream. Input deve ter sequência, timeout e liberação no disconnect.
 4. Integrar Game Detail e Gaming Mode aos metadados reais, preservando os comandos de abrir no PC e o streaming atual. Gamepad só deve ser acionável quando a sessão complementar for funcional.
@@ -37,7 +37,7 @@ Esta auditoria precede mudanças de arquitetura. A linha `codex/brum-backends` �
 
 ## Correção isolada iniciada no Launcher Beta local
 
-Em `H:\BRUMCLASSICS-BETA-2.1` (Git local, sem remoto), a restauração de `save-backup-service.js` agora verifica todos os hashes antes de tocar no save atual, exige que a cópia pré-restauração tenha êxito, rejeita restauração durante jogo ativo, prepara arquivos temporários e usa journal para reverter operação interrompida. Os testes cobrem sucesso, backup adulterado, sessão ativa e recuperação após interrupção.
+Na cópia Beta local do Launcher PC (Git sem remoto), a restauração de `save-backup-service.js` agora verifica todos os hashes antes de tocar no save atual, exige que a cópia pré-restauração tenha êxito, rejeita restauração durante jogo ativo, prepara arquivos temporários e usa journal para reverter operação interrompida. Os testes cobrem sucesso, backup adulterado, sessão ativa e recuperação após interrupção.
 
 O Launcher Beta também consulta, em tempo de execução, `GET_CONFIG_PARAM savefile_directory` na interface UDP local do RetroArch e procura somente arquivos persistentes com o nome exato do conteúdo e extensões nativas conhecidas (como `.srm`/`.rtc`). Arquivos ambíguos, compartilhados ou específicos de core não são atribuídos automaticamente. O registro e o manifesto do backup agora distinguem `native`, `savestate` e `manual`, preservando o backup anterior de estados. Novos backups automáticos também recebem um `canonicalGameId` calculado por SHA-256 do conteúdo quando possível; CUE/GDI/M3U seguem a mesma ordem de arquivos e prefixo versionado do iOS. Isso **não** demonstra ainda compatibilidade entre todas as identidades PC/iOS/Android, transporte autenticado, resolução de conflito ou suporte a memory cards de cores pesados. A detecção de save nativo e a identidade de disco precisam de teste com RetroArch e ROMs reais antes de serem liberadas.
 
