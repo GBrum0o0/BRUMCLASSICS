@@ -86,7 +86,7 @@ const integratedEngine = fs.readFileSync(path.join(app, 'Libretro', 'BrumLibretr
 for (const marker of ['forward.fill', 'toggleFastForward', '_fastForwardEnabled ? 5 : 1', '_suppressVideo', 'AVANÇO RÁPIDO · 5×']) {
   if (!integratedEngine.includes(marker)) throw new Error(`Avanço rápido do BRUM Core incompleto: ${marker}`);
 }
-for (const marker of ['kCAGravityResizeAspectFill', 'toggleDisplayMode', '_screenFillsDisplay = YES', 'Preencher tela', 'Mostrar imagem inteira']) {
+for (const marker of ['brum::calculateViewport', 'brum::ScaleMode::crop', 'toggleDisplayMode', '_screenFillsDisplay = NO', 'Preencher tela', 'Mostrar imagem inteira']) {
   if (!integratedEngine.includes(marker)) throw new Error(`Preenchimento de tela do BRUM Core incompleto: ${marker}`);
 }
 if (integratedEngine.includes('[close.heightAnchor constraintEqualToConstant:38]') || integratedEngine.includes('[_fastForwardButton.heightAnchor constraintEqualToConstant:38]')) throw new Error('Controles superiores ainda possuem restrições de altura conflitantes.');

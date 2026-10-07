@@ -3,6 +3,8 @@
 #include "BrumScreenProfiles.hpp"
 #include "../../../shared/brum-core/InputState.hpp"
 #include "../../../shared/brum-core/N64Input.hpp"
+#include "../../../shared/brum-core/VirtualControlProfile.hpp"
+#include "../../../shared/brum-core/VirtualControlInput.hpp"
 
 #import <AudioToolbox/AudioToolbox.h>
 #import <AVFoundation/AVFoundation.h>
@@ -150,6 +152,91 @@ typedef struct {
 }
 @end
 
+@interface BrumVirtualDPad : UIControl
+@property(nonatomic, readonly) uint8_t mask;
+- (void)reset;
+@end
+
+@implementation BrumVirtualDPad {
+    NSArray<UILabel *> *_arrows;
+    uint8_t _mask;
+}
+- (instancetype)initWithFrame:(CGRect)frame {
+    self = [super initWithFrame:frame];
+    if (!self) return nil;
+    self.backgroundColor = [UIColor colorWithWhite:0.10 alpha:0.84];
+    self.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.35].CGColor;
+    self.layer.borderWidth = 2;
+    NSMutableArray<UILabel *> *arrows = [NSMutableArray array];
+    for (NSString *symbol in @[@"▲", @"▼", @"◀", @"▶"]) {
+        UILabel *label = [[UILabel alloc] init];
+        label.text = symbol;
+        label.textAlignment = NSTextAlignmentCenter;
+        label.textColor = UIColor.whiteColor;
+        label.font = [UIFont boldSystemFontOfSize:19];
+        label.layer.cornerRadius = 10;
+        label.clipsToBounds = YES;
+        [self addSubview:label];
+        [arrows addObject:label];
+    }
+    _arrows = arrows;
+    self.isAccessibilityElement = YES;
+    self.accessibilityLabel = @"Direcional virtual";
+    self.accessibilityHint = @"Deslize entre direções; diagonais são aceitas.";
+    return self;
+}
+- (uint8_t)mask { return _mask; }
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    self.layer.cornerRadius = MIN(self.bounds.size.width, self.bounds.size.height) / 4;
+    const CGFloat cx = CGRectGetMidX(self.bounds), cy = CGRectGetMidY(self.bounds);
+    const CGFloat dx = self.bounds.size.width * 0.30, dy = self.bounds.size.height * 0.29;
+    NSArray<NSValue *> *positions = @[
+        [NSValue valueWithCGPoint:CGPointMake(cx, cy - dy)],
+        [NSValue valueWithCGPoint:CGPointMake(cx, cy + dy)],
+        [NSValue valueWithCGPoint:CGPointMake(cx - dx, cy)],
+        [NSValue valueWithCGPoint:CGPointMake(cx + dx, cy)]
+    ];
+    for (NSUInteger i = 0; i < _arrows.count; ++i) {
+        UILabel *label = _arrows[i];
+        label.bounds = CGRectMake(0, 0, 45, 38);
+        label.center = positions[i].CGPointValue;
+    }
+}
+- (void)updateWithTouch:(UITouch *)touch {
+    const CGPoint point = [touch locationInView:self];
+    const double radius = MAX(1, MIN(self.bounds.size.width, self.bounds.size.height) / 2);
+    const uint8_t next = brum::dpadDirections(point.x - CGRectGetMidX(self.bounds),
+                                               point.y - CGRectGetMidY(self.bounds), radius);
+    if (_mask == next) return;
+    _mask = next;
+    const uint8_t bits[] = {brum::up, brum::down, brum::left, brum::right};
+    for (NSUInteger i = 0; i < _arrows.count; ++i) {
+        const BOOL pressed = (_mask & bits[i]) != 0;
+        UILabel *label = _arrows[i];
+        label.backgroundColor = pressed ? [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:1] : UIColor.clearColor;
+        label.textColor = pressed ? UIColor.blackColor : UIColor.whiteColor;
+    }
+    [self sendActionsForControlEvents:UIControlEventValueChanged];
+}
+- (BOOL)beginTrackingWithTouch:(UITouch *)touch withEvent:(UIEvent *)event {
+    [self updateWithTouch:touch];
+    return YES;
+}
+- (BOOL)continueTrackingWithTouch:(UITouch *)touch withEvent:(UIEvent *)event {
+    [self updateWithTouch:touch];
+    return YES;
+}
+- (void)endTrackingWithTouch:(UITouch *)touch withEvent:(UIEvent *)event { [self reset]; }
+- (void)cancelTrackingWithEvent:(UIEvent *)event { [self reset]; }
+- (void)reset {
+    if (!_mask) return;
+    _mask = 0;
+    for (UILabel *label in _arrows) { label.backgroundColor = UIColor.clearColor; label.textColor = UIColor.whiteColor; }
+    [self sendActionsForControlEvents:UIControlEventValueChanged];
+}
+@end
+
 @class BrumLibretroViewController;
 static __weak BrumLibretroViewController *BrumCurrentHost;
 
@@ -168,7 +255,23 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     brum::InputState _input;
     brum::ScreenManager _screenManager;
     std::vector<brum::Placement> _screenPlacements;
+    brum::Viewport _singleViewport;
+    unsigned _screenProfileWidth;
+    unsigned _screenProfileHeight;
+    double _contentAspectRatio;
+    BOOL _layoutManuallyChosen;
     NSMutableArray<CALayer *> *_screenLayers;
+    CALayer *_singleScreenLayer;
+    UIView *_directionControl;
+    UIView *_actionControl;
+    NSMutableArray<UIButton *> *_virtualButtons;
+    UIImpactFeedbackGenerator *_virtualFeedback;
+    BOOL _virtualHapticsEnabled;
+    BOOL _performanceHUDEnabled;
+    CFTimeInterval _metricsStartedAt;
+    CFTimeInterval _coreRunSeconds;
+    CFTimeInterval _hostVideoSeconds;
+    NSUInteger _measuredFrames;
     BOOL _paused;
     BOOL _explicitlyPaused;
     BOOL _backgrounded;
@@ -187,6 +290,8 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     BrumVirtualStick *_virtualStick;
     BrumVirtualStick *_rightVirtualStick;
     UIView *_digitalPad;
+    BrumVirtualDPad *_primaryDPad;
+    BrumVirtualDPad *_secondaryDPad;
     UIButton *_padModeButton;
     BOOL _dpadMode;
     uint8_t _n64CButtonMask;
@@ -243,6 +348,7 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
 - (void)applyPendingAVInfo;
 - (void)presentFrame:(CGImageRef)image;
 - (void)layoutScreens;
+- (brum::Rect)availableGameRect;
 - (void)showScreenMenu;
 - (void)updatePauseState;
 - (BOOL)configureHardware:(brum_retro_hw_render_callback *)callback;
@@ -250,12 +356,19 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
 - (void)destroyHardware;
 - (void)handleCoreShutdown;
 - (BrumVirtualStick *)analogPad;
+- (BrumVirtualDPad *)directionPad;
+- (void)dpadChanged:(BrumVirtualDPad *)pad;
+- (void)dpadTouchDown:(BrumVirtualDPad *)pad;
 - (UIStackView *)n64ActionPad;
 - (UIStackView *)segaActionPad;
+- (UIStackView *)profileActionPad:(brum::VirtualFace)face;
+- (UIStackView *)faceRows:(NSArray<NSArray<UIButton *> *> *)rows width:(CGFloat)width;
 - (void)virtualStickChanged:(BrumVirtualStick *)stick;
 - (void)rightVirtualStickChanged:(BrumVirtualStick *)stick;
 - (void)toggleAnalogPadMode;
 - (void)updateN64CButtons;
+- (void)setVirtualButton:(UIButton *)button pressed:(BOOL)pressed;
+- (void)releaseVirtualControls;
 @end
 
 static void *BrumLoadSymbol(void *handle, const char *name) {
@@ -335,7 +448,10 @@ static bool BrumEnvironment(unsigned command, void *data) {
         case BRUM_RETRO_ENVIRONMENT_SET_GEOMETRY:
             // Frame dimensions arrive in the video callback; accept a valid
             // geometry change without inventing a different rendered size.
-            return BrumValidGeometry((const brum_retro_game_geometry *)data);
+            if (!BrumValidGeometry((const brum_retro_game_geometry *)data)) return false;
+            host->_contentAspectRatio = ((const brum_retro_game_geometry *)data)->aspect_ratio;
+            host->_screenProfileWidth = 0;
+            return true;
         case BRUM_RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO: {
             const brum_retro_system_av_info *info = (const brum_retro_system_av_info *)data;
             if (!info || !BrumValidGeometry(&info->geometry) || !isfinite(info->timing.fps) ||
@@ -430,6 +546,7 @@ static bool BrumEnvironment(unsigned command, void *data) {
 static void BrumVideo(const void *data, unsigned width, unsigned height, size_t pitch) {
     BrumLibretroViewController *host = BrumCurrentHost;
     if (!host || host->_suppressVideo || !data || !width || !height) return;
+    const CFTimeInterval started = host->_performanceHUDEnabled ? CACurrentMediaTime() : 0;
     if (width > 4096 || height > 4096) return;
     const size_t bytesPerPixel = host->_pixelFormat == BRUM_RETRO_PIXEL_FORMAT_XRGB8888 ? 4 : 2;
     if (data != BrumHardwareFrameBuffer && (pitch < (size_t)width * bytesPerPixel || pitch > SIZE_MAX / height)) return;
@@ -485,6 +602,7 @@ static void BrumVideo(const void *data, unsigned width, unsigned height, size_t 
     }
     CGDataProviderRelease(provider);
     CGColorSpaceRelease(colorSpace);
+    if (host->_performanceHUDEnabled) host->_hostVideoSeconds += CACurrentMediaTime() - started;
 }
 
 static void BrumPushAudio(const int16_t *data, size_t frames) {
@@ -621,9 +739,13 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _variables[@"citra_layout_option"] = @"default";
     _variables[@"citra_resolution_factor"] = @"1";
     _variables[@"citra_enable_touch_touchscreen"] = @"enabled";
+    // Keep the pinned WonderSwan X/Y cursor mapping stable for its two
+    // separate virtual directional clusters.
+    _variables[@"wswan_rotate_keymap"] = @"disabled";
     _screenLayers = [NSMutableArray array];
     _pixelFormat = BRUM_RETRO_PIXEL_FORMAT_0RGB1555;
-    _screenFillsDisplay = YES;
+    // FIT is the safe default; cropping is an explicit user choice.
+    _screenFillsDisplay = NO;
     _audioLock = OS_UNFAIR_LOCK_INIT;
     _audioCapacity = 262144;
     _audioRing = (int16_t *)calloc(_audioCapacity, sizeof(int16_t));
@@ -898,6 +1020,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     if (shouldPause) {
         _input.clear();
         _n64CButtonMask = 0;
+        [self releaseVirtualControls];
+        [_primaryDPad reset];
+        [_secondaryDPad reset];
         [_virtualStick reset];
         _virtualStick.enabled = NO;
         [_rightVirtualStick reset];
@@ -935,6 +1060,12 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 }
 
 - (void)buildInterface {
+    _virtualButtons = [NSMutableArray array];
+    _virtualFeedback = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
+    id hapticPreference = [NSUserDefaults.standardUserDefaults objectForKey:@"BrumVirtualControlHapticsEnabled"];
+    _virtualHapticsEnabled = !hapticPreference || [hapticPreference boolValue];
+    if (_virtualHapticsEnabled) [_virtualFeedback prepare];
+    _performanceHUDEnabled = [NSUserDefaults.standardUserDefaults boolForKey:@"BrumCorePerformanceHUD"];
     _screen = [[UIImageView alloc] init];
     _screen.translatesAutoresizingMaskIntoConstraints = NO;
     _screen.backgroundColor = [UIColor colorWithWhite:0.02 alpha:1];
@@ -947,6 +1078,10 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     touch.cancelsTouchesInView = NO;
     [_screen addGestureRecognizer:touch];
     [self.view addSubview:_screen];
+    _singleScreenLayer = [CALayer layer];
+    _singleScreenLayer.magnificationFilter = kCAFilterNearest;
+    _singleScreenLayer.contentsGravity = kCAGravityResize;
+    [_screen.layer addSublayer:_singleScreenLayer];
 
     UILabel *title = [[UILabel alloc] init];
     title.translatesAutoresizingMaskIntoConstraints = NO;
@@ -991,23 +1126,39 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _statusLabel.font = [UIFont monospacedSystemFontOfSize:10 weight:UIFontWeightBold];
     [self.view addSubview:_statusLabel];
 
-    const BOOL isN64 = [_emulatedSystemID isEqualToString:@"n64"];
+    const char *systemID = _emulatedSystemID.UTF8String;
+    const auto profile = brum::virtualControlProfile(systemID ? systemID : "");
+    const BOOL isN64 = profile && profile->face == brum::VirtualFace::n64;
     const BOOL isDreamcast = [_emulatedSystemID isEqualToString:@"dreamcast"];
     const BOOL isGameCube = [_emulatedSystemID isEqualToString:@"gamecube"];
     const BOOL is3DS = [_emulatedSystemID isEqualToString:@"3ds"];
     const BOOL isSega = [@[@"md", @"segacd", @"32x"] containsObject:_emulatedSystemID];
-    const BOOL hasAnalogPad = isN64 || isDreamcast || isGameCube || is3DS || [_emulatedSystemID isEqualToString:@"psp"];
+    const BOOL isSaturn = [_emulatedSystemID isEqualToString:@"saturn"];
+    const BOOL hasAnalogPad = profile && profile->leftStick;
     UIView *up = hasAnalogPad ? [self analogPad] : [self directionPad];
-    UIView *actions = isN64 ? [self n64ActionPad] : isSega ? [self segaActionPad] : [self actionPad];
+    UIView *actions = profile ? [self profileActionPad:profile->face] : [UIView new];
+    if (!profile) {
+        _statusLabel.text = @"CONTROLE VIRTUAL INDISPONÍVEL PARA ESTE SISTEMA";
+        _statusLabel.textColor = UIColor.systemRedColor;
+        actions.translatesAutoresizingMaskIntoConstraints = NO;
+        [actions.widthAnchor constraintEqualToConstant:1].active = YES;
+        [actions.heightAnchor constraintEqualToConstant:1].active = YES;
+    } else if (profile->face == brum::VirtualFace::arcadeSix) {
+        _statusLabel.text = [NSString stringWithFormat:@"BRUM CORE · %@ · ARCADE 6 BOTÕES (PADRÃO)", _coreDisplayName];
+    }
+    _directionControl = up;
+    _actionControl = actions;
     UIButton *start = [self controlButton:@"START" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_START];
-    NSArray<UIButton *> *menuButtons = (isDreamcast || isGameCube) ? @[start] : @[
-        [self controlButton:isN64 ? @"Z" : isSega ? @"MODE" : @"SELECT" identifier:isN64 ? BRUM_RETRO_DEVICE_ID_JOYPAD_L2 : BRUM_RETRO_DEVICE_ID_JOYPAD_SELECT], start
-    ];
+    NSString *selectLabel = isN64 ? @"Z" : isSega ? @"MODE" :
+        [@[@"ws", @"wsc"] containsObject:_emulatedSystemID] ? @"GIRAR" : @"SELECT";
+    NSArray<UIButton *> *menuButtons = profile && profile->select ? @[
+        [self controlButton:selectLabel identifier:isN64 ? BRUM_RETRO_DEVICE_ID_JOYPAD_L2 : BRUM_RETRO_DEVICE_ID_JOYPAD_SELECT], start
+    ] : profile ? @[start] : @[];
     UIStackView *menu = [[UIStackView alloc] initWithArrangedSubviews:menuButtons];
-    UIButton *leftShoulder = [self controlButton:isDreamcast ? @"LT" : @"L" identifier:(isDreamcast || isGameCube) ? BRUM_RETRO_DEVICE_ID_JOYPAD_L2 : BRUM_RETRO_DEVICE_ID_JOYPAD_L];
-    UIButton *rightShoulder = [self controlButton:isDreamcast ? @"RT" : @"R" identifier:(isDreamcast || isGameCube) ? BRUM_RETRO_DEVICE_ID_JOYPAD_R2 : BRUM_RETRO_DEVICE_ID_JOYPAD_R];
-    leftShoulder.hidden = isSega;
-    rightShoulder.hidden = isSega;
+    UIButton *leftShoulder = [self controlButton:isDreamcast ? @"LT" : @"L" identifier:(isDreamcast || isGameCube || isSaturn) ? BRUM_RETRO_DEVICE_ID_JOYPAD_L2 : BRUM_RETRO_DEVICE_ID_JOYPAD_L];
+    UIButton *rightShoulder = [self controlButton:isDreamcast ? @"RT" : @"R" identifier:(isDreamcast || isGameCube || isSaturn) ? BRUM_RETRO_DEVICE_ID_JOYPAD_R2 : BRUM_RETRO_DEVICE_ID_JOYPAD_R];
+    leftShoulder.hidden = !profile || (!profile->shoulders && !profile->triggers);
+    rightShoulder.hidden = leftShoulder.hidden;
     [self.view addSubview:leftShoulder]; [self.view addSubview:rightShoulder];
     if (isGameCube) {
         UIButton *z = [self controlButton:@"Z" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_R];
@@ -1126,27 +1277,36 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     button.layer.borderWidth = 1;
     if (identifier >= 0) {
         [button addTarget:self action:@selector(inputDown:) forControlEvents:UIControlEventTouchDown];
-        [button addTarget:self action:@selector(inputUp:) forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside | UIControlEventTouchCancel];
+        [button addTarget:self action:@selector(inputDown:) forControlEvents:UIControlEventTouchDragEnter];
+        [button addTarget:self action:@selector(inputUp:) forControlEvents:UIControlEventTouchDragExit | UIControlEventTouchUpInside | UIControlEventTouchUpOutside | UIControlEventTouchCancel];
+        [_virtualButtons addObject:button];
     }
     [button.widthAnchor constraintGreaterThanOrEqualToConstant:54].active = YES;
     [button.heightAnchor constraintEqualToConstant:44].active = YES;
     return button;
 }
 
-- (UIStackView *)directionPad {
-    UIButton *up = [self controlButton:@"▲" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_UP];
-    UIButton *down = [self controlButton:@"▼" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_DOWN];
-    UIButton *left = [self controlButton:@"◀" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_LEFT];
-    UIButton *right = [self controlButton:@"▶" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_RIGHT];
-    UIView *blank1 = [[UIView alloc] init]; UIView *blank2 = [[UIView alloc] init]; UIView *blank3 = [[UIView alloc] init]; UIView *blank4 = [[UIView alloc] init]; UIView *center = [[UIView alloc] init];
-    UIStackView *top = [[UIStackView alloc] initWithArrangedSubviews:@[blank1, up, blank2]];
-    UIStackView *middle = [[UIStackView alloc] initWithArrangedSubviews:@[left, center, right]];
-    UIStackView *bottom = [[UIStackView alloc] initWithArrangedSubviews:@[blank3, down, blank4]];
-    for (UIStackView *row in @[top, middle, bottom]) { row.axis = UILayoutConstraintAxisHorizontal; row.distribution = UIStackViewDistributionFillEqually; }
-    UIStackView *pad = [[UIStackView alloc] initWithArrangedSubviews:@[top, middle, bottom]];
-    pad.translatesAutoresizingMaskIntoConstraints = NO; pad.axis = UILayoutConstraintAxisVertical; pad.distribution = UIStackViewDistributionFillEqually;
+- (BrumVirtualDPad *)directionPad {
+    BrumVirtualDPad *pad = [[BrumVirtualDPad alloc] initWithFrame:CGRectZero];
+    pad.translatesAutoresizingMaskIntoConstraints = NO;
+    [pad addTarget:self action:@selector(dpadChanged:) forControlEvents:UIControlEventValueChanged];
+    [pad addTarget:self action:@selector(dpadTouchDown:) forControlEvents:UIControlEventTouchDown];
+    if (!_primaryDPad) _primaryDPad = pad;
+    else _secondaryDPad = pad;
     [pad.widthAnchor constraintEqualToConstant:166].active = YES; [pad.heightAnchor constraintEqualToConstant:132].active = YES;
     return pad;
+}
+
+- (void)dpadChanged:(BrumVirtualDPad *)pad {
+    const uint8_t mask = _paused ? 0 : pad.mask;
+    _input.set(brum::InputSource::virtualPad, BRUM_RETRO_DEVICE_ID_JOYPAD_UP, (mask & brum::up) != 0);
+    _input.set(brum::InputSource::virtualPad, BRUM_RETRO_DEVICE_ID_JOYPAD_DOWN, (mask & brum::down) != 0);
+    _input.set(brum::InputSource::virtualPad, BRUM_RETRO_DEVICE_ID_JOYPAD_LEFT, (mask & brum::left) != 0);
+    _input.set(brum::InputSource::virtualPad, BRUM_RETRO_DEVICE_ID_JOYPAD_RIGHT, (mask & brum::right) != 0);
+}
+
+- (void)dpadTouchDown:(BrumVirtualDPad *)pad {
+    if (_virtualHapticsEnabled && !_paused && !_stopped && pad.mask) [_virtualFeedback impactOccurred];
 }
 
 - (BrumVirtualStick *)analogPad {
@@ -1205,6 +1365,73 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     return pad;
 }
 
+- (UIStackView *)faceRows:(NSArray<NSArray<UIButton *> *> *)rows width:(CGFloat)width {
+    NSMutableArray<UIStackView *> *rowViews = [NSMutableArray arrayWithCapacity:rows.count];
+    for (NSArray<UIButton *> *buttons in rows) {
+        UIStackView *row = [[UIStackView alloc] initWithArrangedSubviews:buttons];
+        row.axis = UILayoutConstraintAxisHorizontal;
+        row.alignment = UIStackViewAlignmentCenter;
+        row.distribution = UIStackViewDistributionFillEqually;
+        row.spacing = 6;
+        [rowViews addObject:row];
+    }
+    UIStackView *pad = [[UIStackView alloc] initWithArrangedSubviews:rowViews];
+    pad.translatesAutoresizingMaskIntoConstraints = NO;
+    pad.axis = UILayoutConstraintAxisVertical;
+    pad.alignment = UIStackViewAlignmentCenter;
+    pad.spacing = 6;
+    [pad.widthAnchor constraintGreaterThanOrEqualToConstant:width].active = YES;
+    return pad;
+}
+
+- (UIStackView *)profileActionPad:(brum::VirtualFace)face {
+    switch (face) {
+        case brum::VirtualFace::one:
+            return [self faceRows:@[@[[self controlButton:@"FIRE" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_B]]] width:70];
+        case brum::VirtualFace::two: {
+            const BOOL pce = [_emulatedSystemID isEqualToString:@"pce"];
+            const BOOL segaHandheld = [@[@"sms", @"gg"] containsObject:_emulatedSystemID];
+            return [self faceRows:@[@[
+                [self controlButton:pce ? @"II" : segaHandheld ? @"1" : @"B" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_B],
+                [self controlButton:pce ? @"I" : segaHandheld ? @"2" : @"A" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_A]
+            ]] width:120];
+        }
+        case brum::VirtualFace::n64: return [self n64ActionPad];
+        case brum::VirtualFace::segaSix: return [self segaActionPad];
+        case brum::VirtualFace::neoGeo:
+            return [self faceRows:@[@[
+                [self controlButton:@"A" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_B],
+                [self controlButton:@"B" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_A],
+                [self controlButton:@"C" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_Y],
+                [self controlButton:@"D" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_X]
+            ]] width:240];
+        case brum::VirtualFace::wonderSwan:
+            // Beetle WonderSwan's pinned map: X cursor = D-pad, Y cursor =
+            // R2/R/L2/L. A and B remain the RetroPad A and B buttons.
+            return [self faceRows:@[
+                @[[self controlButton:@"Y▲" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_R2]],
+                @[[self controlButton:@"Y◀" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_L],
+                  [self controlButton:@"Y▶" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_R]],
+                @[[self controlButton:@"Y▼" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_L2],
+                  [self controlButton:@"B" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_B],
+                  [self controlButton:@"A" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_A]]
+            ] width:184];
+        case brum::VirtualFace::arcadeSix:
+            return [self faceRows:@[
+                @[[self controlButton:@"1" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_Y],
+                  [self controlButton:@"2" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_X],
+                  [self controlButton:@"3" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_L]],
+                @[[self controlButton:@"4" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_B],
+                  [self controlButton:@"5" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_A],
+                  [self controlButton:@"6" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_R]]
+            ] width:184];
+        case brum::VirtualFace::four:
+        case brum::VirtualFace::sony: return [self actionPad];
+    }
+    NSLog(@"BRUM Core: perfil de controle virtual sem componente visual para %@", _emulatedSystemID);
+    return [self faceRows:@[] width:1];
+}
+
 - (void)virtualStickChanged:(BrumVirtualStick *)stick {
     [self setAnalogStick:0 axis:0 value:_dpadMode ? 0 : stick.horizontal source:BrumInputVirtualPad];
     [self setAnalogStick:0 axis:1 value:_dpadMode ? 0 : stick.vertical source:BrumInputVirtualPad];
@@ -1218,8 +1445,8 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 - (void)toggleAnalogPadMode {
     _dpadMode = !_dpadMode;
     [_virtualStick reset];
-    for (unsigned direction = 4; direction <= 7; ++direction)
-        _input.set(brum::InputSource::virtualPad, direction, false);
+    [_primaryDPad reset];
+    [_secondaryDPad reset];
     _virtualStick.hidden = _dpadMode;
     _virtualStick.enabled = !_dpadMode && !_paused;
     _digitalPad.hidden = !_dpadMode;
@@ -1273,17 +1500,13 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         if (_pointerPressed && [_coreID isEqualToString:@"skyemu"]) _pointerY = MAX(1, _pointerY);
         return;
     }
-    CGSize bounds = _screen.bounds.size;
-    CGFloat scaleX = bounds.width / (CGFloat)_frameWidth;
-    CGFloat scaleY = bounds.height / (CGFloat)_frameHeight;
-    CGFloat scale = _screenFillsDisplay ? MAX(scaleX, scaleY) : MIN(scaleX, scaleY);
-    CGSize image = CGSizeMake((CGFloat)_frameWidth * scale, (CGFloat)_frameHeight * scale);
-    CGRect target = CGRectMake((bounds.width - image.width) / 2.0, (bounds.height - image.height) / 2.0, image.width, image.height);
-    CGFloat normalizedX = target.size.width > 0 ? ((point.x - CGRectGetMinX(target)) / target.size.width) * 2.0 - 1.0 : 0;
-    CGFloat normalizedY = target.size.height > 0 ? ((point.y - CGRectGetMinY(target)) / target.size.height) * 2.0 - 1.0 : 0;
-    _pointerX = (int16_t)lrint(MAX(-1.0, MIN(1.0, normalizedX)) * 32767.0);
-    _pointerY = (int16_t)lrint(MAX(-1.0, MIN(1.0, normalizedY)) * 32767.0);
-    _pointerPressed = (gesture.state == UIGestureRecognizerStateBegan || gesture.state == UIGestureRecognizerStateChanged) && CGRectContainsPoint(target, point);
+    const auto local = _singleViewport.toContent({point.x, point.y});
+    _pointerPressed = local.has_value() &&
+        (gesture.state == UIGestureRecognizerStateBegan || gesture.state == UIGestureRecognizerStateChanged);
+    if (_pointerPressed) {
+        _pointerX = (int16_t)lrint((local->x * 2 - 1) * 32767);
+        _pointerY = (int16_t)lrint((local->y * 2 - 1) * 32767);
+    }
 }
 
 - (void)setButton:(NSUInteger)button source:(BrumInputSource)source pressed:(BOOL)pressed {
@@ -1301,44 +1524,66 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 }
 
 - (void)inputDown:(UIButton *)sender {
-    if (sender.tag < 0) return;
+    if (sender.tag < 0 || _paused || _stopped || sender.selected) return;
     if (sender.tag >= 16 && sender.tag <= 19 && [_emulatedSystemID isEqualToString:@"n64"]) {
-        if (!_paused && !_stopped) {
-            _n64CButtonMask |= (uint8_t)(1u << (sender.tag - 16));
-            [self updateN64CButtons];
-        }
-        return;
+        _n64CButtonMask |= (uint8_t)(1u << (sender.tag - 16));
+        [self updateN64CButtons];
+    } else {
+        [self setButton:(NSUInteger)sender.tag source:BrumInputVirtualPad pressed:YES];
     }
-    [self setButton:(NSUInteger)sender.tag source:BrumInputVirtualPad pressed:YES];
+    [self setVirtualButton:sender pressed:YES];
+    if (_virtualHapticsEnabled) [_virtualFeedback impactOccurred];
 }
 
 - (void)inputUp:(UIButton *)sender {
-    if (sender.tag < 0) return;
+    if (sender.tag < 0 || !sender.selected) return;
     if (sender.tag >= 16 && sender.tag <= 19 && [_emulatedSystemID isEqualToString:@"n64"]) {
         _n64CButtonMask &= (uint8_t)~(1u << (sender.tag - 16));
         [self updateN64CButtons];
-        return;
+    } else {
+        [self setButton:(NSUInteger)sender.tag source:BrumInputVirtualPad pressed:NO];
     }
-    [self setButton:(NSUInteger)sender.tag source:BrumInputVirtualPad pressed:NO];
+    [self setVirtualButton:sender pressed:NO];
+}
+
+- (void)setVirtualButton:(UIButton *)button pressed:(BOOL)pressed {
+    button.selected = pressed;
+    button.transform = pressed ? CGAffineTransformMakeScale(0.92, 0.92) : CGAffineTransformIdentity;
+    button.backgroundColor = pressed ? [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:0.98]
+                                     : [UIColor colorWithWhite:0.1 alpha:0.82];
+    button.layer.borderColor = (pressed ? UIColor.whiteColor : [UIColor colorWithWhite:1 alpha:0.16]).CGColor;
+    [button setTitleColor:pressed ? UIColor.blackColor : UIColor.whiteColor forState:UIControlStateNormal];
+}
+
+- (void)releaseVirtualControls {
+    for (UIButton *button in _virtualButtons) {
+        if (button.selected) [self setVirtualButton:button pressed:NO];
+    }
 }
 
 - (void)presentFrame:(CGImageRef)image {
-    _screenManager.screens = brum::libretroScreens(_coreID.UTF8String, _frameWidth, _frameHeight);
+    if (_screenProfileWidth != _frameWidth || _screenProfileHeight != _frameHeight) {
+        _screenProfileWidth = _frameWidth;
+        _screenProfileHeight = _frameHeight;
+        _screenManager.screens = brum::libretroScreens(_coreID.UTF8String, _frameWidth, _frameHeight);
+        [self layoutScreens];
+    }
     if (_screenManager.screens.size() == 1) {
         for (CALayer *layer in _screenLayers) layer.hidden = YES;
-        _screen.layer.contents = (__bridge id)image;
-        _screen.layer.contentsGravity = _screenFillsDisplay ? kCAGravityResizeAspectFill : kCAGravityResizeAspect;
+        _singleScreenLayer.contents = (__bridge id)image;
         return;
     }
-    _screen.layer.contents = nil;
+    BOOL addedLayers = NO;
     while (_screenLayers.count < _screenManager.screens.size()) {
         CALayer *layer = [CALayer layer];
         layer.magnificationFilter = kCAFilterNearest;
         layer.contentsGravity = kCAGravityResize;
         [_screen.layer addSublayer:layer];
         [_screenLayers addObject:layer];
+        addedLayers = YES;
     }
-    [self layoutScreens];
+    _singleScreenLayer.hidden = YES;
+    if (addedLayers) [self layoutScreens];
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
     for (CALayer *layer in _screenLayers) layer.contents = (__bridge id)image;
@@ -1350,10 +1595,51 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [self layoutScreens];
 }
 
+- (brum::Rect)availableGameRect {
+    const CGRect safe = UIEdgeInsetsInsetRect(_screen.bounds, self.view.safeAreaInsets);
+    CGRect available = CGRectInset(safe, 8, 8);
+    available.origin.y += 52; // Persistent session actions and title.
+    available.size.height -= 52;
+    // The translucent controls overlay the game only when the screen is too
+    // narrow to reserve their space without collapsing the viewport.
+    if (_directionControl && _actionControl) {
+        const CGFloat gap = 12;
+        if (available.size.width > available.size.height &&
+            CGRectGetMinX(_actionControl.frame) - CGRectGetMaxX(_directionControl.frame) > 180) {
+            const CGFloat left = MAX(CGRectGetMinX(available), CGRectGetMaxX(_directionControl.frame) + gap);
+            const CGFloat right = MIN(CGRectGetMaxX(available), CGRectGetMinX(_actionControl.frame) - gap);
+            available.origin.x = left;
+            available.size.width = right - left;
+        } else {
+            const CGFloat bottom = MIN(CGRectGetMinY(_directionControl.frame), CGRectGetMinY(_actionControl.frame)) - gap;
+            if (bottom - available.origin.y > 120) available.size.height = MIN(available.size.height, bottom - available.origin.y);
+        }
+    }
+    return {available.origin.x, available.origin.y, MAX(0, available.size.width), MAX(0, available.size.height)};
+}
+
 - (void)layoutScreens {
-    if (_screenManager.screens.size() < 2) return;
-    const CGSize size = _screen.bounds.size;
-    _screenPlacements = _screenManager.place({0, 0, size.width, size.height});
+    const brum::Rect available = [self availableGameRect];
+    if (_screenManager.screens.size() < 2) {
+        _screenPlacements.clear();
+        const double aspectWidth = _contentAspectRatio > 0 && _frameHeight > 0
+            ? _frameHeight * _contentAspectRatio : _frameWidth;
+        _singleViewport = brum::calculateViewport(available, aspectWidth, _frameHeight,
+            _screenFillsDisplay ? brum::ScaleMode::crop : brum::ScaleMode::fit);
+        [CATransaction begin];
+        [CATransaction setDisableActions:YES];
+        _singleScreenLayer.hidden = !_singleViewport.valid();
+        _singleScreenLayer.frame = CGRectMake(_singleViewport.frame.x, _singleViewport.frame.y,
+                                               _singleViewport.frame.width, _singleViewport.frame.height);
+        [CATransaction commit];
+        return;
+    }
+    _singleScreenLayer.hidden = YES;
+    if (!_layoutManuallyChosen) {
+        _screenManager.layout = _screen.bounds.size.width > _screen.bounds.size.height
+            ? brum::Layout::horizontal : brum::Layout::vertical;
+    }
+    _screenPlacements = _screenManager.place(available);
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
     for (CALayer *layer in _screenLayers) layer.hidden = YES;
@@ -1376,10 +1662,11 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     const BOOL wasPaused = _explicitlyPaused;
     [self pause];
     UIAlertController *menu = [UIAlertController alertControllerWithTitle:@"TELAS" message:nil preferredStyle:UIAlertControllerStyleActionSheet];
-    NSArray<NSString *> *titles = @[@"Superior em cima", @"Inferior em cima", @"Superior à esquerda", @"Inferior à esquerda", @"Somente superior", @"Somente inferior"];
+    NSArray<NSString *> *titles = @[@"Superior em cima", @"Inferior em cima", @"Superior à esquerda", @"Inferior à esquerda", @"Somente superior", @"Somente inferior", @"Superior em destaque", @"Inferior em destaque"];
     for (NSUInteger i = 0; i < titles.count; i++) {
         [menu addAction:[UIAlertAction actionWithTitle:titles[i] style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
             self->_screenManager.layout = static_cast<brum::Layout>(i);
+            self->_layoutManuallyChosen = YES;
             self->_pointerPressed = NO;
             [self layoutScreens];
             if (!wasPaused) [self resume];
@@ -1420,6 +1707,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     if (self.capabilities & BrumBackendMultipleScreens) { [self showScreenMenu]; return; }
     _screenFillsDisplay = !_screenFillsDisplay;
     [self updateDisplayModeButton];
+    [self layoutScreens];
 }
 
 - (void)updateDisplayModeButton {
@@ -1429,7 +1717,6 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _displayModeButton.layer.borderColor = (_screenFillsDisplay ? accent : [UIColor colorWithWhite:1 alpha:0.16]).CGColor;
     _displayModeButton.accessibilityValue = _screenFillsDisplay ? @"Preencher tela" : @"Mostrar imagem inteira";
     _displayModeButton.accessibilityTraits = _screenFillsDisplay ? UIAccessibilityTraitButton | UIAccessibilityTraitSelected : UIAccessibilityTraitButton;
-    _screen.layer.contentsGravity = _screenFillsDisplay ? kCAGravityResizeAspectFill : kCAGravityResizeAspect;
 }
 
 - (NSString *)statePathForSlot:(NSInteger)slot {
@@ -1558,6 +1845,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     brum_retro_system_av_info avInfo = {};
     _core.getAVInfo(&avInfo);
     if (_hasPendingAVInfo) { avInfo = _pendingAVInfo; _hasPendingAVInfo = NO; }
+    _contentAspectRatio = avInfo.geometry.aspect_ratio;
     _screenManager.screens = brum::libretroScreens(_coreID.UTF8String, avInfo.geometry.base_width, avInfo.geometry.base_height);
     _stateButton.enabled = (self.capabilities & BrumBackendSaveState) != 0;
     if (![self startAudio:avInfo.timing.sample_rate error:error]) return NO;
@@ -1617,6 +1905,8 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     if (!_hasPendingAVInfo || _stopped) return;
     const brum_retro_system_av_info info = _pendingAVInfo;
     _hasPendingAVInfo = NO;
+    _contentAspectRatio = info.geometry.aspect_ratio;
+    _screenProfileWidth = 0;
     if (_displayLink) {
         float fps = (float)MAX(20.0, MIN(120.0, info.timing.fps));
         if (@available(iOS 15.0, *)) {
@@ -1642,14 +1932,32 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 - (void)runFrame {
     if (_stopped || !_gameLoaded || _paused || _shutdownRequested) return;
     if (_hardwareInitialized) [EAGLContext setCurrentContext:_hardwareContext];
+    const CFTimeInterval started = _performanceHUDEnabled ? CACurrentMediaTime() : 0;
     NSUInteger frameCount = _fastForwardEnabled ? 5 : 1;
     for (NSUInteger frame = 0; frame < frameCount; frame++) {
         _suppressVideo = frame + 1 < frameCount;
         _core.run();
+        if (_performanceHUDEnabled) ++_measuredFrames;
         if (_shutdownRequested) break;
     }
     _suppressVideo = NO;
     [self applyPendingAVInfo];
+    if (_performanceHUDEnabled) {
+        const CFTimeInterval now = CACurrentMediaTime();
+        _coreRunSeconds += now - started;
+        if (_metricsStartedAt == 0) _metricsStartedAt = now;
+        const CFTimeInterval elapsed = now - _metricsStartedAt;
+        if (elapsed >= 1.0) {
+            _statusLabel.text = [NSString stringWithFormat:@"BRUM CORE · %.1f FPS · core+host %.1f ms · vídeo %.1f ms · térmico %ld",
+                _measuredFrames / elapsed, _measuredFrames ? 1000.0 * _coreRunSeconds / _measuredFrames : 0,
+                _measuredFrames ? 1000.0 * _hostVideoSeconds / _measuredFrames : 0,
+                (long)NSProcessInfo.processInfo.thermalState];
+            _metricsStartedAt = now;
+            _coreRunSeconds = 0;
+            _hostVideoSeconds = 0;
+            _measuredFrames = 0;
+        }
+    }
 }
 
 - (void)restoreSaveRAM {
@@ -1735,6 +2043,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _stopped = YES;
     _hasPendingAVInfo = NO;
     _input.clear();
+    [self releaseVirtualControls];
+    [_primaryDPad reset];
+    [_secondaryDPad reset];
     _pointerPressed = NO;
     [_displayLink invalidate]; _displayLink = nil;
     if (_audioQueue) { AudioQueueStop(_audioQueue, true); AudioQueueDispose(_audioQueue, true); _audioQueue = NULL; }

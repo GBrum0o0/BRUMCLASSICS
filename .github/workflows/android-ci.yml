@@ -136,6 +136,7 @@ jobs:
             android/app/src/main/java/com/brumclassics/mobile/classics/EmulationIdentity.java \
             android/app/src/main/java/com/brumclassics/mobile/classics/SaveManifest.java \
             android/app/src/main/java/com/brumclassics/mobile/emulation/IntegratedEmulatorLaunch.java \
+            android/app/src/main/java/com/brumclassics/mobile/emulation/CoreTiming.java \
             android/app/src/main/java/com/brumclassics/mobile/emulation/RetroAchievementsConsole.java \
             android/app/src/main/java/com/brumclassics/mobile/sync/MobileSyncState.java \
             android/app/src/test/java/com/brumclassics/mobile/data/HomeLibraryTest.java \
@@ -143,6 +144,7 @@ jobs:
             android/app/src/test/java/com/brumclassics/mobile/model/PerformanceLiveStateTest.java \
             android/app/src/test/java/com/brumclassics/mobile/classics/ClassicsRulesTest.java \
             android/app/src/test/java/com/brumclassics/mobile/emulation/IntegratedEmulatorLaunchTest.java \
+            android/app/src/test/java/com/brumclassics/mobile/emulation/CoreTimingTest.java \
             android/app/src/test/java/com/brumclassics/mobile/sync/MobileSyncStateTest.java
           for test in \
             com.brumclassics.mobile.data.HomeLibraryTest \
@@ -150,6 +152,7 @@ jobs:
             com.brumclassics.mobile.model.PerformanceLiveStateTest \
             com.brumclassics.mobile.classics.ClassicsRulesTest \
             com.brumclassics.mobile.emulation.IntegratedEmulatorLaunchTest \
+            com.brumclassics.mobile.emulation.CoreTimingTest \
             com.brumclassics.mobile.sync.MobileSyncStateTest; do
             java -cp "$RUNNER_TEMP/brum-tests" "$test"
           done

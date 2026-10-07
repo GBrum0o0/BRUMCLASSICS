@@ -6,6 +6,7 @@
 #include <EGL/egl.h>
 #include <GLES3/gl3.h>
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
@@ -211,6 +212,8 @@ public:
             const double reportedSampleRate = av.timing.sample_rate;
             sampleRate = std::isfinite(reportedSampleRate) && reportedSampleRate >= 8000.0 && reportedSampleRate <= 192000.0
                 ? static_cast<int>(std::lround(reportedSampleRate)) : 48000;
+            frameRate = std::isfinite(av.timing.fps) && av.timing.fps >= 1.0 && av.timing.fps <= 1000.0
+                ? av.timing.fps : 60.0;
         } catch (...) {
             if (hardware.active()) hardware.makeCurrent();
             if (gameLoaded) core.unloadGame();
@@ -317,8 +320,9 @@ public:
     std::unordered_map<std::string, std::string> variables;
     std::string systemDirectory, saveDirectory;
     int sampleRate = 48000;
-    int16_t pointerX = 0, pointerY = 0;
-    bool pointerPressed = false;
+    double frameRate = 60.0;
+    std::atomic<int16_t> pointerX{0}, pointerY{0};
+    std::atomic<bool> pointerPressed{false};
     bool shutdownRequested = false;
     HardwareContext hardware;
 
@@ -440,9 +444,9 @@ private:
         CoreSession *session = activeSession; if (!session || port != 0 || index != 0) return 0;
         if (device == BRUM_RETRO_DEVICE_JOYPAD && id <= 15) return (session->inputMask & (1u << id)) ? 1 : 0;
         if (device == BRUM_RETRO_DEVICE_POINTER) {
-            if (id == BRUM_RETRO_DEVICE_ID_POINTER_X) return session->pointerX;
-            if (id == BRUM_RETRO_DEVICE_ID_POINTER_Y) return session->pointerY;
-            if (id == BRUM_RETRO_DEVICE_ID_POINTER_PRESSED) return session->pointerPressed ? 1 : 0;
+            if (id == BRUM_RETRO_DEVICE_ID_POINTER_X) return session->pointerX.load(std::memory_order_relaxed);
+            if (id == BRUM_RETRO_DEVICE_ID_POINTER_Y) return session->pointerY.load(std::memory_order_relaxed);
+            if (id == BRUM_RETRO_DEVICE_ID_POINTER_PRESSED) return session->pointerPressed.load(std::memory_order_relaxed) ? 1 : 0;
         }
         return 0;
     }
@@ -512,6 +516,11 @@ Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeClearAudio(JNIEnv *,
 extern "C" JNIEXPORT jint JNICALL
 Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeSampleRate(JNIEnv *, jclass, jlong handle) {
     auto *session = reinterpret_cast<CoreSession *>(handle); return session ? session->sampleRate : 48000;
+}
+
+extern "C" JNIEXPORT jdouble JNICALL
+Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeFrameRate(JNIEnv *, jclass, jlong handle) {
+    auto *session = reinterpret_cast<CoreSession *>(handle); return session ? session->frameRate : 60.0;
 }
 
 extern "C" JNIEXPORT void JNICALL
