@@ -132,6 +132,12 @@ enum GamingCatalogEntry: Identifiable {
 }
 
 enum GamingModeCatalog {
+    static func canOfferRetroArch(for rom: ROMFolderGame, imported: Bool) -> Bool {
+        // A remembered import is not evidence that RetroArch can execute 3DS.
+        if IntegratedEmulatorSupport.system(for: rom) == .nintendo3DS { return false }
+        return RetroArchAppStoreLaunchRules.supports(filename: rom.filename) || imported
+    }
+
     static func library(local: [ROMFolderGame], records: [PocketClassic], computer: [Game]) -> [GamingCatalogEntry] {
         let localFiles = Set(local.map { $0.filename.lowercased() })
         let linkedPCIDs = Set(records.filter { localFiles.contains($0.filename.lowercased()) && !$0.launcherGameID.isEmpty }.map(\.launcherGameID))
@@ -170,8 +176,7 @@ private struct GamingROMDetailView: View {
     private var installedCore: CoreDescriptor? { IntegratedEmulatorSupport.core(for: rom) }
     private var system: EmulatedSystemID? { IntegratedEmulatorSupport.system(for: rom) }
     private var canUseRetroArch: Bool {
-        if system == .nintendo3DS { return false }
-        return RetroArchAppStoreLaunchRules.supports(filename: rom.filename) || pocket.isImportedIntoRetroArch(rom)
+        GamingModeCatalog.canOfferRetroArch(for: rom, imported: pocket.isImportedIntoRetroArch(rom))
     }
     private var linkedPCGame: Game? {
         guard let link = pocket.games.first(where: {

@@ -272,6 +272,8 @@ final class PocketTests: XCTestCase {
                        FileManager.default.fileExists(atPath: azaharPath))
         XCTAssertNil(IntegratedEmulatorSupport.core(for: threeDS, includeExperimental: false))
         XCTAssertFalse(RetroArchAppStoreLaunchRules.supports(filename: "jogo.3ds"))
+        XCTAssertFalse(GamingModeCatalog.canOfferRetroArch(for: threeDS, imported: false))
+        XCTAssertFalse(GamingModeCatalog.canOfferRetroArch(for: threeDS, imported: true))
         XCTAssertEqual(system("nested/PSP/game.iso"), .playStationPortable)
         XCTAssertEqual(system("PS1/PS2/game.iso"), .playStation2)
     }
