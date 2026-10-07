@@ -77,7 +77,7 @@ for (const marker of ['struct GamingModeView', 'GamingTabBar(selection:', 'JOGAD
 }
 if (!source.includes('pocket.launchROM(rom, launcher: store)') || !source.includes('store.launchBCard(game)')) throw new Error('Gaming Mode não decide entre execução local e computador.');
 const gamingSource = fs.readFileSync(path.join(app, 'GamingModeView.swift'), 'utf8');
-for (const marker of ['GamingROMDetailView(rom: $0)', 'selectedROM = rom', 'CoreRegistry.installedCore', 'if system == .nintendo3DS { return false }']) {
+for (const marker of ['GamingROMDetailView(rom: $0)', 'selectedROM = rom', 'CoreRegistry.installedCore', 'GamingModeCatalog.canOfferRetroArch', 'if IntegratedEmulatorSupport.system(for: rom) == .nintendo3DS { return false }']) {
   if (!source.includes(marker)) throw new Error(`Detalhes do Gaming Mode ou rota 3DS incompletos: ${marker}`);
 }
 if (gamingSource.includes('Prontos para jogar') || gamingSource.includes('INSTALADOS NO COMPUTADOR')) throw new Error('Gaming Mode antigo ainda está visível.');
