@@ -82,7 +82,8 @@ struct GamingModeView: View {
                     rom: rom,
                     launcherGame: pocket.launcherGame(for: rom, launcher: store),
                     retroArchReady: pocket.isImportedIntoRetroArch(rom),
-                    integratedCoreName: IntegratedEmulatorSupport.core(for: rom)?.displayName
+                    integratedCoreName: IntegratedEmulatorSupport.core(for: rom)?.displayName,
+                    opensDetails: true
                 ) { selectedROM = rom }
             case .computer(let game):
                 Button { selectedGame = game } label: { GamingGameTile(game: game) }
@@ -192,7 +193,7 @@ private struct GamingROMDetailView: View {
                             BrumSectionLabel(text: "EXECUÇÃO NESTE IPHONE")
                             Text(routeDescription).font(.subheadline).foregroundStyle(BrumTheme.muted)
                             if system == .nintendo3DS {
-                                Text("Build \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?") · Azahar: \(installedCore == nil ? "ausente" : "instalado")")
+                                Text("Build \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?") · Azahar: \(installedCore == nil ? "arquivo ausente" : "arquivo presente")")
                                     .font(.caption2).foregroundStyle(BrumTheme.muted)
                                     .accessibilityIdentifier("brum-core-build-status")
                             }
@@ -200,7 +201,7 @@ private struct GamingROMDetailView: View {
                     }
                     if let core = installedCore {
                         Button { launchIntegrated = true } label: {
-                            Text("JOGAR NO BRUM CORE · \(core.displayName.uppercased())").frame(maxWidth: .infinity)
+                            Text("\(CoreRegistry.experimental.contains(core) ? "TESTAR" : "JOGAR") NO BRUM CORE · \(core.displayName.uppercased())").frame(maxWidth: .infinity)
                         }.buttonStyle(PrimaryButtonStyle())
                     } else if canUseRetroArch {
                         Button {

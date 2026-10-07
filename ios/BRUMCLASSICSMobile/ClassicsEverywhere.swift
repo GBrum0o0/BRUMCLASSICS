@@ -540,6 +540,7 @@ struct ROMFolderGameTile: View {
     let launcherGame: Game?
     let retroArchReady: Bool
     let integratedCoreName: String?
+    var opensDetails = false
     let play: () -> Void
     @State private var artwork: ROMArtwork?
     @State private var artworkImage: UIImage?
@@ -568,7 +569,7 @@ struct ROMFolderGameTile: View {
                     }
                     Text(displayedTitle).font(.system(size: 15, weight: .bold)).foregroundStyle(BrumTheme.text).lineLimit(2).multilineTextAlignment(.leading)
                 }
-            }.buttonStyle(.plain).accessibilityLabel("Jogar \(displayedTitle)")
+            }.buttonStyle(.plain).accessibilityLabel("\(opensDetails ? "Ver detalhes de" : "Jogar") \(displayedTitle)")
             Text(routeLabel)
                 .font(.system(size: 10, weight: .bold)).foregroundStyle(BrumTheme.primary)
         }.task(id: rom.id + (launcherGame?.artworkPath ?? "")) {
