@@ -72,10 +72,15 @@ if (bcardView.split('private func send')[1].includes('offset = 0')) throw new Er
 for (const marker of ['ClassicsEverywhereView', 'PocketSetupView', 'PocketRules.launchURL', '/v1/classics/achievements/sync', 'API_GetGameInfoAndUserProgress.php']) if (!source.includes(marker)) throw new Error(`CLASSICS iPhone incompleto: ${marker}`);
 if (!source.includes('companion-capture') || !source.includes('MobileSettingsView')) throw new Error('Captura ou configurações móveis ausentes.');
 for (const marker of ['MobileNotificationSnapshot', 'NotificationsView', 'notifications_changed', 'markAllNotificationsRead']) if (!source.includes(marker)) throw new Error(`Central BRUM incompleta: ${marker}`);
-for (const marker of ['struct GamingModeView', 'GamingTabBar(selection:', 'Prontos para jogar', 'filter(\\.installed)', 'pocket.romFolderGames', 'GamingOrientation.request(.landscape)', 'selection != 2']) {
+for (const marker of ['struct GamingModeView', 'GamingTabBar(selection:', 'JOGADOS RECENTEMENTE', 'BIBLIOTECA', 'GamingModeCatalog.library', 'pocket.romFolderGames', 'GamingOrientation.request(.landscape)', 'selection != 2']) {
   if (!source.includes(marker)) throw new Error(`Gaming Mode incompleto: ${marker}`);
 }
 if (!source.includes('pocket.launchROM(rom, launcher: store)') || !source.includes('store.launchBCard(game)')) throw new Error('Gaming Mode não decide entre execução local e computador.');
+const gamingSource = fs.readFileSync(path.join(app, 'GamingModeView.swift'), 'utf8');
+for (const marker of ['GamingROMDetailView(rom: $0)', 'selectedROM = rom', 'CoreRegistry.installedCore', 'if system == .nintendo3DS { return false }']) {
+  if (!source.includes(marker)) throw new Error(`Detalhes do Gaming Mode ou rota 3DS incompletos: ${marker}`);
+}
+if (gamingSource.includes('Prontos para jogar') || gamingSource.includes('INSTALADOS NO COMPUTADOR')) throw new Error('Gaming Mode antigo ainda está visível.');
 for (const marker of ['IntegratedEmulatorSupport.supports', 'prepareIntegratedROM', 'stageForIntegratedPlay', 'JOGAR · BRUM CORE', 'finishIntegratedPlay']) {
   if (!source.includes(marker)) throw new Error(`Emulação integrada incompleta: ${marker}`);
 }
@@ -93,7 +98,7 @@ if (integratedEngine.includes('[close.heightAnchor constraintEqualToConstant:38]
 for (const marker of ['constraintEqualToAnchor:self.view.leadingAnchor', 'constraintEqualToAnchor:self.view.trailingAnchor', 'constraintEqualToAnchor:self.view.topAnchor', 'constraintEqualToAnchor:self.view.bottomAnchor']) {
   if (!integratedEngine.includes(marker)) throw new Error(`Tela cheia do BRUM Core incompleta: ${marker}`);
 }
-if (!source.includes('IntegratedEmulatorView(rom: $0, returnsToPortrait: false)')) throw new Error('BRUM Core precisa preservar o Gaming Mode horizontal ao sair.');
+if (!source.includes('IntegratedEmulatorView(rom: rom, returnsToPortrait: false)')) throw new Error('BRUM Core precisa preservar o Gaming Mode horizontal ao sair.');
 const homeSource = fs.readFileSync(path.join(app, 'HomeView.swift'), 'utf8');
 if (homeSource.includes('classics-everywhere-link') || homeSource.includes('NavigationLink { BCardLibraryView()')) throw new Error('Início ainda expõe atalhos removidos de B-CARD ou CLASSICS Everywhere.');
 if (!homeSource.includes('profile-home-link')) throw new Error('Perfil precisa estar acessível pelo Início.');
