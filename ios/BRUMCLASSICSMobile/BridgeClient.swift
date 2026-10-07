@@ -113,6 +113,7 @@ actor BridgeClient {
         for host in hosts {
             guard var request = try makeRequest(path: path, authenticated: true, overrideHost: host) else { throw BridgeError.notPaired }
             request.setValue("application/octet-stream", forHTTPHeaderField: "Accept")
+            request.setValue(candidate.profileId, forHTTPHeaderField: "X-BRUMCLASSICS-Profile-ID")
             do {
                 let (temporary, response) = try await session.download(for: request)
                 defer { try? FileManager.default.removeItem(at: temporary) }
