@@ -88,6 +88,66 @@ actor BridgeClient {
 
     func snapshot() async throws -> LibrarySnapshot { try await request(path: "/v1/snapshot") }
 
+    func nativeSaveCandidates(for identity: CanonicalGameIdentity) async throws -> [NativeSaveCandidate] {
+        let gameID = identity.canonicalGameID
+        guard let escaped = gameID.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+            throw BridgeError.invalidResponse("Identidade da ROM inválida.")
+        }
+        let response: NativeSaveCandidatesResponse = try await request(path: "/v1/classics/saves/native-candidates?canonicalGameId=\(escaped)")
+        return try response.validated(for: gameID)
+    }
+
+    // Only stages verified bytes. Applying a save requires a separate conflict
+    // decision and must never happen while the emulated game is running.
+    func stageNativeSave(for identity: CanonicalGameIdentity, candidate: NativeSaveCandidate, file: NativeSaveFile) async throws -> URL {
+        guard candidate.isValid(for: identity.canonicalGameID),
+              candidate.files.contains(where: { $0.fileIndex == file.fileIndex && $0.name == file.name && $0.sha256 == file.sha256 && $0.size == file.size }) else {
+            throw BridgeError.invalidResponse("O save não pertence a esta ROM.")
+        }
+        guard let escaped = identity.canonicalGameID.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+            throw BridgeError.invalidResponse("Identidade da ROM inválida.")
+        }
+        let path = "/v1/classics/saves/native/\(candidate.versionId)/\(file.fileIndex)?canonicalGameId=\(escaped)"
+        let hosts = try pairedHosts()
+        var lastNetworkError: Error?
+        for host in hosts {
+            guard var request = try makeRequest(path: path, authenticated: true, overrideHost: host) else { throw BridgeError.notPaired }
+            request.setValue("application/octet-stream", forHTTPHeaderField: "Accept")
+            do {
+                let (temporary, response) = try await session.download(for: request)
+                defer { try? FileManager.default.removeItem(at: temporary) }
+                guard let http = response as? HTTPURLResponse else { throw BridgeError.invalidResponse("Resposta de save inválida.") }
+                if http.statusCode == 401 { throw BridgeError.unauthorized }
+                guard http.statusCode == 200 else { throw BridgeError.server("O launcher não disponibilizou este backup de save (\(http.statusCode)).") }
+                guard http.value(forHTTPHeaderField: "X-BRUMCLASSICS-SHA256") == file.sha256,
+                      let size = try FileManager.default.attributesOfItem(atPath: temporary.path)[.size] as? NSNumber,
+                      size.int64Value == Int64(file.size),
+                      try NativeSaveTransfer.sha256(of: temporary) == file.sha256 else {
+                    throw BridgeError.invalidResponse("O save recebido falhou na verificação de integridade. Nenhum progresso foi alterado.")
+                }
+                guard let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+                    throw BridgeError.invalidResponse("Não foi possível preparar o armazenamento seguro do save.")
+                }
+                let directory = support.appendingPathComponent("NativeSaveTransfers", isDirectory: true)
+                    .appendingPathComponent(UUID().uuidString, isDirectory: true)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                let destination = directory.appendingPathComponent(file.name)
+                do { try FileManager.default.moveItem(at: temporary, to: destination) }
+                catch { try? FileManager.default.removeItem(at: directory); throw error }
+                activeHost = host
+                return destination
+            } catch let error as BridgeError { throw error }
+            catch let error as URLError where [.cannotConnectToHost, .timedOut, .networkConnectionLost, .notConnectedToInternet, .dnsLookupFailed, .cannotFindHost].contains(error.code) {
+                lastNetworkError = error
+                continue
+            } catch let error as URLError where error.code == .cancelled || error.code == .serverCertificateUntrusted {
+                throw BridgeError.invalidCertificate
+            } catch { throw BridgeError.invalidResponse("Não foi possível preparar o save recebido: \(error.localizedDescription)") }
+        }
+        if lastNetworkError != nil { throw BridgeError.unreachable }
+        throw BridgeError.notPaired
+    }
+
     func markNotificationRead(_ id: String) async throws {
         guard !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         let body = try JSONSerialization.data(withJSONObject: ["id": id])
@@ -206,13 +266,7 @@ actor BridgeClient {
     }
 
     private func dataRequest(path: String, method: String = "GET", body: Data? = nil, authenticated: Bool = true, overrideHost: String? = nil, overridePort: Int? = nil, maximumBytes: Int = 24 * 1024 * 1024) async throws -> Data {
-        let candidates: [String]
-        if let overrideHost { candidates = [overrideHost] }
-        else if let configuration {
-            candidates = ([activeHost, configuration.host] + (configuration.alternateHosts ?? []).map(Optional.some)).compactMap { $0 }.reduce(into: []) { result, value in
-                if !result.contains(value) { result.append(value) }
-            }
-        } else { throw BridgeError.notPaired }
+        let candidates = try pairedHosts(overrideHost: overrideHost)
         var lastNetworkError: Error?
         for candidate in candidates {
           guard var request = try makeRequest(path: path, authenticated: authenticated, overrideHost: candidate, overridePort: overridePort) else { throw BridgeError.notPaired }
@@ -239,6 +293,14 @@ actor BridgeClient {
         }
         if lastNetworkError != nil { throw BridgeError.unreachable }
         throw BridgeError.notPaired
+    }
+
+    private func pairedHosts(overrideHost: String? = nil) throws -> [String] {
+        if let overrideHost { return [overrideHost] }
+        guard let configuration else { throw BridgeError.notPaired }
+        return ([activeHost, configuration.host] + (configuration.alternateHosts ?? []).map(Optional.some)).compactMap { $0 }.reduce(into: []) { result, value in
+            if !result.contains(value) { result.append(value) }
+        }
     }
 
     private func makeRequest(path: String, authenticated: Bool, overrideHost: String? = nil, overridePort: Int? = nil, webSocket: Bool = false) throws -> URLRequest? {

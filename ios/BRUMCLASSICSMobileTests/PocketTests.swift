@@ -2,6 +2,28 @@ import XCTest
 @testable import BRUMCLASSICSMobile
 
 final class PocketTests: XCTestCase {
+    func testNativeSaveCatalogRejectsWrongROMAndUnsafeFiles() throws {
+        let digest = String(repeating: "a", count: 64)
+        let identity = "classic:gba:sha256:\(digest)"
+        let payload = """
+        {"protocolVersion":1,"transferEnabled":false,"downloadEnabled":true,"candidates":[
+          {"versionId":"2026-10-07T10-00-00-000Z-a1b2c3","gameId":"game-1","canonicalGameId":"\(identity)",
+           "profileId":"primary","createdAt":"2026-10-07T10:00:00Z",
+           "files":[{"fileIndex":0,"name":"game.srm","size":6,"sha256":"\(digest)"}]}
+        ]}
+        """
+        let response = try JSONDecoder().decode(NativeSaveCandidatesResponse.self, from: Data(payload.utf8))
+        XCTAssertEqual(try response.validated(for: identity).count, 1)
+        XCTAssertThrowsError(try response.validated(for: "classic:gb:sha256:\(digest)"))
+        let unsafe = NativeSaveFile(fileIndex: 0, name: "../game.srm", size: 6, sha256: digest)
+        XCTAssertFalse(unsafe.isValid)
+        let source = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try Data("SAVE-A".utf8).write(to: source)
+        defer { try? FileManager.default.removeItem(at: source) }
+        XCTAssertEqual(try NativeSaveTransfer.sha256(of: source),
+                       "ecb10d6167fd4cca49af084b27578db864c7c995068f558f785225f289d6f1ec")
+    }
+
     func testEmulationIdentityUsesHeaderAndContentInsteadOfFilename() throws {
         var bytes = [UInt8](repeating: 0, count: 512)
         let logo: [UInt8] = [
