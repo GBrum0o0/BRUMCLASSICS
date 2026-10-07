@@ -275,6 +275,18 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(system("nested/PSP/game.iso"), .playStationPortable)
         XCTAssertEqual(system("PS1/PS2/game.iso"), .playStation2)
     }
+    func testGamingModeUsesOnlyRealLocalHistoryAndFavorites() {
+        let first = ROMFolderGame(relativePath: "3DS/jogo.3ds", filename: "jogo.3ds", title: "Jogo", fileSize: 100)
+        let second = ROMFolderGame(relativePath: "N64/outro.z64", filename: "outro.z64", title: "Outro", fileSize: 100)
+        var played = PocketClassic(id: UUID(), title: "Outro", filename: "outro.z64")
+        played.lastPlayedAt = Date(timeIntervalSince1970: 1_000)
+        let library = GamingModeCatalog.library(local: [first, second], records: [played], computer: [])
+        XCTAssertEqual(library.count, 2)
+        XCTAssertEqual(GamingModeCatalog.recent(library, favorites: []).map(\.id), ["local:n64/outro.z64"])
+        XCTAssertEqual(GamingModeCatalog.recent(library, favorites: ["local:3ds/jogo.3ds"]).map(\.id),
+                       ["local:3ds/jogo.3ds", "local:n64/outro.z64"])
+        XCTAssertNotNil(GamingModeCatalog.date("2026-10-07T10:30:00.123Z"))
+    }
     func testDiscStagingCopiesTracksAndRemovesOnlyFailedPrivateCopy() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let source = root.appendingPathComponent("source")

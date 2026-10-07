@@ -19,7 +19,7 @@ final class NavigationTests: XCTestCase {
         }
 
         app.buttons["gaming-mode-tab"].tap()
-        XCTAssertTrue(app.staticTexts["Prontos para jogar"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["BIBLIOTECA"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["main-tab-0"].exists)
 
         let gamingAttachment = XCTAttachment(screenshot: app.screenshot())

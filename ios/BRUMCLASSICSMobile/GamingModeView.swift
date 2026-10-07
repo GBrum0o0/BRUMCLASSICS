@@ -7,10 +7,20 @@ struct GamingModeView: View {
     @Binding var selection: Int
     @State private var selectedGame: Game?
     @State private var selectedROM: ROMFolderGame?
+    @AppStorage("gaming-mode-favorites-v1") private var favoritesJSON = "[]"
 
     private let columns = [GridItem(.adaptive(minimum: 135), spacing: 16)]
-    private var installedGames: [Game] { store.snapshot.games.filter(\.installed).sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending } }
-    private var localGames: [ROMFolderGame] { pocket.romFolderGames.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending } }
+    private var favoriteIDs: Set<String> {
+        guard let data = favoritesJSON.data(using: .utf8),
+              let ids = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+        return Set(ids)
+    }
+    private var libraryEntries: [GamingCatalogEntry] {
+        GamingModeCatalog.library(local: pocket.romFolderGames, records: pocket.games, computer: store.snapshot.games)
+    }
+    private var recentEntries: [GamingCatalogEntry] {
+        GamingModeCatalog.recent(libraryEntries, favorites: favoriteIDs)
+    }
 
     var body: some View {
         ScrollView {
@@ -26,31 +36,17 @@ struct GamingModeView: View {
                     ConnectionDot(state: store.connection)
                 }
 
-                if !localGames.isEmpty {
-                    gameSection(title: "NO CELULAR", count: localGames.count) {
-                        ForEach(localGames) { rom in
-                            ROMFolderGameTile(
-                                rom: rom,
-                                launcherGame: pocket.launcherGame(for: rom, launcher: store),
-                                retroArchReady: pocket.isImportedIntoRetroArch(rom),
-                                integratedCoreName: IntegratedEmulatorSupport.core(for: rom)?.displayName
-                            ) {
-                                selectedROM = rom
-                            }
-                        }
+                if !recentEntries.isEmpty {
+                    gameSection(title: "JOGADOS RECENTEMENTE") {
+                        ForEach(recentEntries) { entry in entryTile(entry) }
                     }
                 }
 
-                if !installedGames.isEmpty {
-                    gameSection(title: "INSTALADOS NO COMPUTADOR", count: installedGames.count) {
-                        ForEach(installedGames) { game in
-                            Button { selectedGame = game } label: { GamingGameTile(game: game) }
-                                .buttonStyle(.plain)
-                        }
-                    }
+                gameSection(title: "BIBLIOTECA") {
+                    ForEach(libraryEntries) { entry in entryTile(entry) }
                 }
 
-                if localGames.isEmpty && installedGames.isEmpty {
+                if libraryEntries.isEmpty {
                     BrumCard {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("NENHUM JOGO PRONTO").font(.headline.bold()).foregroundStyle(BrumTheme.text)
@@ -71,15 +67,93 @@ struct GamingModeView: View {
         .fullScreenCover(item: $selectedROM) { GamingROMDetailView(rom: $0) }
     }
 
-    private func gameSection<Content: View>(title: String, count: Int, @ViewBuilder content: () -> Content) -> some View {
+    private func gameSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                BrumSectionLabel(text: title)
-                Spacer()
-                Text("\(count) JOGO\(count == 1 ? "" : "S")").font(.caption2.bold()).foregroundStyle(BrumTheme.primary)
-            }
+            BrumSectionLabel(text: title)
             LazyVGrid(columns: columns, alignment: .leading, spacing: 20, content: content)
         }
+    }
+
+    @ViewBuilder private func entryTile(_ entry: GamingCatalogEntry) -> some View {
+        ZStack(alignment: .topTrailing) {
+            switch entry {
+            case .local(let rom, _):
+                ROMFolderGameTile(
+                    rom: rom,
+                    launcherGame: pocket.launcherGame(for: rom, launcher: store),
+                    retroArchReady: pocket.isImportedIntoRetroArch(rom),
+                    integratedCoreName: IntegratedEmulatorSupport.core(for: rom)?.displayName
+                ) { selectedROM = rom }
+            case .computer(let game):
+                Button { selectedGame = game } label: { GamingGameTile(game: game) }
+                    .buttonStyle(.plain)
+            }
+            Button { toggleFavorite(entry.id) } label: {
+                Image(systemName: favoriteIDs.contains(entry.id) ? "star.fill" : "star")
+                    .font(.headline).foregroundStyle(BrumTheme.primary)
+                    .padding(9).background(BrumTheme.surface).clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(favoriteIDs.contains(entry.id) ? "Remover \(entry.title) dos favoritos" : "Favoritar \(entry.title)")
+        }
+    }
+
+    private func toggleFavorite(_ id: String) {
+        var next = favoriteIDs
+        if !next.insert(id).inserted { next.remove(id) }
+        guard let data = try? JSONEncoder().encode(next.sorted()), let text = String(data: data, encoding: .utf8) else { return }
+        favoritesJSON = text
+    }
+}
+
+enum GamingCatalogEntry: Identifiable {
+    case local(ROMFolderGame, Date?)
+    case computer(Game)
+
+    var id: String {
+        switch self {
+        case .local(let rom, _): return "local:\(rom.id)"
+        case .computer(let game): return "pc:\(game.id)"
+        }
+    }
+    var title: String {
+        switch self {
+        case .local(let rom, _): return rom.title
+        case .computer(let game): return game.title
+        }
+    }
+    var lastPlayedAt: Date? {
+        switch self {
+        case .local(_, let date): return date
+        case .computer(let game): return GamingModeCatalog.date(game.lastPlayedAt)
+        }
+    }
+}
+
+enum GamingModeCatalog {
+    static func library(local: [ROMFolderGame], records: [PocketClassic], computer: [Game]) -> [GamingCatalogEntry] {
+        let localFiles = Set(local.map { $0.filename.lowercased() })
+        let linkedPCIDs = Set(records.filter { localFiles.contains($0.filename.lowercased()) && !$0.launcherGameID.isEmpty }.map(\.launcherGameID))
+        let localEntries = local.map { rom in
+            GamingCatalogEntry.local(rom, records.first { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }?.lastPlayedAt)
+        }
+        let pcEntries = computer.filter { $0.installed && !linkedPCIDs.contains($0.id) }.map(GamingCatalogEntry.computer)
+        return (localEntries + pcEntries).sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+    }
+
+    static func recent(_ entries: [GamingCatalogEntry], favorites: Set<String>, limit: Int = 12) -> [GamingCatalogEntry] {
+        let pinned = entries.filter { favorites.contains($0.id) }
+            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+        let played = entries.filter { $0.lastPlayedAt != nil && !favorites.contains($0.id) }
+            .sorted { ($0.lastPlayedAt ?? .distantPast) > ($1.lastPlayedAt ?? .distantPast) }
+        return Array((pinned + played).prefix(max(0, limit)))
+    }
+
+    static func date(_ stamp: String) -> Date? {
+        guard !stamp.isEmpty else { return nil }
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractional.date(from: stamp) ?? ISO8601DateFormatter().date(from: stamp)
     }
 }
 
@@ -95,7 +169,8 @@ private struct GamingROMDetailView: View {
     private var installedCore: CoreDescriptor? { IntegratedEmulatorSupport.core(for: rom) }
     private var system: EmulatedSystemID? { IntegratedEmulatorSupport.system(for: rom) }
     private var canUseRetroArch: Bool {
-        RetroArchAppStoreLaunchRules.supports(filename: rom.filename) || pocket.isImportedIntoRetroArch(rom)
+        if system == .nintendo3DS { return false }
+        return RetroArchAppStoreLaunchRules.supports(filename: rom.filename) || pocket.isImportedIntoRetroArch(rom)
     }
     private var linkedPCGame: Game? {
         guard let link = pocket.games.first(where: {
