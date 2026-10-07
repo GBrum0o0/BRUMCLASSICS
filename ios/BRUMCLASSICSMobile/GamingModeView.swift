@@ -17,25 +17,13 @@ struct GamingModeView: View {
             LazyVStack(alignment: .leading, spacing: 22) {
                 HStack(spacing: 14) {
                     Button { GamingOrientation.request(.portrait); selection = 0 } label: {
-                        Label("SAIR", systemImage: "arrow.left").font(.caption.bold()).tracking(1)
-                            .foregroundStyle(BrumTheme.text).padding(.horizontal, 15).frame(height: 42)
-                            .background(BrumTheme.surface).clipShape(Capsule()).overlay(Capsule().stroke(BrumTheme.line))
+                        HStack(spacing: 10) {
+                            BrumLogo(compact: true)
+                            Text("BRUM CLASSICS").font(.caption.bold()).tracking(1.5).foregroundStyle(BrumTheme.text)
+                        }
                     }.buttonStyle(.plain).accessibilityIdentifier("gaming-mode-exit")
-                    BrumLogo(compact: true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("BRUMCLASSICS").font(.caption2.bold()).tracking(2).foregroundStyle(BrumTheme.primary)
-                        Text("GAMING MODE").font(.headline.bold()).foregroundStyle(BrumTheme.text)
-                    }
                     Spacer()
                     ConnectionDot(state: store.connection)
-                }
-                Text("BRUM Core iOS · build \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?") · 3DS: \(CoreRegistry.core(for: .nintendo3DS)?.displayName ?? "não ativo")")
-                    .font(.caption2).foregroundStyle(BrumTheme.muted)
-                    .accessibilityIdentifier("brum-core-build-status")
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Prontos para jogar").font(.system(size: 32, weight: .black)).foregroundStyle(BrumTheme.text)
-                    Text("Somente jogos disponíveis agora neste celular ou no computador.").font(.subheadline).foregroundStyle(BrumTheme.muted)
                 }
 
                 if !localGames.isEmpty {
@@ -47,8 +35,7 @@ struct GamingModeView: View {
                                 retroArchReady: pocket.isImportedIntoRetroArch(rom),
                                 integratedCoreName: IntegratedEmulatorSupport.core(for: rom)?.displayName
                             ) {
-                                if IntegratedEmulatorSupport.supports(rom) { selectedROM = rom }
-                                else { Task { await pocket.launchROM(rom, launcher: store) } }
+                                selectedROM = rom
                             }
                         }
                     }
@@ -81,7 +68,7 @@ struct GamingModeView: View {
             await pocket.refreshROMFolder()
         }
         .fullScreenCover(item: $selectedGame) { GamingGameView(game: $0) }
-        .fullScreenCover(item: $selectedROM) { IntegratedEmulatorView(rom: $0, returnsToPortrait: false) }
+        .fullScreenCover(item: $selectedROM) { GamingROMDetailView(rom: $0) }
     }
 
     private func gameSection<Content: View>(title: String, count: Int, @ViewBuilder content: () -> Content) -> some View {
@@ -93,6 +80,96 @@ struct GamingModeView: View {
             }
             LazyVGrid(columns: columns, alignment: .leading, spacing: 20, content: content)
         }
+    }
+}
+
+private struct GamingROMDetailView: View {
+    @EnvironmentObject private var pocket: PocketClassicsStore
+    @EnvironmentObject private var store: AppStore
+    @Environment(\.dismiss) private var dismiss
+    let rom: ROMFolderGame
+    @State private var launchIntegrated = false
+    @State private var launchingOnPC = false
+    @State private var actionMessage = ""
+
+    private var installedCore: CoreDescriptor? { IntegratedEmulatorSupport.core(for: rom) }
+    private var system: EmulatedSystemID? { IntegratedEmulatorSupport.system(for: rom) }
+    private var canUseRetroArch: Bool {
+        RetroArchAppStoreLaunchRules.supports(filename: rom.filename) || pocket.isImportedIntoRetroArch(rom)
+    }
+    private var linkedPCGame: Game? {
+        guard let link = pocket.games.first(where: {
+            $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame && !$0.launcherGameID.isEmpty
+        }) else { return nil }
+        return store.snapshot.games.first { $0.id == link.launcherGameID && $0.installed }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text(system?.rawValue.uppercased() ?? "CLASSICS")
+                        .font(.caption.bold()).tracking(1.5).foregroundStyle(BrumTheme.primary)
+                    Text(rom.title).font(.system(size: 34, weight: .black)).foregroundStyle(BrumTheme.text)
+                    Text(rom.filename).font(.caption).foregroundStyle(BrumTheme.muted)
+                    BrumCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            BrumSectionLabel(text: "EXECUÇÃO NESTE IPHONE")
+                            Text(routeDescription).font(.subheadline).foregroundStyle(BrumTheme.muted)
+                            if system == .nintendo3DS {
+                                Text("Build \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?") · Azahar: \(installedCore == nil ? "ausente" : "instalado")")
+                                    .font(.caption2).foregroundStyle(BrumTheme.muted)
+                                    .accessibilityIdentifier("brum-core-build-status")
+                            }
+                        }
+                    }
+                    if let core = installedCore {
+                        Button { launchIntegrated = true } label: {
+                            Text("JOGAR NO BRUM CORE · \(core.displayName.uppercased())").frame(maxWidth: .infinity)
+                        }.buttonStyle(PrimaryButtonStyle())
+                    } else if canUseRetroArch {
+                        Button {
+                            Task { await pocket.launchROM(rom, launcher: store) }
+                        } label: {
+                            Text(pocket.isImportedIntoRetroArch(rom) ? "ABRIR NO RETROARCH" : "IMPORTAR PARA O RETROARCH")
+                                .frame(maxWidth: .infinity)
+                        }.buttonStyle(PrimaryButtonStyle())
+                    }
+                    if let game = linkedPCGame {
+                        Button {
+                            launchingOnPC = true
+                            Task {
+                                let error = await store.launchBCard(game)
+                                actionMessage = error.map { "Não foi possível iniciar no PC: \($0)" } ?? "Jogo iniciado no computador."
+                                launchingOnPC = false
+                            }
+                        } label: { Text("JOGAR NO PC").frame(maxWidth: .infinity).frame(height: 44) }
+                            .buttonStyle(.bordered).tint(BrumTheme.primary)
+                            .disabled(store.connection != .online || launchingOnPC)
+                    }
+                    if !actionMessage.isEmpty { Text(actionMessage).font(.caption).foregroundStyle(BrumTheme.muted) }
+                    if let message = pocket.message { Text(message).font(.caption).foregroundStyle(.orange) }
+                }.frame(maxWidth: 700, alignment: .leading).padding(20).frame(maxWidth: .infinity)
+            }
+            .background(BrumTheme.background.ignoresSafeArea())
+            .toolbar { ToolbarItem(placement: .topBarTrailing) {
+                Button { dismiss() } label: { Image(systemName: "xmark.circle.fill").font(.title2) }
+            } }
+        }
+        .onAppear { GamingOrientation.request(.landscape) }
+        .sheet(item: $pocket.pendingROMShare) { ticket in
+            DocumentExportView(url: ticket.url) { completed, error in
+                Task { await pocket.finishROMShare(ticket, completed: completed, error: error) }
+            }
+        }
+        .fullScreenCover(isPresented: $launchIntegrated) { IntegratedEmulatorView(rom: rom, returnsToPortrait: false) }
+    }
+
+    private var routeDescription: String {
+        if let installedCore { return "\(installedCore.displayName) está incluído nesta instalação. A ROM será aberta pelo BRUM Core, sem importar para o RetroArch." }
+        if system == .nintendo3DS { return "O arquivo 3DS foi reconhecido, mas o Azahar não está incluído nesta instalação. A importação para o RetroArch não ativaria o BRUM Core." }
+        if canUseRetroArch { return "O BRUM Core ainda não tem um backend instalado para este jogo. A opção abaixo usa explicitamente o RetroArch e não conta como suporte integrado." }
+        return "Este formato foi reconhecido, mas não há um backend de execução disponível nesta instalação. O arquivo original foi preservado."
     }
 }
 

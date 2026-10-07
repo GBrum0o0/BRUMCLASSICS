@@ -259,6 +259,15 @@ enum CoreRegistry {
     static func core(for system: EmulatedSystemID, includeExperimental: Bool = experimentalBuild) -> CoreDescriptor? {
         (all + (includeExperimental ? experimental : [])).first { $0.supportedSystems.contains(system) }
     }
+
+    static func installedCore(for system: EmulatedSystemID, includeExperimental: Bool = experimentalBuild) -> CoreDescriptor? {
+        guard let descriptor = core(for: system, includeExperimental: includeExperimental) else { return nil }
+        guard experimental.contains(descriptor) else { return descriptor }
+        let frameworks = Bundle.main.privateFrameworksPath
+            ?? (Bundle.main.bundlePath as NSString).appendingPathComponent("Frameworks")
+        let library = (frameworks as NSString).appendingPathComponent(descriptor.libraryName)
+        return FileManager.default.fileExists(atPath: library) ? descriptor : nil
+    }
 }
 
 struct EmulationLaunchDescriptor: Equatable, Sendable {

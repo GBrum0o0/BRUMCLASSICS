@@ -264,8 +264,14 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(system("GameCube/game.iso"), .gameCube)
         XCTAssertEqual(system("Arcade/pacman.zip"), .arcade)
         let threeDS = ROMFolderGame(relativePath: "3DS/jogo.3ds", filename: "jogo.3ds", title: "jogo", fileSize: 1)
-        XCTAssertEqual(IntegratedEmulatorSupport.core(for: threeDS, includeExperimental: true)?.id, "azahar")
+        XCTAssertEqual(CoreRegistry.core(for: .nintendo3DS, includeExperimental: true)?.id, "azahar")
+        let frameworks = Bundle.main.privateFrameworksPath
+            ?? (Bundle.main.bundlePath as NSString).appendingPathComponent("Frameworks")
+        let azaharPath = (frameworks as NSString).appendingPathComponent("azahar_libretro_ios.dylib")
+        XCTAssertEqual(IntegratedEmulatorSupport.core(for: threeDS, includeExperimental: true)?.id == "azahar",
+                       FileManager.default.fileExists(atPath: azaharPath))
         XCTAssertNil(IntegratedEmulatorSupport.core(for: threeDS, includeExperimental: false))
+        XCTAssertFalse(RetroArchAppStoreLaunchRules.supports(filename: "jogo.3ds"))
         XCTAssertEqual(system("nested/PSP/game.iso"), .playStationPortable)
         XCTAssertEqual(system("PS1/PS2/game.iso"), .playStation2)
     }

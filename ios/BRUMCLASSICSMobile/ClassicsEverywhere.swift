@@ -293,10 +293,9 @@ actor PocketRAClient {
         await finishPlaySession(launcher: launcher)
     }
     func launchROM(_ rom: ROMFolderGame, launcher: AppStore) async {
-        if CoreRegistry.isTestPackage,
-           IntegratedEmulatorSupport.system(for: rom) == .nintendo3DS,
+        if IntegratedEmulatorSupport.system(for: rom) == .nintendo3DS,
            !IntegratedEmulatorSupport.supports(rom) {
-            message = "Arquivo 3DS reconhecido, mas o Azahar não está ativo nesta instalação. Confira o número da build no Gaming Mode e instale a IPA experimental mais recente pelo Sideloadly."
+            message = "Arquivo 3DS reconhecido, mas o Azahar não está instalado nesta versão. Nenhuma importação para o RetroArch foi iniciada. Confira a build experimental do BRUM Core."
             return
         }
         guard var record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }) else {
@@ -547,8 +546,10 @@ struct ROMFolderGameTile: View {
     private var displayedTitle: String { launcherGame?.title ?? artwork?.title ?? rom.title }
     private var routeLabel: String {
         if let integratedCoreName { return "JOGAR · BRUM CORE · \(integratedCoreName.uppercased())" }
-        if CoreRegistry.isTestPackage, IntegratedEmulatorSupport.system(for: rom) == .nintendo3DS {
-            return "3DS · AZAHAR NÃO ATIVO · VERIFIQUE BUILD"
+        if let system = IntegratedEmulatorSupport.system(for: rom),
+           CoreRegistry.candidate(for: system) != nil,
+           !RetroArchAppStoreLaunchRules.supports(filename: rom.filename) {
+            return "BRUM CORE · NÃO DISPONÍVEL NESTA INSTALAÇÃO"
         }
         return retroArchReady ? "JOGAR · RETROARCH" : "PRIMEIRO USO · IMPORTAR"
     }
