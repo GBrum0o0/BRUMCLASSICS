@@ -293,7 +293,10 @@ actor PocketRAClient {
         await finishPlaySession(launcher: launcher)
     }
     func sendNativeSaveToPC(_ rom: ROMFolderGame, launcher: AppStore) async throws -> String {
-        guard IntegratedEmulatorSupport.supports(rom) else {
+        guard IntegratedEmulatorSupport.supports(rom),
+              let system = IntegratedEmulatorSupport.system(for: rom),
+              Set<EmulatedSystemID>([.gameBoy, .gameBoyColor, .gameBoyAdvance,
+                                     .nintendoEntertainmentSystem, .superNintendo]).contains(system) else {
             throw PocketError.message("Este jogo não usa um núcleo integrado compatível com save nativo.")
         }
         guard let record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }),
@@ -316,7 +319,11 @@ actor PocketRAClient {
         try NativeSaveTransfer.checkProfileBinding(for: identity, profileID: catalog.activeProfileId,
                                                    launcherFingerprint: fingerprint)
         if let latest = catalog.candidates.first {
-            if latest.revisionId == local.revisionId { return "O save do iPhone já está no Cofre do PC." }
+            if latest.revisionId == local.revisionId {
+                try NativeSaveTransfer.bindProfile(for: identity, profileID: catalog.activeProfileId,
+                                                   launcherFingerprint: fingerprint)
+                return "O save do iPhone já está no Cofre do PC."
+            }
             throw PocketError.message("Há progresso diferente no PC. Os dois saves foram preservados; resolva o conflito antes de enviar.")
         }
         try await launcher.uploadNativeSave(local, identity: identity,
@@ -326,7 +333,10 @@ actor PocketRAClient {
         return "Save enviado e verificado. No PC, abra Cofre de Saves e escolha APLICAR AO BRUM CORE PC."
     }
     func receiveNativeSaveFromPC(_ rom: ROMFolderGame, launcher: AppStore) async throws -> String {
-        guard IntegratedEmulatorSupport.supports(rom) else {
+        guard IntegratedEmulatorSupport.supports(rom),
+              let system = IntegratedEmulatorSupport.system(for: rom),
+              Set<EmulatedSystemID>([.gameBoy, .gameBoyColor, .gameBoyAdvance,
+                                     .nintendoEntertainmentSystem, .superNintendo]).contains(system) else {
             throw PocketError.message("Este jogo não usa um núcleo integrado compatível com save nativo.")
         }
         guard let record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }),
@@ -349,7 +359,11 @@ actor PocketRAClient {
         try NativeSaveTransfer.checkProfileBinding(for: identity, profileID: catalog.activeProfileId,
                                                    launcherFingerprint: fingerprint)
         let local = try NativeSaveTransfer.inspectLocalBatterySave(for: identity)
-        if local?.revisionId == candidate.revisionId { return "O save do iPhone já corresponde ao backup do PC." }
+        if local?.revisionId == candidate.revisionId {
+            try NativeSaveTransfer.bindProfile(for: identity, profileID: catalog.activeProfileId,
+                                               launcherFingerprint: fingerprint)
+            return "O save do iPhone já corresponde ao backup do PC."
+        }
         let staged = try await launcher.stageNativeSave(for: identity, candidate: candidate, file: file)
         let applied = try NativeSaveTransfer.installStagedBatterySave(staged, identity: identity,
                                                                       candidate: candidate, allowReplace: true)

@@ -178,6 +178,11 @@ private struct GamingROMDetailView: View {
 
     private var installedCore: CoreDescriptor? { IntegratedEmulatorSupport.core(for: rom) }
     private var system: EmulatedSystemID? { IntegratedEmulatorSupport.system(for: rom) }
+    private var pcNativeSaveCompatible: Bool {
+        guard let system else { return false }
+        return Set<EmulatedSystemID>([.gameBoy, .gameBoyColor, .gameBoyAdvance,
+                                      .nintendoEntertainmentSystem, .superNintendo]).contains(system)
+    }
     private var canUseRetroArch: Bool {
         GamingModeCatalog.canOfferRetroArch(for: rom, imported: pocket.isImportedIntoRetroArch(rom))
     }
@@ -220,7 +225,7 @@ private struct GamingROMDetailView: View {
                         }.buttonStyle(PrimaryButtonStyle())
                     }
                     if let game = linkedPCGame {
-                        if installedCore != nil {
+                        if installedCore != nil && pcNativeSaveCompatible {
                             Button { confirmNativeUpload = true } label: {
                                 Text("ENVIAR SAVE NATIVO PARA O PC").frame(maxWidth: .infinity).frame(height: 44)
                             }
