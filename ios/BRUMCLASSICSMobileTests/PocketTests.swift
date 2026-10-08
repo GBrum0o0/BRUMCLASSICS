@@ -56,6 +56,7 @@ final class PocketTests: XCTestCase {
         let verified = try XCTUnwrap(NativeSaveTransfer.inspectLocalBatterySave(for: identity, savesRoot: root))
         XCTAssertEqual(verified.sha256, hash)
         XCTAssertEqual(verified.generation, 3)
+        XCTAssertEqual(verified.revisionId, "native:v2:f6a38b604731f64c1f5648b461fb78aafe65139426cab5e9d682d920e371d149")
         try Data("SAVE-B".utf8).write(to: save)
         XCTAssertThrowsError(try NativeSaveTransfer.inspectLocalBatterySave(for: identity, savesRoot: root))
     }

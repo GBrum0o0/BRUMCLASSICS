@@ -71,6 +71,7 @@ struct VerifiedLocalBatterySave: Sendable {
     let sha256: String
     let size: Int
     let generation: Int
+    let revisionId: String
 }
 
 enum NativeSaveTransfer {
@@ -154,8 +155,10 @@ enum NativeSaveTransfer {
               try sha256(of: payload) == manifest.payloadSHA256 else {
             throw BridgeError.invalidResponse("O save local não corresponde à ROM ou falhou na verificação de integridade.")
         }
+        let revisionId = try revision(for: [NativeSaveFile(fileIndex: 0, name: payload.lastPathComponent,
+                                                         size: actualSize, sha256: manifest.payloadSHA256)])
         return VerifiedLocalBatterySave(file: payload, sha256: manifest.payloadSHA256,
-                                        size: actualSize, generation: manifest.generation)
+                                        size: actualSize, generation: manifest.generation, revisionId: revisionId)
     }
 
     static func sha256(of file: URL) throws -> String {
