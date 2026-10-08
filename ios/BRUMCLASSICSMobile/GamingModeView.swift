@@ -171,6 +171,9 @@ private struct GamingROMDetailView: View {
     let rom: ROMFolderGame
     @State private var launchIntegrated = false
     @State private var launchingOnPC = false
+    @State private var syncingNativeSave = false
+    @State private var confirmNativeUpload = false
+    @State private var confirmNativeDownload = false
     @State private var actionMessage = ""
 
     private var installedCore: CoreDescriptor? { IntegratedEmulatorSupport.core(for: rom) }
@@ -207,7 +210,7 @@ private struct GamingROMDetailView: View {
                     if let core = installedCore {
                         Button { launchIntegrated = true } label: {
                             Text("\(CoreRegistry.experimental.contains(core) ? "TESTAR" : "JOGAR") NO BRUM CORE · \(core.displayName.uppercased())").frame(maxWidth: .infinity)
-                        }.buttonStyle(PrimaryButtonStyle())
+                        }.buttonStyle(PrimaryButtonStyle()).disabled(syncingNativeSave)
                     } else if canUseRetroArch {
                         Button {
                             Task { await pocket.launchROM(rom, launcher: store) }
@@ -217,6 +220,18 @@ private struct GamingROMDetailView: View {
                         }.buttonStyle(PrimaryButtonStyle())
                     }
                     if let game = linkedPCGame {
+                        if installedCore != nil {
+                            Button { confirmNativeUpload = true } label: {
+                                Text("ENVIAR SAVE NATIVO PARA O PC").frame(maxWidth: .infinity).frame(height: 44)
+                            }
+                            .buttonStyle(.bordered).tint(BrumTheme.primary)
+                            .disabled(store.connection != .online || syncingNativeSave)
+                            Button { confirmNativeDownload = true } label: {
+                                Text("RECEBER SAVE NATIVO DO PC").frame(maxWidth: .infinity).frame(height: 44)
+                            }
+                            .buttonStyle(.bordered).tint(BrumTheme.primary)
+                            .disabled(store.connection != .online || syncingNativeSave)
+                        }
                         Button {
                             launchingOnPC = true
                             Task {
@@ -244,6 +259,30 @@ private struct GamingROMDetailView: View {
             }
         }
         .fullScreenCover(isPresented: $launchIntegrated) { IntegratedEmulatorView(rom: rom, returnsToPortrait: false) }
+        .confirmationDialog("Enviar o save deste iPhone ao perfil ativo no PC?", isPresented: $confirmNativeUpload) {
+            Button("Enviar save") {
+                syncingNativeSave = true
+                Task {
+                    do { actionMessage = try await pocket.sendNativeSaveToPC(rom, launcher: store) }
+                    catch { actionMessage = error.localizedDescription }
+                    syncingNativeSave = false
+                }
+            }
+        } message: {
+            Text("O save local ainda não tem vínculo de perfil. Este envio associa os bytes ao perfil atualmente aberto no Launcher Beta. Nenhum save do PC será substituído automaticamente.")
+        }
+        .confirmationDialog("Receber o save do perfil ativo no PC?", isPresented: $confirmNativeDownload) {
+            Button("Receber e aplicar save") {
+                syncingNativeSave = true
+                Task {
+                    do { actionMessage = try await pocket.receiveNativeSaveFromPC(rom, launcher: store) }
+                    catch { actionMessage = error.localizedDescription }
+                    syncingNativeSave = false
+                }
+            }
+        } message: {
+            Text("Se houver progresso diferente no iPhone, o save atual será guardado para recuperação antes da aplicação do backup do PC. Feche o jogo antes de continuar.")
+        }
     }
 
     private var routeDescription: String {

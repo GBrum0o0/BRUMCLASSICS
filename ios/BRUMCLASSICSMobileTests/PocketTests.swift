@@ -2,6 +2,23 @@ import XCTest
 @testable import BRUMCLASSICSMobile
 
 final class PocketTests: XCTestCase {
+    func testNativeSaveProfileBindingRejectsAnotherProfileOrComputer() throws {
+        let digest = (UUID().uuidString.replacingOccurrences(of: "-", with: "") +
+                      UUID().uuidString.replacingOccurrences(of: "-", with: "")).lowercased()
+        let identity = CanonicalGameIdentity(systemID: .gameBoyAdvance,
+                                             contentSHA256: digest, detectionSource: .header)
+        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let file = root.appendingPathComponent("NativeSaveTransfers/Bindings/gba-\(digest).json")
+        defer { try? FileManager.default.removeItem(at: file) }
+        let fingerprint = String(repeating: "a", count: 64)
+        try NativeSaveTransfer.bindProfile(for: identity, profileID: "primary", launcherFingerprint: fingerprint)
+        XCTAssertNoThrow(try NativeSaveTransfer.checkProfileBinding(for: identity,
+            profileID: "primary", launcherFingerprint: fingerprint.uppercased()))
+        XCTAssertThrowsError(try NativeSaveTransfer.checkProfileBinding(for: identity,
+            profileID: "secondary", launcherFingerprint: fingerprint))
+        XCTAssertThrowsError(try NativeSaveTransfer.checkProfileBinding(for: identity,
+            profileID: "primary", launcherFingerprint: String(repeating: "b", count: 64)))
+    }
     func testNativeSaveCatalogRejectsWrongROMAndUnsafeFiles() throws {
         let digest = String(repeating: "a", count: 64)
         let identity = "classic:gba:sha256:\(digest)"

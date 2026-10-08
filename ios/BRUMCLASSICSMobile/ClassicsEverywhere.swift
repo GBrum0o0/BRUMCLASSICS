@@ -292,6 +292,72 @@ actor PocketRAClient {
     func finishIntegratedPlay(launcher: AppStore) async {
         await finishPlaySession(launcher: launcher)
     }
+    func sendNativeSaveToPC(_ rom: ROMFolderGame, launcher: AppStore) async throws -> String {
+        guard IntegratedEmulatorSupport.supports(rom) else {
+            throw PocketError.message("Este jogo não usa um núcleo integrado compatível com save nativo.")
+        }
+        guard let record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }),
+              !record.launcherGameID.isEmpty else {
+            throw PocketError.message("Vincule este jogo à cópia do PC antes de enviar o save.")
+        }
+        let staged = try await romFolder.stageForIntegratedPlay(rom)
+        let expectedSystem = IntegratedEmulatorSupport.system(for: rom)
+        let identity = try await Task.detached(priority: .userInitiated) {
+            try ROMContentInspector.inspect(url: staged, filename: rom.filename, expectedSystem: expectedSystem)
+        }.value
+        guard let local = try NativeSaveTransfer.inspectLocalBatterySave(for: identity) else {
+            throw PocketError.message("Este jogo ainda não possui save nativo do BRUM Core no iPhone.")
+        }
+        let catalog = try await launcher.nativeSaveCatalog(for: identity)
+        guard catalog.transferEnabled else {
+            throw PocketError.message("Atualize o Launcher Beta para habilitar o envio de saves.")
+        }
+        guard let fingerprint = launcher.configuration?.fingerprint else { throw BridgeError.notPaired }
+        try NativeSaveTransfer.checkProfileBinding(for: identity, profileID: catalog.activeProfileId,
+                                                   launcherFingerprint: fingerprint)
+        if let latest = catalog.candidates.first {
+            if latest.revisionId == local.revisionId { return "O save do iPhone já está no Cofre do PC." }
+            throw PocketError.message("Há progresso diferente no PC. Os dois saves foram preservados; resolva o conflito antes de enviar.")
+        }
+        try await launcher.uploadNativeSave(local, identity: identity,
+                                            gameID: record.launcherGameID, profileID: catalog.activeProfileId)
+        try NativeSaveTransfer.bindProfile(for: identity, profileID: catalog.activeProfileId,
+                                           launcherFingerprint: fingerprint)
+        return "Save enviado e verificado. No PC, abra Cofre de Saves e escolha APLICAR AO BRUM CORE PC."
+    }
+    func receiveNativeSaveFromPC(_ rom: ROMFolderGame, launcher: AppStore) async throws -> String {
+        guard IntegratedEmulatorSupport.supports(rom) else {
+            throw PocketError.message("Este jogo não usa um núcleo integrado compatível com save nativo.")
+        }
+        guard let record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }),
+              !record.launcherGameID.isEmpty else {
+            throw PocketError.message("Vincule este jogo à cópia do PC antes de receber o save.")
+        }
+        let stagedROM = try await romFolder.stageForIntegratedPlay(rom)
+        let expectedSystem = IntegratedEmulatorSupport.system(for: rom)
+        let identity = try await Task.detached(priority: .userInitiated) {
+            try ROMContentInspector.inspect(url: stagedROM, filename: rom.filename, expectedSystem: expectedSystem)
+        }.value
+        let catalog = try await launcher.nativeSaveCatalog(for: identity)
+        guard catalog.downloadEnabled,
+              let candidate = catalog.candidates.first(where: { $0.gameId == record.launcherGameID }),
+              candidate.files.count == 1, let file = candidate.files.first,
+              file.name.lowercased().hasSuffix(".srm") else {
+            throw PocketError.message("O PC ainda não possui um backup de bateria compatível para esta ROM.")
+        }
+        guard let fingerprint = launcher.configuration?.fingerprint else { throw BridgeError.notPaired }
+        try NativeSaveTransfer.checkProfileBinding(for: identity, profileID: catalog.activeProfileId,
+                                                   launcherFingerprint: fingerprint)
+        let local = try NativeSaveTransfer.inspectLocalBatterySave(for: identity)
+        if local?.revisionId == candidate.revisionId { return "O save do iPhone já corresponde ao backup do PC." }
+        let staged = try await launcher.stageNativeSave(for: identity, candidate: candidate, file: file)
+        let applied = try NativeSaveTransfer.installStagedBatterySave(staged, identity: identity,
+                                                                      candidate: candidate, allowReplace: true)
+        try NativeSaveTransfer.bindProfile(for: identity, profileID: catalog.activeProfileId,
+                                           launcherFingerprint: fingerprint)
+        return applied ? "Save do PC aplicado ao BRUM Core. A versão anterior do iPhone foi preservada." :
+                         "O save do iPhone já corresponde ao backup do PC."
+    }
     func launchROM(_ rom: ROMFolderGame, launcher: AppStore) async {
         if IntegratedEmulatorSupport.system(for: rom) == .nintendo3DS,
            !IntegratedEmulatorSupport.supports(rom) {

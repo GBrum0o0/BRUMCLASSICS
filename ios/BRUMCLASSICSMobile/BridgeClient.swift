@@ -89,12 +89,61 @@ actor BridgeClient {
     func snapshot() async throws -> LibrarySnapshot { try await request(path: "/v1/snapshot") }
 
     func nativeSaveCandidates(for identity: CanonicalGameIdentity) async throws -> [NativeSaveCandidate] {
+        let catalog = try await nativeSaveCatalog(for: identity)
+        return try catalog.validated(for: identity.canonicalGameID)
+    }
+
+    func nativeSaveCatalog(for identity: CanonicalGameIdentity) async throws -> NativeSaveCandidatesResponse {
         let gameID = identity.canonicalGameID
         guard let escaped = gameID.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
             throw BridgeError.invalidResponse("Identidade da ROM inválida.")
         }
         let response: NativeSaveCandidatesResponse = try await request(path: "/v1/classics/saves/native-candidates?canonicalGameId=\(escaped)")
-        return try response.validated(for: gameID)
+        _ = try response.validated(for: gameID)
+        return response
+    }
+
+    func uploadNativeSave(_ save: VerifiedLocalBatterySave, identity: CanonicalGameIdentity,
+                          gameID: String, profileID: String) async throws {
+        guard !gameID.isEmpty, !profileID.isEmpty,
+              let escapedIdentity = identity.canonicalGameID.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let escapedGame = gameID.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              try NativeSaveTransfer.sha256(of: save.file) == save.sha256 else {
+            throw BridgeError.invalidResponse("O save local mudou antes do envio. Nenhum progresso foi substituído.")
+        }
+        let requestID = UUID().uuidString.lowercased()
+        let path = "/v1/classics/saves/native-inbox/\(requestID)?canonicalGameId=\(escapedIdentity)&gameId=\(escapedGame)"
+        var lastNetworkError: Error?
+        for host in try pairedHosts() {
+            guard var request = try makeRequest(path: path, authenticated: true, overrideHost: host) else { throw BridgeError.notPaired }
+            request.httpMethod = "PUT"
+            request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+            request.setValue(String(save.size), forHTTPHeaderField: "Content-Length")
+            request.setValue(save.sha256, forHTTPHeaderField: "X-BRUMCLASSICS-SHA256")
+            request.setValue(profileID, forHTTPHeaderField: "X-BRUMCLASSICS-Profile-ID")
+            do {
+                let (data, response) = try await session.upload(for: request, fromFile: save.file)
+                guard let http = response as? HTTPURLResponse else { throw BridgeError.invalidResponse("Resposta de upload inválida.") }
+                if http.statusCode == 401 { throw BridgeError.unauthorized }
+                if http.statusCode == 409 { throw BridgeError.conflict }
+                guard http.statusCode == 201,
+                      let receipt = try? JSONDecoder().decode(NativeSaveUploadReceipt.self, from: data),
+                      receipt.requestId == requestID, receipt.status == "quarantined",
+                      receipt.sha256 == save.sha256, receipt.size == save.size else {
+                    throw BridgeError.invalidResponse("O PC não confirmou o recebimento íntegro do save.")
+                }
+                activeHost = host
+                return
+            } catch let error as BridgeError { throw error }
+            catch let error as URLError where [.cannotConnectToHost, .timedOut, .networkConnectionLost, .notConnectedToInternet, .dnsLookupFailed, .cannotFindHost].contains(error.code) {
+                lastNetworkError = error
+                continue
+            } catch let error as URLError where error.code == .cancelled || error.code == .serverCertificateUntrusted {
+                throw BridgeError.invalidCertificate
+            } catch { throw BridgeError.invalidResponse("Não foi possível enviar o save: \(error.localizedDescription)") }
+        }
+        if lastNetworkError != nil { throw BridgeError.unreachable }
+        throw BridgeError.notPaired
     }
 
     // Only stages verified bytes. Applying a save requires a separate conflict

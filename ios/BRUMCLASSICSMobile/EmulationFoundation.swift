@@ -376,6 +376,7 @@ enum ROMContentInspector {
 enum EmulationLaunchBuilder {
     static func prepare(romURL: URL, title: String, originalFilename: String, expectedSystem: EmulatedSystemID? = nil, retroAchievementsGameID: Int = 0) throws -> EmulationLaunchDescriptor {
         let identity = try ROMContentInspector.inspect(url: romURL, filename: originalFilename, expectedSystem: expectedSystem)
+        try NativeSaveTransfer.recoverPendingInstall(for: identity)
         guard let core = CoreRegistry.core(for: identity.systemID) else {
             throw PocketError.message("Nenhum núcleo compatível está instalado para este sistema.")
         }

@@ -49,6 +49,23 @@ final class AppStore: ObservableObject {
     var canCaptureMoment: Bool { connection == .online && activeGame != nil && !capturingMoment }
     var syncSummary: MobileSyncSummary { .make(connection: connection, paired: isPaired, cachedGames: snapshot.games.count, pending: pendingCount, lastSuccess: lastSuccessfulSyncAt) }
 
+    func nativeSaveCatalog(for identity: CanonicalGameIdentity) async throws -> NativeSaveCandidatesResponse {
+        guard connection == .online else { throw BridgeError.unreachable }
+        return try await bridge.nativeSaveCatalog(for: identity)
+    }
+
+    func uploadNativeSave(_ save: VerifiedLocalBatterySave, identity: CanonicalGameIdentity,
+                          gameID: String, profileID: String) async throws {
+        guard connection == .online else { throw BridgeError.unreachable }
+        try await bridge.uploadNativeSave(save, identity: identity, gameID: gameID, profileID: profileID)
+    }
+
+    func stageNativeSave(for identity: CanonicalGameIdentity, candidate: NativeSaveCandidate,
+                         file: NativeSaveFile) async throws -> URL {
+        guard connection == .online else { throw BridgeError.unreachable }
+        return try await bridge.stageNativeSave(for: identity, candidate: candidate, file: file)
+    }
+
     func syncPocketAchievements(gameID: String, raGameID: Int, username: String) async -> String? {
         do { try await bridge.syncPocketAchievements(gameID: gameID, raGameID: raGameID, username: username); await refresh(); return nil }
         catch { return "Progresso salvo no iPhone. O PC ainda não confirmou: \(error.localizedDescription). Atualize o launcher e confira a mesma conta e o vínculo do jogo." }
