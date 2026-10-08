@@ -19,6 +19,51 @@ final class PocketTests: XCTestCase {
         XCTAssertThrowsError(try NativeSaveTransfer.checkProfileBinding(for: identity,
             profileID: "primary", launcherFingerprint: String(repeating: "b", count: 64)))
     }
+
+    func testStagedNativeSaveInstallsAndKeepsPreviousBatteryBackup() throws {
+        let digest = (UUID().uuidString.replacingOccurrences(of: "-", with: "") +
+                      UUID().uuidString.replacingOccurrences(of: "-", with: "")).lowercased()
+        let identity = CanonicalGameIdentity(systemID: .gameBoyAdvance,
+                                             contentSHA256: digest, detectionSource: .header)
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let saves = support.appendingPathComponent("IntegratedEmulator/Saves/gba", isDirectory: true)
+        let payload = saves.appendingPathComponent("\(digest).srm")
+        let metadata = saves.appendingPathComponent("\(digest).save.json")
+        let journal = saves.appendingPathComponent("\(digest).brum-native-sync.json")
+        let staged = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let history = support.appendingPathComponent("NativeSaveTransfers/History", isDirectory: true)
+        let before = Set((try? FileManager.default.contentsOfDirectory(atPath: history.path)) ?? [])
+        defer {
+            for file in [payload, metadata, journal, staged] { try? FileManager.default.removeItem(at: file) }
+            let after = Set((try? FileManager.default.contentsOfDirectory(atPath: history.path)) ?? [])
+            for name in after.subtracting(before) where UUID(uuidString: name) != nil {
+                try? FileManager.default.removeItem(at: history.appendingPathComponent(name))
+            }
+        }
+        try FileManager.default.createDirectory(at: saves, withIntermediateDirectories: true)
+        try Data("SAVE-A".utf8).write(to: payload)
+        let firstHash = try NativeSaveTransfer.sha256(of: payload)
+        let oldManifest: [String: Any] = ["schemaVersion": 1, "formatVersion": 1,
+            "canonicalGameID": identity.canonicalGameID, "systemID": "gba", "slot": "battery",
+            "generation": 1, "payloadSHA256": firstHash, "sizeBytes": 6]
+        try JSONSerialization.data(withJSONObject: oldManifest).write(to: metadata)
+        try Data("SAVE-B".utf8).write(to: staged)
+        let newHash = try NativeSaveTransfer.sha256(of: staged)
+        let file = NativeSaveFile(fileIndex: 0, name: "remote.srm", size: 6, sha256: newHash)
+        let candidate = NativeSaveCandidate(versionId: "safe-version", revisionId: try NativeSaveTransfer.revision(for: [file]),
+            gameId: "game-1", canonicalGameId: identity.canonicalGameID, profileId: "primary",
+            createdAt: "2026-10-08T00:00:00Z", files: [file])
+        XCTAssertTrue(try NativeSaveTransfer.installStagedBatterySave(staged, identity: identity,
+            candidate: candidate, allowReplace: true))
+        XCTAssertEqual(try Data(contentsOf: payload), Data("SAVE-B".utf8))
+        XCTAssertEqual(try NativeSaveTransfer.inspectLocalBatterySave(for: identity)?.revisionId, candidate.revisionId)
+        XCTAssertFalse(try NativeSaveTransfer.installStagedBatterySave(staged, identity: identity,
+            candidate: candidate, allowReplace: true))
+        let after = Set((try? FileManager.default.contentsOfDirectory(atPath: history.path)) ?? [])
+        let newHistory = try XCTUnwrap(after.subtracting(before).first)
+        XCTAssertEqual(try Data(contentsOf: history.appendingPathComponent(newHistory).appendingPathComponent("previous.srm")),
+                       Data("SAVE-A".utf8))
+    }
     func testNativeSaveCatalogRejectsWrongROMAndUnsafeFiles() throws {
         let digest = String(repeating: "a", count: 64)
         let identity = "classic:gba:sha256:\(digest)"

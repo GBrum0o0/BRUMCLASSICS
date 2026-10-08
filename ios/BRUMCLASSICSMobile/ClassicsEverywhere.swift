@@ -318,19 +318,19 @@ actor PocketRAClient {
         guard let fingerprint = launcher.configuration?.fingerprint else { throw BridgeError.notPaired }
         try NativeSaveTransfer.checkProfileBinding(for: identity, profileID: catalog.activeProfileId,
                                                    launcherFingerprint: fingerprint)
-        if let latest = catalog.candidates.first {
-            if latest.revisionId == local.revisionId {
-                try NativeSaveTransfer.bindProfile(for: identity, profileID: catalog.activeProfileId,
-                                                   launcherFingerprint: fingerprint)
-                return "O save do iPhone já está no Cofre do PC."
-            }
-            throw PocketError.message("Há progresso diferente no PC. Os dois saves foram preservados; resolva o conflito antes de enviar.")
+        if catalog.candidates.contains(where: { $0.revisionId == local.revisionId }) {
+            try NativeSaveTransfer.bindProfile(for: identity, profileID: catalog.activeProfileId,
+                                               launcherFingerprint: fingerprint)
+            return "O save do iPhone já está no Cofre do PC."
         }
+        let hasOtherPCSave = !catalog.candidates.isEmpty
         try await launcher.uploadNativeSave(local, identity: identity,
                                             gameID: record.launcherGameID, profileID: catalog.activeProfileId)
         try NativeSaveTransfer.bindProfile(for: identity, profileID: catalog.activeProfileId,
                                            launcherFingerprint: fingerprint)
-        return "Save enviado e verificado. No PC, abra Cofre de Saves e escolha APLICAR AO BRUM CORE PC."
+        return hasOtherPCSave
+            ? "Conflito preservado: o PC tem outro progresso. Seu save foi enviado à caixa de entrada; escolha manualmente no Cofre de Saves qual versão aplicar."
+            : "Save enviado e verificado. No PC, abra Cofre de Saves e escolha APLICAR AO BRUM CORE PC."
     }
     func receiveNativeSaveFromPC(_ rom: ROMFolderGame, launcher: AppStore) async throws -> String {
         guard IntegratedEmulatorSupport.supports(rom),

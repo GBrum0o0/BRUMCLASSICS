@@ -147,6 +147,14 @@ enum NativeSaveTransfer {
             guard manager.fileExists(atPath: previousPayload.path), manager.fileExists(atPath: previousMetadata.path) else {
                 throw BridgeError.invalidResponse("Backup anterior ausente; o save foi preservado para recuperação manual.")
             }
+            let previousManifest = try JSONDecoder().decode(LocalBatteryManifest.self,
+                from: Data(contentsOf: previousMetadata))
+            guard previousManifest.canonicalGameID == identity.canonicalGameID,
+                  previousManifest.systemID == identity.systemID.rawValue,
+                  previousManifest.sizeBytes == (try previousPayload.resourceValues(forKeys: [.fileSizeKey]).fileSize),
+                  previousManifest.payloadSHA256 == (try sha256(of: previousPayload)) else {
+                throw BridgeError.invalidResponse("Backup anterior não corresponde à ROM; recuperação automática suspensa.")
+            }
             let tempPayload = paths.payload.appendingPathExtension("recovery")
             let tempMetadata = paths.metadata.appendingPathExtension("recovery")
             for file in [tempPayload, tempMetadata] where manager.fileExists(atPath: file.path) { try manager.removeItem(at: file) }
