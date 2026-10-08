@@ -365,6 +365,12 @@ actor PocketRAClient {
             return "O save do iPhone já corresponde ao backup do PC."
         }
         let staged = try await launcher.stageNativeSave(for: identity, candidate: candidate, file: file)
+        defer {
+            let temporaryDirectory = staged.deletingLastPathComponent()
+            if UUID(uuidString: temporaryDirectory.lastPathComponent) != nil {
+                try? FileManager.default.removeItem(at: temporaryDirectory)
+            }
+        }
         let applied = try NativeSaveTransfer.installStagedBatterySave(staged, identity: identity,
                                                                       candidate: candidate, allowReplace: true)
         try NativeSaveTransfer.bindProfile(for: identity, profileID: catalog.activeProfileId,

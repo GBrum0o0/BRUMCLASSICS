@@ -134,8 +134,11 @@ enum NativeSaveTransfer {
         let metadataValid: Bool
         if let data = try? Data(contentsOf: paths.metadata),
            let manifest = try? JSONDecoder().decode(LocalBatteryManifest.self, from: data) {
-            metadataValid = manifest.canonicalGameID == identity.canonicalGameID &&
-                manifest.payloadSHA256 == journal.incomingSHA256 && manifest.sizeBytes == journal.incomingSize
+            metadataValid = manifest.schemaVersion == 1 && manifest.formatVersion == 1 &&
+                manifest.canonicalGameID == identity.canonicalGameID &&
+                manifest.systemID == identity.systemID.rawValue && manifest.slot == "battery" &&
+                manifest.generation > 0 && manifest.payloadSHA256 == journal.incomingSHA256 &&
+                manifest.sizeBytes == journal.incomingSize
         } else { metadataValid = false }
         if payloadValid && metadataValid {
             try manager.removeItem(at: paths.journal)
