@@ -19,6 +19,7 @@ struct NativeSaveCandidatesResponse: Decodable, Sendable {
 
 struct NativeSaveCandidate: Decodable, Sendable {
     let versionId: String
+    let revisionId: String
     let gameId: String
     let canonicalGameId: String
     let profileId: String
@@ -29,8 +30,9 @@ struct NativeSaveCandidate: Decodable, Sendable {
         canonicalGameId == canonicalGameID && !gameId.isEmpty && !profileId.isEmpty &&
         !versionId.isEmpty && versionId.count <= 80 && versionId.utf8.allSatisfy {
             ($0 >= 48 && $0 <= 57) || ($0 >= 65 && $0 <= 90) || ($0 >= 97 && $0 <= 122) || $0 == 45
-        } && !files.isEmpty && files.allSatisfy({ $0.isValid }) &&
-        Set(files.map(\.fileIndex)).count == files.count
+        } && !files.isEmpty && files.count <= 256 && files.allSatisfy({ $0.isValid }) &&
+        Set(files.map(\.fileIndex)).count == files.count &&
+        (try? NativeSaveTransfer.revision(for: files)) == revisionId
     }
 }
 
@@ -72,6 +74,53 @@ struct VerifiedLocalBatterySave: Sendable {
 }
 
 enum NativeSaveTransfer {
+    // Cross-platform v2 revision: semantic filename role, SHA-256 and size,
+    // encoded as length-prefixed UTF-8 and big-endian integers. A renamed
+    // battery file can be recognized without treating SRAM and RTC as equal.
+    static func revision(for files: [NativeSaveFile]) throws -> String {
+        guard !files.isEmpty, files.count <= 256, files.allSatisfy({ $0.isValid }) else {
+            throw BridgeError.invalidResponse("Arquivos de save inválidos para revisão.")
+        }
+        let entries = files.map { file -> (role: String, bytes: [UInt8], file: NativeSaveFile) in
+            let name = file.name.precomposedStringWithCanonicalMapping
+            let lower = name.lowercased()
+            let role = lower.hasSuffix(".srm") ? "battery.srm" :
+                (lower.hasSuffix(".rtc") ? "clock.rtc" : name)
+            return (role, Array(role.utf8), file)
+        }.sorted { $0.bytes.lexicographicallyPrecedes($1.bytes) }
+        guard Set(entries.map { $0.role.lowercased() }).count == entries.count else {
+            throw BridgeError.invalidResponse("Papéis de save nativo ambíguos.")
+        }
+        var data = Data("BRUM-NATIVE-SAVE-V2\0".utf8)
+        appendUInt32(UInt32(entries.count), to: &data)
+        for entry in entries {
+            appendUInt32(UInt32(entry.bytes.count), to: &data)
+            data.append(contentsOf: entry.bytes)
+            let characters = Array(entry.file.sha256.utf8)
+            for index in stride(from: 0, to: characters.count, by: 2) {
+                let high = hexNibble(characters[index])
+                let low = hexNibble(characters[index + 1])
+                data.append((high << 4) | low)
+            }
+            appendUInt64(UInt64(entry.file.size), to: &data)
+        }
+        let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        return "native:v2:\(digest)"
+    }
+
+    private static func hexNibble(_ byte: UInt8) -> UInt8 {
+        byte <= 57 ? byte - 48 : byte - 87
+    }
+
+    private static func appendUInt32(_ value: UInt32, to data: inout Data) {
+        data.append(contentsOf: [UInt8((value >> 24) & 255), UInt8((value >> 16) & 255),
+                                 UInt8((value >> 8) & 255), UInt8(value & 255)])
+    }
+
+    private static func appendUInt64(_ value: UInt64, to data: inout Data) {
+        data.append(contentsOf: (0..<8).reversed().map { UInt8((value >> ($0 * 8)) & 255) })
+    }
+
     static func inspectLocalBatterySave(for identity: CanonicalGameIdentity, savesRoot: URL? = nil) throws -> VerifiedLocalBatterySave? {
         let manager = FileManager.default
         let root = savesRoot ?? manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]

@@ -7,13 +7,19 @@ final class PocketTests: XCTestCase {
         let identity = "classic:gba:sha256:\(digest)"
         let payload = """
         {"protocolVersion":1,"transferEnabled":false,"downloadEnabled":true,"activeProfileId":"primary","candidates":[
-          {"versionId":"2026-10-07T10-00-00-000Z-a1b2c3","gameId":"game-1","canonicalGameId":"\(identity)",
+          {"versionId":"2026-10-07T10-00-00-000Z-a1b2c3","revisionId":"native:v2:e16343ab79a51c63e2854fd7a239f6742186395baf4fe17a891473df751778c0","gameId":"game-1","canonicalGameId":"\(identity)",
            "profileId":"primary","createdAt":"2026-10-07T10:00:00Z",
            "files":[{"fileIndex":0,"name":"game.srm","size":6,"sha256":"\(digest)"}]}
         ]}
         """
         let response = try JSONDecoder().decode(NativeSaveCandidatesResponse.self, from: Data(payload.utf8))
         XCTAssertEqual(try response.validated(for: identity).count, 1)
+        XCTAssertEqual(try NativeSaveTransfer.revision(for: [NativeSaveFile(fileIndex: 0,
+            name: "\(digest).srm", size: 6, sha256: digest)]), response.candidates[0].revisionId)
+        let altered = payload.replacingOccurrences(of: "e16343ab79a51c63e2854fd7a239f6742186395baf4fe17a891473df751778c0",
+                                                    with: String(repeating: "0", count: 64))
+        let forged = try JSONDecoder().decode(NativeSaveCandidatesResponse.self, from: Data(altered.utf8))
+        XCTAssertThrowsError(try forged.validated(for: identity))
         XCTAssertThrowsError(try response.validated(for: "classic:gb:sha256:\(digest)"))
         let wrongProfile = NativeSaveCandidatesResponse(protocolVersion: 1, transferEnabled: false,
                                                         downloadEnabled: true, activeProfileId: "secondary",
