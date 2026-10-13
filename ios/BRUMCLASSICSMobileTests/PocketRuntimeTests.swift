@@ -2,6 +2,17 @@ import XCTest
 @testable import BRUMCLASSICSMobile
 
 final class PocketRuntimeTests: XCTestCase {
+    func testEndedSubsecondIntegratedSessionNeverAccumulatesTimeLater() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let game = PocketClassic(id: UUID(), title: "Test", filename: "test.gba")
+        let sessions = PocketPlaySessionFiles(root: root)
+        try await sessions.begin(game, integrated: true, now: Date(timeIntervalSince1970: 100))
+        let ended = try await sessions.finish(returnedAt: Date(timeIntervalSince1970: 100.5))
+        XCTAssertNil(ended)
+        let foreground = try await sessions.finish(returnedAt: Date(timeIntervalSince1970: 900))
+        XCTAssertNil(foreground)
+    }
     func testIntegratedTimeSurvivesConfiguredRetroArchLogsWithoutDuplicatingTheirDelta() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let logs = root.appendingPathComponent("logs")

@@ -50,7 +50,9 @@ actor PocketPlaySessionFiles {
         let session = try JSONDecoder().decode(PocketPlaySession.self, from: Data(contentsOf: file))
         if preserveIntegrated && session.integrated == true { return nil }
         guard let seconds = PocketSessionRules.elapsed(session, returnedAt: returnedAt) else {
-            if session.backgroundedAt != nil { try? FileManager.default.removeItem(at: file) }
+            // An explicitly ended native session shorter than one second must
+            // not survive and accumulate phantom time on the next foreground.
+            if session.integrated == true || session.backgroundedAt != nil { try FileManager.default.removeItem(at: file) }
             return nil
         }
         try FileManager.default.removeItem(at: file)
