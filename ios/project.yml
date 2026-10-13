@@ -39,6 +39,9 @@ targets:
     platform: iOS
     sources:
       - path: BRUMCLASSICSMobileTests
+        excludes: [Fixtures]
+      - path: build/test-fixtures/BrumTestCore.dylib
+        buildPhase: resources
     dependencies:
       - target: BRUMCLASSICSMobile
   BRUMCLASSICSMobileUITests:

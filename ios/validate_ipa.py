@@ -16,6 +16,8 @@ def validate_ipa(path, expected_version=None):
             entry = PurePosixPath(name)
             if entry.is_absolute() or ".." in entry.parts or "\\" in name:
                 raise ValueError("Unsafe ZIP path")
+            if entry.name == "BrumTestCore.dylib" or any(part.endswith(".xctest") for part in entry.parts):
+                raise ValueError("Simulator test fixtures must not be distributed in an IPA")
         infos = [n for n in names if n.startswith("Payload/") and n.count("/") == 2 and n.endswith(".app/Info.plist")]
         if len(infos) != 1:
             raise ValueError("Expected exactly one Payload application")

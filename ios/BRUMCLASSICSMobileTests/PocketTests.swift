@@ -340,28 +340,39 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(ROMTitleRules.clean("1636 - Pokemon Fire Red (U)(Squirrels).gba"), "Pokemon Fire Red")
         XCTAssertEqual(ROMTitleRules.clean("Pokemon_FireRed_Version.gba"), "Pokemon Fire Red")
     }
-    func testIntegratedCoreSupportsValidatedSystemsOnly() {
-        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Pokemon.gba", filename: "Pokemon.gba", title: "Pokemon", fileSize: 1)))
-        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Tetris.gb", filename: "Tetris.gb", title: "Tetris", fileSize: 1)))
-        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Zelda.gbc", filename: "Zelda.gbc", title: "Zelda", fileSize: 1)))
-        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Metal Slug.neo", filename: "Metal Slug.neo", title: "Metal Slug", fileSize: 1)))
-        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Sonic.sms", filename: "Sonic.sms", title: "Sonic", fileSize: 1)))
-        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Sonic.gg", filename: "Sonic.gg", title: "Sonic", fileSize: 1)))
-        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Mario.nes", filename: "Mario.nes", title: "Mario", fileSize: 1)))
-        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Bonk.pce", filename: "Bonk.pce", title: "Bonk", fileSize: 1)))
-        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Mario.sfc", filename: "Mario.sfc", title: "Mario", fileSize: 1)))
-        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "N64/Mario.z64", filename: "Mario.z64", title: "Mario", fileSize: 1)))
-        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "MegaDrive/Sonic.md", filename: "Sonic.md", title: "Sonic", fileSize: 1)))
-        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "32X/Knuckles.32x", filename: "Knuckles.32x", title: "Knuckles", fileSize: 1)))
-        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "PS1/Ridge Racer.cue", filename: "Ridge Racer.cue", title: "Ridge Racer", fileSize: 1)))
-        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "Saturn/Nights.chd", filename: "Nights.chd", title: "Nights", fileSize: 1)))
-        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "Arcade/mslug.zip", filename: "mslug.zip", title: "Metal Slug", fileSize: 1)))
-        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "Atari/Pitfall.a26", filename: "Pitfall.a26", title: "Pitfall", fileSize: 1)))
-        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "PSP/Game.cso", filename: "Game.cso", title: "Game", fileSize: 1)))
-        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "Dreamcast/Sonic.gdi", filename: "Sonic.gdi", title: "Sonic", fileSize: 1)))
-        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "3DS/Mario.3ds", filename: "Mario.3ds", title: "Mario", fileSize: 1)))
-        XCTAssertFalse(IntegratedEmulatorSupport.supports(.init(relativePath: "GameCube/Melee.rvz", filename: "Melee.rvz", title: "Melee", fileSize: 1)))
-        XCTAssertEqual(IntegratedEmulatorSupport.routeLabel(.init(relativePath: "Pokemon.gba", filename: "Pokemon.gba", title: "Pokemon", fileSize: 1)), "JOGAR · BRUM CORE")
+    func testIntegratedCoreRoutesOnlyInstalledNonExperimentalLibraries() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        // These bytes test installation/routing, not native library validity.
+        for core in CoreRegistry.all { try Data([1]).write(to: directory.appendingPathComponent(core.libraryName)) }
+        for path in ["Pokemon.gba", "Tetris.gb", "Zelda.gbc", "Metal Slug.neo", "Sonic.sms", "Sonic.gg", "Mario.nes", "Bonk.pce", "Mario.sfc"] {
+            let rom = ROMFolderGame(relativePath: path, filename: (path as NSString).lastPathComponent, title: "test", fileSize: 1)
+            XCTAssertTrue(IntegratedEmulatorSupport.supports(rom, includeExperimental: false, frameworksDirectory: directory), path)
+        }
+        for path in ["N64/Mario.z64", "MegaDrive/Sonic.md", "32X/Knuckles.32x", "PS1/Ridge Racer.cue", "Saturn/Nights.chd", "Arcade/mslug.zip", "Atari/Pitfall.a26", "PSP/Game.cso", "Dreamcast/Sonic.gdi", "3DS/Mario.3ds", "GameCube/Melee.rvz"] {
+            let rom = ROMFolderGame(relativePath: path, filename: (path as NSString).lastPathComponent, title: "test", fileSize: 1)
+            XCTAssertFalse(IntegratedEmulatorSupport.supports(rom, includeExperimental: false, frameworksDirectory: directory), path)
+        }
+        let gba = ROMFolderGame(relativePath: "Pokemon.gba", filename: "Pokemon.gba", title: "Pokemon", fileSize: 1)
+        XCTAssertEqual(IntegratedEmulatorSupport.routeLabel(gba, includeExperimental: false, frameworksDirectory: directory), "JOGAR · BRUM CORE")
+        try FileManager.default.removeItem(at: directory.appendingPathComponent(CoreRegistry.mgba.libraryName))
+        XCTAssertFalse(IntegratedEmulatorSupport.supports(gba, includeExperimental: false, frameworksDirectory: directory))
+        XCTAssertEqual(CoreRegistry.installation(for: .gameBoyAdvance, frameworksDirectory: directory).state, .missingLibrary)
+    }
+
+    func testCoreInstallationRejectsEmptyFilesDirectoriesAndDisabledCandidates() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let library = directory.appendingPathComponent(CoreRegistry.azahar.libraryName)
+        try Data().write(to: library)
+        XCTAssertEqual(CoreRegistry.installation(for: .nintendo3DS, includeExperimental: true, frameworksDirectory: directory).state, .invalidLibrary)
+        try FileManager.default.removeItem(at: library)
+        try FileManager.default.createDirectory(at: library, withIntermediateDirectories: false)
+        XCTAssertEqual(CoreRegistry.installation(for: .nintendo3DS, includeExperimental: true, frameworksDirectory: directory).state, .invalidLibrary)
+        XCTAssertEqual(CoreRegistry.installation(for: .nintendo3DS, includeExperimental: false, frameworksDirectory: directory).state, .experimentalDisabled)
+        XCTAssertEqual(CoreRegistry.installation(for: .playStation2, includeExperimental: true, frameworksDirectory: directory).state, .unavailable)
     }
     func testAmbiguousDiscRoutingRequiresFolderAndMatchingFormat() {
         func system(_ path: String) -> EmulatedSystemID? {

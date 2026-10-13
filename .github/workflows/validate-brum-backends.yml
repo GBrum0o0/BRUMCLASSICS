@@ -221,7 +221,7 @@ jobs:
         working-directory: ios
         run: |
           brew install xcodegen
-          xcodegen generate
+          ./generate-project.sh
       - name: Test iOS host
         working-directory: ios
         shell: bash

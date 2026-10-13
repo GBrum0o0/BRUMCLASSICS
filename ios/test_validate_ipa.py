@@ -8,6 +8,16 @@ from pathlib import Path
 from validate_ipa import validate_ipa
 
 class PackageValidationTests(unittest.TestCase):
+    def test_rejects_simulator_test_payload(self):
+        for name in ("Payload/BRUMCLASSICSMobile.app/Frameworks/BrumTestCore.dylib",
+                     "Payload/BRUMCLASSICSMobile.app/PlugIns/Tests.xctest/Info.plist"):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                path = self.fixture(folder)
+                with zipfile.ZipFile(path, "a") as archive:
+                    archive.writestr(name, "simulator fixture")
+                with self.assertRaisesRegex(ValueError, "Simulator test fixtures"):
+                    validate_ipa(path)
+
     def fixture(self, folder, *, executable="BRUMCLASSICSMobile", include_binary=True,
                 app="BRUMCLASSICSMobile", cpu=0x0100000C, executable_mode=True, include_core=True,
                 include_skyemu=True, include_geolith=True, include_gearsystem=True,

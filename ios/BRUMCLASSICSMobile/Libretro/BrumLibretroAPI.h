@@ -41,6 +41,8 @@
 #define BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS 53
 #define BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS_INTL 54
 #define BRUM_RETRO_ENVIRONMENT_GET_PREFERRED_HW_RENDER 56
+#define BRUM_RETRO_ENVIRONMENT_GET_MESSAGE_INTERFACE_VERSION 59
+#define BRUM_RETRO_ENVIRONMENT_SET_MESSAGE_EXT 60
 #define BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2 67
 #define BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2_INTL 68
 
@@ -156,6 +158,17 @@ typedef struct {
     const char *msg;
     unsigned frames;
 } brum_retro_message;
+
+// ABI from libretro.h: enum fields use the native C int representation.
+typedef struct {
+    const char *msg;
+    unsigned duration;
+    unsigned priority;
+    int level;
+    int target;
+    int type;
+    int8_t progress;
+} brum_retro_message_ext;
 
 typedef void (*brum_retro_log_printf_t)(int level, const char *format, ...);
 typedef struct { brum_retro_log_printf_t log; } brum_retro_log_callback;

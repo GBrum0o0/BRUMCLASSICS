@@ -1,12 +1,17 @@
 import SwiftUI
 
 enum IntegratedEmulatorSupport {
-    static func supports(_ rom: ROMFolderGame) -> Bool {
-        core(for: rom) != nil
+    static func supports(_ rom: ROMFolderGame, includeExperimental: Bool = CoreRegistry.experimentalBuild, frameworksDirectory: URL? = nil) -> Bool {
+        core(for: rom, includeExperimental: includeExperimental, frameworksDirectory: frameworksDirectory) != nil
     }
 
-    static func core(for rom: ROMFolderGame, includeExperimental: Bool = CoreRegistry.experimentalBuild) -> CoreDescriptor? {
-        system(for: rom).flatMap { CoreRegistry.installedCore(for: $0, includeExperimental: includeExperimental) }
+    static func core(for rom: ROMFolderGame, includeExperimental: Bool = CoreRegistry.experimentalBuild, frameworksDirectory: URL? = nil) -> CoreDescriptor? {
+        system(for: rom).flatMap { CoreRegistry.installedCore(for: $0, includeExperimental: includeExperimental, frameworksDirectory: frameworksDirectory) }
+    }
+
+    static func availabilityReason(for rom: ROMFolderGame) -> String {
+        guard let system = system(for: rom) else { return "O formato deste arquivo não identifica um sistema integrado. Para discos e arquivos de arcade, organize a ROM na pasta do console correspondente." }
+        return CoreRegistry.installation(for: system).reason
     }
 
     static func system(for rom: ROMFolderGame) -> EmulatedSystemID? {
@@ -54,8 +59,10 @@ enum IntegratedEmulatorSupport {
         return nil
     }
 
-    static func routeLabel(_ rom: ROMFolderGame) -> String {
-        guard let core = core(for: rom) else { return "JOGAR · RETROARCH" }
+    static func routeLabel(_ rom: ROMFolderGame, includeExperimental: Bool = CoreRegistry.experimentalBuild, frameworksDirectory: URL? = nil) -> String {
+        guard let core = core(for: rom, includeExperimental: includeExperimental, frameworksDirectory: frameworksDirectory) else {
+            return system(for: rom) == .nintendo3DS ? "INDISPONÍVEL · BRUM CORE" : "JOGAR · RETROARCH"
+        }
         return CoreRegistry.experimental.contains(core) ? "TESTAR · BRUM CORE" : "JOGAR · BRUM CORE"
     }
 }
@@ -70,6 +77,7 @@ struct IntegratedEmulatorView: View {
     @State private var failure = ""
     @State private var finishing = false
     @State private var choosingROMFolder = false
+    @State private var startingSession: Task<Void, Never>?
 
     init(rom: ROMFolderGame, returnsToPortrait: Bool = true) {
         self.rom = rom
@@ -80,7 +88,7 @@ struct IntegratedEmulatorView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             if let launch {
-                BrumLibretroController(launch: launch, onExit: finish)
+                BrumLibretroController(launch: launch, onReady: beginPlay, onExit: finish)
                     .ignoresSafeArea()
             } else if !failure.isEmpty {
                 VStack(spacing: 18) {
@@ -128,14 +136,23 @@ struct IntegratedEmulatorView: View {
         guard !finishing else { return }
         finishing = true
         Task {
-            await pocket.finishIntegratedPlay(launcher: launcher)
+            if let startingSession {
+                await startingSession.value
+                await pocket.finishIntegratedPlay(launcher: launcher)
+            }
             dismiss()
         }
+    }
+
+    private func beginPlay() {
+        guard !finishing, startingSession == nil else { return }
+        startingSession = Task { await pocket.beginIntegratedPlay(rom, launcher: launcher) }
     }
 }
 
 private struct BrumLibretroController: UIViewControllerRepresentable {
     let launch: EmulationLaunchDescriptor
+    let onReady: () -> Void
     let onExit: () -> Void
 
     func makeUIViewController(context: Context) -> UIViewController {
@@ -152,6 +169,7 @@ private struct BrumLibretroController: UIViewControllerRepresentable {
             retroAchievementsGameID: launch.retroAchievementsGameID,
             saveIdentifier: launch.saveIdentifier,
             legacySaveBasename: launch.legacySaveBasename,
+            onReady: onReady,
             onExit: onExit
         )
     }

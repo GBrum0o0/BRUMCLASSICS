@@ -291,10 +291,11 @@ private struct GamingROMDetailView: View {
     }
 
     private var routeDescription: String {
-        if let installedCore { return "\(installedCore.displayName) está incluído nesta instalação. A ROM será aberta pelo BRUM Core, sem importar para o RetroArch." }
-        if system == .nintendo3DS { return "O arquivo 3DS foi reconhecido, mas o Azahar não está incluído nesta instalação. A importação para o RetroArch não ativaria o BRUM Core." }
-        if canUseRetroArch { return "O BRUM Core ainda não tem um backend instalado para este jogo. A opção abaixo usa explicitamente o RetroArch e não conta como suporte integrado." }
-        return "Este formato foi reconhecido, mas não há um backend de execução disponível nesta instalação. O arquivo original foi preservado."
+        let reason = IntegratedEmulatorSupport.availabilityReason(for: rom)
+        if installedCore != nil { return reason }
+        if system == .nintendo3DS { return "\(reason) A importação para o RetroArch não ativaria o BRUM Core." }
+        if canUseRetroArch { return "\(reason) A opção abaixo usa explicitamente o RetroArch e não conta como suporte integrado." }
+        return "\(reason) O arquivo original foi preservado."
     }
 }
 

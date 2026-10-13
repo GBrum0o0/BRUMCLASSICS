@@ -4,6 +4,7 @@
 #include "VirtualControlProfile.hpp"
 #include "VirtualControlInput.hpp"
 #include "FrameCadence.hpp"
+#include "ContentValidation.hpp"
 #include "../../ios/BRUMCLASSICSMobile/Libretro/BrumScreenProfiles.hpp"
 #include <cstdlib>
 #include <iostream>
@@ -215,5 +216,21 @@ int main() {
     check(cadence.framesDue(1001) == 12); // Stale catch-up is bounded to 100 ms.
     cadence.setRate(std::numeric_limits<double>::quiet_NaN());
     check(cadence.rate() == 60);
+    check(acceptsContentExtension("3ds|cci|3dsx", ".3DS"));
+    check(acceptsContentExtension("zip|7z|chd", "zip"));
+    check(acceptsContentExtension(" iso | GCM |rvz", "gcm"));
+    check(!acceptsContentExtension("cci|3dsx", "3ds"));
+    check(!acceptsContentExtension("zip|7z", "z"));
+    check(!acceptsContentExtension("zip|7z", "zipx"));
+    check(!acceptsContentExtension("", "3ds"));
+    check(!acceptsContentExtension("zip|7z", ""));
+    check(!acceptsContentExtension("zip|7z", "."));
+    check(!acceptsContentExtension("zip|7z", "|"));
+    check(validAVTiming(75, 44100));
+    check(validAVTiming(360, 48000));
+    check(!validAVTiming(0, 48000));
+    check(!validAVTiming(60, 0));
+    check(!validAVTiming(std::numeric_limits<double>::infinity(), 48000));
+    check(!validAVTiming(60, std::numeric_limits<double>::quiet_NaN()));
     std::cout << "BRUM screen/input: " << checks << " checks passed\n";
 }

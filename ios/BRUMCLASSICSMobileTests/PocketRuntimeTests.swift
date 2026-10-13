@@ -2,6 +2,31 @@ import XCTest
 @testable import BRUMCLASSICSMobile
 
 final class PocketRuntimeTests: XCTestCase {
+    func testIntegratedTimeSurvivesConfiguredRetroArchLogsWithoutDuplicatingTheirDelta() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let logs = root.appendingPathComponent("logs")
+        try FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let log = logs.appendingPathComponent("test.lrtl")
+        try Data(#"{"runtime":"0:00:30"}"#.utf8).write(to: log)
+        let game = PocketClassic(id: UUID(), title: "Test", filename: "test.gba")
+        let runtime = PocketRuntimeFiles(root: root.appendingPathComponent("ledger"))
+        try await runtime.configure(logs)
+        try await runtime.prepare(game, allGames: [game])
+        let fallback = try await runtime.creditEstimated(game.id, filename: game.filename, seconds: 125)
+        XCTAssertFalse(fallback)
+        let native = try await runtime.creditIntegrated(game.id, filename: game.filename, seconds: 125)
+        XCTAssertTrue(native)
+        _ = try await runtime.collect()
+        var records = try await runtime.load()
+        XCTAssertEqual(records.first?.creditedSeconds, 125)
+        try Data(#"{"runtime":"0:00:40"}"#.utf8).write(to: log)
+        _ = try await runtime.collect()
+        _ = try await runtime.collect()
+        records = try await runtime.load()
+        XCTAssertEqual(records.first?.creditedSeconds, 135)
+        XCTAssertEqual(records.first?.lastObservedSeconds, 40)
+    }
     func testReceiptWithoutGameIDRemainsCompatibleWithOlderLauncher() throws {
         let receipt = try JSONDecoder().decode(PocketTimeReceipt.self, from: Data(#"{"ok":true,"acceptedSeconds":90}"#.utf8))
         XCTAssertTrue(receipt.ok)
@@ -30,6 +55,9 @@ final class PocketRuntimeTests: XCTestCase {
         let game = PocketClassic(id: UUID(), title: "Test", filename: "test.gba")
         let sessions = PocketPlaySessionFiles(root: root)
         try await sessions.begin(game, integrated: true, now: Date(timeIntervalSince1970: 100))
+        try await sessions.markBackgrounded(now: Date(timeIntervalSince1970: 150))
+        let foregroundReturn = try await sessions.finish(returnedAt: Date(timeIntervalSince1970: 180), preserveIntegrated: true)
+        XCTAssertNil(foregroundReturn)
         let finished = try await sessions.finish(returnedAt: Date(timeIntervalSince1970: 225))
         XCTAssertEqual(finished?.seconds, 125)
     }

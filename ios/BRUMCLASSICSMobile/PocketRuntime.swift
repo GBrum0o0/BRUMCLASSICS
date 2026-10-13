@@ -45,9 +45,10 @@ actor PocketPlaySessionFiles {
         }
     }
 
-    func finish(returnedAt: Date = Date()) throws -> (session: PocketPlaySession, seconds: Int)? {
+    func finish(returnedAt: Date = Date(), preserveIntegrated: Bool = false) throws -> (session: PocketPlaySession, seconds: Int)? {
         guard FileManager.default.fileExists(atPath: file.path) else { return nil }
         let session = try JSONDecoder().decode(PocketPlaySession.self, from: Data(contentsOf: file))
+        if preserveIntegrated && session.integrated == true { return nil }
         guard let seconds = PocketSessionRules.elapsed(session, returnedAt: returnedAt) else {
             if session.backgroundedAt != nil { try? FileManager.default.removeItem(at: file) }
             return nil
@@ -178,7 +179,16 @@ actor PocketRuntimeFiles {
     }
     func creditEstimated(_ id: UUID, filename: String, seconds: Int) throws -> Bool {
         _ = try load()
-        guard state.bookmark == nil, seconds > 0, seconds <= PocketSessionRules.maximumDuration else { return false }
+        guard state.bookmark == nil else { return false }
+        return try creditSession(id, filename: filename, seconds: seconds)
+    }
+    func creditIntegrated(_ id: UUID, filename: String, seconds: Int) throws -> Bool {
+        // The RetroArch log folder cannot measure a session running in this app.
+        _ = try load()
+        return try creditSession(id, filename: filename, seconds: seconds)
+    }
+    private func creditSession(_ id: UUID, filename: String, seconds: Int) throws -> Bool {
+        guard seconds > 0, seconds <= PocketSessionRules.maximumDuration else { return false }
         var next = state
         if let index = next.records.firstIndex(where: { $0.id == id }) {
             guard next.records[index].filename.caseInsensitiveCompare(filename) == .orderedSame else {

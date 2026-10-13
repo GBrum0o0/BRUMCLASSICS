@@ -87,6 +87,25 @@ struct CoreDescriptor: Codable, Equatable, Sendable {
     let supportedSystems: Set<EmulatedSystemID>
 }
 
+struct CoreInstallation: Equatable, Sendable {
+    enum State: String, Sendable { case availableForAttempt, missingLibrary, invalidLibrary, experimentalDisabled, unavailable }
+    let state: State
+    let descriptor: CoreDescriptor?
+
+    var canAttempt: Bool { state == .availableForAttempt }
+    var reason: String {
+        let name = descriptor?.displayName ?? "Este sistema"
+        switch state {
+        case .availableForAttempt:
+            return "\(name) está incluído. O BRUM Core verificará o formato e a inicialização ao abrir o jogo."
+        case .missingLibrary: return "O núcleo \(name) não está incluído nesta instalação."
+        case .invalidLibrary: return "A biblioteca de \(name) está vazia ou não é um arquivo regular nesta instalação."
+        case .experimentalDisabled: return "\(name) está disponível apenas no pacote de teste do BRUM Core."
+        case .unavailable: return "Ainda não há um núcleo integrado disponível para este sistema."
+        }
+    }
+}
+
 enum CoreRegistry {
     static let mgba = CoreDescriptor(
         id: "mgba",
@@ -260,13 +279,29 @@ enum CoreRegistry {
         (all + (includeExperimental ? experimental : [])).first { $0.supportedSystems.contains(system) }
     }
 
-    static func installedCore(for system: EmulatedSystemID, includeExperimental: Bool = experimentalBuild) -> CoreDescriptor? {
-        guard let descriptor = core(for: system, includeExperimental: includeExperimental) else { return nil }
-        guard experimental.contains(descriptor) else { return descriptor }
+    static func installation(for system: EmulatedSystemID, includeExperimental: Bool = experimentalBuild, frameworksDirectory: URL? = nil) -> CoreInstallation {
+        guard let descriptor = core(for: system, includeExperimental: includeExperimental) else {
+            let disabled = experimental.first { $0.supportedSystems.contains(system) }
+            return CoreInstallation(state: disabled == nil ? .unavailable : .experimentalDisabled, descriptor: disabled)
+        }
         let frameworks = Bundle.main.privateFrameworksPath
             ?? (Bundle.main.bundlePath as NSString).appendingPathComponent("Frameworks")
-        let library = (frameworks as NSString).appendingPathComponent(descriptor.libraryName)
-        return FileManager.default.fileExists(atPath: library) ? descriptor : nil
+        let library = (frameworksDirectory ?? URL(fileURLWithPath: frameworks, isDirectory: true)).appendingPathComponent(descriptor.libraryName)
+        guard FileManager.default.fileExists(atPath: library.path) else {
+            return CoreInstallation(state: .missingLibrary, descriptor: descriptor)
+        }
+        let values = try? library.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+        guard values?.isRegularFile == true, values?.isSymbolicLink != true, (values?.fileSize ?? 0) > 0 else {
+            return CoreInstallation(state: .invalidLibrary, descriptor: descriptor)
+        }
+        // Library presence allows a launch attempt. dlopen/API checks and game
+        // compatibility are performed by the native session, never inferred here.
+        return CoreInstallation(state: .availableForAttempt, descriptor: descriptor)
+    }
+
+    static func installedCore(for system: EmulatedSystemID, includeExperimental: Bool = experimentalBuild, frameworksDirectory: URL? = nil) -> CoreDescriptor? {
+        let result = installation(for: system, includeExperimental: includeExperimental, frameworksDirectory: frameworksDirectory)
+        return result.canAttempt ? result.descriptor : nil
     }
 }
 
@@ -377,9 +412,8 @@ enum EmulationLaunchBuilder {
     static func prepare(romURL: URL, title: String, originalFilename: String, expectedSystem: EmulatedSystemID? = nil, retroAchievementsGameID: Int = 0) throws -> EmulationLaunchDescriptor {
         let identity = try ROMContentInspector.inspect(url: romURL, filename: originalFilename, expectedSystem: expectedSystem)
         try NativeSaveTransfer.recoverPendingInstall(for: identity)
-        guard let core = CoreRegistry.core(for: identity.systemID) else {
-            throw PocketError.message("Nenhum núcleo compatível está instalado para este sistema.")
-        }
+        let installation = CoreRegistry.installation(for: identity.systemID)
+        guard installation.canAttempt, let core = installation.descriptor else { throw PocketError.message(installation.reason) }
         return EmulationLaunchDescriptor(
             romURL: romURL,
             title: title,

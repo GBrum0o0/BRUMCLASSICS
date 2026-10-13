@@ -121,6 +121,7 @@ actor PocketRAClient {
     @Published var pendingROMShare: ROMShareTicket?
     private let runtime = PocketRuntimeFiles()
     private let playSessions = PocketPlaySessionFiles()
+    private var integratedSessionActive = false
     private let retroArchFiles = RetroArchLibraryFiles()
     private let romFolder = ROMFolderAccess()
     private var timeBusy = false
@@ -264,7 +265,7 @@ actor PocketRAClient {
     }
     func prepareIntegratedROM(_ rom: ROMFolderGame, launcher: AppStore) async throws -> EmulationLaunchDescriptor {
         guard IntegratedEmulatorSupport.supports(rom) else {
-            throw PocketError.message("Este sistema ainda não possui um núcleo integrado. Use o RetroArch enquanto ampliamos o BRUM Core.")
+            throw PocketError.message(IntegratedEmulatorSupport.availabilityReason(for: rom))
         }
         guard var record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }) else {
             throw PocketError.message("Atualize a pasta de ROMs novamente antes de jogar.")
@@ -275,10 +276,6 @@ actor PocketRAClient {
             await update(record)
         }
         let staged = try await romFolder.stageForIntegratedPlay(rom)
-        do { try await runtime.prepare(record, allGames: games) }
-        catch { runtimeStatus = "A sessão será aberta, mas o contador preciso não pôde ser preparado: \(error.localizedDescription)" }
-        try await playSessions.begin(record, integrated: true)
-        await recordLaunch(record, launcher: launcher)
         return try await Task.detached(priority: .userInitiated) {
             try EmulationLaunchBuilder.prepare(
                 romURL: staged,
@@ -289,7 +286,18 @@ actor PocketRAClient {
             )
         }.value
     }
+    func beginIntegratedPlay(_ rom: ROMFolderGame, launcher: AppStore) async {
+        guard let record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }) else { return }
+        integratedSessionActive = true
+        do { try await runtime.prepare(record, allGames: games) }
+        catch { runtimeStatus = "O jogo iniciou, mas o contador preciso não pôde ser preparado: \(error.localizedDescription)" }
+        do {
+            try await playSessions.begin(record, integrated: true)
+            await recordLaunch(record, launcher: launcher)
+        } catch { runtimeStatus = "O jogo iniciou, mas o registro da sessão falhou: \(error.localizedDescription)" }
+    }
     func finishIntegratedPlay(launcher: AppStore) async {
+        integratedSessionActive = false
         await finishPlaySession(launcher: launcher)
     }
     func sendNativeSaveToPC(_ rom: ROMFolderGame, launcher: AppStore) async throws -> String {
@@ -495,14 +503,19 @@ actor PocketRAClient {
     }
     func finishPlaySession(launcher: AppStore) async {
         do {
-            guard let finished = try await playSessions.finish() else { return }
+            guard let finished = try await playSessions.finish(preserveIntegrated: integratedSessionActive) else { return }
+            let integrated = finished.session.integrated == true
             let exactLogsConfigured = try await runtime.configured()
-            if !exactLogsConfigured {
+            if integrated {
+                _ = try await runtime.creditIntegrated(finished.session.gameID, filename: finished.session.filename, seconds: finished.seconds)
+            } else if !exactLogsConfigured {
                 _ = try await runtime.creditEstimated(finished.session.gameID, filename: finished.session.filename, seconds: finished.seconds)
             }
             await reloadRuntime()
             await syncHours(launcher: launcher)
-            if !exactLogsConfigured {
+            if integrated {
+                runtimeStatus = "Sessão BRUM Core registrada: \(finished.seconds / 60)min \(finished.seconds % 60)s."
+            } else if !exactLogsConfigured {
                 runtimeStatus = "Sessão automática registrada: \(finished.seconds / 60)min \(finished.seconds % 60)s. Autorize os logs do RetroArch para usar o tempo exato do emulador."
             }
         } catch {

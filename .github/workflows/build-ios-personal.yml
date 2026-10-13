@@ -48,7 +48,7 @@ jobs:
 
       - name: Gerar projeto
         working-directory: ios
-        run: xcodegen generate
+        run: ./generate-project.sh
 
       - name: Testar modelos e navegacao no simulador iPhone
         working-directory: ios
@@ -364,7 +364,7 @@ jobs:
           bash build-arcade-experimental.sh "$APP"
           /usr/libexec/PlistBuddy -c 'Add :BRUMExperimentalBackends bool true' "$APP/Info.plist"
           /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName BRUM Core Teste' "$APP/Info.plist"
-          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 47' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 48' "$APP/Info.plist"
 
       - name: Empacotar IPA pessoal
         working-directory: ios

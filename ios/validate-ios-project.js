@@ -21,6 +21,10 @@ const required = [
   'BRUMCLASSICSMobile/Libretro/BrumLibretroAPI.h',
   'BRUMCLASSICSMobile/Libretro/BrumLibretroEngine.h',
   'BRUMCLASSICSMobile/Libretro/BrumLibretroEngine.mm',
+  'BRUMCLASSICSMobile/Libretro/BrumCoreDiagnostics.h',
+  'BRUMCLASSICSMobile/Libretro/BrumCoreDiagnostics.m',
+  'BRUMCLASSICSMobileTests/BrumCoreStartupTests.swift',
+  'BRUMCLASSICSMobileTests/Fixtures/BrumTestCore.c',
   'BRUMCLASSICSMobile/BRUMCLASSICSMobile-Bridging-Header.h',
   'BRUMCLASSICSMobile/MomentsView.swift', 'BRUMCLASSICSMobileTests/SnapshotTests.swift',
   'ios-update.json'
