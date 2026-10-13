@@ -13,6 +13,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)markRunning;
 - (void)markStopped;
 - (void)setMetrics:(NSDictionary<NSString *, NSNumber *> *)metrics;
+- (void)checkpoint;
 @property(nonatomic, readonly) NSDictionary<NSString *, id> *snapshot;
 @property(nonatomic, readonly) NSString *reportText;
 @property(nonatomic, readonly) NSString *failureDetail;

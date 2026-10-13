@@ -46,6 +46,23 @@ final class BrumCoreStartupTests: XCTestCase {
         XCTAssertEqual(marker["stage"] as? String, "first_frame")
     }
 
+    func testAudioFailureCheckpointPersistsEvidenceWithoutStoppingVideoSession() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("session.json")
+        let diagnostics = BrumCoreDiagnostics(context: [:], report: url, redactedPaths: [])
+        diagnostics.markRunning()
+        diagnostics.setMetrics(["audioQueueActive": false, "audioSamplesProduced": 8])
+        diagnostics.recordMessage("Host de áudio: queue restart failed", level: 3)
+        diagnostics.checkpoint()
+        let data = try Data(contentsOf: url)
+        let persisted = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(persisted["outcome"] as? String, "running")
+        XCTAssertEqual(persisted["lastCoreError"] as? String, "Host de áudio: queue restart failed")
+        let metrics = try XCTUnwrap(persisted["metrics"] as? [String: Any])
+        XCTAssertEqual(metrics["audioQueueActive"] as? Bool, false)
+    }
+
     @MainActor
     private func withProbe(mode: UInt8, filenameExtension: String = "brumtest", body: (BrumLibretroViewController, () -> Int, () -> Int) throws -> Void) throws {
         let rom = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension(filenameExtension)

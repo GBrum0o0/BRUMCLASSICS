@@ -311,6 +311,30 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(result.games.map(\.filename), ["Pokemon.gba"])
         XCTAssertEqual(result.duplicateFilenames, 2)
     }
+    func testScannerFindsEveryExistingArcade3DSAndGameCubeRouteFormat() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cases: [(String, EmulatedSystemID)] = [
+            ("Arcade/arcade.7z", .arcade),
+            ("3DS/homebrew.z3dsx", .nintendo3DS), ("3DS/cart.zcci", .nintendo3DS),
+            ("3DS/title.zcxi", .nintendo3DS), ("3DS/homebrew.elf", .nintendo3DS),
+            ("3DS/homebrew.axf", .nintendo3DS), ("3DS/title.app", .nintendo3DS),
+            ("GameCube/cart.gcm", .gameCube), ("GameCube/disc.ciso", .gameCube)
+        ]
+        for (path, _) in cases {
+            let file = root.appendingPathComponent(path)
+            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data([1]).write(to: file)
+        }
+        let scanned = try ROMFolderScanner.scan(root)
+        XCTAssertEqual(scanned.games.count, cases.count)
+        for (path, expected) in cases {
+            let rom = try XCTUnwrap(scanned.games.first { $0.relativePath == path })
+            XCTAssertEqual(IntegratedEmulatorSupport.system(for: rom), expected, path)
+        }
+        let outsideFolder = ROMFolderGame(relativePath: "homebrew.elf", filename: "homebrew.elf", title: "test", fileSize: 1)
+        XCTAssertNil(IntegratedEmulatorSupport.system(for: outsideFolder))
+    }
     func testRetroArchShareStagesReadablePrivateCopyAndPreservesOriginal() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let sourceRoot = root.appendingPathComponent("source", isDirectory: true)

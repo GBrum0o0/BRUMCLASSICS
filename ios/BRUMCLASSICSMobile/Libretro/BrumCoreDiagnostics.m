@@ -109,6 +109,10 @@
     @synchronized (self) { _metrics = [metrics copy]; }
 }
 
+- (void)checkpoint {
+    @synchronized (self) { [self persist]; }
+}
+
 - (NSDictionary<NSString *,id> *)snapshot {
     @synchronized (self) {
         NSMutableDictionary *report = [NSMutableDictionary dictionaryWithDictionary:@{

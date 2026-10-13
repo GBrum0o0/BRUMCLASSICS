@@ -9,6 +9,9 @@ de jogos, desempenho de 3DS/GameCube ou ausência de crashes nativos.
 - O registro verifica arquivos regulares não vazios para todos os núcleos,
   incluindo os sistemas da lista ativa. A presença autoriza uma tentativa de
   abertura; não é apresentada como execução comprovada.
+- A busca de ROMs agora inclui também formatos que já possuíam rota mas eram
+  omitidos pelo scanner: Arcade `.7z`, GameCube `.gcm`/`.ciso` e formatos
+  adicionais de 3DS. ELF/APP/AXF continuam exigindo a pasta 3DS correspondente.
 - O host distingue biblioteca ausente de biblioteca que o iOS recusou carregar.
   O erro de `dlopen`, a API e símbolos ausentes são preservados no diagnóstico.
 - O formato é confrontado com `retro_get_system_info().valid_extensions` do
@@ -20,6 +23,9 @@ de jogos, desempenho de 3DS/GameCube ou ausência de crashes nativos.
   núcleos de CPU disponíveis, memória física e contadores de frames/áudio.
   Amostras ausentes incluem o preenchimento inicial dos buffers; esse contador,
   isoladamente, não prova defeito de áudio ou indica uma otimização a aplicar.
+- Erros do host ao reativar áudio ou recriar a saída são preservados por um
+  checkpoint local, mesmo se a notificação visual desaparecer. Registrar esse
+  erro não transforma a sessão de vídeo em uma falha de carregamento.
 - A inicialização escreve marcadores antes de operações nativas. Uma tentativa
   anterior sem término conserva sua última fase, sem atribuir automaticamente
   a causa a crash, pressão de memória ou encerramento pelo usuário.

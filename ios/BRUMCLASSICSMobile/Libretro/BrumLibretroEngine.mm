@@ -374,6 +374,7 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
 - (void)captureDiagnosticsMetrics;
 - (void)showStartupFailure;
 - (void)shareDiagnostics;
+- (void)reportAudioFailure:(NSString *)message;
 - (BrumVirtualStick *)analogPad;
 - (BrumVirtualDPad *)directionPad;
 - (void)dpadChanged:(BrumVirtualDPad *)pad;
@@ -1073,6 +1074,13 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     return _diagnostics.reportText;
 }
 
+- (void)reportAudioFailure:(NSString *)message {
+    [_diagnostics recordMessage:[@"Host de áudio: " stringByAppendingString:message] level:3];
+    [self captureDiagnosticsMetrics];
+    [_diagnostics checkpoint];
+    [self showStateStatus:message error:YES];
+}
+
 - (void)shareDiagnostics {
     if (self.presentedViewController) return;
     const BOOL wasPaused = _explicitlyPaused;
@@ -1171,11 +1179,11 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     if (!_audioQueue) return;
     NSError *error = nil;
     if (![AVAudioSession.sharedInstance setActive:YES error:&error]) {
-        [self showStateStatus:[NSString stringWithFormat:@"ÁUDIO INDISPONÍVEL: %@", error.localizedDescription] error:YES];
+        [self reportAudioFailure:[NSString stringWithFormat:@"ÁUDIO INDISPONÍVEL: %@", error.localizedDescription]];
         return;
     }
     OSStatus status = AudioQueueStart(_audioQueue, NULL);
-    if (status != noErr) [self showStateStatus:[NSString stringWithFormat:@"ÁUDIO INDISPONÍVEL (%d)", (int)status] error:YES];
+    if (status != noErr) [self reportAudioFailure:[NSString stringWithFormat:@"ÁUDIO INDISPONÍVEL (%d)", (int)status]];
 }
 
 - (void)audioSessionInterrupted:(NSNotification *)notification {
@@ -2094,7 +2102,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     os_unfair_lock_unlock(&_audioLock);
     NSError *error = nil;
     if (![self startAudio:info.timing.sample_rate error:&error]) {
-        [self showStateStatus:[NSString stringWithFormat:@"ÁUDIO INDISPONÍVEL: %@", error.localizedDescription ?: @"falha ao mudar a taxa"] error:YES];
+        [self reportAudioFailure:[NSString stringWithFormat:@"ÁUDIO INDISPONÍVEL: %@", error.localizedDescription ?: @"falha ao mudar a taxa"]];
     }
 }
 
