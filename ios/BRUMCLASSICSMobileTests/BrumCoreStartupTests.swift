@@ -7,7 +7,7 @@ final class BrumCoreStartupTests: XCTestCase {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         let report = directory.appendingPathComponent("session.json")
-        let diagnostics = BrumCoreDiagnostics(context: ["coreID": "probe"], reportURL: report, redactedPaths: ["/private/game.3ds"])
+        let diagnostics = BrumCoreDiagnostics(context: ["coreID": "probe"], report: report, redactedPaths: ["/private/game.3ds"])
         diagnostics.enterStage("load_content")
         diagnostics.recordMessage("bad key for /private/game.3ds", level: 3)
         diagnostics.recordMessage("later warning", level: 2)
@@ -19,7 +19,7 @@ final class BrumCoreStartupTests: XCTestCase {
         XCTAssertEqual(diagnostics.snapshot["outcome"] as? String, "failed")
         XCTAssertEqual(diagnostics.failureDetail, "bad key for <local>")
         XCTAssertFalse(diagnostics.reportText.contains("/private/game.3ds"))
-        let reloaded = BrumCoreDiagnostics(context: [:], reportURL: report, redactedPaths: [])
+        let reloaded = BrumCoreDiagnostics(context: [:], report: report, redactedPaths: [])
         let previous = try XCTUnwrap(reloaded.snapshot["previousAttempt"] as? [String: Any])
         XCTAssertEqual(previous["outcome"] as? String, "failed")
         XCTAssertEqual(previous["stage"] as? String, "load_content")
@@ -30,7 +30,7 @@ final class BrumCoreStartupTests: XCTestCase {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         let report = directory.appendingPathComponent("session.json")
-        let diagnostics = BrumCoreDiagnostics(context: [:], reportURL: report, redactedPaths: [])
+        let diagnostics = BrumCoreDiagnostics(context: [:], report: report, redactedPaths: [])
         diagnostics.enterStage("first_frame")
         diagnostics.recordMessage("initial fatal error", level: 3)
         DispatchQueue.concurrentPerform(iterations: 200) { i in
@@ -40,7 +40,7 @@ final class BrumCoreStartupTests: XCTestCase {
         XCTAssertEqual(messages.count, 32)
         XCTAssertEqual(diagnostics.failureDetail, "initial fatal error")
         XCTAssertTrue(messages.allSatisfy { ($0["text"] as? String)?.count == 2048 })
-        let next = BrumCoreDiagnostics(context: [:], reportURL: report, redactedPaths: [])
+        let next = BrumCoreDiagnostics(context: [:], report: report, redactedPaths: [])
         let marker = try XCTUnwrap(next.snapshot["previousAttempt"] as? [String: Any])
         XCTAssertEqual(marker["outcome"] as? String, "starting")
         XCTAssertEqual(marker["stage"] as? String, "first_frame")
@@ -99,7 +99,9 @@ final class BrumCoreStartupTests: XCTestCase {
         try withProbe(mode: 83) { controller, ready, _ in
             controller.runFrame()
             XCTAssertTrue(controller.diagnosticsReport.contains("probe: required BIOS missing"), controller.diagnosticsReport)
-            XCTAssertTrue(controller.diagnosticsReport.contains("\"outcome\" : \"failed\""))
+            let data = try XCTUnwrap(controller.diagnosticsReport.data(using: .utf8))
+            let report = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            XCTAssertEqual(report["outcome"] as? String, "failed")
             XCTAssertEqual(ready(), 0)
         }
     }
