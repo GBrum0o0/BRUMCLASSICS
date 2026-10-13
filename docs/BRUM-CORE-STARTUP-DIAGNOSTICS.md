@@ -16,6 +16,10 @@ de jogos, desempenho de 3DS/GameCube ou ausência de crashes nativos.
   O erro de `dlopen`, a API e símbolos ausentes são preservados no diagnóstico.
 - O formato é confrontado com `retro_get_system_info().valid_extensions` do
   núcleo efetivamente carregado. Nenhum formato é habilitado apenas pela pasta.
+- A geometria distingue imagem atual de capacidade máxima anunciada. Azahar
+  reserva até 7200×4800, mas o layout nativo é 400×480; isso não torna a imagem
+  nativa inválida nem causa uma alocação do máximo. As verificações de alocação
+  permanecem no caminho que recebe o frame efetivo.
 - Avisos e erros de `GET_LOG_INTERFACE`, `SET_MESSAGE` e `SET_MESSAGE_EXT`
   sobrevivem ao encerramento. Há limite de 32 mensagens/2048 caracteres, com
   último erro preservado separadamente mesmo quando o histórico gira.

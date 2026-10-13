@@ -24,7 +24,9 @@ void retro_get_system_info(brum_retro_system_info *info) {
     *info = (brum_retro_system_info){"BRUM startup probe", "1", "brumtest", false, false};
 }
 void retro_get_system_av_info(brum_retro_system_av_info *info) {
-    *info = (brum_retro_system_av_info){{2, 2, 2, 2, 1}, {60, mode == 'T' ? NAN : 48000}};
+    *info = (brum_retro_system_av_info){{2, 2, mode == 'M' ? 7200 : mode == 'G' ? 1 : 2,
+                                      mode == 'M' ? 4800 : 2, 1},
+                                     {60, mode == 'T' ? NAN : 48000}};
 }
 bool retro_load_game(const brum_retro_game_info *game) {
     if (!game || !game->data || !game->size) return false;

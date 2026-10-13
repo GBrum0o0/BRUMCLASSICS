@@ -419,7 +419,10 @@ static brum_retro_proc_address_t BrumGetProcAddress(const char *name) {
 static bool BrumValidGeometry(const brum_retro_game_geometry *geometry) {
     return geometry && geometry->base_width > 0 && geometry->base_height > 0 &&
         geometry->max_width >= geometry->base_width && geometry->max_height >= geometry->base_height &&
-        geometry->max_width <= 4096 && geometry->max_height <= 4096 &&
+        // Advertised maxima are capacity hints, not the currently rendered
+        // dimensions. Azahar advertises 7200x4800 for optional future layouts
+        // while its native frame is 400x480. Allocation checks belong to the
+        // actual video callback, not this metadata contract.
         isfinite(geometry->aspect_ratio) && geometry->aspect_ratio >= 0;
 }
 

@@ -110,6 +110,11 @@ final class BrumCoreStartupTests: XCTestCase {
             controller.runFrame()
             XCTAssertEqual(ready(), 0)
         }
+        try withProbe(mode: 71) { controller, ready, _ in
+            controller.runFrame()
+            XCTAssertEqual(ready(), 0)
+            XCTAssertTrue(controller.diagnosticsReport.contains("geometria"))
+        }
     }
 
     @MainActor func testFirstFrameShutdownPreservesCoreErrorAndDoesNotSignalReady() throws {
@@ -137,6 +142,14 @@ final class BrumCoreStartupTests: XCTestCase {
             controller.stopCore()
             controller.runFrame()
             XCTAssertEqual(ready(), 1)
+        }
+    }
+    @MainActor func testLargeAdvertisedCapacityDoesNotRejectSmallValidFrames() throws {
+        // Like Azahar, this probe reserves 7200x4800 while rendering a small
+        // native frame. The host must not confuse a capacity hint with a limit.
+        try withProbe(mode: 77) { controller, ready, _ in
+            controller.runFrame()
+            XCTAssertEqual(ready(), 1, controller.diagnosticsReport)
         }
     }
 }
