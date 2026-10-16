@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.75.1"><strong>Windows 1.75.1</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.3"><strong>Windows 2.1.3</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.24.0"><strong>Android 0.24.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.0"><strong>iOS 0.15.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -145,7 +145,7 @@ Consulte também o guia de [Conexões e origem dos dados](docs/CONEXOES.md), com
 
 ## Instalação rápida
 
-1. Baixe o executável portátil da [release Windows 1.75.1](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v1.75.1).
+1. Baixe o executável portátil da [release Windows 2.1.3](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.3), ou use Configurações → Sistema → Atualizações no Launcher já instalado. [Notas e limites](releases/v2.1.3/RELEASE-NOTES.md).
 2. Execute `BRUMCLASSICS OFICIAL.exe`.
 3. Abra **Configurações → Conexões → Explorar conexões** e vincule somente suas próprias contas.
 4. Para CLASSICS, coloque somente suas próprias ROMs na pasta `RETROGAMES`.

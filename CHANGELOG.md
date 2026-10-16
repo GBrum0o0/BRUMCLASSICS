@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## Launcher 2.1.3 — Cofre autoral e host PC
+
+- Containers ON BRUM verificados, origem e isolamento de perfil; importar, ativar e aplicar são ações separadas.
+- Aplicação/recuperação manual pelo host, confirmação, lease exclusivo, hashes consentidos e cópia anterior preservada. Unicode e caminhos longos testados.
+- Fetcher/FIFOs e headroom PCM na engine autoral experimental; gameplay autoral permanece bloqueado na distribuição. Backends externos/RetroArch preservados.
+- 776 testes aprovados e oito capturas de QA do Cofre. [Evidências, atualização e limites](releases/v2.1.3/RELEASE-NOTES.md).
+
 ## Android 0.24.0 e iOS 0.15.0 — BRUM Core GPL e novos sistemas
 
 - O código próprio do aplicativo móvel e do BRUM Core passa a GPL-3.0-or-later; launcher de PC, marca e artes mantêm suas licenças separadas.
