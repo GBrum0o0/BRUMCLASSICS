@@ -30,3 +30,5 @@ Quatro casos gráficos autossuficientes ainda falham; nove também exigem dados 
 ## Publicação e atualização
 
 O fluxo de publicação envia os assets a uma release em rascunho, confere tamanho e digest SHA-256 pela API do GitHub e só depois promove para Latest oficial não prerelease. A validação posterior consulta a release e baixa o executável pelo serviço real do Launcher para um perfil temporário; não instala no perfil pessoal. Atualização pelo aplicativo: [instruções e limites](RELEASE-NOTES.md).
+
+**Pós-publicação confirmado em 2026-10-17:** API Latest retornou `v2.1.4`, `draft:false`, `prerelease:false`, três assets e os digests esperados. O serviço real do Launcher baixou os 393.463.813 bytes para um perfil temporário e chegou a `ready` com o SHA acima. O arquivo-sentinela de save permaneceu inalterado; nenhuma atualização foi instalada no perfil pessoal. A seleção da implementação antiga confirmou Beta 2 → Beta 3 → 2.1.4; instalações oficiais 2.1.2/2.1.3 receberam 2.1.4 e a própria 2.1.4 não recebeu atualização repetida.

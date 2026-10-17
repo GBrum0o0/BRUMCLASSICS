@@ -23,4 +23,4 @@ Abra **Configurações → Sistema → Atualizações → Verificar → Baixar �
 
 Validação independente local: gráficos **12/25 aprovados e 13 divergentes**; Mooneye **93/94 DMG**, com uma falha pós-boot; SameSuite **2/2 DMG**; diagnósticos DMG sound **12/12**. Nove referências gráficas também dependem de dados pós-firmware ausentes no boot simulado; quatro casos autossuficientes continuam falhando. Há regressão conhecida no caso de tamanho OBJ sem scroll, mantida no relatório e não ocultada. Esses números não representam porcentagem de conclusão ou compatibilidade geral de jogos.
 
-O pacote não inclui ROMs, BIOS, saves pessoais, fontes diagnósticos externos ou DLLs de cores. Não adiciona sincronização automática, streaming, novos consoles, conta online, Gamepad ou segunda tela. Publicação somente PC. [Validação e limites](VALIDACAO.md).
+O pacote não inclui ROMs, BIOS, saves pessoais, fontes diagnósticos externos ou DLLs de cores. Não adiciona sincronização automática, streaming, novos consoles, conta online, Gamepad ou segunda tela. Publicação somente PC. [Validação e limites](https://github.com/GBrum0o0/BRUMCLASSICS/blob/v2.1.4/releases/v2.1.4/VALIDACAO.md).
