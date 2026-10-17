@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## Launcher 2.1.4 — manutenção do BRUM Core PC
+
+- Correções de janela, scroll e áudio wave na ON BRUM em desenvolvimento, com diagnósticos independentes ampliados.
+- Cofre, perfis e backends externos preservados; **gameplay autoral permanece bloqueado**, com 13 divergências gráficas e uma falha pós-boot ainda abertas.
+- Publicação oficial no GitHub e atualização pelo Launcher, inclusive pela ponte da Beta antiga. Somente PC. [Notas e validação](releases/v2.1.4/RELEASE-NOTES.md).
+
 ## Launcher 2.1.3 — Cofre autoral e host PC
 
 - Containers ON BRUM verificados, origem e isolamento de perfil; importar, ativar e aplicar são ações separadas.
