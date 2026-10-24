@@ -30,6 +30,14 @@ Uma execução concorrente anterior encontrou EPERM transitório ao renomear um 
 
 ## Decisões e limites
 
+## Publicação e atualizador ao vivo
+
+Publicada como Latest oficial, não prerelease, em `v2.1.5`. O mesmo serviço de atualização do Launcher, simulando a versão instalada 2.1.4 em pasta temporária, consultou o GitHub, encontrou 2.1.5 e baixou integralmente **393.785.066 bytes**, chegando ao estado **ready / 100%**. SHA-256 conferido: `d05240a4c893329c7bda0ff284a0c3e1899dab3bd34a52f082d1007e47cfd82f`.
+
+A seleção também confirmou compatibilidade da ponte 2.1.0-beta.3. Nenhuma instalação/reinicialização foi executada sobre o perfil pessoal; o arquivo de controle do perfil temporário permaneceu intacto. A troca real dos executáveis no computador do usuário continua sendo uma ação explícita pelo botão Reiniciar e atualizar.
+
+### Limites de uso
+
 1. Um cartão por AppID preserva IDs, notas e organização. A conta principal tem preferência nos jogos compartilhados; a página identifica qual conta fornece as estatísticas. Não há soma de conquistas ou horas entre contas. Uma visualização com cartões separados por conta não foi adicionada.
 2. A troca Steam é assistida no cliente oficial, com nova conferência da sessão. Não foi implementada autenticação silenciosa, alteração de arquivos de login ou cópia de tokens. Login/Steam Guard de duas contas reais continuam dependentes do usuário.
 3. O upscale melhora a apresentação, não recria detalhes ausentes. O foco e a experiência audiovisual durante a abertura de jogos reais ainda dependem da validação no computador do usuário.
