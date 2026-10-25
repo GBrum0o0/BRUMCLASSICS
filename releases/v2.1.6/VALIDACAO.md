@@ -32,4 +32,10 @@ Revisão independente não encontrou falha crítica de integridade ou bypass par
 
 Esta entrega não certifica jogos comerciais nem os 32 sistemas. São protótipos, sem garantia de gameplay; Arcade genérico permanece indisponível. Não houve teste físico de controles nem instalação sobre perfil pessoal. Leia RELEASE-NOTES.md antes de atualizar: o lançamento externo foi removido, mas seus arquivos, saves antigos e Vault foram preservados; saves de teste são isolados e não são ativados automaticamente.
 
-Publicação e download pelo atualizador são verificações separadas, registradas após a disponibilização dos assets no GitHub.
+## Publicação e atualizador ao vivo
+
+Publicada como Latest oficial, não prerelease, em `v2.1.6`, no commit público `7be15386c512b3af0863ea0e149aca5b8f83e208`. Os três assets tiveram tamanho e SHA-256 confirmados pela API do GitHub antes da publicação.
+
+O serviço de atualização do Launcher, simulando a versão instalada 2.1.5 em perfil temporário, consultou o GitHub, encontrou 2.1.6 e baixou integralmente 394298562 bytes, chegando a `ready / 100%`. SHA-256 confirmado: `22c508447a65137e95132acc530b051f046efc09b5ea3c671bdf31df2baa84ad`.
+
+A seleção da ponte 2.1.0-beta.3 também encontrou a versão nova. O arquivo de controle do perfil temporário permaneceu intacto. Não foi executada instalação/reinicialização sobre o perfil pessoal: a troca real dos executáveis depende da ação explícita do usuário no Launcher.

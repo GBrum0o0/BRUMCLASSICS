@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.4"><strong>Windows 2.1.4</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.6"><strong>Windows 2.1.6 experimental</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.24.0"><strong>Android 0.24.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.0"><strong>iOS 0.15.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -82,7 +82,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 2.1.4 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.4) |
+| Windows | 2.1.6 experimental | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.6) |
 | Android | 0.24.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.24.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.15.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.0) · [Guia](ios/README-IOS.md) |
 
@@ -145,7 +145,9 @@ Consulte também o guia de [Conexões e origem dos dados](docs/CONEXOES.md), com
 
 ## Instalação rápida
 
-1. Baixe o executável portátil da [release Windows 2.1.3](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.3), ou use Configurações → Sistema → Atualizações no Launcher já instalado. [Notas e limites](releases/v2.1.3/RELEASE-NOTES.md).
+Esta versão usa exclusivamente a M.U.R.B experimental para CLASSICS, sem RetroArch/fallback. Não certifica suporte completo aos consoles. Saves antigos são preservados e os testes usam armazenamento separado. Se precisar dos emuladores externos anteriores, mantenha a [2.1.5](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.5).
+
+1. Baixe o executável portátil da [release Windows 2.1.6 experimental](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.6), ou use Configurações → Sistema → Atualizações no Launcher já instalado. [Notas e limites](releases/v2.1.6/RELEASE-NOTES.md).
 2. Execute `BRUMCLASSICS OFICIAL.exe`.
 3. Abra **Configurações → Conexões → Explorar conexões** e vincule somente suas próprias contas.
 4. Para CLASSICS, coloque somente suas próprias ROMs na pasta `RETROGAMES`.
