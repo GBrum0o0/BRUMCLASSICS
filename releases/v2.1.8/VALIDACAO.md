@@ -51,3 +51,11 @@ Não certificados pelo revisor: compatibilidade comercial dos32 sistemas, fideli
 - Portátil: 394334105 bytes; SHA-256 `6d0384a68fa85cbfde841f2179772ace0b6732bba65d0565c70147960f525176`.
 - ASAR: SHA-256 `a089f51ef1002af82871f707c882e88b370aa126951b4ae9573165b1f9a80f8c`.
 - Host: SHA-256 `dbb9a7769e4e177e1ac15ce73d9400577aa72ae2db37cd479fefeda3ddcc9730`.
+
+## Publicação e atualizador ao vivo
+
+Publicada como Latest oficial, não prerelease, em `v2.1.8`, commit público `bccadc4528b807ffae0adec704cfe551306568c7`. Executável, notas e manifesto tiveram tamanho e SHA-256 confirmados pela API do GitHub antes da publicação. O estágio experimental está explícito no título, nas notas e no Launcher.
+
+O serviço real de atualização, simulando instalação 2.1.7 em perfil temporário, encontrou 2.1.8 e baixou integralmente 394334105 bytes. Estado final `ready / 100%`; SHA-256 `6d0384a68fa85cbfde841f2179772ace0b6732bba65d0565c70147960f525176` confirmado. A seleção da ponte 2.1.0-beta.3 também encontrou a versão nova.
+
+O arquivo de controle do perfil temporário permaneceu intacto. Nenhuma instalação ou reinicialização foi executada sobre o perfil pessoal; a atualização real depende da confirmação explícita do usuário no Launcher.
