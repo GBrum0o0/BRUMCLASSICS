@@ -60,3 +60,11 @@ Saves autorais permanecem isolados por perfil/sistema/SHA256 em murb-test-saves.
 - Portátil: **394348219 bytes**, ProductVersion 2.1.9; SHA-256 `cfbc9d848251e5e5285fbf05951f3ca3f8d19524821b796d76325f89a1c88cf5`.
 - ASAR: SHA-256 `c9b3da44d63ca0ad420641d94c1f972246460bf02f0db27c271cbcf33d677859`.
 - Host: SHA-256 `105df5cd39624c176843f4c96a4b0c31338a5293f430999101c0233c7c20de58`.
+
+## Publicação e download real pelo atualizador
+
+Release `v2.1.9` publicada como Latest oficial, não rascunho e não prerelease, no commit público `726a401a7304b6858676765b5072c9437aecde40`. O estágio experimental permanece explícito no Launcher e nas notas. Os três assets (executável, notas e SHA256SUMS) tiveram tamanho e digest confirmados pela API do GitHub antes da publicação.
+
+O serviço real de atualização, simulando uma instalação 2.1.8 em perfil temporário, encontrou a 2.1.9 e baixou integralmente **394348219 bytes**, chegando a **ready /100%** com SHA-256 `cfbc9d848251e5e5285fbf05951f3ca3f8d19524821b796d76325f89a1c88cf5`. A seleção da ponte 2.1.0-beta.3 também encontrou a versão nova.
+
+O arquivo de controle do perfil temporário permaneceu intacto. Não foi executada instalação nem reinicialização sobre o Launcher pessoal. A aplicação real da atualização continua dependendo da confirmação do usuário no aplicativo.
