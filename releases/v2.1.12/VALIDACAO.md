@@ -25,4 +25,10 @@ A interação física do usuário com o diálogo nativo não é apresentada como
 - ASAR SHA256: `de62f18c78dd51bdc1c81a02ce889bd412fc876db83cb36bc3df6fb3b13f5f41`.
 - Host SHA256: `b6cd78a499fee0695071e104c6a30cda2f3a98da0cccac85694160a86b6c110c`.
 
-Resultados de publicação e atualização ao vivo serão registrados após confirmação. Nenhuma instalação pessoal foi autorizada ou executada.
+## Publicação e atualizador ao vivo
+
+Release `v2.1.12` publicada como Latest oficial, não rascunho e não prerelease, no commit público `088f530e97b4a8c6d01e614acf6cdb92d96cabc1`. Executável, notas e SHA256SUMS conferidos por tamanho e digest na API GitHub antes da publicação. Estágio experimental explícito.
+
+O serviço real de atualização, simulando versão 2.1.11 em perfil temporário, encontrou a 2.1.12 e baixou integralmente os 394.367.755 bytes. Resultado `ready / 100%`, SHA256 `bb86d9ea6e5a903d61db3b04d438cbca982926caf5ed76836bf16e21939f61a6`, sentinela do perfil preservada e seleção da ponte Beta 2.1.0-beta.3 compatível.
+
+Nenhuma instalação pessoal ou reinicialização foi executada. O usuário deve confirmar a instalação no Launcher e, separadamente, a criação do save novo quando o diálogo de recuperação aparecer.
