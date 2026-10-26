@@ -31,4 +31,8 @@ Permanecem janelas/alpha/fades incompletos, precisão por linha/latches afins pe
 - ASAR SHA256: `b36a2087fc9edab3cb6fab17b26598606f48a19b39b7a19baf287b8a7b5dbca3`.
 - Host SHA256: `a1fb4962bda453018e7ccd2ef24b338795fef9f1b44f35fb136c8f2e83536eb3`.
 
-Publicação e teste de download pelo atualizador serão registrados depois da verificação ao vivo. Nenhuma instalação pessoal executada.
+## Publicação e atualização ao vivo
+
+Release `v2.1.11` publicada como Latest oficial, não rascunho e não prerelease, no commit público `86107dd9d7ddcec5afac8269f1651c2c04ea7962`. Os três anexos (portátil, notas e SHA256SUMS) tiveram tamanho e digest SHA256 confirmados na API antes da publicação. Estágio experimental permanece explícito.
+
+O serviço real de atualização, simulando 2.1.10 em perfil temporário, detectou 2.1.11 e baixou os 394.356.943 bytes, chegando a `ready / 100%`, com SHA256 `a64563e02ae2d793dc133ec1a73b506411be97d054b9a4ff0a479dc329595382`. Seleção pela ponte 2.1.0-beta.3 também compatível. Sentinela de perfil preservada. Não foi chamada instalação nem reiniciado o Launcher pessoal; a aplicação da atualização depende da confirmação do usuário.
