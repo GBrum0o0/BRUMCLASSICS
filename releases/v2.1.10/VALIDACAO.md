@@ -64,3 +64,11 @@ Saves experimentais permanecem separados por perfil/sistema/SHA256 em murb-test-
 - Portátil:394352553 bytes, versão2.1.10; SHA256 `eda02f3d08654da8df77898e125ee8187d1c42e12d76c24d8c31786cdf3419c8`.
 - ASAR: `4a066405b1a5f32f2c66422210282325dfa187b0a3aa33b5516c602d8513aa09`.
 - Host: `fda940059ff698d1b29e3ff8857139e5434b9f6bc94cf87464bc77aa4ffee37b`.
+
+## GitHub e atualizador ao vivo
+
+Release `v2.1.10` publicada como Latest oficial, não rascunho/não prerelease, no commit público `640d1143c5175722e437918f245db0daaf1d7a1a`. Executável, notas e manifesto tiveram tamanho e SHA256 confirmados na API GitHub antes da publicação. Estágio experimental permanece explícito.
+
+Serviço real de atualização, simulando versão2.1.9 em perfil temporário, encontrou2.1.10 e baixou integralmente394352553 bytes, chegando a **ready /100%** com SHA256 `eda02f3d08654da8df77898e125ee8187d1c42e12d76c24d8c31786cdf3419c8`. A seleção da ponte2.1.0-beta.3 também encontrou a nova versão.
+
+Sentinela de perfil preservada. Nenhuma instalação ou reinicialização sobre o Launcher pessoal; aplicação da atualização exige confirmação do usuário no aplicativo.
