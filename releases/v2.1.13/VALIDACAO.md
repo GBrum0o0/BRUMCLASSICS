@@ -73,6 +73,17 @@ SHA256:
 - ASAR: `6096efa5f7466ed1a495f67e52fa6c73e1312bc5c42c83eaf02ee77a3ab405db`.
 - Host: `e819c7e9cdad171c49f2acc8f720e5e29f13d3cad34e9d307d62b4a273afa67a`.
 
-Nenhuma instalação pessoal ou reinicialização foi executada. O teste ao vivo do
-atualizador só pode ocorrer após a publicação; seu resultado será registrado
-separadamente, sem antecipar sucesso.
+## Publicação e atualizador ao vivo
+
+Release `v2.1.13` publicada como Latest oficial, não rascunho e não prerelease,
+no commit público `1a6fdd12c9935c65b9f7a82326d5fb8ba5ecca0f`. Os três anexos
+foram conferidos por tamanho e digest SHA256 na API GitHub antes da publicação.
+
+O serviço real do atualizador, em perfil temporário simulando a versão 2.1.12,
+encontrou a 2.1.13 e baixou integralmente os 394.376.896 bytes. Resultado
+`ready / 100%`, com o SHA256 do portátil acima, sentinela do perfil preservada
+e seleção da ponte Beta 2.1.0-beta.3 também compatível.
+
+Nenhuma instalação pessoal ou reinicialização foi executada. O usuário deve
+confirmar a instalação pelo próprio Launcher. A recuperação de save antigo,
+quando elegível, continua exigindo confirmação separada.
