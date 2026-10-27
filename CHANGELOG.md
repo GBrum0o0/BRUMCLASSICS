@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## Launcher 2.1.13 — correções experimentais de GBA
+
+- Composição WIN/BLD, quatro canais PSG, LCD/DMA e rotinas autorais de escala/rotação.
+- Logo completo do Emerald e avanço até menus/instruções dos dois Pokémon verificados.
+- 327 testes nativos e 846 do Launcher aprovados; não certifica partidas completas.
+- Saves, Vault e perfis preservados. [Notas e limites](releases/v2.1.13/RELEASE-NOTES.md).
+
 ## Launcher 2.1.4 — manutenção do BRUM Core PC
 
 - Correções de janela, scroll e áudio wave na ON BRUM em desenvolvimento, com diagnósticos independentes ampliados.
