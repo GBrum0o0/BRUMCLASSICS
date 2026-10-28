@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## Launcher 2.1.14 — atualização experimental de GBA e NES
+
+- Alterações de GBA e NES com correções na EEPROM, DMA, PPU e proteção de saves.
+- 349 testes nativos e 846 testes do Launcher passaram; um teste opcional foi ignorado.
+- Saves EEPROM antigos ambíguos são preservados e recusados, sem conversão automática. [Notas e limites](releases/v2.1.14/RELEASE-NOTES.md).
+
 ## Launcher 2.1.13 — correções experimentais de GBA
 
 - Composição WIN/BLD, quatro canais PSG, LCD/DMA e rotinas autorais de escala/rotação.
