@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## Launcher 2.1.16 — interface e Brum iOS Bridge
+
+- Configurações permanecem acima da página do jogo; notas em edição são preservadas ao abrir e fechar o painel.
+- Últimas Atividades e Saves removidos dos detalhes dos jogos modernos; Clássicos mantém essas informações.
+- Fundo dinâmico acompanha as cores da arte selecionada, com transição suave e respeito ao modo Economia.
+- Brum iOS Bridge integrado às Configurações para importar IPAs, localizar o iPhone e gerenciar assinatura, instalação e renovação. Login Apple, instalação e renovação reais ainda exigem validação no aparelho.
+- 883 testes do Launcher aprovados, zero falhas e um ignorado; testes visuais, nativos e revisão independente executados. Somente PC; os emuladores permanecem na versão anterior. [Notas e limites](releases/v2.1.16/RELEASE-NOTES.md).
+
 ## Launcher 2.1.15 — biblioteca, detalhes e organização
 
 - Cabeçalho da biblioteca com degradê suave e página do jogo mais ampla, sem IDs de conta ou mensagens técnicas no destaque.
