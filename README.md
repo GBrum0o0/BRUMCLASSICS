@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.14"><strong>Windows 2.1.14 experimental</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.15"><strong>Windows 2.1.15</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.24.0"><strong>Android 0.24.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.0"><strong>iOS 0.15.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -33,6 +33,9 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - Explorador único de conexões para lojas, RetroAchievements e RetroArch, com estados detalhados, última sincronização, origem dos jogos, diagnóstico guiado, fila central e preservação do último catálogo válido.
 - Família Steam opcional: jogos compartilhados atualmente acessíveis entram identificados separadamente, sem serem tratados como compras da conta.
 - Busca, filtros, coleções, favoritos e prioridade de loja.
+- Coleções independentes em Jogos e Clássicos, com contagens por seção e preservação das coleções antigas.
+- Clique na capa para abrir a página completa do jogo; instalar e jogar ficam nessa página, sem botão sobreposto na capa.
+- Conquistas desbloqueadas com imagem e anotações em um campo único, preservando o conteúdo dos quatro campos anteriores.
 - Busca geral por `Ctrl+K` para localizar jogos, configurações, conexões e recursos sem conhecer a estrutura do launcher.
 - Roteiro inicial de cinco tarefas para preparar perfil, loja, controles, visual e Living Room; opções técnicas ficam recolhidas em **Mais configurações**.
 - Estados visuais consistentes, vazios com orientação e ação direta, além de **Desfazer** para favoritos, coleções e remoções da biblioteca.
@@ -82,7 +85,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 2.1.14 experimental | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.14) |
+| Windows | 2.1.15 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.15) |
 | Android | 0.24.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.24.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.15.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.0) · [Guia](ios/README-IOS.md) |
 
@@ -92,6 +95,7 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 
 ## Versões atuais
 
+- **Launcher 2.1.15:** degradê suave na biblioteca, detalhes mais amplos, conquistas com imagens, coleções separadas e campo único de anotações. [Notas e compatibilidade móvel](releases/v2.1.15/RELEASE-NOTES.md). A M.U.R.B ENGINE mantém o caráter experimental da versão anterior.
 - **Launcher 1.75.1:** monitoramento Steam em tempo real por manifesto e pasta de transferência, com detecção imediata de instalações e atualizações iniciadas no cliente.
 - **Launcher 1.75.0:** Central de Downloads integrada à biblioteca, com fila transparente, progresso oficial da Steam e detecção de transferências iniciadas no cliente.
 - **Launcher 1.74.4:** capturas grandes e legíveis na BRUMWORLD, sem marcadores desconexos, com ampliação em tela cheia e guia atual limitado a Android e iOS.

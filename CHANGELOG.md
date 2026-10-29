@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## Launcher 2.1.15 — biblioteca, detalhes e organização
+
+- Cabeçalho da biblioteca com degradê suave e página do jogo mais ampla, sem IDs de conta ou mensagens técnicas no destaque.
+- Conquistas com imagens e representação alternativa quando a imagem não estiver disponível.
+- Coleções e contagens independentes entre Jogos e Clássicos, incluindo edição de categoria e migração dos dados antigos.
+- Capa abre os detalhes sem botão de instalar/jogar sobreposto; anotações reunidas em um campo com conteúdo antigo preservado.
+- 868 testes do Launcher aprovados, zero falhas e um ignorado; revisão independente e smoke visual aprovados. [Notas e limites](releases/v2.1.15/RELEASE-NOTES.md).
+
 ## Launcher 2.1.14 — atualização experimental de GBA e NES
 
 - Alterações de GBA e NES com correções na EEPROM, DMA, PPU e proteção de saves.
