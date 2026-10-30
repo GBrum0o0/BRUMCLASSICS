@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## Launcher 2.1.18 — integração revisada de SMS/Game Gear e PC Engine
+
+- Melhorias experimentais de instruções Z80, timing/interrupção do VDP, instruções HuC6280 e acesso ao VDC/VRAM, extraídas dos novos snapshots do Antigravity.
+- 355 testes nativos e 937 testes do Launcher aprovados, incluindo seis regressões nativas novas. Host protegido e correções publicadas de GB/GBA/NES preservados.
+- Alterações regressivas de saves e recursos demonstrativos de host/conquistas/JIT/GPU ficaram fora da distribuição. Não certifica uso pleno dos 32 sistemas. [Notas, revisão e limites](releases/v2.1.18/RELEASE-NOTES.md).
+
 ## Launcher 2.1.17 — IPA do GitHub e seleção no Brum iOS Bridge
 
 - Novo botão para baixar e importar a última IPA iOS publicada no GitHub, com tamanho e SHA-256 conferidos; baixar não inicia instalação.
