@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## Launcher 2.1.17 — IPA do GitHub e seleção no Brum iOS Bridge
+
+- Novo botão para baixar e importar a última IPA iOS publicada no GitHub, com tamanho e SHA-256 conferidos; baixar não inicia instalação.
+- Seleções preservadas durante atualizações da tela e importações simultâneas ao carregamento. Um único candidato é selecionado; múltiplas opções continuam manuais.
+- Busca do iPhone ao abrir a seção e orientação explícita quando nenhum aparelho é detectado. Conta Apple conectada não confirma conexão física do iPhone.
+- Downloads cancelados ao sair ou trocar de perfil, sem importar no perfil seguinte ou deixar avisos antigos nele; cliques rápidos não duplicam buscas.
+- 937 testes aprovados, zero falhas e um opcional ignorado; 110 verificações direcionadas de publicação aprovadas. Assinatura, instalação, Wi-Fi e renovação física continuam pendentes de validação. [Notas e limites](releases/v2.1.17/RELEASE-NOTES.md).
+
 ## Launcher 2.1.16 — interface e Brum iOS Bridge
 
 - Configurações permanecem acima da página do jogo; notas em edição são preservadas ao abrir e fechar o painel.

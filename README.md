@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.16"><strong>Windows 2.1.16</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.17"><strong>Windows 2.1.17</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.24.0"><strong>Android 0.24.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.0"><strong>iOS 0.15.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -85,7 +85,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 2.1.16 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.16) |
+| Windows | 2.1.17 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.17) |
 | Android | 0.24.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.24.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.15.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.0) · [Guia](ios/README-IOS.md) |
 
@@ -95,7 +95,7 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 
 ## Versões atuais
 
-- **Launcher 2.1.16:** Configurações acima dos detalhes do jogo, informações de saves restritas aos Clássicos e fundo que acompanha a arte selecionada. Brum iOS Bridge integrado, com autenticação, instalação e renovação ainda pendentes de validação em aparelho. [Notas e limites](releases/v2.1.16/RELEASE-NOTES.md). A M.U.R.B ENGINE mantém o caráter experimental da versão anterior.
+- **Launcher 2.1.17:** Brum iOS Bridge baixa a última IPA iOS publicada no GitHub, verifica tamanho e SHA-256 e mantém a seleção durante as atualizações da interface. Ausência de iPhone detectado recebe orientação explícita; assinatura e instalação reais permanecem em validação. [Notas e limites](releases/v2.1.17/RELEASE-NOTES.md). Os emuladores permanecem inalterados nesta etapa.
 - **Launcher 1.75.1:** monitoramento Steam em tempo real por manifesto e pasta de transferência, com detecção imediata de instalações e atualizações iniciadas no cliente.
 - **Launcher 1.75.0:** Central de Downloads integrada à biblioteca, com fila transparente, progresso oficial da Steam e detecção de transferências iniciadas no cliente.
 - **Launcher 1.74.4:** capturas grandes e legíveis na BRUMWORLD, sem marcadores desconexos, com ampliação em tela cheia e guia atual limitado a Android e iOS.
@@ -151,7 +151,7 @@ Consulte também o guia de [Conexões e origem dos dados](docs/CONEXOES.md), com
 
 Esta versão usa exclusivamente a M.U.R.B experimental para CLASSICS, sem RetroArch/fallback. Não certifica suporte completo aos consoles. Saves antigos são preservados e os testes usam armazenamento separado. Se precisar dos emuladores externos anteriores, mantenha a [2.1.5](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.5).
 
-1. Baixe o executável portátil da [release Windows 2.1.16](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.16), ou use Configurações → Sistema → Atualizações no Launcher já instalado. [Notas e limites](releases/v2.1.16/RELEASE-NOTES.md). O Brum iOS Bridge está em validação no iPhone e os emuladores mantêm as limitações experimentais anteriores. Saves EEPROM antigos ambíguos são recusados e preservados, sem conversão automática.
+1. Baixe o executável portátil da [release Windows 2.1.17](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.17), ou use Configurações → Sistema → Atualizações no Launcher já instalado. [Notas e limites](releases/v2.1.17/RELEASE-NOTES.md). O Brum iOS Bridge está em validação no iPhone e os emuladores mantêm as limitações experimentais anteriores. Saves EEPROM antigos ambíguos são recusados e preservados, sem conversão automática.
 2. Execute `BRUMCLASSICS OFICIAL.exe`.
 3. Abra **Configurações → Conexões → Explorar conexões** e vincule somente suas próprias contas.
 4. Para CLASSICS, coloque somente suas próprias ROMs na pasta `RETROGAMES`.
