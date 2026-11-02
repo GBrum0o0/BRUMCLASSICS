@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## Launcher 2.1.19 — revisão seletiva de PSP, Neo Geo Pocket e cartuchos
+
+- PSP EXT/INS e prioridade do registro de controle Neo Geo Pocket integrados com regressões isoladas.
+- Catálogo de perfis por sistema e identificação de cartuchos adicionais para RetroAchievements com IDs e cabeçalhos conferidos. Catálogo e hashes não certificam compatibilidade plena ou desbloqueios online.
+- Host, armazenamento, GB/GBC/GBA/NES e Brum iOS Bridge preservados. Novas mudanças inseguras de host/rede e núcleos incompletos ficaram fora. [Notas, revisão e limites](releases/v2.1.19/RELEASE-NOTES.md).
+
+
 ## Launcher 2.1.18 — integração revisada de SMS/Game Gear e PC Engine
 
 - Melhorias experimentais de instruções Z80, timing/interrupção do VDP, instruções HuC6280 e acesso ao VDC/VRAM, extraídas dos novos snapshots do Antigravity.
