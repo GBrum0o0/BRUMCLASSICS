@@ -39,23 +39,35 @@ public final class LocalClassic {
         public final boolean unlocked;
         public final boolean hardcore;
         public final String unlockedAt;
+        public final String badgeName;
 
         public Achievement(String id, String title, String description, int points, boolean unlocked, boolean hardcore, String unlockedAt) {
+            this(id, title, description, points, unlocked, hardcore, unlockedAt, "");
+        }
+
+        public Achievement(String id, String title, String description, int points, boolean unlocked,
+                           boolean hardcore, String unlockedAt, String badgeName) {
             this.id = id; this.title = title; this.description = description; this.points = points;
             this.unlocked = unlocked; this.hardcore = hardcore; this.unlockedAt = unlockedAt;
+            this.badgeName = badgeName == null ? "" : badgeName;
+        }
+
+        public String badgeUrl() {
+            if (!badgeName.matches("[0-9]{1,12}")) return "";
+            return "https://i.retroachievements.org/Badge/" + badgeName + (unlocked ? ".png" : "_lock.png");
         }
 
         JSONObject toJson() throws Exception {
             JSONObject result = new JSONObject();
             result.put("id", id); result.put("title", title); result.put("description", description);
             result.put("points", points); result.put("unlocked", unlocked); result.put("hardcore", hardcore);
-            result.put("unlockedAt", unlockedAt);
+            result.put("unlockedAt", unlockedAt); result.put("badgeName", badgeName);
             return result;
         }
 
         static Achievement fromJson(JSONObject item) {
             return new Achievement(item.optString("id"), item.optString("title", "Conquista"), item.optString("description"),
-                Math.max(0, item.optInt("points")), item.optBoolean("unlocked"), item.optBoolean("hardcore"), item.optString("unlockedAt"));
+                Math.max(0, item.optInt("points")), item.optBoolean("unlocked"), item.optBoolean("hardcore"), item.optString("unlockedAt"), item.optString("badgeName"));
         }
     }
 
