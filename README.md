@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.19"><strong>Windows 2.1.19</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.20"><strong>Windows 2.1.20</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.24.0"><strong>Android 0.24.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.0"><strong>iOS 0.15.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -85,7 +85,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 2.1.19 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.19) |
+| Windows | 2.1.20 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.20) |
 | Android | 0.24.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.24.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.15.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.0) · [Guia](ios/README-IOS.md) |
 
@@ -95,7 +95,7 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 
 ## Versões atuais
 
-- **Launcher 2.1.19:** instruções EXT/INS do PSP, registro de controle Neo Geo Pocket, catálogo de perfis por sistema e identificação de cartuchos adicionais com IDs e cabeçalhos conferidos. Host, saves e Brum iOS Bridge preservados; mudanças inseguras e núcleos ainda incompletos ficaram fora da atualização. [Notas e revisão](releases/v2.1.19/RELEASE-NOTES.md). A M.U.R.B ENGINE permanece experimental, sem certificação de uso pleno dos 32 sistemas.
+- **Launcher 2.1.20:** duas telas de DS e 3DS no PC, alternância com F3 e descoberta de arquivos `.3ds` na biblioteca. A M.U.R.B ENGINE permanece experimental. [Notas e limites dos testes](releases/v2.1.20/RELEASE-NOTES.md).
 - **Launcher 1.75.1:** monitoramento Steam em tempo real por manifesto e pasta de transferência, com detecção imediata de instalações e atualizações iniciadas no cliente.
 - **Launcher 1.75.0:** Central de Downloads integrada à biblioteca, com fila transparente, progresso oficial da Steam e detecção de transferências iniciadas no cliente.
 - **Launcher 1.74.4:** capturas grandes e legíveis na BRUMWORLD, sem marcadores desconexos, com ampliação em tela cheia e guia atual limitado a Android e iOS.
@@ -151,7 +151,7 @@ Consulte também o guia de [Conexões e origem dos dados](docs/CONEXOES.md), com
 
 Esta versão usa exclusivamente a M.U.R.B experimental para CLASSICS, sem RetroArch/fallback. Não certifica suporte completo aos consoles. Saves antigos são preservados e os testes usam armazenamento separado. Se precisar dos emuladores externos anteriores, mantenha a [2.1.5](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.5).
 
-1. Baixe o executável portátil da [release Windows 2.1.19](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.19), ou use Configurações → Sistema → Atualizações no Launcher já instalado. [Notas e limites](releases/v2.1.19/RELEASE-NOTES.md). O Brum iOS Bridge está em validação no iPhone e os emuladores mantêm caráter experimental. Saves EEPROM antigos ambíguos são recusados e preservados, sem conversão automática.
+1. Baixe o executável portátil da [release Windows 2.1.20](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.20), ou use Configurações → Sistema → Atualizações no Launcher já instalado. [Notas e limites](releases/v2.1.20/RELEASE-NOTES.md). O Brum iOS Bridge está em validação no iPhone e os emuladores mantêm caráter experimental.
 2. Execute `BRUMCLASSICS OFICIAL.exe`.
 3. Abra **Configurações → Conexões → Explorar conexões** e vincule somente suas próprias contas.
 4. Para CLASSICS, coloque somente suas próprias ROMs na pasta `RETROGAMES`.

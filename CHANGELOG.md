@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## Launcher 2.1.20 — telas de Nintendo DS e 3DS
+
+- DS e 3DS começam com as duas telas empilhadas. F3 alterna entre superior, inferior e ambas.
+- A biblioteca reconhece arquivos `.3ds`. O layout foi validado com conteúdo diagnóstico. A jogabilidade comercial dos dois sistemas segue em validação. [Notas e limites](releases/v2.1.20/RELEASE-NOTES.md).
+
 ## Launcher 2.1.19 — revisão seletiva de PSP, Neo Geo Pocket e cartuchos
 
 - PSP EXT/INS e prioridade do registro de controle Neo Geo Pocket integrados com regressões isoladas.
