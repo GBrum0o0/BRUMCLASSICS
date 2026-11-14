@@ -124,7 +124,7 @@ struct AchievementList: View {
     }
 }
 
-private struct AchievementBadge: View {
+struct AchievementBadge: View {
     let item: Game.Achievement
     var body: some View {
         Group {

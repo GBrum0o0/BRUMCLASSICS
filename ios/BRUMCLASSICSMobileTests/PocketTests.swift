@@ -2,6 +2,25 @@ import XCTest
 @testable import BRUMCLASSICSMobile
 
 final class PocketTests: XCTestCase {
+    func testAchievementProgressProvidesOnlyOfficialNumericBadgeURLs() throws {
+        let json = """
+        {"ID":12,"Title":"Demo","Achievements":{
+          "1":{"Title":"A","BadgeName":"00042","DateEarned":"2026-10-08"},
+          "2":{"Title":"B","BadgeName":"https://other.example/badge"},
+          "3":{"Title":"C"}
+        }}
+        """
+        let progress = try PocketProgress.decode(Data(json.utf8), username: "fixture", expectedID: 12)
+        XCTAssertEqual(progress.unlocked, 1)
+        XCTAssertEqual(progress.achievements.count, 3)
+        XCTAssertEqual(progress.achievements[0].badgeUrl, "https://media.retroachievements.org/Badge/00042.png")
+        XCTAssertNil(progress.achievements[1].badgeUrl)
+        XCTAssertNil(progress.achievements[2].badgeUrl)
+        XCTAssertEqual(GamingAchievements.fraction(earned: 1, total: 3), 1.0 / 3.0)
+        XCTAssertEqual(GamingAchievements.fraction(earned: 8, total: 4), 1)
+        XCTAssertEqual(GamingAchievements.fraction(earned: 0, total: 0), 0)
+    }
+
     func testNativeSaveProfileBindingRejectsAnotherProfileOrComputer() throws {
         let digest = (UUID().uuidString.replacingOccurrences(of: "-", with: "") +
                       UUID().uuidString.replacingOccurrences(of: "-", with: "")).lowercased()

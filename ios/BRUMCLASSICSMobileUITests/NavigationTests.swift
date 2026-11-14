@@ -19,7 +19,14 @@ final class NavigationTests: XCTestCase {
         }
 
         app.buttons["gaming-mode-tab"].tap()
-        XCTAssertTrue(app.staticTexts["BIBLIOTECA"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["gaming-mode-library"].waitForExistence(timeout: 5))
+        app.buttons["gaming-mode-controllers"].tap()
+        XCTAssertTrue(app.navigationBars["Controles"].waitForExistence(timeout: 5))
+        app.navigationBars["Controles"].buttons["Fechar"].tap()
+        app.buttons["gaming-mode-settings"].tap()
+        XCTAssertTrue(app.textFields["gaming-mode-ra-username"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.secureTextFields["gaming-mode-ra-key"].exists)
+        app.navigationBars["Configurações"].buttons["Fechar"].tap()
         XCTAssertFalse(app.buttons["main-tab-0"].exists)
 
         let gamingAttachment = XCTAttachment(screenshot: app.screenshot())

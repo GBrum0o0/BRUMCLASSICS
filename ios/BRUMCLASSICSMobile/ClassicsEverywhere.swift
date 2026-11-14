@@ -20,6 +20,12 @@ struct PocketProgress: Codable, Equatable {
     var updatedAt: Date
     var unlocked: Int { achievements.filter(\.unlocked).count }
 
+    private static func badgeURL(_ name: String?) -> String? {
+        guard let name, (1...16).contains(name.utf8.count),
+              name.utf8.allSatisfy({ $0 >= 48 && $0 <= 57 }) else { return nil }
+        return "https://media.retroachievements.org/Badge/\(name).png"
+    }
+
     static func decode(_ data: Data, username: String, expectedID: Int) throws -> Self {
         guard let raw = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               raw["Error"] == nil, (raw["ID"] as? NSNumber)?.intValue == expectedID,
@@ -31,7 +37,7 @@ struct PocketProgress: Codable, Equatable {
             guard let title = item["Title"] as? String else { return nil }
             let soft = item["DateEarned"] as? String ?? ""
             let hard = item["DateEarnedHardcore"] as? String ?? ""
-            return Game.Achievement(id: key, title: title, description: item["Description"] as? String ?? "", points: (item["Points"] as? NSNumber)?.intValue ?? 0, unlocked: !soft.isEmpty || !hard.isEmpty, hardcore: !hard.isEmpty, unlockedAt: hard.isEmpty ? soft : hard, badgeUrl: nil, manual: nil)
+            return Game.Achievement(id: key, title: title, description: item["Description"] as? String ?? "", points: (item["Points"] as? NSNumber)?.intValue ?? 0, unlocked: !soft.isEmpty || !hard.isEmpty, hardcore: !hard.isEmpty, unlockedAt: hard.isEmpty ? soft : hard, badgeUrl: badgeURL(item["BadgeName"] as? String), manual: nil)
         }.sorted { $0.title < $1.title }
         return Self(username: username, gameID: expectedID, title: title, achievements: achievements, updatedAt: Date())
     }
