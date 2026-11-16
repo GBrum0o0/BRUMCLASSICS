@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## Launcher 2.1.21 — validação Windows M.U.R.B (Atari 2600, NES, SNES e GBA) e ajustes de SNES/DS
+
+- Validados em 10 minutos de gameplay real (`36.000` quadros), vídeo, áudio e controles: Atari 2600 (*Pac-Man*), NES (*Excitebike* e *Super Mario Bros. 3*), SNES (*A Link to the Past* e *Super Mario World*, com persistência e recarga de SRAM 64 KiB) e GBA (*Super Mario Advance 4*, com persistência e recarga Flash128 isolada em `.onbrum`).
+- Regressões de GB (*Pokémon Red*) e GBC (*Pokémon Crystal* com RTC e `.onbrum`) e suíte do Cofre de Saves (`56/56`) aprovadas sem alterar saves originais.
+- Correções de temporizadores/cascade, Shared WRAM, RTC, AUXSPI, divisão/raiz, IPC FIFO, DMA e canais de áudio ARM7 no Nintendo DS (`478` testes nativos aprovados), porém jogos comerciais de DS testados ainda exibem tela branca e sem áudio.
+- 3DS segue limitado a diagnóstico sem compressão (`.3ds` comerciais comprimidos recusados); SMS/GG/PCE seguem apenas em diagnóstico (sem mídia comercial local) e os demais sistemas dos 30 grupos permanecem experimentais/pendentes. [Notas e validação](releases/v2.1.21/RELEASE-NOTES.md).
+
 ## Launcher 2.1.20 — telas de Nintendo DS e 3DS
 
 - DS e 3DS começam com as duas telas empilhadas. F3 alterna entre superior, inferior e ambas.
