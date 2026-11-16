@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## Launcher 2.1.22 — diretórios personalizados em CLASSICS e correção da detecção de jogos
+
+- Nova seção **Pastas de jogos** em **Configurações → Mais configurações → CLASSICS** para listar pastas ativas, **adicionar qualquer diretório do computador**, alterar a pasta principal, remover pastas extras sem apagar ROMs nem saves e disparar **Puxar jogos agora**.
+- Pastas `RETROGAMES` ou `games` existentes ao lado do executável portátil passam a ser incluídas automaticamente mesmo quando `RETROGAMES` legado aponta para outro caminho.
+- Corrigido o fallback de inicialização (`quick-state`) para sempre incluir `retro` em segundo plano quando o cache rápido excede `350 ms`, evitando que ROMs recém-copiadas deixem de entrar na biblioteca.
+- Ampliado o reconhecimento de extensões/discos clássicos (`.gdi`, `.cdi`, `.rvz`, `.gcz`, `.gcm`, `.wbfs`, `.3dsx`, `.neo`) e detecção por assinatura binária de ISOs **Wii** (`0x5D1C9EA3`) e **GameCube** (`0xC2339F3D`), incluindo imagens `.nkit.iso`. Mantida toda a base M.U.R.B ENGINE validada na `2.1.21` (`4/30` sistemas jogáveis verificados; demais grupos seguem experimentais/pendentes). [Notas e validação](releases/v2.1.22/RELEASE-NOTES.md).
+
 ## Launcher 2.1.21 — validação Windows M.U.R.B (Atari 2600, NES, SNES e GBA) e ajustes de SNES/DS
 
 - Validados em 10 minutos de gameplay real (`36.000` quadros), vídeo, áudio e controles: Atari 2600 (*Pac-Man*), NES (*Excitebike* e *Super Mario Bros. 3*), SNES (*A Link to the Past* e *Super Mario World*, com persistência e recarga de SRAM 64 KiB) e GBA (*Super Mario Advance 4*, com persistência e recarga Flash128 isolada em `.onbrum`).

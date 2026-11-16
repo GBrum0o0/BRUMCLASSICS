@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.21"><strong>Windows 2.1.21</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.22"><strong>Windows 2.1.22</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.24.0"><strong>Android 0.24.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.0"><strong>iOS 0.15.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -85,7 +85,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 2.1.21 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.21) |
+| Windows | 2.1.22 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.22) |
 | Android | 0.24.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.24.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.15.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.0) · [Guia](ios/README-IOS.md) |
 
@@ -95,6 +95,7 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 
 ## Versões atuais
 
+- **Launcher 2.1.22:** múltiplos diretórios de jogos em **Configurações → CLASSICS** (`ADICIONAR DIRETÓRIO`, alteração da pasta principal, remoção segura sem apagar arquivos e botão **Puxar jogos agora**), autodetecção da pasta local `games`/`RETROGAMES` ao lado do executável, identificação de ISOs de Wii/GameCube (inclusive `.nkit.iso`) e correção no fallback do startup quando a leitura inicial ultrapassa `350 ms`. [Notas e validação](releases/v2.1.22/RELEASE-NOTES.md).
 - **Launcher 2.1.21:** validação estendida no Windows para Atari 2600, NES, SNES e GBA (jogos comerciais em 36.000 quadros / 10 min, controles, áudio e saves isolados), regressão preservada de GB/GBC e correções de SNES/DS na suíte nativa. O restante dos 30 grupos (incluindo DS comercial, 3DS comprimido, SMS/GG/PCE sem mídia local e sistemas experimentais) permanece pendente; o porte ainda não está completo. [Notas e limites](releases/v2.1.21/RELEASE-NOTES.md).
 - **Launcher 2.1.20:** duas telas de DS e 3DS no PC, alternância com F3 e descoberta de arquivos `.3ds` na biblioteca. A M.U.R.B ENGINE permanece experimental. [Notas e limites dos testes](releases/v2.1.20/RELEASE-NOTES.md).
 - **Launcher 1.75.1:** monitoramento Steam em tempo real por manifesto e pasta de transferência, com detecção imediata de instalações e atualizações iniciadas no cliente.
@@ -152,7 +153,7 @@ Consulte também o guia de [Conexões e origem dos dados](docs/CONEXOES.md), com
 
 Esta versão usa exclusivamente a M.U.R.B experimental para CLASSICS, sem RetroArch/fallback. Não certifica suporte completo aos consoles. Saves antigos são preservados e os testes usam armazenamento separado. Se precisar dos emuladores externos anteriores, mantenha a [2.1.5](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.5).
 
-1. Baixe o executável portátil da [release Windows 2.1.21](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.21), ou use Configurações → Sistema → Atualizações no Launcher já instalado. [Notas e limites](releases/v2.1.21/RELEASE-NOTES.md). O Brum iOS Bridge está em validação no iPhone e os emuladores mantêm caráter experimental.
+1. Baixe o executável portátil da [release Windows 2.1.22](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.22), ou use Configurações → Sistema → Atualizações no Launcher já instalado. [Notas e limites](releases/v2.1.22/RELEASE-NOTES.md). O Brum iOS Bridge está em validação no iPhone e os emuladores mantêm caráter experimental.
 2. Execute `BRUMCLASSICS OFICIAL.exe`.
 3. Abra **Configurações → Conexões → Explorar conexões** e vincule somente suas próprias contas.
 4. Para CLASSICS, coloque somente suas próprias ROMs na pasta `RETROGAMES`.
