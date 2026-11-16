@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## Launcher 2.1.24 — correção do controle PC no Nintendo Wii U (Cemu)
+
+- Restaurada a detecção direta de controles físicos conectados ao computador no **Nintendo Wii U (Cemu)**: removida a leitura forçada `winmm`/`joyGetPosEx` sem verificação de `JOYCAPS_HASPOV` que prendia a tecla sintética `VK_UP` (`buttons=4`) quando um controle XInput estava conectado.
+- Mantida prioridade ao XInput nativo no `controller0.xml` sem concorrência de teclas sintéticas, com fallback para slots XInput `1..3` ou DirectInput real e entrega limpa do foco para a janela do Cemu após a tela de abertura do Launcher. [Notas e detalhes](releases/v2.1.24/RELEASE-NOTES.md).
+
 ## Launcher 2.1.23 — integração completa de consoles na M.U.R.B ENGINE (exceto PS3 e Xbox)
 
 - Liberada a nova política de integração híbrida da **M.U.R.B ENGINE** no **BRUMCLASSICS OFICIAL** com suporte a **`33` sistemas integrados**: Game Boy, Game Boy Color, Game Boy Advance, Nintendo DS, Nintendo 3DS, NES, SNES, Nintendo 64, GameCube, Wii, Wii U (via Cemu e `.rpx` HLE), Master System, Game Gear, Mega Drive/Genesis, Sega CD, Sega 32X, Sega Saturn, Dreamcast, SG-1000, PlayStation, PlayStation 2, PSP, Atari 2600, Atari 7800, Atari Jaguar, Atari Lynx, PC Engine, Neo Geo, Neo Geo Pocket, WonderSwan, 3DO, MSX e Arcade.
