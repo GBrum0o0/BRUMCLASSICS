@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## Launcher 2.1.28 — Correção da intro travada e abertura imediata no Wii U (Cemu) e CLASSICS
+
+- Eliminado o atraso de ~8,2 s causado por `Get-PnpDevice` em `controllerService.prepareLaunch` antes da abertura dos jogos, passando a usar sonda nativa imediata (`--probe-controllers`), limite de 250 ms no inventário PnP e cache aquecido em segundo plano na inicialização.
+- Corrigida a detecção de carregamento real do **Cemu (Wii U)** em modo tela cheia (`portable/log.txt` com `Loaded module '` / `IOSU_ACT:`), removendo `WS_EX_LAYERED` na entrega de `BRUM_CORE_WINDOW_READY` (~8,2 s no *Mario Kart 8*), liberando `FOCUS` incondicionalmente e reduzindo o fallback de 25 s para 12 s.
+- Ajustado o timeout de espera pós-intro (`onWait`) de 45 s para 20 s, ampliado o timeout de confirmação inicial do host (`25 s` no Cemu / `15 s` demais núcleos) e adicionado cancelamento seguro via `Escape` após 1,5 s de espera em `launch-briefing.js`. [Notas e detalhes](releases/v2.1.28/RELEASE-NOTES.md).
+
 ## Launcher 2.1.27 — Gerenciador minimalista, correção Wii U/CLASSICS, intro sincronizada e RetroAchievements nativo
 
 - **Brum Input Core simplificado:** o ícone de controle passa a abrir uma visão limpa apenas com os cartões dos controles conectados (controle no PC e celular pareado como `CONECTADO`) e dois botões principais (**`TESTAR CONTROLE`** e **`CONFIGURAÇÃO GLOBAL`**), mantendo testador e preferências avançadas ocultos até o clique; corrigido o isolamento para que o celular como companheiro não ocupe `P2` nem ative `--remote-gamepad 1` sem modo Gamepad Mobile ativo.
