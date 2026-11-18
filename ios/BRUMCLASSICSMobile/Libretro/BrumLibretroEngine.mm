@@ -2002,8 +2002,8 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 }
 
 - (void)applyVirtualControlsVisibility {
-    const BOOL hasPhysical = BrumActiveController() != nil;
-    const BOOL nextHidden = _manualControlsHidden || (_autoHideWithController && hasPhysical);
+    const BOOL hasPhysical = BrumActiveControllers().count > 0;
+    const BOOL nextHidden = _manualControlsHidden || (_autoHideWithController && _virtualPadPort == 0 && hasPhysical);
     _controlsHidden = nextHidden;
     if (nextHidden) {
         [self releaseInputSource:BrumInputVirtualPad];
@@ -2035,7 +2035,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 }
 
 - (void)syncPhysicalControllerUIWithToast:(BOOL)showToast {
-    GCController *controller = BrumActiveController();
+    GCController *controller = BrumActiveControllers().firstObject;
     [self applyVirtualControlsVisibility];
     if (!showToast || _stopped) return;
     if (controller) {
