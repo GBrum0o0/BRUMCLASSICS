@@ -1,6 +1,7 @@
 package com.brumclassics.mobile.murb;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
@@ -38,6 +39,9 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
     private int port;
     private String token;
     private String system = "ds";
+    private String gameTitle = "";
+    private int playerNumber = 1;
+    private String p2Uri = "";
 
     private MurbRemoteClient client;
     private RemoteCanvasView canvasView;
@@ -61,11 +65,19 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
     private int lastRtt;
 
     public static Intent intent(Context context, String host, int port, String token, String system) {
+        return intent(context, host, port, token, system, "", 1, "");
+    }
+
+    public static Intent intent(Context context, String host, int port, String token, String system,
+                                String gameTitle, int playerNumber, String p2Uri) {
         Intent intent = new Intent(context, MurbRemoteGamepadActivity.class);
         intent.putExtra("host", host);
         intent.putExtra("port", port);
         intent.putExtra("token", token);
         intent.putExtra("sys", system);
+        intent.putExtra("gameTitle", gameTitle == null ? "" : gameTitle);
+        intent.putExtra("playerNumber", Math.max(1, Math.min(4, playerNumber)));
+        intent.putExtra("p2Uri", p2Uri == null ? "" : p2Uri);
         return intent;
     }
 
@@ -79,6 +91,11 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
         port = getIntent().getIntExtra("port", 8089);
         token = getIntent().getStringExtra("token");
         system = MurbRemoteClient.normalizeSystem(getIntent().getStringExtra("sys"));
+        gameTitle = getIntent().getStringExtra("gameTitle");
+        if (gameTitle == null) gameTitle = "";
+        playerNumber = Math.max(1, Math.min(4, getIntent().getIntExtra("playerNumber", 1)));
+        p2Uri = getIntent().getStringExtra("p2Uri");
+        if (p2Uri == null) p2Uri = "";
 
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.rgb(6, 7, 10));
@@ -118,6 +135,10 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
         bar.addView(statusPill, marginStart(dp(8)));
         View spacer = new View(this);
         bar.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1));
+        if (!p2Uri.isEmpty()) {
+            TextView p2Button = pillButton("P2 LAN", true, v -> showP2Dialog());
+            bar.addView(p2Button, marginStart(dp(6)));
+        }
         bar.addView(scaleToggle, marginStart(dp(6)));
         bar.addView(modeToggle, marginStart(dp(6)));
         bar.addView(reconnect, marginStart(dp(6)));
@@ -277,16 +298,30 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 
+    private void showP2Dialog() {
+        MurbRemoteClient.PairingTarget target = MurbRemoteClient.parseUri(p2Uri);
+        String msg = target != null
+            ? "No segundo celular, abra Controles → Gamepad M.U.R.B para PC e conecte:\n\nIP: " + target.host + "\nPorta: " + target.port + "\nToken: " + target.token + "\n\nLink: " + p2Uri
+            : p2Uri;
+        new AlertDialog.Builder(this)
+            .setTitle("Convidar Jogador 2 (Wi-Fi)")
+            .setMessage(msg)
+            .setPositiveButton("Fechar", null)
+            .show();
+    }
+
     private void updateStatusPill() {
         boolean online = client != null && client.isConnected();
         String dot = online ? "●" : "○";
-        String base = dot + " M.U.R.B " + system.toUpperCase(Locale.ROOT) + " · PC";
+        String prefix = gameTitle.isEmpty()
+            ? dot + " P" + playerNumber + " · M.U.R.B " + system.toUpperCase(Locale.ROOT) + " · PC"
+            : dot + " P" + playerNumber + " · " + gameTitle;
         if (online && MurbRemoteClient.supportsDualScreen(system)) {
-            statusPill.setText(String.format(Locale.US, "%s · %d FPS · %d ms", base, fps, lastRtt));
+            statusPill.setText(String.format(Locale.US, "%s · %d FPS · %d ms", prefix, fps, lastRtt));
         } else if (online) {
-            statusPill.setText(String.format(Locale.US, "%s · %d ms", base, lastRtt));
+            statusPill.setText(String.format(Locale.US, "%s · %d ms", prefix, lastRtt));
         } else {
-            statusPill.setText(base + " · reconectando…");
+            statusPill.setText(prefix + " · conectando…");
         }
     }
 

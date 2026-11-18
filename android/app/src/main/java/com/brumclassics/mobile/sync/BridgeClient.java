@@ -78,6 +78,8 @@ public final class BridgeClient {
         void onError(String safeMessage);
     }
 
+    public String pairedHost() { return preferredHost(); }
+
     public String serverFingerprint() { return preferences.getString("tls_pin", ""); }
     public long lastSuccessfulSyncAt() { return preferences.getLong("last_successful_sync", 0L); }
     public int pendingChanges() { return pendingCompanionNotes() + pendingLibraryChanges(); }
@@ -167,6 +169,47 @@ public final class BridgeClient {
                 JSONObject result = root.optJSONObject("result");
                 if (result == null || !result.optBoolean("ok", false)) {
                     throw new IllegalStateException(result == null ? "O launcher não confirmou a abertura." : result.optString("message", "Não foi possível iniciar o jogo."));
+                }
+                post(() -> callback.onResult(result));
+            } catch (Exception error) { post(() -> callback.onError(safeMessage(error))); }
+        });
+    }
+
+    public void launchGamepad(Game game, String filename, String title, String mode, int players, String hybridMode, BCardCallback callback) {
+        if (!isConfigured()) { callback.onError("Conecte este celular ao launcher primeiro."); return; }
+        String gameId = game != null && game.id != null ? game.id : "";
+        if (gameId.isEmpty() && (filename == null || filename.isEmpty()) && (title == null || title.isEmpty())) {
+            callback.onError("Jogo indisponível no computador.");
+            return;
+        }
+        executor.execute(() -> {
+            try {
+                JSONObject payload = new JSONObject();
+                if (!gameId.isEmpty()) payload.put("gameId", gameId);
+                if (filename != null && !filename.isEmpty()) payload.put("filename", filename);
+                if (title != null && !title.isEmpty()) payload.put("title", title);
+                payload.put("mode", "continue-auto".equals(mode) || "continue-manual".equals(mode) ? mode : "new");
+                payload.put("players", Math.max(1, Math.min(4, players)));
+                if (hybridMode != null && !hybridMode.isEmpty()) payload.put("hybridMode", hybridMode);
+                JSONObject body = new JSONObject();
+                body.put("command", "gamepad_launch");
+                body.put("requestId", UUID.randomUUID().toString());
+                body.put("issuedAt", System.currentTimeMillis());
+                body.put("payload", payload);
+                HttpURLConnection connection = open(baseUrl() + "/v1/remote", "POST", true);
+                connection.setDoOutput(true);
+                byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
+                connection.setFixedLengthStreamingMode(bytes.length);
+                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                try (OutputStream output = connection.getOutputStream()) { output.write(bytes); }
+                String response = readResponse(connection, 256 * 1024);
+                JSONObject root = response.isEmpty() ? new JSONObject() : new JSONObject(response);
+                if (connection.getResponseCode() != 200 || !root.optBoolean("ok", false)) {
+                    throw new IllegalStateException(root.optString("message", "O launcher recusou o modo Gamepad."));
+                }
+                JSONObject result = root.optJSONObject("result");
+                if (result == null || !result.optBoolean("ok", false)) {
+                    throw new IllegalStateException(result == null ? "O launcher não confirmou a abertura." : result.optString("message", "Não foi possível abrir o jogo no computador."));
                 }
                 post(() -> callback.onResult(result));
             } catch (Exception error) { post(() -> callback.onError(safeMessage(error))); }

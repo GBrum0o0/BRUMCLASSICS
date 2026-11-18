@@ -24,6 +24,7 @@ typedef void (^BrumEmulatorReadyHandler)(void);
                         onExit:(BrumEmulatorExitHandler)onExit NS_DESIGNATED_INITIALIZER;
 
 @property(nonatomic, readonly) NSString *diagnosticsReport;
+@property(nonatomic) NSInteger virtualPadPort;
 
 - (instancetype)initWithNibName:(nullable NSString *)nibNameOrNil
                           bundle:(nullable NSBundle *)nibBundleOrNil NS_UNAVAILABLE;

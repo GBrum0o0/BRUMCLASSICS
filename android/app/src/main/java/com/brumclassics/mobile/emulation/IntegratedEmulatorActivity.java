@@ -62,6 +62,8 @@ public final class IntegratedEmulatorActivity extends Activity {
     private boolean autoHideWithController;
     private boolean virtualHapticsEnabled = true;
     private boolean useAnalogStick;
+    private int virtualPadPort;
+    private final List<Integer> physicalDeviceIds = new ArrayList<>();
     private final InputManager.InputDeviceListener inputListener = new InputManager.InputDeviceListener() {
         @Override public void onInputDeviceAdded(int deviceId) { syncControllerOverlay(true); }
         @Override public void onInputDeviceChanged(int deviceId) { syncControllerOverlay(false); }
@@ -69,6 +71,10 @@ public final class IntegratedEmulatorActivity extends Activity {
     };
 
     public static Intent intent(Context context, IntegratedEmulatorLaunch launch) {
+        return intent(context, launch, 0);
+    }
+
+    public static Intent intent(Context context, IntegratedEmulatorLaunch launch, int virtualPadPort) {
         Intent intent = new Intent(context, IntegratedEmulatorActivity.class);
         intent.putExtra("gameId", launch.gameId); intent.putExtra("title", launch.title);
         intent.putExtra("canonicalGameId", launch.canonicalGameId); intent.putExtra("systemId", launch.systemId);
@@ -76,6 +82,7 @@ public final class IntegratedEmulatorActivity extends Activity {
         intent.putExtra("coreDisplayName", launch.coreDisplayName); intent.putExtra("coreVersion", launch.coreVersion);
         intent.putExtra("coreLibraryName", launch.coreLibraryName);
         intent.putExtra("raGameId", launch.retroAchievementsGameId);
+        intent.putExtra("virtualPadPort", Math.max(0, Math.min(3, virtualPadPort)));
         intent.putExtra("romFile", launch.romFile == null ? "" : launch.romFile.getAbsolutePath()); intent.putExtra("romUri", launch.romUri); intent.putExtra("saveFile", launch.saveFile.getAbsolutePath());
         intent.putExtra("manifestFile", launch.manifestFile.getAbsolutePath()); intent.putExtra("systemDirectory", launch.systemDirectory.getAbsolutePath());
         return intent;
@@ -99,6 +106,8 @@ public final class IntegratedEmulatorActivity extends Activity {
             }
             BrumCoreBridge bridge = new BrumCoreBridge(corePath, romPath, launch);
             emulatorView = new BrumCoreView(this, bridge, this::showRuntimeFailure);
+            virtualPadPort = Math.max(0, Math.min(3, getIntent().getIntExtra("virtualPadPort", 0)));
+            emulatorView.setVirtualPadPort(virtualPadPort);
             SharedPreferences prefs = getSharedPreferences("brum_mobile_prefs", MODE_PRIVATE);
             virtualHapticsEnabled = prefs.getBoolean("virtual_haptics", true);
             autoHideWithController = prefs.getBoolean("auto_hide_pad_with_controller", false);
@@ -134,10 +143,21 @@ public final class IntegratedEmulatorActivity extends Activity {
 
     @Override public void onBackPressed() { closeEmulator(); }
 
+    private int resolvePhysicalPort(int deviceId) {
+        if (deviceId <= 0) return 0;
+        int idx = physicalDeviceIds.indexOf(deviceId);
+        if (idx < 0) {
+            physicalDeviceIds.add(deviceId);
+            idx = physicalDeviceIds.size() - 1;
+        }
+        return Math.max(0, Math.min(3, idx));
+    }
+
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
         if (emulatorView != null) {
+            int port = resolvePhysicalPort(event.getDeviceId());
             for (int id = 0; id < CONTROLLER_KEYS.length; id++) if (event.getKeyCode() == CONTROLLER_KEYS[id]) {
-                emulatorView.setButton(id, event.getAction() == KeyEvent.ACTION_DOWN);
+                emulatorView.setPortButton(port, id, event.getAction() == KeyEvent.ACTION_DOWN);
                 return true;
             }
         }
@@ -146,16 +166,17 @@ public final class IntegratedEmulatorActivity extends Activity {
 
     @Override public boolean dispatchGenericMotionEvent(MotionEvent event) {
         if (emulatorView != null && (event.getSource() & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK && event.getAction() == MotionEvent.ACTION_MOVE) {
+            int port = resolvePhysicalPort(event.getDeviceId());
             float x = axis(event, MotionEvent.AXIS_HAT_X, MotionEvent.AXIS_X);
             float y = axis(event, MotionEvent.AXIS_HAT_Y, MotionEvent.AXIS_Y);
-            emulatorView.setButton(6, x < -0.45f); emulatorView.setButton(7, x > 0.45f);
-            emulatorView.setButton(4, y < -0.45f); emulatorView.setButton(5, y > 0.45f);
-            emulatorView.setAnalog(0, 0, clampAxis(event.getAxisValue(MotionEvent.AXIS_X)));
-            emulatorView.setAnalog(0, 1, clampAxis(event.getAxisValue(MotionEvent.AXIS_Y)));
-            emulatorView.setAnalog(1, 0, clampAxis(event.getAxisValue(MotionEvent.AXIS_Z)));
-            emulatorView.setAnalog(1, 1, clampAxis(event.getAxisValue(MotionEvent.AXIS_RZ)));
-            emulatorView.setButton(12, event.getAxisValue(MotionEvent.AXIS_LTRIGGER) > 0.25f);
-            emulatorView.setButton(13, event.getAxisValue(MotionEvent.AXIS_RTRIGGER) > 0.25f);
+            emulatorView.setPortButton(port, 6, x < -0.45f); emulatorView.setPortButton(port, 7, x > 0.45f);
+            emulatorView.setPortButton(port, 4, y < -0.45f); emulatorView.setPortButton(port, 5, y > 0.45f);
+            emulatorView.setPortAnalog(port, 0, 0, clampAxis(event.getAxisValue(MotionEvent.AXIS_X)));
+            emulatorView.setPortAnalog(port, 0, 1, clampAxis(event.getAxisValue(MotionEvent.AXIS_Y)));
+            emulatorView.setPortAnalog(port, 1, 0, clampAxis(event.getAxisValue(MotionEvent.AXIS_Z)));
+            emulatorView.setPortAnalog(port, 1, 1, clampAxis(event.getAxisValue(MotionEvent.AXIS_RZ)));
+            emulatorView.setPortButton(port, 12, event.getAxisValue(MotionEvent.AXIS_LTRIGGER) > 0.25f);
+            emulatorView.setPortButton(port, 13, event.getAxisValue(MotionEvent.AXIS_RTRIGGER) > 0.25f);
             return true;
         }
         return super.dispatchGenericMotionEvent(event);
@@ -297,15 +318,16 @@ public final class IntegratedEmulatorActivity extends Activity {
     private boolean hasPhysicalController() {
         InputManager manager = getSystemService(InputManager.class);
         if (manager == null) return false;
+        physicalDeviceIds.clear();
         for (int id : manager.getInputDeviceIds()) {
             InputDevice device = manager.getInputDevice(id);
             if (device == null || device.isVirtual()) continue;
             if (Build.VERSION.SDK_INT >= 27 && !device.isEnabled()) continue;
             if (device.supportsSource(InputDevice.SOURCE_GAMEPAD) || device.supportsSource(InputDevice.SOURCE_JOYSTICK)) {
-                return true;
+                physicalDeviceIds.add(id);
             }
         }
-        return false;
+        return !physicalDeviceIds.isEmpty();
     }
 
     private void updateAnalogPadVisibility(boolean hidden) {

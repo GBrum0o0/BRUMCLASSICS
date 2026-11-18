@@ -43,6 +43,25 @@ final class PocketTests: XCTestCase {
         XCTAssertNil(MurbPairingPayload.parse(URL(string: "murb://ds?ip=192.168.1.1&port=99999&token=AA")!))
         XCTAssertNil(MurbPairingPayload.parse(URL(string: "https://example.com/?ip=1.2.3.4&token=AA")!))
 
+        let loopbackInfo = BridgeClient.MurbRemoteSessionInfo(
+            available: true, host: "127.0.0.1", port: 8089, token: "z9y8x7",
+            session: "s2", qrUri: "murb://wiiu?ip=127.0.0.1&port=8089&token=z9y8x7",
+            p2QrUri: "murb://wiiu?ip=0.0.0.0&port=8089&token=p2code", system: "wiiu"
+        )
+        let target = try XCTUnwrap(MurbRemoteLaunchTarget.from(
+            loopbackInfo,
+            fallbackHost: "192.168.0.77",
+            gameTitle: "Mario Kart 8",
+            playerNumber: 2
+        ))
+        XCTAssertEqual(target.payload.host, "192.168.0.77")
+        XCTAssertEqual(target.payload.token, "Z9Y8X7")
+        XCTAssertEqual(target.payload.system, "wiiu")
+        XCTAssertEqual(target.playerNumber, 2)
+        XCTAssertEqual(target.gameTitle, "Mario Kart 8")
+        XCTAssertEqual(target.p2Payload?.host, "192.168.0.77")
+        XCTAssertEqual(target.p2Payload?.token, "P2CODE")
+
         var frameData = Data(count: 16 + 4 * 2 * 2)
         frameData[0] = 0x42; frameData[1] = 0x52; frameData[2] = 0x55; frameData[3] = 0x4D // 'MURB' LE
         frameData[4] = 7

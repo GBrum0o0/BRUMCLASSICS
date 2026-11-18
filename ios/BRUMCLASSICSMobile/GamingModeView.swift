@@ -1,3 +1,4 @@
+import GameController
 import SwiftUI
 import UIKit
 
@@ -55,7 +56,7 @@ struct GamingModeView: View {
                         BrumCard {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Nenhum jogo pronto").font(.headline).foregroundStyle(BrumTheme.text)
-                                Text("Escolha uma pasta de ROMs no Perfil ou instale um jogo no computador.")
+                                Text("Toque na engrenagem acima para selecionar uma pasta de ROMs ou instale um jogo no computador.")
                                     .font(.subheadline).foregroundStyle(.secondary)
                             }.frame(maxWidth: .infinity, alignment: .leading)
                         }
@@ -207,7 +208,12 @@ private struct GamingROMDetailView: View {
     @Environment(\.dismiss) private var dismiss
     let rom: ROMFolderGame
     @State private var launchIntegrated = false
+    @State private var launchIntegratedVirtualP2 = false
     @State private var launchingOnPC = false
+    @State private var launchingGamepad = false
+    @State private var showLocalMultiplayer = false
+    @State private var showMurbManual = false
+    @State private var activeMurbTarget: MurbRemoteLaunchTarget?
     @State private var syncingNativeSave = false
     @State private var confirmNativeUpload = false
     @State private var confirmNativeDownload = false
@@ -286,17 +292,35 @@ private struct GamingROMDetailView: View {
                         GamingInfoItem(label: "RetroAchievements", value: Int(record?.retroAchievementID ?? "").map { "ID \($0)" } ?? "Não vinculado"),
                         GamingInfoItem(label: "Launcher PC", value: linkedPCGame?.title ?? "Não vinculado")
                     ])
+                    GamingActionBar(
+                        canPlay: installedCore != nil || canUseRetroArch || linkedPCGame != nil,
+                        playTitle: "JOGAR",
+                        playSubtitle: installedCore != nil ? "No celular · \(installedCore!.displayName)" : (canUseRetroArch ? "No celular · RetroArch" : "No PC"),
+                        gamepadBusy: launchingGamepad,
+                        pcOnline: store.connection == .online,
+                        onPlay: {
+                            if installedCore != nil {
+                                launchIntegrated = true
+                            } else if canUseRetroArch {
+                                Task { await pocket.launchROM(rom, launcher: store) }
+                            } else if let game = linkedPCGame {
+                                launchingOnPC = true
+                                Task {
+                                    let error = await store.launchBCard(game)
+                                    actionMessage = error.map { "Não foi possível iniciar no PC: \($0)" } ?? "Jogo iniciado no computador."
+                                    launchingOnPC = false
+                                }
+                            }
+                        },
+                        onGamepad: launchGamepadFromROM,
+                        onLocalMultiplayer: { showLocalMultiplayer = true }
+                    )
                     if let core = installedCore {
-                        Button { launchIntegrated = true } label: {
-                            Text("\(CoreRegistry.experimental.contains(core) ? "TESTAR" : "JOGAR") NO BRUM CORE · \(core.displayName.uppercased())").frame(maxWidth: .infinity)
-                        }.buttonStyle(PrimaryButtonStyle()).disabled(syncingNativeSave)
+                        Text("\(CoreRegistry.experimental.contains(core) ? "TESTAR" : "JOGAR · BRUM CORE") · \(core.displayName)")
+                            .font(.caption.bold()).foregroundStyle(BrumTheme.primary)
                     } else if canUseRetroArch {
-                        Button {
-                            Task { await pocket.launchROM(rom, launcher: store) }
-                        } label: {
-                            Text(pocket.isImportedIntoRetroArch(rom) ? "ABRIR NO RETROARCH" : "IMPORTAR PARA O RETROARCH")
-                                .frame(maxWidth: .infinity)
-                        }.buttonStyle(PrimaryButtonStyle())
+                        Text(pocket.isImportedIntoRetroArch(rom) ? "RetroArch pronto" : "Importar ROM para o RetroArch ao jogar")
+                            .font(.caption).foregroundStyle(BrumTheme.muted)
                     }
                     if let game = linkedPCGame {
                         if installedCore != nil && pcNativeSaveCompatible {
@@ -318,7 +342,7 @@ private struct GamingROMDetailView: View {
                                 actionMessage = error.map { "Não foi possível iniciar no PC: \($0)" } ?? "Jogo iniciado no computador."
                                 launchingOnPC = false
                             }
-                        } label: { Text("JOGAR NO PC").frame(maxWidth: .infinity).frame(height: 44) }
+                        } label: { Text("SOMENTE INICIAR NO COMPUTADOR").frame(maxWidth: .infinity).frame(height: 44) }
                             .buttonStyle(.bordered).tint(BrumTheme.primary)
                             .disabled(store.connection != .online || launchingOnPC)
                     }
@@ -348,6 +372,35 @@ private struct GamingROMDetailView: View {
             }
         }
         .fullScreenCover(isPresented: $launchIntegrated) { IntegratedEmulatorView(rom: rom, returnsToPortrait: false) }
+        .fullScreenCover(isPresented: $launchIntegratedVirtualP2) { IntegratedEmulatorView(rom: rom, returnsToPortrait: false, virtualPadPort: 1) }
+        .fullScreenCover(item: $activeMurbTarget) { target in
+            MurbRemoteGamepadView(target: target.payload, gameTitle: target.gameTitle, playerNumber: target.playerNumber, p2Payload: target.p2Payload)
+        }
+        .sheet(isPresented: $showMurbManual) {
+            MurbRemoteGamepadLauncherSheet().preferredColorScheme(.dark)
+        }
+        .sheet(isPresented: $showLocalMultiplayer) {
+            LocalMultiplayerSheet(
+                gameTitle: rom.title,
+                pcAvailable: store.connection == .online,
+                phoneCoopAvailable: installedCore != nil,
+                onStartPhoneCoop: { virtualPort in
+                    showLocalMultiplayer = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        if virtualPort == 1 { launchIntegratedVirtualP2 = true } else { launchIntegrated = true }
+                    }
+                },
+                onStartPCLanMultiplayer: { hybridMode, myPlayerNumber in
+                    showLocalMultiplayer = false
+                    startPCGamepadOrMultiplayer(players: 2, hybridMode: hybridMode, myPlayerNumber: myPlayerNumber)
+                },
+                onOpenManualMurb: {
+                    showLocalMultiplayer = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { showMurbManual = true }
+                }
+            )
+            .preferredColorScheme(.dark)
+        }
         .confirmationDialog("Enviar o save deste iPhone ao perfil ativo no PC?", isPresented: $confirmNativeUpload) {
             Button("Enviar save") {
                 syncingNativeSave = true
@@ -395,6 +448,47 @@ private struct GamingROMDetailView: View {
         if canUseRetroArch { return "\(reason) A opção abaixo usa explicitamente o RetroArch e não conta como suporte integrado." }
         return "\(reason) O arquivo original foi preservado."
     }
+
+    private func launchGamepadFromROM() {
+        startPCGamepadOrMultiplayer(players: 1, hybridMode: "mobile1-pc2", myPlayerNumber: 1)
+    }
+
+    private func startPCGamepadOrMultiplayer(players: Int, hybridMode: String, myPlayerNumber: Int) {
+        guard store.connection == .online else {
+            actionMessage = "Computador offline. Conecte o Launcher na mesma rede ou abra o Gamepad M.U.R.B manualmente."
+            showMurbManual = true
+            return
+        }
+        launchingGamepad = true
+        actionMessage = "Iniciando \(rom.title) no computador e abrindo joystick virtual…"
+        let resolvedGameID = linkedPCGame?.id ?? pocket.launcherGame(for: rom, launcher: store)?.id
+        Task {
+            let result = await store.launchGamepadOnPC(
+                gameID: resolvedGameID,
+                filename: rom.filename,
+                title: rom.title,
+                mode: "new",
+                players: players,
+                hybridMode: hybridMode
+            )
+            await MainActor.run {
+                launchingGamepad = false
+                switch result {
+                case .success(let launch):
+                    if let target = MurbRemoteLaunchTarget.from(launch.remoteGamepad, fallbackHost: store.configuration?.host, gameTitle: rom.title, playerNumber: myPlayerNumber) {
+                        MurbRemoteStore().remember(target.payload)
+                        actionMessage = launch.message ?? "Jogo aberto no PC. Joystick virtual conectado."
+                        activeMurbTarget = target
+                    } else {
+                        actionMessage = (launch.message ?? "Jogo iniciado no computador.") + " Conecte o Gamepad M.U.R.B pela tela seguinte."
+                        showMurbManual = true
+                    }
+                case .failure(let error):
+                    actionMessage = error.localizedDescription
+                }
+            }
+        }
+    }
 }
 
 @MainActor enum GamingOrientation {
@@ -433,8 +527,11 @@ private struct GamingGameView: View {
 
     @State private var launchState = ""
     @State private var launching = false
+    @State private var launchingGamepad = false
     @State private var openingClient = false
     @State private var showMurbRemote = false
+    @State private var showLocalMultiplayer = false
+    @State private var activeMurbTarget: MurbRemoteLaunchTarget?
 
     private var streaming: StreamingStatus? { store.snapshot.experience?.streaming }
 
@@ -462,14 +559,22 @@ private struct GamingGameView: View {
                         GamingInfoItem(label: "Tamanho", value: game.sizeBytes > 0 ? ByteCountFormatter.string(fromByteCount: game.sizeBytes, countStyle: .file) : ""),
                         GamingInfoItem(label: "Execução", value: "Depende do PC (B-CARD / Streaming / M.U.R.B)")
                     ])
-                    Button(action: playStream) { HStack { if launching { ProgressView().tint(.black) }; Text(streamPlayLabel) }.frame(maxWidth: .infinity) }
-                        .buttonStyle(PrimaryButtonStyle()).disabled(!canPlay || launching).opacity(canPlay ? 1 : 0.38)
-                    Button { showMurbRemote = true } label: {
-                        Text("USAR GAMEPAD M.U.R.B PARA ESTE JOGO NO PC").font(.caption.bold()).frame(maxWidth: .infinity).frame(height: 44)
+                    GamingActionBar(
+                        canPlay: canStartOnPC,
+                        playTitle: "JOGAR",
+                        playSubtitle: streaming?.available == true ? "Streaming no celular" : "Iniciar no PC",
+                        gamepadBusy: launchingGamepad,
+                        pcOnline: canStartOnPC,
+                        onPlay: {
+                            if streaming?.available == true { playStream() } else { playOnPC() }
+                        },
+                        onGamepad: { startPCGamepad(players: 1, hybridMode: "mobile1-pc2", myPlayerNumber: 1) },
+                        onLocalMultiplayer: { showLocalMultiplayer = true }
+                    )
+                    if streaming?.available == true {
+                        Button(action: playOnPC) { Text("SOMENTE INICIAR NO COMPUTADOR").font(.caption.bold()).frame(maxWidth: .infinity).frame(height: 44) }
+                            .buttonStyle(.bordered).tint(BrumTheme.primary).disabled(!canStartOnPC || launching).opacity(canStartOnPC ? 1 : 0.38)
                     }
-                    .buttonStyle(.bordered).tint(BrumTheme.primary)
-                    Button(action: playOnPC) { Text("SOMENTE INICIAR NO COMPUTADOR").font(.caption.bold()).frame(maxWidth: .infinity).frame(height: 44) }
-                        .buttonStyle(.bordered).tint(BrumTheme.primary).disabled(!canStartOnPC || launching).opacity(canStartOnPC ? 1 : 0.38)
                     if !launchState.isEmpty { Text(launchState).font(.caption).foregroundStyle(launchState.contains("não") ? Color.orange : BrumTheme.primary) }
                     GamingAchievements(title: achievementSource, items: game.achievements,
                                        earned: hasAchievementTotals ? game.achievementsCollected : nil,
@@ -492,6 +597,26 @@ private struct GamingGameView: View {
         .sheet(isPresented: $showMurbRemote) {
             MurbRemoteGamepadLauncherSheet()
                 .preferredColorScheme(.dark)
+        }
+        .fullScreenCover(item: $activeMurbTarget) { target in
+            MurbRemoteGamepadView(target: target.payload, gameTitle: target.gameTitle, playerNumber: target.playerNumber, p2Payload: target.p2Payload)
+        }
+        .sheet(isPresented: $showLocalMultiplayer) {
+            LocalMultiplayerSheet(
+                gameTitle: game.title,
+                pcAvailable: canStartOnPC,
+                phoneCoopAvailable: false,
+                onStartPhoneCoop: { _ in },
+                onStartPCLanMultiplayer: { hybridMode, myPlayerNumber in
+                    showLocalMultiplayer = false
+                    startPCGamepad(players: 2, hybridMode: hybridMode, myPlayerNumber: myPlayerNumber)
+                },
+                onOpenManualMurb: {
+                    showLocalMultiplayer = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { showMurbRemote = true }
+                }
+            )
+            .preferredColorScheme(.dark)
         }
     }
 
@@ -551,6 +676,167 @@ private struct GamingGameView: View {
         } else {
             if let storeURL { UIApplication.shared.open(storeURL) }
             openingClient = false
+        }
+    }
+
+    private func startPCGamepad(players: Int, hybridMode: String, myPlayerNumber: Int) {
+        guard canStartOnPC else {
+            launchState = "Computador offline ou jogo não confirmado."
+            showMurbRemote = true
+            return
+        }
+        launchingGamepad = true
+        launchState = "Abrindo \(game.title) no computador e preparando o joystick virtual…"
+        Task {
+            let result = await store.launchGamepadOnPC(
+                gameID: game.id,
+                filename: nil,
+                title: game.title,
+                mode: "new",
+                players: players,
+                hybridMode: hybridMode
+            )
+            await MainActor.run {
+                launchingGamepad = false
+                switch result {
+                case .success(let launch):
+                    if let target = MurbRemoteLaunchTarget.from(launch.remoteGamepad, fallbackHost: store.configuration?.host, gameTitle: game.title, playerNumber: myPlayerNumber) {
+                        MurbRemoteStore().remember(target.payload)
+                        launchState = launch.message ?? "Jogo aberto no computador; joystick virtual ativo."
+                        activeMurbTarget = target
+                    } else {
+                        launchState = launch.message ?? "Jogo aberto no computador. Conecte o Gamepad manualmente."
+                        showMurbRemote = true
+                    }
+                case .failure(let error):
+                    launchState = "Não foi possível abrir o modo Gamepad: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+}
+
+private struct GamingActionBar: View {
+    let canPlay: Bool
+    let playTitle: String
+    let playSubtitle: String
+    let gamepadBusy: Bool
+    let pcOnline: Bool
+    let onPlay: () -> Void
+    let onGamepad: () -> Void
+    let onLocalMultiplayer: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Button(action: onPlay) {
+                    VStack(spacing: 2) {
+                        Label(playTitle, systemImage: "play.fill").font(.subheadline.bold())
+                        Text(playSubtitle).font(.caption2).opacity(0.82).lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(!canPlay)
+                .opacity(canPlay ? 1 : 0.42)
+                .accessibilityIdentifier("gaming-action-play")
+
+                Button(action: onGamepad) {
+                    VStack(spacing: 2) {
+                        if gamepadBusy {
+                            ProgressView().tint(BrumTheme.primary)
+                        } else {
+                            Label("GAMEPAD", systemImage: "gamecontroller.fill").font(.subheadline.bold())
+                        }
+                        Text(pcOnline ? "Abre no PC + Celular" : "Requer PC · LAN").font(.caption2).opacity(0.82).lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                }
+                .buttonStyle(.bordered).tint(BrumTheme.primary)
+                .disabled(gamepadBusy)
+                .accessibilityIdentifier("gaming-action-gamepad")
+
+                Button(action: onLocalMultiplayer) {
+                    VStack(spacing: 2) {
+                        Label("MULTIJOGADOR LOCAL", systemImage: "person.2.fill").font(.subheadline.bold()).lineLimit(1).minimumScaleFactor(0.75)
+                        Text("2 a 4 jogadores").font(.caption2).opacity(0.82).lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                }
+                .buttonStyle(.bordered).tint(BrumTheme.text)
+                .accessibilityIdentifier("gaming-action-multiplayer")
+            }
+        }
+    }
+}
+
+private struct LocalMultiplayerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let gameTitle: String
+    let pcAvailable: Bool
+    let phoneCoopAvailable: Bool
+    let onStartPhoneCoop: (Int) -> Void
+    let onStartPCLanMultiplayer: (String, Int) -> Void
+    let onOpenManualMurb: () -> Void
+    @State private var controllers: [GCController] = []
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Multijogador Local no Computador (LAN)") {
+                    Button {
+                        onStartPCLanMultiplayer("pc1-mobile2", 2)
+                    } label: {
+                        Label("PC (Jogador 1) + Este celular (Jogador 2)", systemImage: "laptopcomputer.and.iphone")
+                    }
+                    .disabled(!pcAvailable)
+
+                    Button {
+                        onStartPCLanMultiplayer("mobile1-pc2", 1)
+                    } label: {
+                        Label("Este celular (Jogador 1) + PC (Jogador 2)", systemImage: "iphone.and.arrow.forward")
+                    }
+                    .disabled(!pcAvailable)
+
+                    Button {
+                        onStartPCLanMultiplayer("dual-mobile", 1)
+                    } label: {
+                        Label("2 celulares no Wi-Fi (P1 e P2 · QR para 2º celular)", systemImage: "person.2.wave.2.fill")
+                    }
+                    .disabled(!pcAvailable)
+
+                    if !pcAvailable {
+                        Button("Abrir Gamepad M.U.R.B manualmente") { onOpenManualMurb() }
+                    }
+                    Text("Ao iniciar no PC em rede local, este celular abre automaticamente o joystick virtual conectado no jogador escolhido.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+
+                if phoneCoopAvailable {
+                    Section("Multijogador Local neste iPhone (Offline)") {
+                        Text(controllers.isEmpty
+                             ? "Conecte controles Bluetooth/USB no iPhone ou use 1 controle como P1 e este celular na tela como P2."
+                             : "\(controllers.count) controle(s) físico(s) detectado(s) para P1–P4.")
+                            .font(.caption).foregroundStyle(.secondary)
+
+                        Button {
+                            onStartPhoneCoop(0)
+                        } label: {
+                            Label("Iniciar com controles conectados (Virtual = P1)", systemImage: "gamecontroller.fill")
+                        }
+
+                        Button {
+                            onStartPhoneCoop(1)
+                        } label: {
+                            Label("Controle Bluetooth = P1 · Tela do celular = P2", systemImage: "hand.tap.fill")
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Multijogador · \(gameTitle)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Fechar") { dismiss() } } }
+            .onAppear { controllers = GCController.controllers().filter { !$0.isSnapshot } }
         }
     }
 }

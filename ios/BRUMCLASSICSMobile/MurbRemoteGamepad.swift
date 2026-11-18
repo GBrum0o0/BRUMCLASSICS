@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreImage.CIFilterBuiltins
 import Foundation
 import GameController
 import SwiftUI
@@ -52,6 +53,69 @@ struct MurbPairingPayload: Codable, Equatable {
         components.path = "/stream"
         components.queryItems = [URLQueryItem(name: "token", value: token)]
         return components.url
+    }
+
+    static func resolve(from info: BridgeClient.MurbRemoteSessionInfo?, fallbackHost: String?) -> MurbPairingPayload? {
+        guard let info, info.available == true else { return nil }
+        if let rawQR = info.qrUri, let url = URL(string: rawQR), var parsed = parse(url) {
+            if parsed.host.isEmpty || parsed.host == "127.0.0.1" || parsed.host == "0.0.0.0",
+               let fallback = fallbackHost?.trimmingCharacters(in: .whitespacesAndNewlines), !fallback.isEmpty {
+                parsed.host = fallback
+            }
+            return parsed
+        }
+        let host = {
+            let candidate = (info.host ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !candidate.isEmpty && candidate != "127.0.0.1" && candidate != "0.0.0.0" { return candidate }
+            return (fallbackHost ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        }()
+        let token = (info.token ?? "").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let port = info.port ?? 8089
+        guard !host.isEmpty, !token.isEmpty, (1...65535).contains(port) else { return nil }
+        return MurbPairingPayload(
+            host: host,
+            port: port,
+            token: token,
+            system: MurbProtocol.normalizeSystem(info.system ?? "gamepad"),
+            session: info.session ?? ""
+        )
+    }
+}
+
+struct MurbRemoteLaunchTarget: Identifiable {
+    let id = UUID()
+    let payload: MurbPairingPayload
+    let gameTitle: String
+    let playerNumber: Int
+    let p2Payload: MurbPairingPayload?
+
+    init(payload: MurbPairingPayload, gameTitle: String = "", playerNumber: Int = 1, p2Payload: MurbPairingPayload? = nil) {
+        self.payload = payload
+        self.gameTitle = gameTitle
+        self.playerNumber = max(1, min(4, playerNumber))
+        self.p2Payload = p2Payload
+    }
+
+    static func from(
+        _ info: BridgeClient.MurbRemoteSessionInfo?,
+        fallbackHost: String?,
+        gameTitle: String,
+        playerNumber: Int
+    ) -> MurbRemoteLaunchTarget? {
+        guard let payload = MurbPairingPayload.resolve(from: info, fallbackHost: fallbackHost) else { return nil }
+        var p2Payload: MurbPairingPayload?
+        if let rawP2 = info?.p2QrUri, let urlP2 = URL(string: rawP2), var parsedP2 = MurbPairingPayload.parse(urlP2) {
+            if (parsedP2.host.isEmpty || parsedP2.host == "127.0.0.1" || parsedP2.host == "0.0.0.0") && !payload.host.isEmpty {
+                parsedP2.host = payload.host
+            }
+            p2Payload = parsedP2
+        }
+        return MurbRemoteLaunchTarget(
+            payload: payload,
+            gameTitle: gameTitle,
+            playerNumber: playerNumber,
+            p2Payload: p2Payload
+        )
     }
 }
 
@@ -587,11 +651,18 @@ private struct MurbTargetBox: Identifiable {
 struct MurbRemoteGamepadView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var session: MurbRemoteSession
+    private let gameTitle: String
+    private let playerNumber: Int
+    private let p2Payload: MurbPairingPayload?
     @State private var showControls = true
     @State private var fillScreen = false
+    @State private var showP2Invite = false
 
-    init(target: MurbPairingPayload) {
+    init(target: MurbPairingPayload, gameTitle: String = "", playerNumber: Int = 1, p2Payload: MurbPairingPayload? = nil) {
         _session = StateObject(wrappedValue: MurbRemoteSession(target: target))
+        self.gameTitle = gameTitle
+        self.playerNumber = max(1, min(4, playerNumber))
+        self.p2Payload = p2Payload
     }
 
     private var isDualScreen: Bool { MurbProtocol.supportsDualScreen(session.activeSystem) }
@@ -626,8 +697,10 @@ struct MurbRemoteGamepadView: View {
                         Circle()
                             .fill(session.state == .connected ? BrumTheme.primary : .orange)
                             .frame(width: 8, height: 8)
-                        Text("M.U.R.B \(session.activeSystem.uppercased()) · PC")
-                            .font(.caption2.bold()).foregroundStyle(BrumTheme.text)
+                        Text(gameTitle.isEmpty
+                             ? "P\(playerNumber) · M.U.R.B \(session.activeSystem.uppercased()) · PC"
+                             : "P\(playerNumber) · \(gameTitle)")
+                            .font(.caption2.bold()).foregroundStyle(BrumTheme.text).lineLimit(1)
                         Text(telemetryText).font(.caption2.monospacedDigit()).foregroundStyle(BrumTheme.muted)
                         if let controller = session.physicalControllerName {
                             Text("· \(controller)").font(.caption2.bold()).foregroundStyle(BrumTheme.primary).lineLimit(1)
@@ -638,6 +711,18 @@ struct MurbRemoteGamepadView: View {
                     .overlay(Capsule().stroke(BrumTheme.line))
 
                     Spacer()
+
+                    if p2Payload != nil {
+                        Button {
+                            showP2Invite = true
+                        } label: {
+                            Text("P2 QR")
+                                .font(.caption2.bold())
+                                .padding(.horizontal, 10).frame(height: 36)
+                                .background(BrumTheme.surface.opacity(0.9), in: Capsule())
+                                .overlay(Capsule().stroke(BrumTheme.line))
+                        }.foregroundStyle(BrumTheme.primary)
+                    }
 
                     if isDualScreen {
                         Button {
@@ -680,6 +765,12 @@ struct MurbRemoteGamepadView: View {
             session.start()
         }
         .onDisappear { session.stop() }
+        .sheet(isPresented: $showP2Invite) {
+            if let p2 = p2Payload {
+                MurbP2InviteSheet(payload: p2)
+                    .preferredColorScheme(.dark)
+            }
+        }
     }
 
     private var telemetryText: String {
@@ -693,6 +784,55 @@ struct MurbRemoteGamepadView: View {
         case .error:
             return "· Reconectando…"
         }
+    }
+}
+
+private struct MurbP2InviteSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let payload: MurbPairingPayload
+
+    private var uriString: String {
+        "murb://\(payload.system)?ip=\(payload.host)&port=\(payload.port)&token=\(payload.token)&session=\(payload.session)"
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                Text("Convidar Jogador 2 no Wi-Fi").font(.headline.bold())
+                Text("No segundo celular, abra Controles → Gamepad M.U.R.B para PC e escaneie este QR ou digite os dados abaixo.")
+                    .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                if let image = qrImage(for: uriString) {
+                    Image(uiImage: image)
+                        .interpolation(.none)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 190, height: 190)
+                        .padding(12)
+                        .background(Color.white, in: RoundedRectangle(cornerRadius: 12))
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("IP: \(payload.host)").font(.caption.monospaced())
+                    Text("Porta: \(payload.port)").font(.caption.monospaced())
+                    Text("Token P2: \(payload.token)").font(.caption.monospaced().bold()).foregroundStyle(BrumTheme.primary)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(BrumTheme.elevated, in: RoundedRectangle(cornerRadius: 12))
+            }
+            .padding(20)
+            .navigationTitle("Jogador 2 · LAN")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Fechar") { dismiss() } } }
+        }
+    }
+
+    private func qrImage(for text: String) -> UIImage? {
+        let context = CIContext()
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(text.utf8)
+        guard let output = filter.outputImage,
+              let cgImage = context.createCGImage(output, from: output.extent) else { return nil }
+        return UIImage(cgImage: cgImage)
     }
 }
 

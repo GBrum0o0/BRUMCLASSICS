@@ -239,6 +239,16 @@ final class AppStore: ObservableObject {
         catch { return .failure(error) }
     }
 
+    func launchGamepadOnPC(gameID: String?, filename: String?, title: String?, mode: String = "new", players: Int = 1, hybridMode: String = "") async -> Result<BridgeClient.GamepadLaunchResult, Error> {
+        guard connection == .online else { return .failure(BridgeError.unreachable) }
+        do {
+            let result = try await bridge.launchGamepad(gameID: gameID, filename: filename, title: title, mode: mode, players: players, hybridMode: hybridMode)
+            return .success(result)
+        } catch {
+            return .failure(error)
+        }
+    }
+
     func markNotificationRead(_ notification: MobileNotification) async {
         guard !notification.isRead else { return }
         guard connection == .online else { message = "Conecte o iPhone ao launcher para marcar a notificação como lida."; return }

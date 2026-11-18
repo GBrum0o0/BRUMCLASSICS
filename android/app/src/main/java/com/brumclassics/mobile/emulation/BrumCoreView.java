@@ -22,7 +22,10 @@ final class BrumCoreView extends View implements Runnable {
 
     private final BrumCoreBridge core;
     private final RuntimeErrorListener errorListener;
-    private final AtomicInteger inputMask = new AtomicInteger();
+    private final AtomicInteger[] portMasks = {
+        new AtomicInteger(), new AtomicInteger(), new AtomicInteger(), new AtomicInteger()
+    };
+    private int virtualPadPort = 0;
     private final int[] pixels = new int[2048 * 2048];
     private final short[] audioSamples = new short[16 * 1024];
     private final Object bitmapLock = new Object();
@@ -63,13 +66,16 @@ final class BrumCoreView extends View implements Runnable {
 
     void pauseEmulation() {
         running = false;
-        inputMask.set(0);
+        for (int p = 0; p < 4; p++) {
+            portMasks[p].set(0);
+            core.setPortMask(p, 0);
+            core.setAnalog(p, 0, 0, 0f);
+            core.setAnalog(p, 0, 1, 0f);
+            core.setAnalog(p, 1, 0, 0f);
+            core.setAnalog(p, 1, 1, 0f);
+        }
         touchActive = false;
         core.setPointer(0, 0, false);
-        core.setAnalog(0, 0, 0f);
-        core.setAnalog(0, 1, 0f);
-        core.setAnalog(1, 0, 0f);
-        core.setAnalog(1, 1, 0f);
         if (audioTrack != null) { audioTrack.pause(); audioTrack.flush(); }
         Thread thread = emulationThread;
         if (thread != null && thread != Thread.currentThread()) {
@@ -86,17 +92,34 @@ final class BrumCoreView extends View implements Runnable {
         core.close();
     }
 
+    void setVirtualPadPort(int port) {
+        virtualPadPort = (port >= 0 && port < 4) ? port : 0;
+    }
+
     void setButton(int id, boolean pressed) {
+        setPortButton(virtualPadPort, id, pressed);
+    }
+
+    void setPortButton(int port, int id, boolean pressed) {
+        if (port < 0 || port >= 4 || id < 0 || id >= 16) return;
         int bit = 1 << id;
+        AtomicInteger target = portMasks[port];
         while (true) {
-            int current = inputMask.get();
+            int current = target.get();
             int next = pressed ? current | bit : current & ~bit;
-            if (inputMask.compareAndSet(current, next)) return;
+            if (target.compareAndSet(current, next)) {
+                core.setPortMask(port, next);
+                return;
+            }
         }
     }
 
     void setAnalog(int stick, int axis, float value) {
-        core.setAnalog(stick, axis, value);
+        core.setAnalog(virtualPadPort, stick, axis, value);
+    }
+
+    void setPortAnalog(int port, int stick, int axis, float value) {
+        core.setAnalog(port, stick, axis, value);
     }
 
     void setFastForward(boolean enabled) {
@@ -134,7 +157,8 @@ final class BrumCoreView extends View implements Runnable {
         try {
             final long frameDuration = CoreTiming.frameDurationNanos(core.frameRate());
             while (running) {
-                core.runFrames(fastForward ? 5 : 1, inputMask.get());
+                for (int p = 0; p < 4; p++) core.setPortMask(p, portMasks[p].get());
+                core.runFrames(fastForward ? 5 : 1, 0);
                 long dimensions = core.copyFrame(pixels);
                 int width = (int) (dimensions >>> 32); int height = (int) dimensions;
                 if (width > 0 && height > 0 && (long) width * height <= pixels.length) {

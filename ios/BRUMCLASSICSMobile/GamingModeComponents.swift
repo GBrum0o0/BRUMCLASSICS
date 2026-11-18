@@ -1,6 +1,7 @@
 import GameController
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 struct TopControlAndSettingsActions: View {
     @Environment(\.scenePhase) private var scenePhase
@@ -160,6 +161,7 @@ private struct GamingSettingsPanel: View {
     @State private var key = ""
     @State private var feedback = ""
     @State private var savedAccount: String?
+    @State private var choosingROMFolder = false
 
     var body: some View {
         Form {
@@ -182,8 +184,22 @@ private struct GamingSettingsPanel: View {
                 Toggle("Ocultar controles na tela com joystick conectado", isOn: $autoHidePadWithController)
                 Toggle("Preencher tela por padrão ao iniciar jogo", isOn: $defaultFillDisplay)
             }
-            Section("Biblioteca local e Launcher PC") {
-                LabeledContent("Pasta de ROMs", value: pocket.romFolderConfigured ? pocket.romFolderName : "Não definida")
+            Section("Pasta de ROMs no celular") {
+                LabeledContent("Pasta selecionada", value: pocket.romFolderConfigured ? pocket.romFolderName : "Não definida")
+                Button(pocket.romFolderConfigured ? "Alterar pasta de ROMs" : "Selecionar pasta de ROMs") {
+                    choosingROMFolder = true
+                }
+                .accessibilityIdentifier("gaming-mode-choose-rom-folder")
+                Button("Verificar pasta agora") {
+                    Task { await pocket.refreshROMFolder() }
+                }
+                .disabled(!pocket.romFolderConfigured || pocket.busy)
+                Text("Escolha uma pasta (No Meu iPhone, Downloads ou iCloud Drive) para colocar suas ROMs; elas aparecem automaticamente no Gaming Mode.")
+                    .font(.caption).foregroundStyle(.secondary)
+                if !pocket.romFolderStatus.isEmpty { Text(pocket.romFolderStatus).font(.caption).foregroundStyle(.secondary) }
+                if let message = pocket.message, !message.isEmpty { Text(message).font(.caption).foregroundStyle(.orange) }
+            }
+            Section("Launcher PC e sincronização") {
                 LabeledContent("Launcher PC", value: store.connection == .online ? "Conectado (\(store.configuration?.host ?? "LAN"))" : "Offline (biblioteca em cache)")
                 Button("Atualizar horas e conquistas") {
                     Task { await pocket.sync(launcher: store, force: true) }
@@ -197,6 +213,14 @@ private struct GamingSettingsPanel: View {
         .onAppear {
             savedAccount = pocket.credentials?.username
             username = savedAccount ?? ""
+        }
+        .fileImporter(isPresented: $choosingROMFolder, allowedContentTypes: [.folder]) { result in
+            switch result {
+            case .success(let folder):
+                Task { await pocket.configureROMFolder(folder) }
+            case .failure(let error):
+                pocket.message = error.localizedDescription
+            }
         }
     }
 

@@ -56,6 +56,22 @@ actor BridgeClient {
     struct Device: Codable { let id: String; let name: String }
     struct ServerEnvelope<T: Decodable>: Decodable { let ok: Bool?; let result: T?; let message: String?; let error: String? }
     struct EmptyResult: Codable {}
+    struct MurbRemoteSessionInfo: Codable, Equatable {
+        let available: Bool?
+        let host: String?
+        let port: Int?
+        let token: String?
+        let session: String?
+        let qrUri: String?
+        let p2QrUri: String?
+        let system: String?
+    }
+    struct GamepadLaunchResult: Decodable {
+        let ok: Bool
+        let message: String?
+        let alreadyRunning: Bool?
+        let remoteGamepad: MurbRemoteSessionInfo?
+    }
     struct StreamingLaunchResult: Decodable { let ok: Bool; let session: StreamingSession }
     struct NotificationReadResponse: Decodable { let ok: Bool; let unread: Int }
     struct MomentResponse: Decodable { let id: String; let gameId: String; let gameTitle: String; let capturedAt: String; let imagePath: String }
@@ -264,6 +280,24 @@ actor BridgeClient {
         let envelope: ServerEnvelope<StreamingLaunchResult> = try await request(path: "/v1/remote", method: "POST", body: body)
         guard let result = envelope.result, result.ok else { throw BridgeError.server(envelope.message ?? "O launcher não preparou a transmissão.") }
         return result.session
+    }
+
+    func launchGamepad(gameID: String?, filename: String?, title: String?, mode: String = "new", players: Int = 1, hybridMode: String = "") async throws -> GamepadLaunchResult {
+        var payload: [String: Any] = ["mode": mode, "players": max(1, min(4, players))]
+        if let gameID, !gameID.isEmpty { payload["gameId"] = gameID }
+        if let filename, !filename.isEmpty { payload["filename"] = filename }
+        if let title, !title.isEmpty { payload["title"] = title }
+        if !hybridMode.isEmpty { payload["hybridMode"] = hybridMode }
+        let body = try JSONSerialization.data(withJSONObject: [
+            "command": "gamepad_launch", "requestId": UUID().uuidString,
+            "issuedAt": Int(Date().timeIntervalSince1970 * 1000),
+            "payload": payload
+        ])
+        let envelope: ServerEnvelope<GamepadLaunchResult> = try await request(path: "/v1/remote", method: "POST", body: body)
+        guard let result = envelope.result, result.ok else {
+            throw BridgeError.server(envelope.message ?? envelope.result?.message ?? "O launcher não abriu o jogo no modo Gamepad.")
+        }
+        return result
     }
 
     func save(_ mutation: PendingMutation) async throws {

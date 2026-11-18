@@ -73,22 +73,24 @@ struct IntegratedEmulatorView: View {
     @Environment(\.dismiss) private var dismiss
     let rom: ROMFolderGame
     let returnsToPortrait: Bool
+    let virtualPadPort: Int
     @State private var launch: EmulationLaunchDescriptor?
     @State private var failure = ""
     @State private var finishing = false
     @State private var choosingROMFolder = false
     @State private var startingSession: Task<Void, Never>?
 
-    init(rom: ROMFolderGame, returnsToPortrait: Bool = true) {
+    init(rom: ROMFolderGame, returnsToPortrait: Bool = true, virtualPadPort: Int = 0) {
         self.rom = rom
         self.returnsToPortrait = returnsToPortrait
+        self.virtualPadPort = virtualPadPort
     }
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
             if let launch {
-                BrumLibretroController(launch: launch, onReady: beginPlay, onExit: finish)
+                BrumLibretroController(launch: launch, virtualPadPort: virtualPadPort, onReady: beginPlay, onExit: finish)
                     .ignoresSafeArea()
             } else if !failure.isEmpty {
                 VStack(spacing: 18) {
@@ -152,11 +154,12 @@ struct IntegratedEmulatorView: View {
 
 private struct BrumLibretroController: UIViewControllerRepresentable {
     let launch: EmulationLaunchDescriptor
+    let virtualPadPort: Int
     let onReady: () -> Void
     let onExit: () -> Void
 
     func makeUIViewController(context: Context) -> UIViewController {
-        BrumLibretroViewController(
+        let controller = BrumLibretroViewController(
             romurl: launch.romURL,
             title: launch.title,
             canonicalGameID: launch.identity.canonicalGameID,
@@ -172,6 +175,8 @@ private struct BrumLibretroController: UIViewControllerRepresentable {
             onReady: onReady,
             onExit: onExit
         )
+        controller.virtualPadPort = virtualPadPort
+        return controller
     }
 
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}

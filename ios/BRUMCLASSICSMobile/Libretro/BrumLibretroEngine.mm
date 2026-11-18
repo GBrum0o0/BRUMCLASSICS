@@ -289,6 +289,8 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     BrumEmulatorReadyHandler _onReady;
     unsigned _pixelFormat;
     brum::InputState _input;
+    std::array<brum::InputState, 4> _extraPortInputs;
+    NSInteger _virtualPadPort;
     brum::ScreenManager _screenManager;
     std::vector<brum::Placement> _screenPlacements;
     brum::Viewport _singleViewport;
@@ -711,78 +713,103 @@ static size_t BrumAudioBatch(const int16_t *data, size_t frames) {
     return frames;
 }
 
-static GCController *BrumActiveController(void) {
+static NSArray<GCController *> *BrumActiveControllers(void) {
+    NSMutableArray<GCController *> *active = [NSMutableArray array];
     for (GCController *controller in GCController.controllers) {
-        if (!controller.isSnapshot) return controller;
+        if (!controller.isSnapshot) [active addObject:controller];
     }
-    return nil;
+    return active;
 }
 
-static void BrumInputPoll(void) {
-    BrumLibretroViewController *host = BrumCurrentHost;
-    if (!host) return;
-    host->_input.release(brum::InputSource::controller);
-    GCController *controller = BrumActiveController();
-    if (!controller) return;
+static void BrumApplyControllerToInput(GCController *controller, NSString *systemID, brum::InputState &target) {
     GCExtendedGamepad *pad = controller.extendedGamepad;
     if (!pad) {
         GCMicroGamepad *micro = controller.microGamepad;
         if (micro) {
-            host->_input.set(brum::InputSource::controller, 0, micro.buttonA.isPressed);
-            host->_input.set(brum::InputSource::controller, 1, micro.buttonX.isPressed);
-            host->_input.set(brum::InputSource::controller, 3, micro.buttonMenu.isPressed);
-            host->_input.set(brum::InputSource::controller, 4, micro.dpad.up.isPressed);
-            host->_input.set(brum::InputSource::controller, 5, micro.dpad.down.isPressed);
-            host->_input.set(brum::InputSource::controller, 6, micro.dpad.left.isPressed);
-            host->_input.set(brum::InputSource::controller, 7, micro.dpad.right.isPressed);
+            target.set(brum::InputSource::controller, 0, micro.buttonA.isPressed);
+            target.set(brum::InputSource::controller, 1, micro.buttonX.isPressed);
+            target.set(brum::InputSource::controller, 3, micro.buttonMenu.isPressed);
+            target.set(brum::InputSource::controller, 4, micro.dpad.up.isPressed);
+            target.set(brum::InputSource::controller, 5, micro.dpad.down.isPressed);
+            target.set(brum::InputSource::controller, 6, micro.dpad.left.isPressed);
+            target.set(brum::InputSource::controller, 7, micro.dpad.right.isPressed);
         }
         return;
     }
     NSArray<GCControllerButtonInput *> *buttons = @[pad.buttonB, pad.buttonY, pad.buttonOptions ?: pad.buttonMenu, pad.buttonMenu,
         pad.dpad.up, pad.dpad.down, pad.dpad.left, pad.dpad.right, pad.buttonA, pad.buttonX,
         pad.leftShoulder, pad.rightShoulder, pad.leftTrigger, pad.rightTrigger];
-    for (NSUInteger i = 0; i < buttons.count; i++) host->_input.set(brum::InputSource::controller, (unsigned)i, buttons[i].isPressed);
-    host->_input.set(brum::InputSource::controller, 2, pad.buttonOptions.isPressed);
-    host->_input.set(brum::InputSource::controller, 12, pad.leftTrigger.isPressed || pad.leftTrigger.value > 0.25f);
-    host->_input.set(brum::InputSource::controller, 13, pad.rightTrigger.isPressed || pad.rightTrigger.value > 0.25f);
-    if ([host->_emulatedSystemID isEqualToString:@"psx"] ||
-        [host->_emulatedSystemID isEqualToString:@"psp"] ||
-        [host->_emulatedSystemID isEqualToString:@"dreamcast"] ||
-        [@[@"md", @"segacd", @"32x"] containsObject:host->_emulatedSystemID]) {
-        host->_input.set(brum::InputSource::controller, 0, pad.buttonA.isPressed);
-        host->_input.set(brum::InputSource::controller, 8, pad.buttonB.isPressed);
-        host->_input.set(brum::InputSource::controller, 1, pad.buttonX.isPressed);
-        host->_input.set(brum::InputSource::controller, 9, pad.buttonY.isPressed);
-    } else if ([host->_emulatedSystemID isEqualToString:@"n64"]) {
+    for (NSUInteger i = 0; i < buttons.count; i++) target.set(brum::InputSource::controller, (unsigned)i, buttons[i].isPressed);
+    target.set(brum::InputSource::controller, 2, pad.buttonOptions.isPressed);
+    target.set(brum::InputSource::controller, 12, pad.leftTrigger.isPressed || pad.leftTrigger.value > 0.25f);
+    target.set(brum::InputSource::controller, 13, pad.rightTrigger.isPressed || pad.rightTrigger.value > 0.25f);
+    if ([systemID isEqualToString:@"psx"] ||
+        [systemID isEqualToString:@"psp"] ||
+        [systemID isEqualToString:@"dreamcast"] ||
+        [@[@"md", @"segacd", @"32x"] containsObject:systemID]) {
+        target.set(brum::InputSource::controller, 0, pad.buttonA.isPressed);
+        target.set(brum::InputSource::controller, 8, pad.buttonB.isPressed);
+        target.set(brum::InputSource::controller, 1, pad.buttonX.isPressed);
+        target.set(brum::InputSource::controller, 9, pad.buttonY.isPressed);
+    } else if ([systemID isEqualToString:@"n64"]) {
         // Mupen's default map reads Libretro B/Y as N64 A/B.
-        host->_input.set(brum::InputSource::controller, 0, pad.buttonA.isPressed);
-        host->_input.set(brum::InputSource::controller, 1, pad.buttonB.isPressed);
+        target.set(brum::InputSource::controller, 0, pad.buttonA.isPressed);
+        target.set(brum::InputSource::controller, 1, pad.buttonB.isPressed);
     }
-    host->_input.setAxis(brum::InputSource::controller, 0, 0, pad.leftThumbstick.xAxis.value);
-    host->_input.setAxis(brum::InputSource::controller, 0, 1, -pad.leftThumbstick.yAxis.value);
+    target.setAxis(brum::InputSource::controller, 0, 0, pad.leftThumbstick.xAxis.value);
+    target.setAxis(brum::InputSource::controller, 0, 1, -pad.leftThumbstick.yAxis.value);
     // This pinned Mupen revision reverses right-stick X when decoding C buttons.
-    host->_input.setAxis(brum::InputSource::controller, 1, 0,
-                         [host->_emulatedSystemID isEqualToString:@"n64"] ? -pad.rightThumbstick.xAxis.value : pad.rightThumbstick.xAxis.value);
-    host->_input.setAxis(brum::InputSource::controller, 1, 1, -pad.rightThumbstick.yAxis.value);
-    host->_input.set(brum::InputSource::controller, 14, pad.leftThumbstickButton.isPressed);
-    host->_input.set(brum::InputSource::controller, 15, pad.rightThumbstickButton.isPressed);
+    target.setAxis(brum::InputSource::controller, 1, 0,
+                   [systemID isEqualToString:@"n64"] ? -pad.rightThumbstick.xAxis.value : pad.rightThumbstick.xAxis.value);
+    target.setAxis(brum::InputSource::controller, 1, 1, -pad.rightThumbstick.yAxis.value);
+    target.set(brum::InputSource::controller, 14, pad.leftThumbstickButton.isPressed);
+    target.set(brum::InputSource::controller, 15, pad.rightThumbstickButton.isPressed);
+}
+
+static void BrumInputPoll(void) {
+    BrumLibretroViewController *host = BrumCurrentHost;
+    if (!host) return;
+    host->_input.release(brum::InputSource::controller);
+    for (auto &extra : host->_extraPortInputs) extra.clear();
+    NSArray<GCController *> *controllers = BrumActiveControllers();
+    const NSInteger vPort = (host->_virtualPadPort >= 0 && host->_virtualPadPort < 4) ? host->_virtualPadPort : 0;
+    for (NSUInteger idx = 0; idx < controllers.count && idx < 4; idx++) {
+        GCController *controller = controllers[idx];
+        if (vPort == 0 && idx == 0) {
+            BrumApplyControllerToInput(controller, host->_emulatedSystemID, host->_input);
+        } else {
+            BrumApplyControllerToInput(controller, host->_emulatedSystemID, host->_extraPortInputs[idx]);
+        }
+    }
 }
 
 static int16_t BrumInputState(unsigned port, unsigned device, unsigned index, unsigned identifier) {
     BrumLibretroViewController *host = BrumCurrentHost;
-    if (!host || port != 0 || host->_paused) return 0;
-    if (device == BRUM_RETRO_DEVICE_ANALOG) return host->_input.analog(index, identifier);
+    if (!host || port >= 4 || host->_paused) return 0;
+    const unsigned vPort = (host->_virtualPadPort >= 0 && host->_virtualPadPort < 4) ? (unsigned)host->_virtualPadPort : 0;
+    if (device == BRUM_RETRO_DEVICE_ANALOG) {
+        if (vPort == 0 && port == 0) return host->_input.analog(index, identifier);
+        if (port == vPort) {
+            const int16_t v = host->_input.analog(index, identifier);
+            const int16_t c = host->_extraPortInputs[port].analog(index, identifier);
+            return abs(v) >= abs(c) ? v : c;
+        }
+        return host->_extraPortInputs[port].analog(index, identifier);
+    }
     if (index != 0) return 0;
     if (device == BRUM_RETRO_DEVICE_POINTER) {
+        if (port != 0) return 0;
         if (identifier == BRUM_RETRO_DEVICE_ID_POINTER_X) return host->_pointerX;
         if (identifier == BRUM_RETRO_DEVICE_ID_POINTER_Y) return host->_pointerY;
         if (identifier == BRUM_RETRO_DEVICE_ID_POINTER_PRESSED) return host->_pointerPressed ? 1 : 0;
         return 0;
     }
     if (device != BRUM_RETRO_DEVICE_JOYPAD || identifier > 15) return 0;
-    BOOL pressed = host->_input.pressed(identifier);
-
-    return pressed ? 1 : 0;
+    if (vPort == 0 && port == 0) return host->_input.pressed(identifier) ? 1 : 0;
+    if (port == vPort) {
+        return (host->_input.pressed(identifier) || host->_extraPortInputs[port].pressed(identifier)) ? 1 : 0;
+    }
+    return host->_extraPortInputs[port].pressed(identifier) ? 1 : 0;
 }
 
 static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueBufferRef buffer) {
@@ -2140,7 +2167,11 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:14 userInfo:@{NSLocalizedDescriptionKey: @"O núcleo interrompeu a própria inicialização. Consulte o aviso registrado no relatório."}];
         return NO;
     }
-    _core.setController(0, BRUM_RETRO_DEVICE_JOYPAD);
+    if (_core.setController) {
+        for (unsigned port = 0; port < 4; port++) {
+            _core.setController(port, BRUM_RETRO_DEVICE_JOYPAD);
+        }
+    }
 
     brum_retro_system_info systemInfo = {};
     _core.getSystemInfo(&systemInfo);
