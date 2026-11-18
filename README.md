@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.26"><strong>Windows 2.1.26</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.27"><strong>Windows 2.1.27</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.24.0"><strong>Android 0.24.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.0"><strong>iOS 0.15.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -85,7 +85,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 2.1.26 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.26) |
+| Windows | 2.1.27 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.27) |
 | Android | 0.24.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.24.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.15.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.0) · [Guia](ios/README-IOS.md) |
 
@@ -95,6 +95,7 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 
 ## Versões atuais
 
+- **Launcher 2.1.27:** gerenciador de controles simplificado com cartões conectados (PC e Celular `CONECTADO`) e apenas os botões **`TESTAR CONTROLE`** e **`CONFIGURAÇÃO GLOBAL`**, remoção dos bloqueios de encaminhamento físico (`p1BoundSlotMask` / `p1NativeXInputLive`) e isolamento de Gamepad Mobile em `P2` no Wii U (Cemu), eliminação de falsos `Arquivos ausentes` em Wii e pastas adicionadas no CLASSICS (inspeção de `.zip`/`.7z`, deduplicação de compactados com ROM extraída e limpeza de `nkit`), intro sincronizada até `BRUM_CORE_WINDOW_READY` em tela cheia e motor nativo RetroAchievements (`consoleId: 62` no 3DS). [Notas e detalhes](releases/v2.1.27/RELEASE-NOTES.md).
 - **Launcher 2.1.26:** integração completa do **Brum Input Core** como central universal de controles (`P1–P4`, PC físico USB/Bluetooth + Gamepad Mobile LAN), novo botão com ícone de controle imediatamente à esquerda da engrenagem de Configurações, gerenciador visual inspirado no menu de controles do Switch (teste em tempo real de botões/analógicos, troca global `A/B` e `X/Y`, zona morta, vibração, perfis salvos e prioridade de toque Celular vs. Mouse PC), reconhecimento nativo XInput/PnP (incluindo receptores GameSir `3537:2106`/`3537:1040` e estado de standby), arquitetura extensível de adaptadores (`Cemu`, `Dolphin`, `BRUM Core PC`, `RPCS3` e `xemu`) e roteamento direto do perfil global e slots XInput ao Cemu/Wii U com remoção de `<profile>` no Jogador 1 e recuperação explícita de foco pós-briefing (`FOCUS`). [Notas e detalhes](releases/v2.1.26/RELEASE-NOTES.md).
 - **Launcher 2.1.25:** correção para controles reconhecidos pelo Cemu que não respondiam durante os jogos de **Nintendo Wii U**, normalizando automaticamente o perfil do Jogador 1 (`controller0.xml` e perfis nomeados) para **Wii U GamePad** com preservação do dispositivo XInput/USB e dos botões do usuário, remoção de sobrescritas de controle por jogo e filtro de botões presos no fallback DirectInput. [Notas e detalhes](releases/v2.1.25/RELEASE-NOTES.md).
 - **Launcher 2.1.24:** correção imediata no host nativo para controles conectados diretamente ao computador no **Nintendo Wii U (Cemu)**, removendo o bloqueio de seta Cima sintética via `winmm`, priorizando XInput nativo com fallback para slots extras/DirectInput e garantindo foco da janela após a tela de preparação. [Notas e detalhes](releases/v2.1.24/RELEASE-NOTES.md).

@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## Launcher 2.1.27 — Gerenciador minimalista, correção Wii U/CLASSICS, intro sincronizada e RetroAchievements nativo
+
+- **Brum Input Core simplificado:** o ícone de controle passa a abrir uma visão limpa apenas com os cartões dos controles conectados (controle no PC e celular pareado como `CONECTADO`) e dois botões principais (**`TESTAR CONTROLE`** e **`CONFIGURAÇÃO GLOBAL`**), mantendo testador e preferências avançadas ocultos até o clique; corrigido o isolamento para que o celular como companheiro não ocupe `P2` nem ative `--remote-gamepad 1` sem modo Gamepad Mobile ativo.
+- **Wii U (Cemu) e Dolphin:** removidos bloqueios (`p1BoundSlotMask` / `p1NativeXInputLive`) em `runCemuCommercialWiiU` para encaminhar leituras XInput/DirectInput reais durante as partidas em todos os títulos de Wii U; localização automática de `dolphin-emu/Sys` populado e limpeza unificada de NAND para Wii e GameCube.
+- **CLASSICS sem falso "Arquivos ausentes":** validação baseada na existência real da ROM (sem exigir `retroarch.exe` legado), inspeção interna de `.zip`/`.7z`, deduplicação de arquivos compactados com ROM já extraída, limpeza do sufixo `nkit` nos títulos e âncoras de pasta em `inferMedia`.
+- **Intro sincronizada e RetroAchievements nativo:** a tela de abertura mantém o logotipo visível até o sinal `BRUM_CORE_WINDOW_READY` com a janela do jogo em tela cheia, e o host nativo recebe suporte base a `BRUM_RA` com `consoleId: 62` para 3DS. [Notas e detalhes](releases/v2.1.27/RELEASE-NOTES.md).
+
 ## Launcher 2.1.26 — Brum Input Core (Central Universal de Controles e correção end-to-end Wii U)
 
 - Implementado o **Brum Input Core** (`src/brum-input-core.js`), centralizando atribuição de jogadores `P1–P4`, tradução de botões por console (`swapAB`, `swapXY`, zona morta, vibração), prioridade de tela sensível ao toque (Gamepad Mobile ativado = tela do celular; desativado = mouse do PC para DS/3DS/Wii U) e arquitetura de adaptadores para Cemu, Dolphin, BRUM Core PC/Libretro, RPCS3 e xemu.
