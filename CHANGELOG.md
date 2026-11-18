@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## Launcher 2.1.25 — normalização Wii U GamePad para entrada em jogo no Cemu
+
+- Corrigido o cenário em que o Cemu reconhecia o controle nas configurações de entrada, mas o jogo (como *Pokkén Tournament*) ignorava o controle durante a partida porque o `controller0.xml` (ou perfil nomeado vinculado) estava salvo como `Wii U Pro Controller`.
+- O host `brum-core-pc.exe` passa a normalizar automaticamente o perfil do Jogador 1 para **`Wii U GamePad`** (`normalizeCemuPlayer1ProfileToGamePad`), convertendo mapeamentos `12..25` de Pro/Classic para `11..24`, preservando botões e slot XInput/DirectInput/SDL escolhidos pelo usuário, limpando sobrescritas `controller1..8=` em `portable/gameProfiles/*.ini` e filtrando botões fantasmas no fallback `winmm`. [Notas e detalhes](releases/v2.1.25/RELEASE-NOTES.md).
+
 ## Launcher 2.1.24 — correção do controle PC no Nintendo Wii U (Cemu)
 
 - Restaurada a detecção direta de controles físicos conectados ao computador no **Nintendo Wii U (Cemu)**: removida a leitura forçada `winmm`/`joyGetPosEx` sem verificação de `JOYCAPS_HASPOV` que prendia a tecla sintética `VK_UP` (`buttons=4`) quando um controle XInput estava conectado.
