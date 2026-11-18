@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.25"><strong>Windows 2.1.25</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.26"><strong>Windows 2.1.26</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.24.0"><strong>Android 0.24.0</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.0"><strong>iOS 0.15.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
@@ -85,7 +85,7 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 2.1.25 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.25) |
+| Windows | 2.1.26 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.26) |
 | Android | 0.24.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.24.0) · [Guia](docs/MOVEL.md) |
 | iOS pessoal | 0.15.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.0) · [Guia](ios/README-IOS.md) |
 
@@ -95,6 +95,7 @@ A versão pessoal para iPhone é compilada separadamente em **Actions → Build 
 
 ## Versões atuais
 
+- **Launcher 2.1.26:** integração completa do **Brum Input Core** como central universal de controles (`P1–P4`, PC físico USB/Bluetooth + Gamepad Mobile LAN), novo botão com ícone de controle imediatamente à esquerda da engrenagem de Configurações, gerenciador visual inspirado no menu de controles do Switch (teste em tempo real de botões/analógicos, troca global `A/B` e `X/Y`, zona morta, vibração, perfis salvos e prioridade de toque Celular vs. Mouse PC), reconhecimento nativo XInput/PnP (incluindo receptores GameSir `3537:2106`/`3537:1040` e estado de standby), arquitetura extensível de adaptadores (`Cemu`, `Dolphin`, `BRUM Core PC`, `RPCS3` e `xemu`) e roteamento direto do perfil global e slots XInput ao Cemu/Wii U com remoção de `<profile>` no Jogador 1 e recuperação explícita de foco pós-briefing (`FOCUS`). [Notas e detalhes](releases/v2.1.26/RELEASE-NOTES.md).
 - **Launcher 2.1.25:** correção para controles reconhecidos pelo Cemu que não respondiam durante os jogos de **Nintendo Wii U**, normalizando automaticamente o perfil do Jogador 1 (`controller0.xml` e perfis nomeados) para **Wii U GamePad** com preservação do dispositivo XInput/USB e dos botões do usuário, remoção de sobrescritas de controle por jogo e filtro de botões presos no fallback DirectInput. [Notas e detalhes](releases/v2.1.25/RELEASE-NOTES.md).
 - **Launcher 2.1.24:** correção imediata no host nativo para controles conectados diretamente ao computador no **Nintendo Wii U (Cemu)**, removendo o bloqueio de seta Cima sintética via `winmm`, priorizando XInput nativo com fallback para slots extras/DirectInput e garantindo foco da janela após a tela de preparação. [Notas e detalhes](releases/v2.1.24/RELEASE-NOTES.md).
 - **Launcher 2.1.23:** integração completa dos consoles suportados na **M.U.R.B ENGINE** para o **BRUMCLASSICS OFICIAL** (`33` sistemas integrados, exceto **PS3** e **Xbox**), unificando execução via núcleos locais, ponte **Cemu** para **Wii U**, áudio **WASAPI/Sonic**, **Gamepad Híbrido** e segunda tela (**DS/3DS/Wii U**), além dos módulos autorais em transição (`gb`, `gbc`, `gba`, `nes`, `snes`, `a2600` e registro completo `on-brum`). [Notas e detalhes](releases/v2.1.23/RELEASE-NOTES.md).
@@ -156,7 +157,7 @@ Consulte também o guia de [Conexões e origem dos dados](docs/CONEXOES.md), com
 
 Esta versão usa exclusivamente a M.U.R.B experimental para CLASSICS, sem RetroArch/fallback. Não certifica suporte completo aos consoles. Saves antigos são preservados e os testes usam armazenamento separado. Se precisar dos emuladores externos anteriores, mantenha a [2.1.5](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.5).
 
-1. Baixe o executável portátil da [release Windows 2.1.25](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.25), ou use Configurações → Sistema → Atualizações no Launcher já instalado. [Notas e detalhes](releases/v2.1.25/RELEASE-NOTES.md). O Brum iOS Bridge segue em validação no iPhone e a base híbrida prepara a transição gradual para módulos 100% autorais.
+1. Baixe o executável portátil da [release Windows 2.1.26](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.26), ou use Configurações → Sistema → Atualizações no Launcher já instalado. [Notas e detalhes](releases/v2.1.26/RELEASE-NOTES.md). O Brum iOS Bridge segue em validação no iPhone e a base híbrida prepara a transição gradual para módulos 100% autorais.
 2. Execute `BRUMCLASSICS OFICIAL.exe`.
 3. Abra **Configurações → Conexões → Explorar conexões** e vincule somente suas próprias contas.
 4. Para CLASSICS, coloque somente suas próprias ROMs na pasta `RETROGAMES`.

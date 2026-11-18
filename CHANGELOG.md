@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## Launcher 2.1.26 — Brum Input Core (Central Universal de Controles e correção end-to-end Wii U)
+
+- Implementado o **Brum Input Core** (`src/brum-input-core.js`), centralizando atribuição de jogadores `P1–P4`, tradução de botões por console (`swapAB`, `swapXY`, zona morta, vibração), prioridade de tela sensível ao toque (Gamepad Mobile ativado = tela do celular; desativado = mouse do PC para DS/3DS/Wii U) e arquitetura de adaptadores para Cemu, Dolphin, BRUM Core PC/Libretro, RPCS3 e xemu.
+- Adicionado ícone com silhueta de controle **imediatamente à esquerda da engrenagem de Configurações**, abrindo o gerenciador visual P1–P4 (PC/Celular LAN), inversão rápida `P1 ↔ P2`, teste de botões e analógicos em tempo real, edição de preferências globais, alertas reais de standby/conflito e gerenciamento de perfis.
+- Corrigido o encadeamento entre Launcher (`launchStoredLibraryGame` / `brum-core-pc-service.js`) e `brum-core-pc.exe`: encaminhamento automático de `--input-deadzone`, `--input-swap-ab`, `--input-swap-xy`, `--input-rumble`, `--p1-slot..--p4-slot` e `--remote-gamepad`, sonda nativa `--probe-controllers` com fallback PnP Windows (incluindo receptores sem fio `3537:2106`/`3537:1040` GameSir), remoção de `<profile>` em `controller0.xml`, múltiplos slots XInput no Jogador 1 (GamePad) e comando `FOCUS` pós-briefing no Cemu/Wii U. [Notas e detalhes](releases/v2.1.26/RELEASE-NOTES.md).
+
 ## Launcher 2.1.25 — normalização Wii U GamePad para entrada em jogo no Cemu
 
 - Corrigido o cenário em que o Cemu reconhecia o controle nas configurações de entrada, mas o jogo (como *Pokkén Tournament*) ignorava o controle durante a partida porque o `controller0.xml` (ou perfil nomeado vinculado) estava salvo como `Wii U Pro Controller`.
