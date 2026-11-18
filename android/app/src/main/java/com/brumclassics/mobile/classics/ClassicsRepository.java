@@ -101,14 +101,24 @@ public final class ClassicsRepository {
 
     public synchronized void updateLinks(String id, int raGameId, String launcherGameId) throws Exception {
         LocalClassic game = find(id); if (game == null) return;
-        game.raGameId = Math.max(0, raGameId); game.launcherGameId = launcherGameId == null ? "" : launcherGameId;
+        int nextId = Math.max(0, raGameId);
+        if (game.raGameId != nextId) {
+            game.progressUsername = "";
+            game.progressTitle = "";
+            game.progressUpdatedAt = 0;
+            game.achievements.clear();
+        }
+        game.raGameId = nextId;
+        game.launcherGameId = launcherGameId == null ? "" : launcherGameId;
         save();
     }
 
-    public synchronized void updateProgress(String id, String username, String title, List<LocalClassic.Achievement> achievements) throws Exception {
-        LocalClassic game = find(id); if (game == null) return;
+    public synchronized boolean updateProgress(String id, int requestedGameId, String username, String title, List<LocalClassic.Achievement> achievements) throws Exception {
+        LocalClassic game = find(id);
+        if (game == null || game.raGameId != requestedGameId || !raUsername().equalsIgnoreCase(username)) return false;
         game.progressUsername = username; game.progressTitle = title; game.progressUpdatedAt = System.currentTimeMillis();
         game.achievements.clear(); game.achievements.addAll(achievements); save();
+        return true;
     }
 
     public synchronized void prepareLaunch(LocalClassic game) throws Exception {

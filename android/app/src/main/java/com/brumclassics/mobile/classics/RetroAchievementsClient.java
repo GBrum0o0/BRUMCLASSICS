@@ -37,11 +37,22 @@ public final class RetroAchievementsClient {
                 String endpoint = "https://retroachievements.org/API/API_GetGameInfoAndUserProgress.php?y="
                     + URLEncoder.encode(key.trim(), "UTF-8") + "&u=" + URLEncoder.encode(username.trim(), "UTF-8") + "&g=" + gameId;
                 HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
-                connection.setConnectTimeout(8_000); connection.setReadTimeout(20_000); connection.setUseCaches(false);
-                connection.setRequestProperty("Accept", "application/json"); connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android/0.25.0");
-                int code = connection.getResponseCode();
-                if (code != 200) throw new IllegalStateException("RetroAchievements indisponível ou credencial inválida (" + code + ").");
-                String raw; try (InputStream input = connection.getInputStream()) { raw = new String(readAll(input, 12 * 1024 * 1024), StandardCharsets.UTF_8); }
+                String raw;
+                try {
+                    connection.setConnectTimeout(8_000);
+                    connection.setReadTimeout(20_000);
+                    connection.setUseCaches(false);
+                    connection.setInstanceFollowRedirects(false);
+                    connection.setRequestProperty("Accept", "application/json");
+                    connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android");
+                    int code = connection.getResponseCode();
+                    if (code != 200) throw new IllegalStateException("RetroAchievements indisponível ou credencial inválida (" + code + ").");
+                    try (InputStream input = connection.getInputStream()) {
+                        raw = new String(readAll(input, 12 * 1024 * 1024), StandardCharsets.UTF_8);
+                    }
+                } finally {
+                    connection.disconnect();
+                }
                 JSONObject root = new JSONObject(raw);
                 if (root.has("Error") || root.optInt("ID", -1) != gameId) throw new IllegalStateException("O RetroAchievements não retornou o jogo solicitado.");
                 String title = root.optString("Title", "Jogo " + gameId); JSONObject rows = root.optJSONObject("Achievements");
@@ -49,15 +60,17 @@ public final class RetroAchievementsClient {
                 List<LocalClassic.Achievement> achievements = new ArrayList<>(); Iterator<String> ids = rows.keys();
                 while (ids.hasNext()) {
                     String id = ids.next(); JSONObject item = rows.optJSONObject(id); if (item == null) continue;
-                    String soft = item.optString("DateEarned"); String hard = item.optString("DateEarnedHardcore");
+                    String soft = item.isNull("DateEarned") ? "" : item.optString("DateEarned");
+                    String hard = item.isNull("DateEarnedHardcore") ? "" : item.optString("DateEarnedHardcore");
                     achievements.add(new LocalClassic.Achievement(id, item.optString("Title", "Conquista"), item.optString("Description"),
-                        Math.max(0, item.optInt("Points")), !soft.isEmpty() || !hard.isEmpty(), !hard.isEmpty(), hard.isEmpty() ? soft : hard));
+                        Math.max(0, item.optInt("Points")), !soft.isEmpty() || !hard.isEmpty(), !hard.isEmpty(),
+                        hard.isEmpty() ? soft : hard, item.optString("BadgeName")));
                 }
                 Collections.sort(achievements, Comparator.comparing(item -> item.title.toLowerCase(java.util.Locale.ROOT)));
                 main.post(() -> callback.onSuccess(title, achievements));
                 throttle();
             } catch (Exception error) {
-                String message = error.getMessage() == null ? "Não foi possível consultar o RetroAchievements." : error.getMessage();
+                String message = error instanceof IllegalStateException ? error.getMessage() : "Não foi possível consultar o RetroAchievements.";
                 main.post(() -> callback.onError(message + " O progresso salvo foi preservado."));
                 throttle();
             }

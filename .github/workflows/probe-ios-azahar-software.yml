@@ -1,0 +1,55 @@
+name: Probe iOS Azahar software backend
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/brum-backends]
+    paths: [.github/workflows/probe-ios-azahar-software.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  azahar-software-arm64:
+    runs-on: macos-15
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build pinned software-only Azahar Libretro core
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE="$RUNNER_TEMP/azahar-core"
+          BUILD="$RUNNER_TEMP/azahar-build"
+          git clone --filter=blob:none https://github.com/azahar-emu/azahar.git "$SOURCE"
+          git -C "$SOURCE" checkout --detach 9e6f523a57fac9564ac0bf8286db3c3702d301ec
+          test "$(git -C "$SOURCE" rev-parse HEAD)" = 9e6f523a57fac9564ac0bf8286db3c3702d301ec
+          git -C "$SOURCE" submodule update --init --recursive --depth 1
+          cmake -S "$SOURCE" -B "$BUILD" -G Xcode \
+            -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_SYSTEM_PROCESSOR=arm64 \
+            -DCMAKE_OSX_SYSROOT=iphoneos -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0 \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DCMAKE_C_FLAGS=-DIOS -DCMAKE_CXX_FLAGS=-DIOS \
+            -DIOS=ON -DENABLE_LIBRETRO=ON \
+            -DENABLE_OPENGL=OFF -DENABLE_VULKAN=OFF \
+            -DENABLE_SOFTWARE_RENDERER=ON -DENABLE_BUILTIN_KEYBLOB=OFF \
+            -DENABLE_OPT=OFF -DENABLE_LTO=OFF \
+            -DENABLE_WEB_SERVICE=OFF -DENABLE_SCRIPTING=OFF \
+            -DCITRA_USE_PRECOMPILED_HEADERS=OFF -DCITRA_WARNINGS_AS_ERRORS=OFF
+          cmake --build "$BUILD" --config Release --target citra_libretro --parallel "$(sysctl -n hw.ncpu)"
+          CORE=$(find "$BUILD" -type f -name 'azahar_libretro*.dylib' -print -quit)
+          test -n "$CORE"
+          file "$CORE" | grep -q arm64
+          otool -L "$CORE"
+          mkdir -p candidate
+          cp "$CORE" candidate/azahar_libretro_ios.dylib
+          cp "$SOURCE/license.txt" candidate/Azahar-LICENSE.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: brum-ios-core-azahar-software-probe
+          path: candidate/
+          retention-days: 7
+          if-no-files-found: error

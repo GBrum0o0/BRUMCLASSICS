@@ -2,6 +2,146 @@ import XCTest
 @testable import BRUMCLASSICSMobile
 
 final class PocketTests: XCTestCase {
+    func testAchievementProgressProvidesOnlyOfficialNumericBadgeURLs() throws {
+        let json = """
+        {"ID":12,"Title":"Demo","Achievements":{
+          "1":{"Title":"A","BadgeName":"00042","DateEarned":"2026-10-08"},
+          "2":{"Title":"B","BadgeName":"https://other.example/badge"},
+          "3":{"Title":"C"}
+        }}
+        """
+        let progress = try PocketProgress.decode(Data(json.utf8), username: "fixture", expectedID: 12)
+        XCTAssertEqual(progress.unlocked, 1)
+        XCTAssertEqual(progress.achievements.count, 3)
+        XCTAssertEqual(progress.achievements[0].badgeUrl, "https://media.retroachievements.org/Badge/00042.png")
+        XCTAssertNil(progress.achievements[1].badgeUrl)
+        XCTAssertNil(progress.achievements[2].badgeUrl)
+        XCTAssertEqual(GamingAchievements.fraction(earned: 1, total: 3), 1.0 / 3.0)
+        XCTAssertEqual(GamingAchievements.fraction(earned: 8, total: 4), 1)
+        XCTAssertEqual(GamingAchievements.fraction(earned: 0, total: 0), 0)
+    }
+
+    func testNativeSaveProfileBindingRejectsAnotherProfileOrComputer() throws {
+        let digest = (UUID().uuidString.replacingOccurrences(of: "-", with: "") +
+                      UUID().uuidString.replacingOccurrences(of: "-", with: "")).lowercased()
+        let identity = CanonicalGameIdentity(systemID: .gameBoyAdvance,
+                                             contentSHA256: digest, detectionSource: .header)
+        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let file = root.appendingPathComponent("NativeSaveTransfers/Bindings/gba-\(digest).json")
+        defer { try? FileManager.default.removeItem(at: file) }
+        let fingerprint = String(repeating: "a", count: 64)
+        try NativeSaveTransfer.bindProfile(for: identity, profileID: "primary", launcherFingerprint: fingerprint)
+        XCTAssertNoThrow(try NativeSaveTransfer.checkProfileBinding(for: identity,
+            profileID: "primary", launcherFingerprint: fingerprint.uppercased()))
+        XCTAssertThrowsError(try NativeSaveTransfer.checkProfileBinding(for: identity,
+            profileID: "secondary", launcherFingerprint: fingerprint))
+        XCTAssertThrowsError(try NativeSaveTransfer.checkProfileBinding(for: identity,
+            profileID: "primary", launcherFingerprint: String(repeating: "b", count: 64)))
+    }
+
+    func testStagedNativeSaveInstallsAndKeepsPreviousBatteryBackup() throws {
+        let digest = (UUID().uuidString.replacingOccurrences(of: "-", with: "") +
+                      UUID().uuidString.replacingOccurrences(of: "-", with: "")).lowercased()
+        let identity = CanonicalGameIdentity(systemID: .gameBoyAdvance,
+                                             contentSHA256: digest, detectionSource: .header)
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let saves = support.appendingPathComponent("IntegratedEmulator/Saves/gba", isDirectory: true)
+        let payload = saves.appendingPathComponent("\(digest).srm")
+        let metadata = saves.appendingPathComponent("\(digest).save.json")
+        let journal = saves.appendingPathComponent("\(digest).brum-native-sync.json")
+        let staged = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let history = support.appendingPathComponent("NativeSaveTransfers/History", isDirectory: true)
+        let before = Set((try? FileManager.default.contentsOfDirectory(atPath: history.path)) ?? [])
+        defer {
+            for file in [payload, metadata, journal, staged] { try? FileManager.default.removeItem(at: file) }
+            let after = Set((try? FileManager.default.contentsOfDirectory(atPath: history.path)) ?? [])
+            for name in after.subtracting(before) where UUID(uuidString: name) != nil {
+                try? FileManager.default.removeItem(at: history.appendingPathComponent(name))
+            }
+        }
+        try FileManager.default.createDirectory(at: saves, withIntermediateDirectories: true)
+        try Data("SAVE-A".utf8).write(to: payload)
+        let firstHash = try NativeSaveTransfer.sha256(of: payload)
+        let oldManifest: [String: Any] = ["schemaVersion": 1, "formatVersion": 1,
+            "canonicalGameID": identity.canonicalGameID, "systemID": "gba", "slot": "battery",
+            "generation": 1, "payloadSHA256": firstHash, "sizeBytes": 6]
+        try JSONSerialization.data(withJSONObject: oldManifest).write(to: metadata)
+        try Data("SAVE-B".utf8).write(to: staged)
+        let newHash = try NativeSaveTransfer.sha256(of: staged)
+        let file = NativeSaveFile(fileIndex: 0, name: "remote.srm", size: 6, sha256: newHash)
+        let candidate = NativeSaveCandidate(versionId: "safe-version", revisionId: try NativeSaveTransfer.revision(for: [file]),
+            gameId: "game-1", canonicalGameId: identity.canonicalGameID, profileId: "primary",
+            createdAt: "2026-10-08T00:00:00Z", files: [file])
+        XCTAssertTrue(try NativeSaveTransfer.installStagedBatterySave(staged, identity: identity,
+            candidate: candidate, allowReplace: true))
+        XCTAssertEqual(try Data(contentsOf: payload), Data("SAVE-B".utf8))
+        XCTAssertEqual(try NativeSaveTransfer.inspectLocalBatterySave(for: identity)?.revisionId, candidate.revisionId)
+        XCTAssertFalse(try NativeSaveTransfer.installStagedBatterySave(staged, identity: identity,
+            candidate: candidate, allowReplace: true))
+        let after = Set((try? FileManager.default.contentsOfDirectory(atPath: history.path)) ?? [])
+        let newHistory = try XCTUnwrap(after.subtracting(before).first)
+        XCTAssertEqual(try Data(contentsOf: history.appendingPathComponent(newHistory).appendingPathComponent("previous.srm")),
+                       Data("SAVE-A".utf8))
+    }
+    func testNativeSaveCatalogRejectsWrongROMAndUnsafeFiles() throws {
+        let digest = String(repeating: "a", count: 64)
+        let identity = "classic:gba:sha256:\(digest)"
+        let payload = """
+        {"protocolVersion":1,"transferEnabled":false,"downloadEnabled":true,"activeProfileId":"primary","candidates":[
+          {"versionId":"2026-10-07T10-00-00-000Z-a1b2c3","revisionId":"native:v2:e16343ab79a51c63e2854fd7a239f6742186395baf4fe17a891473df751778c0","gameId":"game-1","canonicalGameId":"\(identity)",
+           "profileId":"primary","createdAt":"2026-10-07T10:00:00Z",
+           "files":[{"fileIndex":0,"name":"game.srm","size":6,"sha256":"\(digest)"}]}
+        ]}
+        """
+        let response = try JSONDecoder().decode(NativeSaveCandidatesResponse.self, from: Data(payload.utf8))
+        XCTAssertEqual(try response.validated(for: identity).count, 1)
+        XCTAssertEqual(try NativeSaveTransfer.revision(for: [NativeSaveFile(fileIndex: 0,
+            name: "\(digest).srm", size: 6, sha256: digest)]), response.candidates[0].revisionId)
+        let altered = payload.replacingOccurrences(of: "e16343ab79a51c63e2854fd7a239f6742186395baf4fe17a891473df751778c0",
+                                                    with: String(repeating: "0", count: 64))
+        let forged = try JSONDecoder().decode(NativeSaveCandidatesResponse.self, from: Data(altered.utf8))
+        XCTAssertThrowsError(try forged.validated(for: identity))
+        XCTAssertThrowsError(try response.validated(for: "classic:gb:sha256:\(digest)"))
+        let wrongProfile = NativeSaveCandidatesResponse(protocolVersion: 1, transferEnabled: false,
+                                                        downloadEnabled: true, activeProfileId: "secondary",
+                                                        candidates: response.candidates)
+        XCTAssertThrowsError(try wrongProfile.validated(for: identity))
+        let unsafe = NativeSaveFile(fileIndex: 0, name: "../game.srm", size: 6, sha256: digest)
+        XCTAssertFalse(unsafe.isValid)
+        XCTAssertFalse(NativeSaveFile(fileIndex: 0, name: "..", size: 6, sha256: digest).isValid)
+        let source = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try Data("SAVE-A".utf8).write(to: source)
+        defer { try? FileManager.default.removeItem(at: source) }
+        XCTAssertEqual(try NativeSaveTransfer.sha256(of: source),
+                       "ecb10d6167fd4cca49af084b27578db864c7c995068f558f785225f289d6f1ec")
+    }
+
+    func testLocalBatterySaveRequiresMatchingManifestAndPayload() throws {
+        let identity = CanonicalGameIdentity(systemID: .gameBoyAdvance,
+                                             contentSHA256: String(repeating: "a", count: 64),
+                                             detectionSource: .header)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        XCTAssertNil(try NativeSaveTransfer.inspectLocalBatterySave(for: identity, savesRoot: root))
+        let directory = root.appendingPathComponent("gba", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let save = directory.appendingPathComponent("\(identity.contentSHA256).srm")
+        let manifest = directory.appendingPathComponent("\(identity.contentSHA256).save.json")
+        try Data("SAVE-A".utf8).write(to: save)
+        XCTAssertThrowsError(try NativeSaveTransfer.inspectLocalBatterySave(for: identity, savesRoot: root))
+        let hash = try NativeSaveTransfer.sha256(of: save)
+        let metadata: [String: Any] = ["schemaVersion": 1, "formatVersion": 1,
+                                       "canonicalGameID": identity.canonicalGameID, "systemID": "gba",
+                                       "slot": "battery", "generation": 3, "payloadSHA256": hash, "sizeBytes": 6]
+        try JSONSerialization.data(withJSONObject: metadata).write(to: manifest)
+        let verified = try XCTUnwrap(NativeSaveTransfer.inspectLocalBatterySave(for: identity, savesRoot: root))
+        XCTAssertEqual(verified.sha256, hash)
+        XCTAssertEqual(verified.generation, 3)
+        XCTAssertEqual(verified.revisionId, "native:v2:f6a38b604731f64c1f5648b461fb78aafe65139426cab5e9d682d920e371d149")
+        try Data("SAVE-B".utf8).write(to: save)
+        XCTAssertThrowsError(try NativeSaveTransfer.inspectLocalBatterySave(for: identity, savesRoot: root))
+    }
+
     func testEmulationIdentityUsesHeaderAndContentInsteadOfFilename() throws {
         var bytes = [UInt8](repeating: 0, count: 512)
         let logo: [UInt8] = [
@@ -23,6 +163,9 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(a.systemID, .gameBoyColor)
         XCTAssertEqual(a.detectionSource, .header)
         XCTAssertEqual(a.canonicalGameID, b.canonicalGameID)
+        let hinted = try ROMContentInspector.inspect(url: first, filename: "wrong.gba", expectedSystem: .playStation)
+        XCTAssertEqual(hinted.systemID, .gameBoyColor)
+        XCTAssertEqual(hinted.detectionSource, .header)
     }
 
     func testEmulationIdentityFallsBackToExtensionForSyntheticGBA() throws {
@@ -53,6 +196,40 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(CoreRegistry.core(for: .wonderSwanColor)?.id, "beetle-wswan")
         XCTAssertEqual(ROMContentInspector.detectSystem(header: Data([1]), filename: "Judgment Silversword.wsc")?.system, .wonderSwanColor)
         XCTAssertEqual(EmulatedSystemID.wonderSwan.retroAchievementsConsoleID, 53)
+        XCTAssertEqual(CoreRegistry.candidate(for: .nintendo64)?.id, "mupen64plus-next")
+        XCTAssertEqual(CoreRegistry.candidate(for: .playStation)?.id, "beetle-psx")
+        XCTAssertEqual(CoreRegistry.candidate(for: .saturn)?.id, "beetle-saturn")
+        XCTAssertEqual(CoreRegistry.candidate(for: .atari2600)?.id, "stella2014")
+        XCTAssertEqual(CoreRegistry.candidate(for: .playStationPortable)?.id, "ppsspp")
+        XCTAssertEqual(CoreRegistry.candidate(for: .dreamcast)?.id, "flycast")
+        XCTAssertEqual(CoreRegistry.candidate(for: .megaDrive)?.id, "blastem")
+        XCTAssertEqual(CoreRegistry.candidate(for: .segaCD)?.id, "blastem")
+        XCTAssertEqual(CoreRegistry.candidate(for: .sega32X)?.id, "blastem")
+        XCTAssertEqual(CoreRegistry.candidate(for: .arcade)?.id, "mame2016")
+        XCTAssertEqual(CoreRegistry.candidate(for: .nintendo3DS)?.id, "azahar")
+        XCTAssertEqual(CoreRegistry.candidate(for: .gameCube)?.id, "dolphin")
+        XCTAssertEqual(CoreRegistry.candidate(for: .playStation2)?.id, "play")
+        for candidate in CoreRegistry.candidates {
+            for system in candidate.supportedSystems { XCTAssertNil(CoreRegistry.core(for: system, includeExperimental: false)) }
+        }
+        XCTAssertEqual(CoreRegistry.core(for: .playStation, includeExperimental: true)?.id, "beetle-psx")
+        XCTAssertEqual(CoreRegistry.core(for: .atari2600, includeExperimental: true)?.id, "stella2014")
+        XCTAssertEqual(CoreRegistry.core(for: .nintendo64, includeExperimental: true)?.id, "mupen64plus-next")
+        XCTAssertEqual(CoreRegistry.core(for: .saturn, includeExperimental: true)?.id, "beetle-saturn")
+        XCTAssertEqual(CoreRegistry.core(for: .playStationPortable, includeExperimental: true)?.id, "ppsspp")
+        XCTAssertEqual(CoreRegistry.core(for: .dreamcast, includeExperimental: true)?.id, "flycast")
+        XCTAssertEqual(CoreRegistry.core(for: .arcade, includeExperimental: true)?.id, "mame2016")
+        XCTAssertEqual(CoreRegistry.core(for: .megaDrive, includeExperimental: true)?.id, "blastem")
+        XCTAssertEqual(CoreRegistry.core(for: .segaCD, includeExperimental: true)?.id, "blastem")
+        XCTAssertEqual(CoreRegistry.core(for: .sega32X, includeExperimental: true)?.id, "blastem")
+        XCTAssertEqual(CoreRegistry.core(for: .nintendo3DS, includeExperimental: true)?.id, "azahar")
+        XCTAssertEqual(CoreRegistry.core(for: .gameCube, includeExperimental: true)?.id, "dolphin")
+        XCTAssertEqual(EmulatedSystemID.nintendo64.retroAchievementsConsoleID, 2)
+        XCTAssertEqual(EmulatedSystemID.playStation.retroAchievementsConsoleID, 12)
+        XCTAssertEqual(EmulatedSystemID.playStationPortable.retroAchievementsConsoleID, 41)
+        XCTAssertEqual(EmulatedSystemID.dreamcast.retroAchievementsConsoleID, 40)
+        XCTAssertEqual(EmulatedSystemID.nintendo3DS.retroAchievementsConsoleID, 62)
+        XCTAssertEqual(EmulatedSystemID.gameCube.retroAchievementsConsoleID, 16)
     }
 
     func testSaveManifestOnlyAdvancesGenerationWhenPayloadChanges() {
@@ -153,6 +330,30 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(result.games.map(\.filename), ["Pokemon.gba"])
         XCTAssertEqual(result.duplicateFilenames, 2)
     }
+    func testScannerFindsEveryExistingArcade3DSAndGameCubeRouteFormat() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cases: [(String, EmulatedSystemID)] = [
+            ("Arcade/arcade.7z", .arcade),
+            ("3DS/homebrew.z3dsx", .nintendo3DS), ("3DS/cart.zcci", .nintendo3DS),
+            ("3DS/title.zcxi", .nintendo3DS), ("3DS/homebrew.elf", .nintendo3DS),
+            ("3DS/homebrew.axf", .nintendo3DS), ("3DS/title.app", .nintendo3DS),
+            ("GameCube/cart.gcm", .gameCube), ("GameCube/disc.ciso", .gameCube)
+        ]
+        for (path, _) in cases {
+            let file = root.appendingPathComponent(path)
+            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data([1]).write(to: file)
+        }
+        let scanned = try ROMFolderScanner.scan(root)
+        XCTAssertEqual(scanned.games.count, cases.count)
+        for (path, expected) in cases {
+            let rom = try XCTUnwrap(scanned.games.first { $0.relativePath == path })
+            XCTAssertEqual(IntegratedEmulatorSupport.system(for: rom), expected, path)
+        }
+        let outsideFolder = ROMFolderGame(relativePath: "homebrew.elf", filename: "homebrew.elf", title: "test", fileSize: 1)
+        XCTAssertNil(IntegratedEmulatorSupport.system(for: outsideFolder))
+    }
     func testRetroArchShareStagesReadablePrivateCopyAndPreservesOriginal() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let sourceRoot = root.appendingPathComponent("source", isDirectory: true)
@@ -182,17 +383,115 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(ROMTitleRules.clean("1636 - Pokemon Fire Red (U)(Squirrels).gba"), "Pokemon Fire Red")
         XCTAssertEqual(ROMTitleRules.clean("Pokemon_FireRed_Version.gba"), "Pokemon Fire Red")
     }
-    func testIntegratedCoreSupportsValidatedSystemsOnly() {
-        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Pokemon.gba", filename: "Pokemon.gba", title: "Pokemon", fileSize: 1)))
-        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Tetris.gb", filename: "Tetris.gb", title: "Tetris", fileSize: 1)))
-        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Zelda.gbc", filename: "Zelda.gbc", title: "Zelda", fileSize: 1)))
-        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Metal Slug.neo", filename: "Metal Slug.neo", title: "Metal Slug", fileSize: 1)))
-        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Sonic.sms", filename: "Sonic.sms", title: "Sonic", fileSize: 1)))
-        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Sonic.gg", filename: "Sonic.gg", title: "Sonic", fileSize: 1)))
-        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Mario.nes", filename: "Mario.nes", title: "Mario", fileSize: 1)))
-        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Bonk.pce", filename: "Bonk.pce", title: "Bonk", fileSize: 1)))
-        XCTAssertTrue(IntegratedEmulatorSupport.supports(.init(relativePath: "Mario.sfc", filename: "Mario.sfc", title: "Mario", fileSize: 1)))
-        XCTAssertEqual(IntegratedEmulatorSupport.routeLabel(.init(relativePath: "Pokemon.gba", filename: "Pokemon.gba", title: "Pokemon", fileSize: 1)), "JOGAR · BRUM CORE · MGBA")
+    func testIntegratedCoreRoutesOnlyInstalledNonExperimentalLibraries() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        // These bytes test installation/routing, not native library validity.
+        for core in CoreRegistry.all { try Data([1]).write(to: directory.appendingPathComponent(core.libraryName)) }
+        for path in ["Pokemon.gba", "Tetris.gb", "Zelda.gbc", "Metal Slug.neo", "Sonic.sms", "Sonic.gg", "Mario.nes", "Bonk.pce", "Mario.sfc"] {
+            let rom = ROMFolderGame(relativePath: path, filename: (path as NSString).lastPathComponent, title: "test", fileSize: 1)
+            XCTAssertTrue(IntegratedEmulatorSupport.supports(rom, includeExperimental: false, frameworksDirectory: directory), path)
+        }
+        for path in ["N64/Mario.z64", "MegaDrive/Sonic.md", "32X/Knuckles.32x", "PS1/Ridge Racer.cue", "Saturn/Nights.chd", "Arcade/mslug.zip", "Atari/Pitfall.a26", "PSP/Game.cso", "Dreamcast/Sonic.gdi", "3DS/Mario.3ds", "GameCube/Melee.rvz"] {
+            let rom = ROMFolderGame(relativePath: path, filename: (path as NSString).lastPathComponent, title: "test", fileSize: 1)
+            XCTAssertFalse(IntegratedEmulatorSupport.supports(rom, includeExperimental: false, frameworksDirectory: directory), path)
+        }
+        let gba = ROMFolderGame(relativePath: "Pokemon.gba", filename: "Pokemon.gba", title: "Pokemon", fileSize: 1)
+        XCTAssertEqual(IntegratedEmulatorSupport.routeLabel(gba, includeExperimental: false, frameworksDirectory: directory), "JOGAR · BRUM CORE")
+        try FileManager.default.removeItem(at: directory.appendingPathComponent(CoreRegistry.mgba.libraryName))
+        XCTAssertFalse(IntegratedEmulatorSupport.supports(gba, includeExperimental: false, frameworksDirectory: directory))
+        XCTAssertEqual(CoreRegistry.installation(for: .gameBoyAdvance, frameworksDirectory: directory).state, .missingLibrary)
+    }
+
+    func testCoreInstallationRejectsEmptyFilesDirectoriesAndDisabledCandidates() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let library = directory.appendingPathComponent(CoreRegistry.azahar.libraryName)
+        try Data().write(to: library)
+        XCTAssertEqual(CoreRegistry.installation(for: .nintendo3DS, includeExperimental: true, frameworksDirectory: directory).state, .invalidLibrary)
+        try FileManager.default.removeItem(at: library)
+        try FileManager.default.createDirectory(at: library, withIntermediateDirectories: false)
+        XCTAssertEqual(CoreRegistry.installation(for: .nintendo3DS, includeExperimental: true, frameworksDirectory: directory).state, .invalidLibrary)
+        XCTAssertEqual(CoreRegistry.installation(for: .nintendo3DS, includeExperimental: false, frameworksDirectory: directory).state, .experimentalDisabled)
+        XCTAssertEqual(CoreRegistry.installation(for: .playStation2, includeExperimental: true, frameworksDirectory: directory).state, .unavailable)
+    }
+    func testAmbiguousDiscRoutingRequiresFolderAndMatchingFormat() {
+        func system(_ path: String) -> EmulatedSystemID? {
+            IntegratedEmulatorSupport.system(for: .init(relativePath: path, filename: (path as NSString).lastPathComponent, title: "test", fileSize: 1))
+        }
+        XCTAssertNil(system("game.iso"))
+        XCTAssertNil(system("PS1/readme.txt"))
+        XCTAssertNil(system("Arcade/game.iso"))
+        XCTAssertEqual(system("Dreamcast/game.cdi"), .dreamcast)
+        XCTAssertEqual(system("PSP/game.iso"), .playStationPortable)
+        XCTAssertEqual(system("Sega CD/game.cue"), .segaCD)
+        XCTAssertNil(system("Sega CD/game.m3u"))
+        XCTAssertEqual(ROMFolderScanner.firmwareDestinationNames["bios_cd_u.bin"], "bios_CD_U.bin")
+        XCTAssertEqual(ROMFolderScanner.firmwareDestinationNames["32x_m_bios.bin"], "32X_M_BIOS.bin")
+        XCTAssertEqual(system("PS1/game.cue"), .playStation)
+        XCTAssertEqual(system("PS2/game.iso"), .playStation2)
+        XCTAssertEqual(system("Sega CD/game.chd"), .segaCD)
+        XCTAssertEqual(system("3DS/homebrew.3dsx"), .nintendo3DS)
+        XCTAssertEqual(system("3DS/jogo.3ds"), .nintendo3DS)
+        XCTAssertEqual(system("3DS/title.app"), .nintendo3DS)
+        XCTAssertEqual(system("GameCube/game.iso"), .gameCube)
+        XCTAssertEqual(system("Arcade/pacman.zip"), .arcade)
+        let threeDS = ROMFolderGame(relativePath: "3DS/jogo.3ds", filename: "jogo.3ds", title: "jogo", fileSize: 1)
+        XCTAssertEqual(CoreRegistry.core(for: .nintendo3DS, includeExperimental: true)?.id, "azahar")
+        let frameworks = Bundle.main.privateFrameworksPath
+            ?? (Bundle.main.bundlePath as NSString).appendingPathComponent("Frameworks")
+        let azaharPath = (frameworks as NSString).appendingPathComponent("azahar_libretro_ios.dylib")
+        XCTAssertEqual(IntegratedEmulatorSupport.core(for: threeDS, includeExperimental: true)?.id == "azahar",
+                       FileManager.default.fileExists(atPath: azaharPath))
+        XCTAssertNil(IntegratedEmulatorSupport.core(for: threeDS, includeExperimental: false))
+        XCTAssertFalse(RetroArchAppStoreLaunchRules.supports(filename: "jogo.3ds"))
+        XCTAssertFalse(GamingModeCatalog.canOfferRetroArch(for: threeDS, imported: false))
+        XCTAssertFalse(GamingModeCatalog.canOfferRetroArch(for: threeDS, imported: true))
+        XCTAssertEqual(system("nested/PSP/game.iso"), .playStationPortable)
+        XCTAssertEqual(system("PS1/PS2/game.iso"), .playStation2)
+    }
+    func testGamingModeUsesOnlyRealLocalHistoryAndFavorites() {
+        let first = ROMFolderGame(relativePath: "3DS/jogo.3ds", filename: "jogo.3ds", title: "Jogo", fileSize: 100)
+        let second = ROMFolderGame(relativePath: "N64/outro.z64", filename: "outro.z64", title: "Outro", fileSize: 100)
+        var played = PocketClassic(id: UUID(), title: "Outro", filename: "outro.z64")
+        played.lastPlayedAt = Date(timeIntervalSince1970: 1_000)
+        let library = GamingModeCatalog.library(local: [first, second], records: [played], computer: [])
+        XCTAssertEqual(library.count, 2)
+        XCTAssertEqual(GamingModeCatalog.recent(library, favorites: []).map(\.id), ["local:n64/outro.z64"])
+        XCTAssertEqual(GamingModeCatalog.recent(library, favorites: ["local:3ds/jogo.3ds"]).map(\.id),
+                       ["local:3ds/jogo.3ds", "local:n64/outro.z64"])
+        XCTAssertNotNil(GamingModeCatalog.date("2026-10-07T10:30:00.123Z"))
+    }
+    func testDiscStagingCopiesTracksAndRemovesOnlyFailedPrivateCopy() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let source = root.appendingPathComponent("source")
+        let output = root.appendingPathComponent("output")
+        try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cue = source.appendingPathComponent("disc.cue")
+        let track = source.appendingPathComponent("track 01.bin")
+        try Data("FILE \"track 01.bin\" BINARY\n TRACK 01 MODE2/2352\n".utf8).write(to: cue)
+        try Data([1, 2, 3]).write(to: track)
+        let playlist = source.appendingPathComponent("game.m3u")
+        try Data("disc.cue\n".utf8).write(to: playlist)
+        let staged = try ROMExportStager.stageDiscSet(source: playlist, filename: "game.m3u", root: output, id: UUID())
+        XCTAssertEqual(try Data(contentsOf: staged.deletingLastPathComponent().appendingPathComponent("track 01.bin")), Data([1, 2, 3]))
+        let firstIdentity = try ROMContentInspector.inspect(url: playlist, filename: "game.m3u", expectedSystem: .playStation)
+        try Data([4, 5, 6]).write(to: track)
+        let secondIdentity = try ROMContentInspector.inspect(url: playlist, filename: "game.m3u", expectedSystem: .playStation)
+        XCTAssertNotEqual(firstIdentity.contentSHA256, secondIdentity.contentSHA256)
+        try Data("game.m3u\n".utf8).write(to: playlist)
+        XCTAssertThrowsError(try ROMExportStager.contentFiles(for: playlist))
+        for reference in ["../outside.bin", "missing.bin"] {
+            try Data("FILE \"\(reference)\" BINARY\n".utf8).write(to: cue)
+            let id = UUID()
+            XCTAssertThrowsError(try ROMExportStager.stageDiscSet(source: cue, filename: "disc.cue", root: output, id: id))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: output.appendingPathComponent(id.uuidString).path))
+            XCTAssertTrue(FileManager.default.fileExists(atPath: cue.path))
+            XCTAssertTrue(FileManager.default.fileExists(atPath: track.path))
+        }
     }
     func testROMArtworkMatchesSceneNameWithinPlatformAndKeepsOtherGamesOut() {
         let paths = ["Named_Boxarts/Pokemon - FireRed Version (USA, Europe).png", "Named_Boxarts/Pokemon - LeafGreen Version (USA).png", "Named_Snaps/Pokemon - FireRed Version (USA, Europe).png"]

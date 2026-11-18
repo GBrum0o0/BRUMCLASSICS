@@ -16,6 +16,8 @@ def validate_ipa(path, expected_version=None):
             entry = PurePosixPath(name)
             if entry.is_absolute() or ".." in entry.parts or "\\" in name:
                 raise ValueError("Unsafe ZIP path")
+            if entry.name == "BrumTestCore.dylib" or any(part.endswith(".xctest") for part in entry.parts):
+                raise ValueError("Simulator test fixtures must not be distributed in an IPA")
         infos = [n for n in names if n.startswith("Payload/") and n.count("/") == 2 and n.endswith(".app/Info.plist")]
         if len(infos) != 1:
             raise ValueError("Expected exactly one Payload application")
@@ -49,6 +51,44 @@ def validate_ipa(path, expected_version=None):
             "Beetle WonderSwan": root + "Frameworks/mednafen_wswan_libretro_ios.dylib",
             "bsnes-mercury": root + "Frameworks/bsnes_mercury_performance_libretro_ios.dylib",
         }
+        experimental = info.get("BRUMExperimentalBackends", False)
+        if not isinstance(experimental, bool):
+            raise ValueError("Invalid experimental backend flag")
+        build_number = info.get("CFBundleVersion", "")
+        if experimental and (not isinstance(build_number, str) or not build_number.isdecimal() or int(build_number) < 36):
+            raise ValueError("Invalid experimental build number")
+        expanded_experimental = experimental and int(build_number) >= 37
+        heavy_experimental = experimental and int(build_number) >= 39
+        sega_experimental = experimental and int(build_number) >= 40
+        arcade_gc_experimental = experimental and int(build_number) >= 44
+        azahar_experimental = experimental and int(build_number) >= 45
+        sideload_diagnostic = experimental and int(build_number) >= 46
+        if experimental:
+            integrated_cores.update({
+                "Beetle PSX": root + "Frameworks/mednafen_psx_libretro_ios.dylib",
+                "Stella2014": root + "Frameworks/stella2014_libretro_ios.dylib",
+            })
+        if expanded_experimental:
+            integrated_cores.update({
+                "Mupen64Plus-Next": root + "Frameworks/mupen64plus_next_libretro_ios.dylib",
+                "Beetle Saturn": root + "Frameworks/mednafen_saturn_libretro_ios.dylib",
+            })
+        if heavy_experimental:
+            integrated_cores.update({
+                "PPSSPP": root + "Frameworks/ppsspp_libretro_ios.dylib",
+                "Flycast": root + "Frameworks/flycast_libretro_ios.dylib",
+            })
+        if sega_experimental:
+            integrated_cores["BlastEm"] = root + "Frameworks/blastem_libretro_ios.dylib"
+        if arcade_gc_experimental:
+            integrated_cores.update({
+                "MAME 2016": root + "Frameworks/mamearcade2016_libretro_ios.dylib",
+                "Dolphin": root + "Frameworks/dolphin_libretro_ios.dylib",
+            })
+        if azahar_experimental:
+            integrated_cores["Azahar"] = root + "Frameworks/azahar_libretro_ios.dylib"
+        if sideload_diagnostic and info.get("CFBundleDisplayName") != "BRUM Core Teste":
+            raise ValueError("Experimental CFBundleDisplayName must be BRUM Core Teste")
         for core_name, core_path in integrated_cores.items():
             if core_path not in names:
                 raise ValueError(f"Integrated {core_name} core is absent")
@@ -72,9 +112,45 @@ def validate_ipa(path, expected_version=None):
             root + "Frameworks/Beetle-WonderSwan-LICENSE.txt",
             root + "Frameworks/bsnes-mercury-LICENSE.txt",
         ]
+        if experimental:
+            required_licenses += [root + "Frameworks/Beetle-PSX-LICENSE.txt",
+                                  root + "Frameworks/Stella2014-LICENSE.txt"]
+        if expanded_experimental:
+            required_licenses += [root + "Frameworks/Mupen64Plus-Next-LICENSE.txt",
+                                  root + "Frameworks/Beetle-Saturn-LICENSE.txt"]
+        if heavy_experimental:
+            required_licenses += [root + "Frameworks/PPSSPP-LICENSE.txt",
+                                  root + "Frameworks/Flycast-LICENSE.txt"]
+        if sega_experimental:
+            required_licenses += [root + "Frameworks/BlastEm-LICENSE.txt"]
+        if arcade_gc_experimental:
+            required_licenses += [root + "Frameworks/MAME2016-LICENSE.md",
+                                  root + "Frameworks/Dolphin-LICENSE.txt"]
+        if azahar_experimental:
+            required_licenses += [root + "Frameworks/Azahar-LICENSE.txt"]
         for license_path in required_licenses:
             if license_path not in names or len(archive.read(license_path)) < 1_000:
                 raise ValueError("Required mobile or core license is absent")
+        if heavy_experimental and not any(name.startswith(root + "Frameworks/CoreAssets/PPSSPP/")
+                                          and not name.endswith("/") for name in names):
+            raise ValueError("PPSSPP core assets are absent")
+        if sega_experimental:
+            for notice in ("BlastEm-libchdr-LICENSE.txt", "BlastEm-LZMA-LICENSE.txt", "BlastEm-zlib-LICENSE.txt"):
+                notice_path = root + "Frameworks/" + notice
+                if notice_path not in names or not archive.read(notice_path):
+                    raise ValueError(f"{notice} is absent or empty")
+        if arcade_gc_experimental:
+            if not any(name.startswith(root + "Frameworks/CoreAssets/dolphin-emu/Sys/")
+                       and not name.endswith("/") for name in names):
+                raise ValueError("Dolphin core assets are absent")
+            for notice in ("MAME2016-THIRD-PARTY.md", "MAME2016-softfloat-NOTICE.txt",
+                           "MAME2016-expat-LICENSE.txt", "MAME2016-FLAC-LICENSE.txt",
+                           "MAME2016-libuv-LICENSE.txt", "MAME2016-http-parser-LICENSE.txt",
+                           "MAME2016-LZMA-NOTICE.txt", "Dolphin-COPYING.txt",
+                           "Dolphin-BSD-3-Clause.txt", "Dolphin-CC0-1.0.txt", "Dolphin-MIT.txt"):
+                notice_path = root + "Frameworks/" + notice
+                if notice_path not in names or not archive.read(notice_path):
+                    raise ValueError(f"{notice} is absent or empty")
         if info.get("CFBundleIdentifier") != "com.brumclassics.mobile.ios":
             raise ValueError("Unexpected bundle identifier")
         if "iPhoneOS" not in info.get("CFBundleSupportedPlatforms", []):
@@ -85,7 +161,8 @@ def validate_ipa(path, expected_version=None):
             raise ValueError("ZIP CRC check failed")
         return {"ok": True, "version": info.get("CFBundleShortVersionString"),
                 "build": info.get("CFBundleVersion"), "bundleId": info["CFBundleIdentifier"],
-                "executable": executable_path, "architecture": "arm64", "integratedCores": ["mGBA arm64", "SkyEmu arm64", "Geolith arm64", "Gearsystem arm64", "Nestopia arm64", "Beetle PCE Fast arm64", "Beetle WonderSwan arm64", "bsnes-mercury arm64"],
+                "executable": executable_path, "architecture": "arm64", "integratedCores": [name + " arm64" for name in integrated_cores],
+                "experimentalBackends": experimental,
                 "signing": "unsigned; requires AltStore or Sideloadly", "entries": len(names)}
 
 if __name__ == "__main__":

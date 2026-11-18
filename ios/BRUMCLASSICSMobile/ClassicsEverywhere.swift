@@ -20,6 +20,12 @@ struct PocketProgress: Codable, Equatable {
     var updatedAt: Date
     var unlocked: Int { achievements.filter(\.unlocked).count }
 
+    private static func badgeURL(_ name: String?) -> String? {
+        guard let name, (1...16).contains(name.utf8.count),
+              name.utf8.allSatisfy({ $0 >= 48 && $0 <= 57 }) else { return nil }
+        return "https://media.retroachievements.org/Badge/\(name).png"
+    }
+
     static func decode(_ data: Data, username: String, expectedID: Int) throws -> Self {
         guard let raw = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               raw["Error"] == nil, (raw["ID"] as? NSNumber)?.intValue == expectedID,
@@ -31,7 +37,7 @@ struct PocketProgress: Codable, Equatable {
             guard let title = item["Title"] as? String else { return nil }
             let soft = item["DateEarned"] as? String ?? ""
             let hard = item["DateEarnedHardcore"] as? String ?? ""
-            return Game.Achievement(id: key, title: title, description: item["Description"] as? String ?? "", points: (item["Points"] as? NSNumber)?.intValue ?? 0, unlocked: !soft.isEmpty || !hard.isEmpty, hardcore: !hard.isEmpty, unlockedAt: hard.isEmpty ? soft : hard, badgeUrl: nil, manual: nil)
+            return Game.Achievement(id: key, title: title, description: item["Description"] as? String ?? "", points: (item["Points"] as? NSNumber)?.intValue ?? 0, unlocked: !soft.isEmpty || !hard.isEmpty, hardcore: !hard.isEmpty, unlockedAt: hard.isEmpty ? soft : hard, badgeUrl: badgeURL(item["BadgeName"] as? String), manual: nil)
         }.sorted { $0.title < $1.title }
         return Self(username: username, gameID: expectedID, title: title, achievements: achievements, updatedAt: Date())
     }
@@ -43,7 +49,7 @@ enum PocketError: LocalizedError {
 }
 
 enum PocketRules {
-    static let extensions: Set<String> = ["gba", "gb", "gbc", "nes", "sfc", "smc", "n64", "z64", "v64", "nds", "sms", "gg", "md", "gen", "pce", "neo", "ws", "wsc", "chd", "pbp", "iso", "cso", "rvz", "cue", "m3u", "gdi", "wad", "zip"]
+    static let extensions: Set<String> = ["gba", "gb", "gbc", "nes", "sfc", "smc", "n64", "z64", "v64", "nds", "sms", "gg", "md", "gen", "smd", "32x", "pce", "neo", "ws", "wsc", "a26", "bin", "chd", "pbp", "iso", "cso", "cdi", "rvz", "gcz", "ciso", "gcm", "cue", "m3u", "gdi", "wad", "zip", "7z", "3ds", "3dsx", "z3dsx", "cci", "zcci", "cxi", "zcxi", "app", "elf", "axf"]
     static func safeFilename(_ value: String) -> Bool {
         !value.isEmpty && value != "." && value != ".." && !value.contains("/") && !value.contains("\\") && !value.contains("\0")
     }
@@ -121,6 +127,7 @@ actor PocketRAClient {
     @Published var pendingROMShare: ROMShareTicket?
     private let runtime = PocketRuntimeFiles()
     private let playSessions = PocketPlaySessionFiles()
+    private var integratedSessionActive = false
     private let retroArchFiles = RetroArchLibraryFiles()
     private let romFolder = ROMFolderAccess()
     private var timeBusy = false
@@ -264,7 +271,7 @@ actor PocketRAClient {
     }
     func prepareIntegratedROM(_ rom: ROMFolderGame, launcher: AppStore) async throws -> EmulationLaunchDescriptor {
         guard IntegratedEmulatorSupport.supports(rom) else {
-            throw PocketError.message("Este sistema ainda não possui um núcleo integrado. Use o RetroArch enquanto ampliamos o BRUM Core.")
+            throw PocketError.message(IntegratedEmulatorSupport.availabilityReason(for: rom))
         }
         guard var record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }) else {
             throw PocketError.message("Atualize a pasta de ROMs novamente antes de jogar.")
@@ -275,23 +282,122 @@ actor PocketRAClient {
             await update(record)
         }
         let staged = try await romFolder.stageForIntegratedPlay(rom)
-        do { try await runtime.prepare(record, allGames: games) }
-        catch { runtimeStatus = "A sessão será aberta, mas o contador preciso não pôde ser preparado: \(error.localizedDescription)" }
-        try await playSessions.begin(record, integrated: true)
-        await recordLaunch(record, launcher: launcher)
         return try await Task.detached(priority: .userInitiated) {
             try EmulationLaunchBuilder.prepare(
                 romURL: staged,
                 title: rom.title,
                 originalFilename: rom.filename,
+                expectedSystem: IntegratedEmulatorSupport.system(for: rom),
                 retroAchievementsGameID: Int(record.retroAchievementID) ?? 0
             )
         }.value
     }
+    func beginIntegratedPlay(_ rom: ROMFolderGame, launcher: AppStore) async {
+        guard let record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }) else { return }
+        integratedSessionActive = true
+        do { try await runtime.prepare(record, allGames: games) }
+        catch { runtimeStatus = "O jogo iniciou, mas o contador preciso não pôde ser preparado: \(error.localizedDescription)" }
+        do {
+            try await playSessions.begin(record, integrated: true)
+            await recordLaunch(record, launcher: launcher)
+        } catch { runtimeStatus = "O jogo iniciou, mas o registro da sessão falhou: \(error.localizedDescription)" }
+    }
     func finishIntegratedPlay(launcher: AppStore) async {
+        integratedSessionActive = false
         await finishPlaySession(launcher: launcher)
     }
+    func sendNativeSaveToPC(_ rom: ROMFolderGame, launcher: AppStore) async throws -> String {
+        guard IntegratedEmulatorSupport.supports(rom),
+              let system = IntegratedEmulatorSupport.system(for: rom),
+              Set<EmulatedSystemID>([.gameBoy, .gameBoyColor, .gameBoyAdvance,
+                                     .nintendoEntertainmentSystem, .superNintendo]).contains(system) else {
+            throw PocketError.message("Este jogo não usa um núcleo integrado compatível com save nativo.")
+        }
+        guard let record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }),
+              !record.launcherGameID.isEmpty else {
+            throw PocketError.message("Vincule este jogo à cópia do PC antes de enviar o save.")
+        }
+        let staged = try await romFolder.stageForIntegratedPlay(rom)
+        let expectedSystem = IntegratedEmulatorSupport.system(for: rom)
+        let identity = try await Task.detached(priority: .userInitiated) {
+            try ROMContentInspector.inspect(url: staged, filename: rom.filename, expectedSystem: expectedSystem)
+        }.value
+        guard let local = try NativeSaveTransfer.inspectLocalBatterySave(for: identity) else {
+            throw PocketError.message("Este jogo ainda não possui save nativo do BRUM Core no iPhone.")
+        }
+        let catalog = try await launcher.nativeSaveCatalog(for: identity)
+        guard catalog.transferEnabled else {
+            throw PocketError.message("Atualize o Launcher Beta para habilitar o envio de saves.")
+        }
+        guard let fingerprint = launcher.configuration?.fingerprint else { throw BridgeError.notPaired }
+        try NativeSaveTransfer.checkProfileBinding(for: identity, profileID: catalog.activeProfileId,
+                                                   launcherFingerprint: fingerprint)
+        if catalog.candidates.contains(where: { $0.revisionId == local.revisionId }) {
+            try NativeSaveTransfer.bindProfile(for: identity, profileID: catalog.activeProfileId,
+                                               launcherFingerprint: fingerprint)
+            return "O save do iPhone já está no Cofre do PC."
+        }
+        let hasOtherPCSave = !catalog.candidates.isEmpty
+        try await launcher.uploadNativeSave(local, identity: identity,
+                                            gameID: record.launcherGameID, profileID: catalog.activeProfileId)
+        try NativeSaveTransfer.bindProfile(for: identity, profileID: catalog.activeProfileId,
+                                           launcherFingerprint: fingerprint)
+        return hasOtherPCSave
+            ? "Conflito preservado: o PC tem outro progresso. Seu save foi enviado à caixa de entrada; escolha manualmente no Cofre de Saves qual versão aplicar."
+            : "Save enviado e verificado. No PC, abra Cofre de Saves e escolha APLICAR AO BRUM CORE PC."
+    }
+    func receiveNativeSaveFromPC(_ rom: ROMFolderGame, launcher: AppStore) async throws -> String {
+        guard IntegratedEmulatorSupport.supports(rom),
+              let system = IntegratedEmulatorSupport.system(for: rom),
+              Set<EmulatedSystemID>([.gameBoy, .gameBoyColor, .gameBoyAdvance,
+                                     .nintendoEntertainmentSystem, .superNintendo]).contains(system) else {
+            throw PocketError.message("Este jogo não usa um núcleo integrado compatível com save nativo.")
+        }
+        guard let record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }),
+              !record.launcherGameID.isEmpty else {
+            throw PocketError.message("Vincule este jogo à cópia do PC antes de receber o save.")
+        }
+        let stagedROM = try await romFolder.stageForIntegratedPlay(rom)
+        let expectedSystem = IntegratedEmulatorSupport.system(for: rom)
+        let identity = try await Task.detached(priority: .userInitiated) {
+            try ROMContentInspector.inspect(url: stagedROM, filename: rom.filename, expectedSystem: expectedSystem)
+        }.value
+        let catalog = try await launcher.nativeSaveCatalog(for: identity)
+        guard catalog.downloadEnabled,
+              let candidate = catalog.candidates.first(where: { $0.gameId == record.launcherGameID }),
+              candidate.files.count == 1, let file = candidate.files.first,
+              file.name.lowercased().hasSuffix(".srm") else {
+            throw PocketError.message("O PC ainda não possui um backup de bateria compatível para esta ROM.")
+        }
+        guard let fingerprint = launcher.configuration?.fingerprint else { throw BridgeError.notPaired }
+        try NativeSaveTransfer.checkProfileBinding(for: identity, profileID: catalog.activeProfileId,
+                                                   launcherFingerprint: fingerprint)
+        let local = try NativeSaveTransfer.inspectLocalBatterySave(for: identity)
+        if local?.revisionId == candidate.revisionId {
+            try NativeSaveTransfer.bindProfile(for: identity, profileID: catalog.activeProfileId,
+                                               launcherFingerprint: fingerprint)
+            return "O save do iPhone já corresponde ao backup do PC."
+        }
+        let staged = try await launcher.stageNativeSave(for: identity, candidate: candidate, file: file)
+        defer {
+            let temporaryDirectory = staged.deletingLastPathComponent()
+            if UUID(uuidString: temporaryDirectory.lastPathComponent) != nil {
+                try? FileManager.default.removeItem(at: temporaryDirectory)
+            }
+        }
+        let applied = try NativeSaveTransfer.installStagedBatterySave(staged, identity: identity,
+                                                                      candidate: candidate, allowReplace: true)
+        try NativeSaveTransfer.bindProfile(for: identity, profileID: catalog.activeProfileId,
+                                           launcherFingerprint: fingerprint)
+        return applied ? "Save do PC aplicado ao BRUM Core. A versão anterior do iPhone foi preservada." :
+                         "O save do iPhone já corresponde ao backup do PC."
+    }
     func launchROM(_ rom: ROMFolderGame, launcher: AppStore) async {
+        if IntegratedEmulatorSupport.system(for: rom) == .nintendo3DS,
+           !IntegratedEmulatorSupport.supports(rom) {
+            message = "Arquivo 3DS reconhecido, mas o Azahar não está instalado nesta versão. Nenhuma importação para o RetroArch foi iniciada. Confira a build experimental do BRUM Core."
+            return
+        }
         guard var record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }) else {
             message = "Atualize a pasta de ROMs novamente antes de jogar."
             return
@@ -403,14 +509,19 @@ actor PocketRAClient {
     }
     func finishPlaySession(launcher: AppStore) async {
         do {
-            guard let finished = try await playSessions.finish() else { return }
+            guard let finished = try await playSessions.finish(preserveIntegrated: integratedSessionActive) else { return }
+            let integrated = finished.session.integrated == true
             let exactLogsConfigured = try await runtime.configured()
-            if !exactLogsConfigured {
+            if integrated {
+                _ = try await runtime.creditIntegrated(finished.session.gameID, filename: finished.session.filename, seconds: finished.seconds)
+            } else if !exactLogsConfigured {
                 _ = try await runtime.creditEstimated(finished.session.gameID, filename: finished.session.filename, seconds: finished.seconds)
             }
             await reloadRuntime()
             await syncHours(launcher: launcher)
-            if !exactLogsConfigured {
+            if integrated {
+                runtimeStatus = "Sessão BRUM Core registrada: \(finished.seconds / 60)min \(finished.seconds % 60)s."
+            } else if !exactLogsConfigured {
                 runtimeStatus = "Sessão automática registrada: \(finished.seconds / 60)min \(finished.seconds % 60)s. Autorize os logs do RetroArch para usar o tempo exato do emulador."
             }
         } catch {
@@ -534,10 +645,20 @@ struct ROMFolderGameTile: View {
     let launcherGame: Game?
     let retroArchReady: Bool
     let integratedCoreName: String?
+    var opensDetails = false
     let play: () -> Void
     @State private var artwork: ROMArtwork?
     @State private var artworkImage: UIImage?
     private var displayedTitle: String { launcherGame?.title ?? artwork?.title ?? rom.title }
+    private var routeLabel: String {
+        if let integratedCoreName { return "JOGAR · BRUM CORE · \(integratedCoreName.uppercased())" }
+        if let system = IntegratedEmulatorSupport.system(for: rom),
+           CoreRegistry.candidate(for: system) != nil,
+           !RetroArchAppStoreLaunchRules.supports(filename: rom.filename) {
+            return "BRUM CORE · NÃO DISPONÍVEL NESTA INSTALAÇÃO"
+        }
+        return retroArchReady ? "JOGAR · RETROARCH" : "PRIMEIRO USO · IMPORTAR"
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button(action: play) {
@@ -553,8 +674,8 @@ struct ROMFolderGameTile: View {
                     }
                     Text(displayedTitle).font(.system(size: 15, weight: .bold)).foregroundStyle(BrumTheme.text).lineLimit(2).multilineTextAlignment(.leading)
                 }
-            }.buttonStyle(.plain).accessibilityLabel("Jogar \(displayedTitle)")
-            Text(integratedCoreName.map { "JOGAR · BRUM CORE · \($0.uppercased())" } ?? (retroArchReady ? "JOGAR · RETROARCH" : "PRIMEIRO USO · IMPORTAR"))
+            }.buttonStyle(.plain).accessibilityLabel("\(opensDetails ? "Ver detalhes de" : "Jogar") \(displayedTitle)")
+            Text(routeLabel)
                 .font(.system(size: 10, weight: .bold)).foregroundStyle(BrumTheme.primary)
         }.task(id: rom.id + (launcherGame?.artworkPath ?? "")) {
             guard launcherGame?.artworkPath.isEmpty != false else { return }

@@ -1,0 +1,12 @@
+diff --git a/Source/Core/Core/MemTools.cpp b/Source/Core/Core/MemTools.cpp
+--- a/Source/Core/Core/MemTools.cpp
++++ b/Source/Core/Core/MemTools.cpp
+@@ -25,1 +25,1 @@
+-#if defined(__APPLE__) && !defined(USE_SIGACTION_ON_APPLE)
++#if defined(__APPLE__) && !defined(_M_GENERIC) && !defined(USE_SIGACTION_ON_APPLE)
+@@ -29,1 +29,1 @@
+-#if defined(__APPLE__)
++#if defined(__APPLE__) && !defined(_M_GENERIC)
+@@ -123,1 +123,1 @@
+-#elif defined(__APPLE__) && !defined(USE_SIGACTION_ON_APPLE) && !TARGET_OS_TV
++#elif defined(__APPLE__) && !defined(_M_GENERIC) && !defined(USE_SIGACTION_ON_APPLE) && !TARGET_OS_TV

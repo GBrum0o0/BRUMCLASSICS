@@ -2,7 +2,7 @@
 
 Copyright (c) 2026 BRUMCLASSICS.
 
-O código-fonte próprio contido em `android/` e `ios/`, incluindo o host Libretro BRUM Core, é software livre sob a **GNU General Public License, versão 3 ou, a seu critério, qualquer versão posterior (GPL-3.0-or-later)**. O texto integral está em `LICENSES/GPL-3.0.txt` e é empacotado nos builds móveis distribuídos pelo projeto.
+O código-fonte próprio contido em `android/`, `ios/` e `shared/brum-core/`, incluindo o host Libretro BRUM Core, é software livre sob a **GNU General Public License, versão 3 ou, a seu critério, qualquer versão posterior (GPL-3.0-or-later)**. O texto integral está em `LICENSES/GPL-3.0.txt` e é empacotado nos builds móveis distribuídos pelo projeto.
 
 ## Limites do escopo
 

@@ -1,10 +1,12 @@
 #import <UIKit/UIKit.h>
+#import "BrumBackend.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
 typedef void (^BrumEmulatorExitHandler)(void);
+typedef void (^BrumEmulatorReadyHandler)(void);
 
-@interface BrumLibretroViewController : UIViewController
+@interface BrumLibretroViewController : UIViewController <BrumBackendSession>
 
 - (instancetype)initWithROMURL:(NSURL *)romURL
                          title:(NSString *)title
@@ -18,7 +20,10 @@ typedef void (^BrumEmulatorExitHandler)(void);
         retroAchievementsGameID:(NSInteger)retroAchievementsGameID
                 saveIdentifier:(NSString *)saveIdentifier
             legacySaveBasename:(NSString *)legacySaveBasename
+                       onReady:(BrumEmulatorReadyHandler)onReady
                         onExit:(BrumEmulatorExitHandler)onExit NS_DESIGNATED_INITIALIZER;
+
+@property(nonatomic, readonly) NSString *diagnosticsReport;
 
 - (instancetype)initWithNibName:(nullable NSString *)nibNameOrNil
                           bundle:(nullable NSBundle *)nibBundleOrNil NS_UNAVAILABLE;

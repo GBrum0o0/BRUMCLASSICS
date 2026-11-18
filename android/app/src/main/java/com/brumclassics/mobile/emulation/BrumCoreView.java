@@ -11,11 +11,11 @@ import android.media.AudioAttributes;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
-import android.os.SystemClock;
 import android.view.View;
 import android.view.MotionEvent;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.LockSupport;
 
 final class BrumCoreView extends View implements Runnable {
     interface RuntimeErrorListener { void onRuntimeError(String message); }
@@ -31,7 +31,7 @@ final class BrumCoreView extends View implements Runnable {
     private Thread emulationThread;
     private volatile boolean running;
     private volatile boolean fastForward;
-    private volatile boolean fillDisplay = true;
+    private volatile boolean fillDisplay;
     private AudioTrack audioTrack;
     private long playedNanos;
     private final RectF displayTarget = new RectF();
@@ -56,6 +56,8 @@ final class BrumCoreView extends View implements Runnable {
 
     void pauseEmulation() {
         running = false;
+        inputMask.set(0);
+        core.setPointer(0, 0, false);
         if (audioTrack != null) { audioTrack.pause(); audioTrack.flush(); }
         Thread thread = emulationThread;
         if (thread != null && thread != Thread.currentThread()) {
@@ -109,11 +111,13 @@ final class BrumCoreView extends View implements Runnable {
     }
 
     @Override public void run() {
-        final long frameDuration = 16_666_667L;
+        // Respect the core's declared cadence rather than imposing 60 Hz on
+        // 75 Hz and future systems. Rendering remains vsync-driven by Android.
+        long nextFrame = System.nanoTime();
         long lastAccounting = System.nanoTime();
         try {
+            final long frameDuration = CoreTiming.frameDurationNanos(core.frameRate());
             while (running) {
-                long started = System.nanoTime();
                 core.runFrames(fastForward ? 5 : 1, inputMask.get());
                 long dimensions = core.copyFrame(pixels);
                 int width = (int) (dimensions >>> 32); int height = (int) dimensions;
@@ -137,12 +141,14 @@ final class BrumCoreView extends View implements Runnable {
                 } else {
                     core.clearAudio();
                 }
-                long elapsed = System.nanoTime() - started;
                 long now = System.nanoTime();
                 playedNanos += Math.max(0L, Math.min(5_000_000_000L, now - lastAccounting));
                 lastAccounting = now;
-                long remaining = frameDuration - elapsed;
-                if (remaining > 0) SystemClock.sleep(Math.max(0L, remaining / 1_000_000L));
+                if (fastForward) { nextFrame = now; continue; }
+                nextFrame += frameDuration;
+                if (nextFrame < now - frameDuration * 3) nextFrame = now;
+                long remaining;
+                while (running && (remaining = nextFrame - System.nanoTime()) > 0) LockSupport.parkNanos(remaining);
             }
         } catch (Throwable error) {
             boolean unexpected = running;

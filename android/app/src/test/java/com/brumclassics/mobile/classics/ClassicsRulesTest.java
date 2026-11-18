@@ -17,6 +17,13 @@ public final class ClassicsRulesTest {
         EmulationIdentity second = EmulationIdentity.inspect(new ByteArrayInputStream(rom), "another.gba");
         if (!"gba".equals(first.systemId) || !"header".equals(first.detectionSource)) throw new AssertionError("Cabeçalho GBA não detectado");
         if (!first.canonicalGameId().equals(second.canonicalGameId())) throw new AssertionError("ID mudou após renomear a ROM");
+        String portableHash = first.contentSha256;
+        if (!EmulationIdentity.portableGameId("smc", portableHash).equals(EmulationIdentity.portableGameId("sfc", portableHash))) throw new AssertionError("SNES tem IDs divergentes entre plataformas");
+        if (!EmulationIdentity.portableGameId("gen", portableHash).equals(EmulationIdentity.portableGameId("md", portableHash))) throw new AssertionError("Mega Drive tem IDs divergentes entre plataformas");
+        if (!EmulationIdentity.portableGameId("v64", portableHash).equals(EmulationIdentity.portableGameId("n64", portableHash))) throw new AssertionError("N64 tem IDs divergentes entre plataformas");
+        if (EmulationIdentity.portableGameId("smc", portableHash).equals("classic:smc:sha256:" + portableHash)) throw new AssertionError("ID de transporte não foi normalizado");
+        try { EmulationIdentity.portableGameId("sfc", "invalid"); throw new AssertionError("Hash inválido aceito"); }
+        catch (IllegalArgumentException expected) { }
         if (!"mgba".equals(CoreRegistry.retroArchCore(first.systemId, "renamed.gb"))) throw new AssertionError("Core incorreto");
         if (!CoreRegistry.supportsIntegrated("gba", "renamed.gba")) throw new AssertionError("GBA deveria usar o BRUM Core");
         if (!"libmgba_libretro.so".equals(CoreRegistry.integratedCore("gba", "renamed.gba").androidLibraryName)) throw new AssertionError("Biblioteca integrada incorreta");

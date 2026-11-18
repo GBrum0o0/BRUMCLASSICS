@@ -14,23 +14,49 @@ enum EmulatedSystemID: String, Codable, CaseIterable, Sendable {
     case superNintendo = "sfc"
     case wonderSwan = "ws"
     case wonderSwanColor = "wsc"
+    case nintendo64 = "n64"
+    case megaDrive = "md"
+    case segaCD = "segacd"
+    case sega32X = "32x"
+    case playStation = "psx"
+    case playStationPortable = "psp"
+    case dreamcast = "dreamcast"
+    case saturn = "saturn"
+    case arcade = "arcade"
+    case atari2600 = "atari2600"
+    case nintendo3DS = "3ds"
+    case gameCube = "gamecube"
+    case playStation2 = "ps2"
 }
 
 extension EmulatedSystemID {
     /// Numeric identifiers from the official rcheevos rc_consoles.h contract.
     var retroAchievementsConsoleID: UInt32 {
         switch self {
+        case .megaDrive: return 1
+        case .nintendo64: return 2
         case .superNintendo: return 3
         case .gameBoy: return 4
         case .gameBoyAdvance: return 5
         case .gameBoyColor: return 6
         case .nintendoEntertainmentSystem: return 7
         case .pcEngine: return 8
+        case .segaCD: return 9
+        case .sega32X: return 10
         case .masterSystem: return 11
         case .gameGear: return 15
+        case .playStation: return 12
+        case .playStation2: return 21
+        case .gameCube: return 16
         case .nintendoDS: return 18
         case .neoGeo: return 27
+        case .arcade: return 27
+        case .atari2600: return 25
+        case .saturn: return 39
+        case .dreamcast: return 40
+        case .playStationPortable: return 41
         case .wonderSwan, .wonderSwanColor: return 53
+        case .nintendo3DS: return 62
         }
     }
 }
@@ -59,6 +85,25 @@ struct CoreDescriptor: Codable, Equatable, Sendable {
     let license: String
     let libraryName: String
     let supportedSystems: Set<EmulatedSystemID>
+}
+
+struct CoreInstallation: Equatable, Sendable {
+    enum State: String, Sendable { case availableForAttempt, missingLibrary, invalidLibrary, experimentalDisabled, unavailable }
+    let state: State
+    let descriptor: CoreDescriptor?
+
+    var canAttempt: Bool { state == .availableForAttempt }
+    var reason: String {
+        let name = descriptor?.displayName ?? "Este sistema"
+        switch state {
+        case .availableForAttempt:
+            return "\(name) está incluído. O BRUM Core verificará o formato e a inicialização ao abrir o jogo."
+        case .missingLibrary: return "O núcleo \(name) não está incluído nesta instalação."
+        case .invalidLibrary: return "A biblioteca de \(name) está vazia ou não é um arquivo regular nesta instalação."
+        case .experimentalDisabled: return "\(name) está disponível apenas no pacote de teste do BRUM Core."
+        case .unavailable: return "Ainda não há um núcleo integrado disponível para este sistema."
+        }
+    }
 }
 
 enum CoreRegistry {
@@ -134,10 +179,129 @@ enum CoreRegistry {
         supportedSystems: [.wonderSwan, .wonderSwanColor]
     )
 
-    static let all = [mgba, skyEmu, geolith, gearsystem, nestopia, beetlePCEFast, bsnesMercury, beetleWonderSwan]
+    static let mupen64PlusNext = CoreDescriptor(
+        id: "mupen64plus-next", displayName: "Mupen64Plus-Next",
+        version: "12edd2c74a517ff86dfa8cfc71ad75e4c10486d5", license: "GPL-2.0-or-later",
+        libraryName: "mupen64plus_next_libretro_ios.dylib", supportedSystems: [.nintendo64]
+    )
 
-    static func core(for system: EmulatedSystemID) -> CoreDescriptor? {
-        all.first { $0.supportedSystems.contains(system) }
+
+
+    static let beetlePSX = CoreDescriptor(
+        id: "beetle-psx", displayName: "Beetle PSX",
+        version: "5ec9909f2654fb2041315a13fac0b704c5065c0e", license: "GPL-2.0-or-later",
+        libraryName: "mednafen_psx_libretro_ios.dylib", supportedSystems: [.playStation]
+    )
+
+    static let beetleSaturn = CoreDescriptor(
+        id: "beetle-saturn", displayName: "Beetle Saturn",
+        version: "65f05fa66f83e65e33be83aa433d883b4fd9509a", license: "GPL-2.0-or-later",
+        libraryName: "mednafen_saturn_libretro_ios.dylib", supportedSystems: [.saturn]
+    )
+
+
+    static let stella2014 = CoreDescriptor(
+        id: "stella2014", displayName: "Stella 2014",
+        version: "7d1361e407e63f29e52892655069e5fb4096e691", license: "GPL-2.0-or-later",
+        libraryName: "stella2014_libretro_ios.dylib", supportedSystems: [.atari2600]
+    )
+
+    static let blastEm = CoreDescriptor(
+        id: "blastem", displayName: "BlastEm",
+        version: "1e0de94dc7e669c0925a22c0fccf6cdc837af0a0", license: "GPL-3.0-or-later",
+        libraryName: "blastem_libretro_ios.dylib", supportedSystems: [.megaDrive, .segaCD, .sega32X]
+    )
+
+    static let ppsspp = CoreDescriptor(
+        id: "ppsspp", displayName: "PPSSPP",
+        version: "7b4ddb426bbe9e287bb7f19b0cfaebb4ea0d41d8", license: "GPL-2.0-or-later",
+        libraryName: "ppsspp_libretro_ios.dylib", supportedSystems: [.playStationPortable]
+    )
+
+    static let flycast = CoreDescriptor(
+        id: "flycast", displayName: "Flycast",
+        version: "59ed35a7ea7c1940d4c8ac221a662d0e6d6dc9ea", license: "GPL-2.0-or-later",
+        libraryName: "flycast_libretro_ios.dylib", supportedSystems: [.dreamcast]
+    )
+
+    // Compiled for iOS arm64 in the isolated arcade probe. Enabled only in
+    // experimental packages until ROM-set and on-device acceptance.
+    static let mame2016 = CoreDescriptor(
+        id: "mame2016", displayName: "MAME 2016",
+        version: "ae07c2f88ff2482ba9f50ffc8c9e7e6fbfe97d0a", license: "GPL-2.0-or-later",
+        libraryName: "mamearcade2016_libretro_ios.dylib", supportedSystems: [.arcade]
+    )
+
+    static let azahar = CoreDescriptor(
+        id: "azahar", displayName: "Azahar (Software)",
+        version: "9e6f523a57fac9564ac0bf8286db3c3702d301ec", license: "GPL-2.0-or-later",
+        libraryName: "azahar_libretro_ios.dylib", supportedSystems: [.nintendo3DS]
+    )
+
+    static let dolphin = CoreDescriptor(
+        id: "dolphin", displayName: "Dolphin",
+        version: "4d23cf151640eb810cb1b8e9d9fc922cf59c0b87", license: "GPL-2.0-or-later",
+        libraryName: "dolphin_libretro_ios.dylib", supportedSystems: [.gameCube]
+    )
+
+    static let play = CoreDescriptor(
+        id: "play", displayName: "Play!",
+        version: "83700b2c31e593bc94e845b4b31b797be84dda59", license: "BSD-2-Clause",
+        libraryName: "play_libretro_ios.dylib", supportedSystems: [.playStation2]
+    )
+
+    // A descriptor alone does not enable a backend. Preserve the existing release
+    // while new engines pass independent builds and device acceptance tests.
+    static let all = [mgba, skyEmu, geolith, gearsystem, nestopia, beetlePCEFast, bsnesMercury, beetleWonderSwan]
+    static let candidates = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, ppsspp, flycast, blastEm, mame2016, azahar, dolphin, play]
+    static let experimental = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, ppsspp, flycast, blastEm, mame2016, azahar, dolphin]
+    static var isTestPackage: Bool {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String == "BRUM Core Teste"
+    }
+    static let experimentalBuild: Bool = {
+        if (Bundle.main.object(forInfoDictionaryKey: "BRUMExperimentalBackends") as? NSNumber)?.boolValue == true {
+            return true
+        }
+        // Some sideload signers rewrite Info.plist. The signed app's bundled
+        // libraries are a second, concrete signal that this is a test package.
+        let frameworks = Bundle.main.privateFrameworksPath
+            ?? (Bundle.main.bundlePath as NSString).appendingPathComponent("Frameworks")
+        return experimental.contains {
+            FileManager.default.fileExists(atPath: (frameworks as NSString).appendingPathComponent($0.libraryName))
+        }
+    }()
+
+    static func candidate(for system: EmulatedSystemID) -> CoreDescriptor? {
+        candidates.first { $0.supportedSystems.contains(system) }
+    }
+
+    static func core(for system: EmulatedSystemID, includeExperimental: Bool = experimentalBuild) -> CoreDescriptor? {
+        (all + (includeExperimental ? experimental : [])).first { $0.supportedSystems.contains(system) }
+    }
+
+    static func installation(for system: EmulatedSystemID, includeExperimental: Bool = experimentalBuild, frameworksDirectory: URL? = nil) -> CoreInstallation {
+        guard let descriptor = core(for: system, includeExperimental: includeExperimental) else {
+            let disabled = experimental.first { $0.supportedSystems.contains(system) }
+            return CoreInstallation(state: disabled == nil ? .unavailable : .experimentalDisabled, descriptor: disabled)
+        }
+        let frameworks = Bundle.main.privateFrameworksPath
+            ?? (Bundle.main.bundlePath as NSString).appendingPathComponent("Frameworks")
+        let library = (frameworksDirectory ?? URL(fileURLWithPath: frameworks, isDirectory: true)).appendingPathComponent(descriptor.libraryName)
+        guard FileManager.default.fileExists(atPath: library.path) else {
+            return CoreInstallation(state: .missingLibrary, descriptor: descriptor)
+        }
+        let values = try? library.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+        guard values?.isRegularFile == true, values?.isSymbolicLink != true, (values?.fileSize ?? 0) > 0 else {
+            return CoreInstallation(state: .invalidLibrary, descriptor: descriptor)
+        }
+        // Library presence allows a launch attempt. dlopen/API checks and game
+        // compatibility are performed by the native session, never inferred here.
+        return CoreInstallation(state: .availableForAttempt, descriptor: descriptor)
+    }
+
+    static func installedCore(for system: EmulatedSystemID, includeExperimental: Bool = experimentalBuild, frameworksDirectory: URL? = nil) -> CoreDescriptor? {
+        let result = installation(for: system, includeExperimental: includeExperimental, frameworksDirectory: frameworksDirectory)
+        return result.canAttempt ? result.descriptor : nil
     }
 }
 
@@ -164,7 +328,7 @@ enum ROMContentInspector {
         0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E
     ]
 
-    static func inspect(url: URL, filename: String) throws -> CanonicalGameIdentity {
+    static func inspect(url: URL, filename: String, expectedSystem: EmulatedSystemID? = nil) throws -> CanonicalGameIdentity {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
 
@@ -182,8 +346,24 @@ enum ROMContentInspector {
             throw PocketError.message("A ROM está vazia e não pode ser identificada.")
         }
 
+        if ["cue", "m3u", "gdi"].contains(url.pathExtension.lowercased()) {
+            // Versioned disc-set hash; cartridge identities remain unchanged.
+            var discHasher = SHA256()
+            discHasher.update(data: Data("BRUM-DISC-SET-v1\0".utf8))
+            for file in try ROMExportStager.contentFiles(for: url) {
+                let input = try FileHandle(forReadingFrom: file)
+                defer { try? input.close() }
+                var fileHasher = SHA256()
+                while let chunk = try input.read(upToCount: 1_048_576), !chunk.isEmpty { fileHasher.update(data: chunk) }
+                discHasher.update(data: Data(fileHasher.finalize()))
+            }
+            hasher = discHasher
+        }
+
         let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        // A folder hint must not override a ROM header or an unambiguous format.
         let detected = detectSystem(header: header, filename: filename)
+            ?? expectedSystem.map { (system: $0, source: ROMDetectionSource.extensionFallback) }
         guard let detected else {
             throw PocketError.message("O formato desta ROM ainda não é reconhecido pelo BRUM Core.")
         }
@@ -215,17 +395,25 @@ enum ROMContentInspector {
         case "sfc", "smc": return (.superNintendo, .extensionFallback)
         case "ws": return (.wonderSwan, .extensionFallback)
         case "wsc": return (.wonderSwanColor, .extensionFallback)
+        case "n64", "z64", "v64": return (.nintendo64, .extensionFallback)
+        case "md", "gen", "smd": return (.megaDrive, .extensionFallback)
+        case "32x": return (.sega32X, .extensionFallback)
+        case "a26": return (.atari2600, .extensionFallback)
+        case "gdi": return (.dreamcast, .extensionFallback)
+        case "cso": return (.playStationPortable, .extensionFallback)
+        case "3ds", "3dsx", "z3dsx", "cci", "zcci", "cxi", "zcxi": return (.nintendo3DS, .extensionFallback)
+        case "rvz", "gcz": return (.gameCube, .extensionFallback)
         default: return nil
         }
     }
 }
 
 enum EmulationLaunchBuilder {
-    static func prepare(romURL: URL, title: String, originalFilename: String, retroAchievementsGameID: Int = 0) throws -> EmulationLaunchDescriptor {
-        let identity = try ROMContentInspector.inspect(url: romURL, filename: originalFilename)
-        guard let core = CoreRegistry.core(for: identity.systemID) else {
-            throw PocketError.message("Nenhum núcleo compatível está instalado para este sistema.")
-        }
+    static func prepare(romURL: URL, title: String, originalFilename: String, expectedSystem: EmulatedSystemID? = nil, retroAchievementsGameID: Int = 0) throws -> EmulationLaunchDescriptor {
+        let identity = try ROMContentInspector.inspect(url: romURL, filename: originalFilename, expectedSystem: expectedSystem)
+        try NativeSaveTransfer.recoverPendingInstall(for: identity)
+        let installation = CoreRegistry.installation(for: identity.systemID)
+        guard installation.canAttempt, let core = installation.descriptor else { throw PocketError.message(installation.reason) }
         return EmulationLaunchDescriptor(
             romURL: romURL,
             title: title,

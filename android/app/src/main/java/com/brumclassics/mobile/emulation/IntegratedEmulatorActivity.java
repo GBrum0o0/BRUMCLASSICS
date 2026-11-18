@@ -132,9 +132,9 @@ public final class IntegratedEmulatorActivity extends Activity {
         FrameLayout.LayoutParams titleParams = frame(300, 42, Gravity.TOP | Gravity.CENTER_HORIZONTAL); titleParams.topMargin = dp(13); root.addView(title, titleParams);
 
         LinearLayout tools = new LinearLayout(this); tools.setOrientation(LinearLayout.HORIZONTAL); tools.setGravity(Gravity.CENTER); tools.setPadding(0, 0, 0, 0);
-        Button states = control("SLOTS"); Button display = control("PREENCHER"); Button fast = control("≫  5×");
+        Button states = control("SLOTS"); Button display = control("INTEIRA"); Button fast = control("≫  5×");
         states.setOnClickListener(v -> showStateMenu());
-        display.setOnClickListener(v -> { emulatorView.toggleFillDisplay(); display.setText(emulatorView.fillsDisplay() ? "PREENCHER" : "INTEIRA"); });
+        display.setOnClickListener(v -> { emulatorView.toggleFillDisplay(); display.setText(emulatorView.fillsDisplay() ? "CORTAR" : "INTEIRA"); });
         fast.setOnClickListener(v -> { emulatorView.setFastForward(!emulatorView.isFastForward()); fast.setTextColor(emulatorView.isFastForward() ? Color.BLACK : Color.WHITE); fast.setBackground(controlBackground(emulatorView.isFastForward())); });
         tools.addView(states, new LinearLayout.LayoutParams(dp(66), dp(44)));
         LinearLayout.LayoutParams displayParams = new LinearLayout.LayoutParams(dp(100), dp(44)); displayParams.leftMargin = dp(8); tools.addView(display, displayParams);

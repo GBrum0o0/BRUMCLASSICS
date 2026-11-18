@@ -1,12 +1,23 @@
 name: Build iOS pessoal
 
 on:
+  workflow_call:
+    inputs:
+      experimental:
+        type: boolean
+        default: false
   workflow_dispatch:
+    inputs:
+      experimental:
+        description: "Build de teste com Arcade/3DS/GameCube e demais backends experimentais; não publicar release"
+        type: boolean
+        default: false
   push:
     branches:
       - main
     paths:
       - "ios/**"
+      - "shared/brum-core/**"
       - "LICENSES/**"
       - "MOBILE-LICENSING.md"
       - ".github/workflows/build-ios-personal.yml"
@@ -17,9 +28,14 @@ permissions:
 jobs:
   build-unsigned-ipa:
     runs-on: macos-15
-    timeout-minutes: 60
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
+
+      - name: Validar componentes compartilhados
+        run: |
+          clang++ -std=c++17 -Wall -Wextra -Werror shared/brum-core/tests.cpp -o "$RUNNER_TEMP/brum-core-tests"
+          "$RUNNER_TEMP/brum-core-tests"
 
       - name: Validar projeto e testes do pacote
         working-directory: ios
@@ -32,7 +48,7 @@ jobs:
 
       - name: Gerar projeto
         working-directory: ios
-        run: xcodegen generate
+        run: ./generate-project.sh
 
       - name: Testar modelos e navegacao no simulador iPhone
         working-directory: ios
@@ -69,7 +85,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: BRUMCLASSICS-IOS-TESTES-0.15.1
+          name: BRUMCLASSICS-IOS-TESTES-0.16.0
           path: ios/build/iOS-Tests.xcresult
           retention-days: 7
           if-no-files-found: warn
@@ -300,6 +316,56 @@ jobs:
           chmod 755 "$APP/Frameworks/mednafen_wswan_libretro_ios.dylib"
           file "$APP/Frameworks/mednafen_wswan_libretro_ios.dylib" | grep -q arm64
 
+      - name: Incluir backends experimentais iOS
+        if: inputs.experimental
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="build/DerivedData/Build/Products/Release-iphoneos/BRUMCLASSICSMobile.app"
+          IOSSDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          git clone --filter=blob:none https://github.com/libretro/mupen64plus-libretro-nx.git build/mupen64-core
+          git -C build/mupen64-core checkout --detach 12edd2c74a517ff86dfa8cfc71ad75e4c10486d5
+          git -C build/mupen64-core apply --unidiff-zero "$GITHUB_WORKSPACE/ios/patches/mupen64-ios-libpng.patch"
+          make -C build/mupen64-core platform=ios-arm64 IOSSDK="$IOSSDK" DEBUG=0 HAVE_PARALLEL_RSP=0 HAVE_PARALLEL_RDP=0 HAVE_THR_AL=0 LLE=0 WITH_DYNAREC= -j"$(sysctl -n hw.ncpu)"
+          cp build/mupen64-core/mupen64plus_next_libretro_ios.dylib "$APP/Frameworks/"
+          cp build/mupen64-core/LICENSE "$APP/Frameworks/Mupen64Plus-Next-LICENSE.txt"
+          git clone --filter=blob:none https://github.com/libretro/beetle-psx-libretro.git build/beetle-psx-core
+          git -C build/beetle-psx-core checkout --detach 5ec9909f2654fb2041315a13fac0b704c5065c0e
+          make -C build/beetle-psx-core platform=ios-arm64 IOSSDK="$IOSSDK" -j"$(sysctl -n hw.ncpu)"
+          cp build/beetle-psx-core/mednafen_psx_libretro_ios.dylib "$APP/Frameworks/"
+          cp build/beetle-psx-core/COPYING "$APP/Frameworks/Beetle-PSX-LICENSE.txt"
+          git clone --filter=blob:none https://github.com/libretro/beetle-saturn-libretro.git build/beetle-saturn-core
+          git -C build/beetle-saturn-core checkout --detach 65f05fa66f83e65e33be83aa433d883b4fd9509a
+          make -C build/beetle-saturn-core platform=ios-arm64 IOSSDK="$IOSSDK" DEBUG=0 -j"$(sysctl -n hw.ncpu)"
+          cp build/beetle-saturn-core/mednafen_saturn_libretro_ios.dylib "$APP/Frameworks/"
+          cp build/beetle-saturn-core/COPYING "$APP/Frameworks/Beetle-Saturn-LICENSE.txt"
+          git clone --filter=blob:none https://github.com/libretro/stella2014-libretro.git build/stella2014-core
+          git -C build/stella2014-core checkout --detach 7d1361e407e63f29e52892655069e5fb4096e691
+          make -C build/stella2014-core platform=ios-arm64 IOSSDK="$IOSSDK" -j"$(sysctl -n hw.ncpu)"
+          cp build/stella2014-core/stella2014_libretro_ios.dylib "$APP/Frameworks/"
+          cp build/stella2014-core/stella/license.txt "$APP/Frameworks/Stella2014-LICENSE.txt"
+          git clone --filter=blob:none https://github.com/libretro/blastem.git build/blastem-core
+          git -C build/blastem-core checkout --detach 1e0de94dc7e669c0925a22c0fccf6cdc837af0a0
+          make -C build/blastem-core -f Makefile.libretro platform=ios-arm64 core -j"$(sysctl -n hw.ncpu)"
+          cp build/blastem-core/blastem_libretro_ios.dylib "$APP/Frameworks/"
+          cp build/blastem-core/COPYING "$APP/Frameworks/BlastEm-LICENSE.txt"
+          cp build/blastem-core/libchdr/LICENSE.txt "$APP/Frameworks/BlastEm-libchdr-LICENSE.txt"
+          cp build/blastem-core/lzma/LICENSE.txt "$APP/Frameworks/BlastEm-LZMA-LICENSE.txt"
+          cp build/blastem-core/zlib/LICENSE "$APP/Frameworks/BlastEm-zlib-LICENSE.txt"
+          for library in mupen64plus_next_libretro_ios.dylib mednafen_psx_libretro_ios.dylib mednafen_saturn_libretro_ios.dylib stella2014_libretro_ios.dylib blastem_libretro_ios.dylib; do
+            chmod 755 "$APP/Frameworks/$library"
+            file "$APP/Frameworks/$library" | grep -q arm64
+          done
+          bash build-heavy-experimental.sh ppsspp "$APP"
+          bash build-heavy-experimental.sh flycast "$APP"
+          bash build-heavy-experimental.sh dolphin "$APP"
+          bash build-heavy-experimental.sh azahar "$APP"
+          bash build-arcade-experimental.sh "$APP"
+          /usr/libexec/PlistBuddy -c 'Add :BRUMExperimentalBackends bool true' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName BRUM Core Teste' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 48' "$APP/Info.plist"
+
       - name: Empacotar IPA pessoal
         working-directory: ios
         shell: bash
@@ -310,7 +376,7 @@ jobs:
       - name: Guardar build pessoal
         uses: actions/upload-artifact@v4
         with:
-          name: BRUMCLASSICS-MOVEL-IOS-PESSOAL-0.15.1
+          name: BRUMCLASSICS-MOVEL-IOS-${{ inputs.experimental && 'EXPERIMENTAL' || 'PESSOAL' }}-0.16.0
           path: |
             ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa
             ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa.sha256
@@ -319,6 +385,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publicar versão pessoal para instalação
+        if: github.ref == 'refs/heads/main' && !inputs.experimental
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash

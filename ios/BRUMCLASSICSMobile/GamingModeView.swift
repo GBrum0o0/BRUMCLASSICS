@@ -7,69 +7,61 @@ struct GamingModeView: View {
     @Binding var selection: Int
     @State private var selectedGame: Game?
     @State private var selectedROM: ROMFolderGame?
+    @State private var showLibrary = false
+    @AppStorage("gaming-mode-favorites-v1") private var favoritesJSON = "[]"
 
     private let columns = [GridItem(.adaptive(minimum: 135), spacing: 16)]
-    private var installedGames: [Game] { store.snapshot.games.filter(\.installed).sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending } }
-    private var localGames: [ROMFolderGame] { pocket.romFolderGames.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending } }
+    private var favoriteIDs: Set<String> {
+        guard let data = favoritesJSON.data(using: .utf8),
+              let ids = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+        return Set(ids)
+    }
+    private var libraryEntries: [GamingCatalogEntry] {
+        GamingModeCatalog.library(local: pocket.romFolderGames, records: pocket.games, computer: store.snapshot.games)
+    }
+    private var recentEntries: [GamingCatalogEntry] {
+        GamingModeCatalog.recent(libraryEntries, favorites: favoriteIDs)
+    }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 22) {
-                HStack(spacing: 14) {
-                    Button { GamingOrientation.request(.portrait); selection = 0 } label: {
-                        Label("SAIR", systemImage: "arrow.left").font(.caption.bold()).tracking(1)
-                            .foregroundStyle(BrumTheme.text).padding(.horizontal, 15).frame(height: 42)
-                            .background(BrumTheme.surface).clipShape(Capsule()).overlay(Capsule().stroke(BrumTheme.line))
-                    }.buttonStyle(.plain).accessibilityIdentifier("gaming-mode-exit")
-                    BrumLogo(compact: true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("BRUMCLASSICS").font(.caption2.bold()).tracking(2).foregroundStyle(BrumTheme.primary)
-                        Text("GAMING MODE").font(.headline.bold()).foregroundStyle(BrumTheme.text)
-                    }
-                    Spacer()
-                    ConnectionDot(state: store.connection)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Prontos para jogar").font(.system(size: 32, weight: .black)).foregroundStyle(BrumTheme.text)
-                    Text("Somente jogos disponíveis agora neste celular ou no computador.").font(.subheadline).foregroundStyle(BrumTheme.muted)
-                }
-
-                if !localGames.isEmpty {
-                    gameSection(title: "NO CELULAR", count: localGames.count) {
-                        ForEach(localGames) { rom in
-                            ROMFolderGameTile(
-                                rom: rom,
-                                launcherGame: pocket.launcherGame(for: rom, launcher: store),
-                                retroArchReady: pocket.isImportedIntoRetroArch(rom),
-                                integratedCoreName: IntegratedEmulatorSupport.core(for: rom)?.displayName
-                            ) {
-                                if IntegratedEmulatorSupport.supports(rom) { selectedROM = rom }
-                                else { Task { await pocket.launchROM(rom, launcher: store) } }
-                            }
-                        }
-                    }
-                }
-
-                if !installedGames.isEmpty {
-                    gameSection(title: "INSTALADOS NO COMPUTADOR", count: installedGames.count) {
-                        ForEach(installedGames) { game in
-                            Button { selectedGame = game } label: { GamingGameTile(game: game) }
-                                .buttonStyle(.plain)
-                        }
-                    }
-                }
-
-                if localGames.isEmpty && installedGames.isEmpty {
-                    BrumCard {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("NENHUM JOGO PRONTO").font(.headline.bold()).foregroundStyle(BrumTheme.text)
-                            Text("Escolha uma pasta de ROMs no Perfil ou instale um jogo no computador.").font(.subheadline).foregroundStyle(BrumTheme.muted)
-                        }.frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
+        VStack(spacing: 0) {
+            GamingHeader {
+                Button { GamingOrientation.request(.portrait); selection = 0 } label: {
+                    HStack(spacing: 10) {
+                        BrumLogo(compact: true)
+                        Text("BRUM CLASSICS").font(.caption.bold()).tracking(1.2)
+                    }.foregroundStyle(BrumTheme.text)
+                }.buttonStyle(.plain).accessibilityIdentifier("gaming-mode-exit")
             }
-            .padding(20).frame(maxWidth: 1200, alignment: .leading).frame(maxWidth: .infinity)
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 18) {
+                    HStack(spacing: 16) {
+                        libraryTab("JOGADOS RECENTEMENTE", selected: !showLibrary) { showLibrary = false }
+                            .accessibilityIdentifier("gaming-mode-recent")
+                        libraryTab("BIBLIOTECA", selected: showLibrary) { showLibrary = true }
+                            .accessibilityIdentifier("gaming-mode-library")
+                    }
+                    if let featured = recentEntries.first ?? libraryEntries.first {
+                        GamingHero(title: featured.title, platform: platform(for: featured), artwork: artwork(for: featured)) {
+                            Button("VER DETALHES") { open(featured) }
+                                .buttonStyle(PrimaryButtonStyle()).frame(maxWidth: 180)
+                        }
+                        if showLibrary || recentEntries.isEmpty {
+                            gameSection(title: "Biblioteca") { ForEach(libraryEntries) { entryTile($0) } }
+                        } else {
+                            gameSection(title: "Jogos recentes e favoritos") { ForEach(recentEntries) { entryTile($0) } }
+                        }
+                    } else {
+                        BrumCard {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Nenhum jogo pronto").font(.headline).foregroundStyle(BrumTheme.text)
+                                Text("Escolha uma pasta de ROMs no Perfil ou instale um jogo no computador.")
+                                    .font(.subheadline).foregroundStyle(.secondary)
+                            }.frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }.padding(20).frame(maxWidth: 1200, alignment: .leading).frame(maxWidth: .infinity)
+            }
         }
         .background(BrumTheme.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
@@ -78,18 +70,307 @@ struct GamingModeView: View {
             await pocket.refreshROMFolder()
         }
         .fullScreenCover(item: $selectedGame) { GamingGameView(game: $0) }
-        .fullScreenCover(item: $selectedROM) { IntegratedEmulatorView(rom: $0, returnsToPortrait: false) }
+        .fullScreenCover(item: $selectedROM) { GamingROMDetailView(rom: $0) }
     }
 
-    private func gameSection<Content: View>(title: String, count: Int, @ViewBuilder content: () -> Content) -> some View {
+    private func libraryTab(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title).font(.subheadline.weight(.semibold))
+                .foregroundStyle(selected ? BrumTheme.primary : BrumTheme.text)
+                .padding(.horizontal, 12).frame(minHeight: 44)
+                .background(selected ? BrumTheme.primary.opacity(0.12) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+        }.buttonStyle(.plain)
+            .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func open(_ entry: GamingCatalogEntry) {
+        switch entry {
+        case .local(let rom, _): selectedROM = rom
+        case .computer(let game): selectedGame = game
+        }
+    }
+
+    private func platform(for entry: GamingCatalogEntry) -> String {
+        switch entry {
+        case .local(let rom, _): return IntegratedEmulatorSupport.system(for: rom)?.rawValue.uppercased() ?? "CLASSICS"
+        case .computer(let game): return game.platform
+        }
+    }
+
+    private func artwork(for entry: GamingCatalogEntry) -> GamingArtwork {
+        switch entry {
+        case .local(let rom, _): return GamingArtwork(game: pocket.launcherGame(for: rom, launcher: store), rom: rom)
+        case .computer(let game): return GamingArtwork(game: game)
+        }
+    }
+
+    private func gameSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                BrumSectionLabel(text: title)
-                Spacer()
-                Text("\(count) JOGO\(count == 1 ? "" : "S")").font(.caption2.bold()).foregroundStyle(BrumTheme.primary)
-            }
+            BrumSectionLabel(text: title)
             LazyVGrid(columns: columns, alignment: .leading, spacing: 20, content: content)
         }
+    }
+
+    @ViewBuilder private func entryTile(_ entry: GamingCatalogEntry) -> some View {
+        ZStack(alignment: .topTrailing) {
+            switch entry {
+            case .local(let rom, _):
+                ROMFolderGameTile(
+                    rom: rom,
+                    launcherGame: pocket.launcherGame(for: rom, launcher: store),
+                    retroArchReady: pocket.isImportedIntoRetroArch(rom),
+                    integratedCoreName: IntegratedEmulatorSupport.core(for: rom)?.displayName,
+                    opensDetails: true
+                ) { selectedROM = rom }
+            case .computer(let game):
+                Button { selectedGame = game } label: { GamingGameTile(game: game) }
+                    .buttonStyle(.plain)
+            }
+            Button { toggleFavorite(entry.id) } label: {
+                Image(systemName: favoriteIDs.contains(entry.id) ? "star.fill" : "star")
+                    .font(.headline).foregroundStyle(BrumTheme.primary)
+                    .padding(9).background(BrumTheme.surface).clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(favoriteIDs.contains(entry.id) ? "Remover \(entry.title) dos favoritos" : "Favoritar \(entry.title)")
+        }
+    }
+
+    private func toggleFavorite(_ id: String) {
+        var next = favoriteIDs
+        if !next.insert(id).inserted { next.remove(id) }
+        guard let data = try? JSONEncoder().encode(next.sorted()), let text = String(data: data, encoding: .utf8) else { return }
+        favoritesJSON = text
+    }
+}
+
+enum GamingCatalogEntry: Identifiable {
+    case local(ROMFolderGame, Date?)
+    case computer(Game)
+
+    var id: String {
+        switch self {
+        case .local(let rom, _): return "local:\(rom.id)"
+        case .computer(let game): return "pc:\(game.id)"
+        }
+    }
+    var title: String {
+        switch self {
+        case .local(let rom, _): return rom.title
+        case .computer(let game): return game.title
+        }
+    }
+    var lastPlayedAt: Date? {
+        switch self {
+        case .local(_, let date): return date
+        case .computer(let game): return GamingModeCatalog.date(game.lastPlayedAt)
+        }
+    }
+}
+
+enum GamingModeCatalog {
+    static func canOfferRetroArch(for rom: ROMFolderGame, imported: Bool) -> Bool {
+        // A remembered import is not evidence that RetroArch can execute 3DS.
+        if IntegratedEmulatorSupport.system(for: rom) == .nintendo3DS { return false }
+        return RetroArchAppStoreLaunchRules.supports(filename: rom.filename) || imported
+    }
+
+    static func library(local: [ROMFolderGame], records: [PocketClassic], computer: [Game]) -> [GamingCatalogEntry] {
+        let localFiles = Set(local.map { $0.filename.lowercased() })
+        let linkedPCIDs = Set(records.filter { localFiles.contains($0.filename.lowercased()) && !$0.launcherGameID.isEmpty }.map(\.launcherGameID))
+        let localEntries = local.map { rom in
+            GamingCatalogEntry.local(rom, records.first { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }?.lastPlayedAt)
+        }
+        let pcEntries = computer.filter { $0.installed && !linkedPCIDs.contains($0.id) }.map(GamingCatalogEntry.computer)
+        return (localEntries + pcEntries).sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+    }
+
+    static func recent(_ entries: [GamingCatalogEntry], favorites: Set<String>, limit: Int = 12) -> [GamingCatalogEntry] {
+        let pinned = entries.filter { favorites.contains($0.id) }
+            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+        let played = entries.filter { $0.lastPlayedAt != nil && !favorites.contains($0.id) }
+            .sorted { ($0.lastPlayedAt ?? .distantPast) > ($1.lastPlayedAt ?? .distantPast) }
+        return Array((pinned + played).prefix(max(0, limit)))
+    }
+
+    static func date(_ stamp: String) -> Date? {
+        guard !stamp.isEmpty else { return nil }
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractional.date(from: stamp) ?? ISO8601DateFormatter().date(from: stamp)
+    }
+}
+
+private struct GamingROMDetailView: View {
+    @EnvironmentObject private var pocket: PocketClassicsStore
+    @EnvironmentObject private var store: AppStore
+    @Environment(\.dismiss) private var dismiss
+    let rom: ROMFolderGame
+    @State private var launchIntegrated = false
+    @State private var launchingOnPC = false
+    @State private var syncingNativeSave = false
+    @State private var confirmNativeUpload = false
+    @State private var confirmNativeDownload = false
+    @State private var actionMessage = ""
+    @State private var showAssociation = false
+
+    private var record: PocketClassic? {
+        pocket.games.first { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }
+    }
+    private var localTime: String {
+        guard let record, let runtime = pocket.runtimeRecords.first(where: { $0.id == record.id }) else {
+            return "Sem registro"
+        }
+        let minutes = max(0, runtime.creditedSeconds) / 60
+        return minutes >= 60 ? "\(minutes / 60) h \(minutes % 60) min" : "\(minutes) min"
+    }
+    private var progress: PocketProgress? {
+        guard let account = pocket.credentials, let record, let progress = record.progress,
+              progress.gameID == Int(record.retroAchievementID),
+              progress.username.caseInsensitiveCompare(account.username) == .orderedSame else { return nil }
+        return progress
+    }
+
+    private var installedCore: CoreDescriptor? { IntegratedEmulatorSupport.core(for: rom) }
+    private var system: EmulatedSystemID? { IntegratedEmulatorSupport.system(for: rom) }
+    private var pcNativeSaveCompatible: Bool {
+        guard let system else { return false }
+        return Set<EmulatedSystemID>([.gameBoy, .gameBoyColor, .gameBoyAdvance,
+                                      .nintendoEntertainmentSystem, .superNintendo]).contains(system)
+    }
+    private var canUseRetroArch: Bool {
+        GamingModeCatalog.canOfferRetroArch(for: rom, imported: pocket.isImportedIntoRetroArch(rom))
+    }
+    private var linkedPCGame: Game? {
+        guard let link = record, !link.launcherGameID.isEmpty else { return nil }
+        return store.snapshot.games.first { $0.id == link.launcherGameID && $0.installed }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            GamingHeader {
+                Button { dismiss() } label: { Label("Biblioteca", systemImage: "chevron.left") }
+                    .buttonStyle(.plain)
+            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    GamingHero(title: rom.title, platform: system?.rawValue.uppercased() ?? "CLASSICS",
+                               artwork: GamingArtwork(game: pocket.launcherGame(for: rom, launcher: store), rom: rom)) {
+                        GamingMetrics(time: localTime, timeLabel: "Tempo neste iPhone", earned: progress?.unlocked,
+                                      total: progress?.achievements.count)
+                    }
+                    BrumCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            BrumSectionLabel(text: "EXECUÇÃO NESTE IPHONE")
+                            Text(routeDescription).font(.subheadline).foregroundStyle(BrumTheme.muted)
+                            if system == .nintendo3DS {
+                                Text("Build \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?") · Azahar: \(installedCore == nil ? "arquivo ausente" : "arquivo presente")")
+                                    .font(.caption2).foregroundStyle(BrumTheme.muted)
+                                    .accessibilityIdentifier("brum-core-build-status")
+                            }
+                        }
+                    }
+                    if let core = installedCore {
+                        Button { launchIntegrated = true } label: {
+                            Text("\(CoreRegistry.experimental.contains(core) ? "TESTAR" : "JOGAR") NO BRUM CORE · \(core.displayName.uppercased())").frame(maxWidth: .infinity)
+                        }.buttonStyle(PrimaryButtonStyle()).disabled(syncingNativeSave)
+                    } else if canUseRetroArch {
+                        Button {
+                            Task { await pocket.launchROM(rom, launcher: store) }
+                        } label: {
+                            Text(pocket.isImportedIntoRetroArch(rom) ? "ABRIR NO RETROARCH" : "IMPORTAR PARA O RETROARCH")
+                                .frame(maxWidth: .infinity)
+                        }.buttonStyle(PrimaryButtonStyle())
+                    }
+                    if let game = linkedPCGame {
+                        if installedCore != nil && pcNativeSaveCompatible {
+                            Button { confirmNativeUpload = true } label: {
+                                Text("ENVIAR SAVE NATIVO PARA O PC").frame(maxWidth: .infinity).frame(height: 44)
+                            }
+                            .buttonStyle(.bordered).tint(BrumTheme.primary)
+                            .disabled(store.connection != .online || syncingNativeSave)
+                            Button { confirmNativeDownload = true } label: {
+                                Text("RECEBER SAVE NATIVO DO PC").frame(maxWidth: .infinity).frame(height: 44)
+                            }
+                            .buttonStyle(.bordered).tint(BrumTheme.primary)
+                            .disabled(store.connection != .online || syncingNativeSave)
+                        }
+                        Button {
+                            launchingOnPC = true
+                            Task {
+                                let error = await store.launchBCard(game)
+                                actionMessage = error.map { "Não foi possível iniciar no PC: \($0)" } ?? "Jogo iniciado no computador."
+                                launchingOnPC = false
+                            }
+                        } label: { Text("JOGAR NO PC").frame(maxWidth: .infinity).frame(height: 44) }
+                            .buttonStyle(.bordered).tint(BrumTheme.primary)
+                            .disabled(store.connection != .online || launchingOnPC)
+                    }
+                    GamingAchievements(title: "RetroAchievements", items: progress?.achievements ?? [],
+                                       earned: progress?.unlocked, total: progress?.achievements.count,
+                                       emptyMessage: localAchievementMessage)
+                    if let record {
+                        Button(Int(record.retroAchievementID) == nil ? "Vincular jogo ao RetroAchievements" : "Ver vínculo e sincronização") {
+                            showAssociation = true
+                        }.font(.subheadline.weight(.semibold)).tint(BrumTheme.primary)
+                    }
+                    if !actionMessage.isEmpty { Text(actionMessage).font(.caption).foregroundStyle(BrumTheme.muted) }
+                    if let message = pocket.message { Text(message).font(.caption).foregroundStyle(.orange) }
+                }.frame(maxWidth: 1000, alignment: .leading).padding(20).frame(maxWidth: .infinity)
+            }
+        }.background(BrumTheme.background.ignoresSafeArea())
+        .sheet(isPresented: $showAssociation) {
+            if let record {
+                NavigationStack { PocketGameView(id: record.id) }
+                    .preferredColorScheme(.dark)
+            }
+        }
+        .onAppear { GamingOrientation.request(.landscape) }
+        .sheet(item: $pocket.pendingROMShare) { ticket in
+            DocumentExportView(url: ticket.url) { completed, error in
+                Task { await pocket.finishROMShare(ticket, completed: completed, error: error) }
+            }
+        }
+        .fullScreenCover(isPresented: $launchIntegrated) { IntegratedEmulatorView(rom: rom, returnsToPortrait: false) }
+        .confirmationDialog("Enviar o save deste iPhone ao perfil ativo no PC?", isPresented: $confirmNativeUpload) {
+            Button("Enviar save") {
+                syncingNativeSave = true
+                Task {
+                    do { actionMessage = try await pocket.sendNativeSaveToPC(rom, launcher: store) }
+                    catch { actionMessage = error.localizedDescription }
+                    syncingNativeSave = false
+                }
+            }
+        } message: {
+            Text("O save local ainda não tem vínculo de perfil. Este envio associa os bytes ao perfil atualmente aberto no Launcher Beta. Nenhum save do PC será substituído automaticamente.")
+        }
+        .confirmationDialog("Receber o save do perfil ativo no PC?", isPresented: $confirmNativeDownload) {
+            Button("Receber e aplicar save") {
+                syncingNativeSave = true
+                Task {
+                    do { actionMessage = try await pocket.receiveNativeSaveFromPC(rom, launcher: store) }
+                    catch { actionMessage = error.localizedDescription }
+                    syncingNativeSave = false
+                }
+            }
+        } message: {
+            Text("Se houver progresso diferente no iPhone, o save atual será guardado para recuperação antes da aplicação do backup do PC. Feche o jogo antes de continuar.")
+        }
+    }
+
+    private var localAchievementMessage: String {
+        if pocket.credentials == nil { return "Conecte sua conta nas configurações do Gaming Mode." }
+        if Int(record?.retroAchievementID ?? "") == nil { return "Vincule este jogo ao RetroAchievements para consultar o progresso." }
+        if progress != nil { return "O RetroAchievements não retornou conquistas para este título." }
+        return "O progresso aparece após sincronizar o jogo vinculado."
+    }
+
+    private var routeDescription: String {
+        let reason = IntegratedEmulatorSupport.availabilityReason(for: rom)
+        if installedCore != nil { return reason }
+        if system == .nintendo3DS { return "\(reason) A importação para o RetroArch não ativaria o BRUM Core." }
+        if canUseRetroArch { return "\(reason) A opção abaixo usa explicitamente o RetroArch e não conta como suporte integrado." }
+        return "\(reason) O arquivo original foi preservado."
     }
 }
 
@@ -117,7 +398,16 @@ private struct GamingGameTile: View {
 private struct GamingGameView: View {
     @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
-    let game: Game
+    let initialGame: Game
+    private var game: Game { store.snapshot.games.first { $0.id == initialGame.id } ?? initialGame }
+    init(game: Game) { initialGame = game }
+    private var hasAchievementTotals: Bool { game.achievementsAvailable || game.allowsManualAchievements }
+    private var achievementSource: String {
+        if game.allowsManualAchievements { return game.achievementCatalogLabel }
+        if game.isClassic, game.achievementsAvailable { return "RetroAchievements" }
+        return game.platform
+    }
+
     @State private var launchState = ""
     @State private var launching = false
     @State private var openingClient = false
@@ -125,20 +415,30 @@ private struct GamingGameView: View {
     private var streaming: StreamingStatus? { store.snapshot.experience?.streaming }
 
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            GamingHeader {
+                Button { dismiss() } label: { Label("Biblioteca", systemImage: "chevron.left") }
+                    .buttonStyle(.plain)
+            }
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    GameCoverView(game: game, cornerRadius: 16).aspectRatio(0.72, contentMode: .fit).frame(maxWidth: 330).frame(maxWidth: .infinity)
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text(routeLabel).font(.caption.bold()).tracking(1.5).foregroundStyle(BrumTheme.primary)
-                        Text(game.title).font(.system(size: 34, weight: .black)).foregroundStyle(BrumTheme.text)
-                        Text(game.description).font(.body).foregroundStyle(BrumTheme.muted)
+                    GamingHero(title: game.title, platform: game.platform, artwork: GamingArtwork(game: game)) {
+                        GamingMetrics(time: game.playtimeLabel, timeLabel: "Tempo jogado",
+                                      earned: hasAchievementTotals ? game.achievementsCollected : nil,
+                                      total: hasAchievementTotals ? game.achievementsTotal : nil)
                     }
                     Button(action: playStream) { HStack { if launching { ProgressView().tint(.black) }; Text(streamPlayLabel) }.frame(maxWidth: .infinity) }
                         .buttonStyle(PrimaryButtonStyle()).disabled(!canPlay || launching).opacity(canPlay ? 1 : 0.38)
                     Button(action: playOnPC) { Text("SOMENTE INICIAR NO COMPUTADOR").font(.caption.bold()).frame(maxWidth: .infinity).frame(height: 44) }
                         .buttonStyle(.bordered).tint(BrumTheme.primary).disabled(!canStartOnPC || launching).opacity(canStartOnPC ? 1 : 0.38)
                     if !launchState.isEmpty { Text(launchState).font(.caption).foregroundStyle(launchState.contains("não") ? Color.orange : BrumTheme.primary) }
+                    GamingAchievements(title: achievementSource, items: game.achievements,
+                                       earned: hasAchievementTotals ? game.achievementsCollected : nil,
+                                       total: hasAchievementTotals ? game.achievementsTotal : nil,
+                                       emptyMessage: "As conquistas aparecem quando o launcher disponibiliza o progresso deste título.")
+                    if !game.description.isEmpty {
+                        Text(game.description).font(.body).foregroundStyle(.secondary)
+                    }
                     BrumCard {
                         VStack(alignment: .leading, spacing: 9) {
                             HStack { BrumSectionLabel(text: "STREAMING"); Spacer(); Text(streaming?.available == true ? "PRONTO" : "AÇÃO NECESSÁRIA").font(.caption2.bold()).foregroundStyle(streaming?.available == true ? BrumTheme.primary : .orange) }
@@ -146,10 +446,9 @@ private struct GamingGameView: View {
                             if streaming?.network.remoteReady == true { Label("Acesso remoto protegido disponível", systemImage: "checkmark.shield.fill").font(.caption2.bold()).foregroundStyle(BrumTheme.primary) }
                         }
                     }
-                }.padding(20)
-            }.background(BrumTheme.background.ignoresSafeArea())
-                .toolbar { ToolbarItem(placement: .topBarTrailing) { Button { dismiss() } label: { Image(systemName: "xmark.circle.fill").font(.title2) } } }
-        }
+                }.frame(maxWidth: 1000, alignment: .leading).padding(20).frame(maxWidth: .infinity)
+            }
+        }.background(BrumTheme.background.ignoresSafeArea())
         .onAppear { GamingOrientation.request(.landscape) }
     }
 

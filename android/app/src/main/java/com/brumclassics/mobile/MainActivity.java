@@ -14,6 +14,7 @@ import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.hardware.input.InputManager;
 import android.os.Bundle;
 import android.os.Build;
 import android.os.Handler;
@@ -24,6 +25,7 @@ import android.text.InputType;
 import android.text.InputFilter;
 import android.text.TextWatcher;
 import android.view.Gravity;
+import android.view.InputDevice;
 import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
@@ -40,6 +42,7 @@ import android.widget.GridLayout;
 import android.widget.GridView;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -95,6 +98,11 @@ public final class MainActivity extends Activity {
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final ExecutorService modelExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService badgeExecutor = new java.util.concurrent.ThreadPoolExecutor(
+        2, 2, 0L, java.util.concurrent.TimeUnit.MILLISECONDS,
+        new java.util.concurrent.ArrayBlockingQueue<>(32),
+        new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
+    private final android.util.LruCache<String, Bitmap> gamingBadgeCache = new android.util.LruCache<>(64);
     private final List<Button> navButtons = new ArrayList<>();
     private FrameLayout content;
     private LinearLayout bottomNavigation;
@@ -145,6 +153,13 @@ public final class MainActivity extends Activity {
     private org.json.JSONObject experience = new org.json.JSONObject();
     private long lastRootBackAt = 0L;
     private boolean gamingOrientationLocked;
+    private ImageButton gamingControllerButton;
+    private TextView gamingControllerList;
+    private final InputManager.InputDeviceListener gamingInputListener = new InputManager.InputDeviceListener() {
+        @Override public void onInputDeviceAdded(int id) { updateGamingControllers(); }
+        @Override public void onInputDeviceChanged(int id) { updateGamingControllers(); }
+        @Override public void onInputDeviceRemoved(int id) { updateGamingControllers(); }
+    };
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -333,11 +348,14 @@ public final class MainActivity extends Activity {
         retroAchievements.close();
         localArtwork.close();
         modelExecutor.shutdownNow();
+        badgeExecutor.shutdownNow();
         super.onDestroy();
     }
 
     @Override protected void onResume() {
         super.onResume();
+        getSystemService(InputManager.class).registerInputDeviceListener(gamingInputListener, handler);
+        updateGamingControllers();
         handler.removeCallbacks(performanceExpiry);
         handler.post(performanceExpiry);
         if (updateManager != null) updateManager.resumeInstallIfReady();
@@ -360,6 +378,7 @@ public final class MainActivity extends Activity {
     }
 
     @Override protected void onPause() {
+        getSystemService(InputManager.class).unregisterInputDeviceListener(gamingInputListener);
         handler.removeCallbacks(performanceExpiry);
         if (launchingClassic && classicsRepository != null) classicsRepository.markSessionBackgrounded();
         super.onPause();
@@ -486,6 +505,12 @@ public final class MainActivity extends Activity {
         if ("home".equals(screen)) showHome();
         else if ("library".equals(screen)) showLibrary();
         else if ("gaming".equals(screen)) openGamingMode();
+        else if ("gaming-details".equals(screen) || "gaming-classic-details".equals(screen)) {
+            gamingOrientationLocked = true;
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+            currentScreen = screen;
+            refreshCurrentScreen();
+        }
         else if ("achievements".equals(screen)) showAchievements();
         else if ("stats".equals(screen)) showStats();
         else if ("companion".equals(screen)) showCompanion();
@@ -869,6 +894,7 @@ public final class MainActivity extends Activity {
     private void setScreen(String name, View view) {
         currentScreen = name;
         boolean gamingScreen = name.startsWith("gaming");
+        if (!gamingScreen) gamingControllerButton = null;
         if (bottomNavigation != null) bottomNavigation.setVisibility(gamingScreen ? View.GONE : View.VISIBLE);
         if (!gamingScreen && gamingOrientationLocked) {
             gamingOrientationLocked = false;
@@ -1069,22 +1095,249 @@ public final class MainActivity extends Activity {
         showGamingMode();
     }
 
+    private LinearLayout gamingHeader(boolean details) {
+        LinearLayout header = row();
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        Button back = gamingAction(details ? "‹ Biblioteca" : "‹ Sair", false,
+                v -> { if (details) showGamingMode(); else showHome(); });
+        header.addView(back, new LinearLayout.LayoutParams(-2, dp(44)));
+        TextView brand = text("BRUM CLASSICS", 14, TEXT, true);
+        brand.setLetterSpacing(.11f);
+        brand.setGravity(Gravity.CENTER_VERTICAL);
+        brand.setPadding(dp(12), 0, 0, 0);
+        header.addView(brand, new LinearLayout.LayoutParams(0, dp(44), 1));
+        boolean pc = "connected".equals(syncState);
+        if (getResources().getConfiguration().screenWidthDp >= 600) {
+            header.addView(text(pc ? "● PC conectado" : "○ PC offline", 12, pc ? ACCENT : MUTED, true),
+                    margins(-2, 0, 10, 0));
+        }
+        gamingControllerButton = gamingIcon(R.drawable.ic_gaming_gamepad, "Controles", v -> showGamingControllers());
+        header.addView(gamingControllerButton, margins(46, 0, 8, 0, 46));
+        header.addView(gamingIcon(R.drawable.ic_gaming_settings, "Configurações", v -> showGamingSettings()),
+                new LinearLayout.LayoutParams(dp(46), dp(46)));
+        updateGamingControllers();
+        return header;
+    }
+
+    private ImageButton gamingIcon(int resource, String label, View.OnClickListener action) {
+        ImageButton icon = new ImageButton(this);
+        icon.setImageResource(resource);
+        icon.setContentDescription(label);
+        icon.setBackground(background(SURFACE, 9, LINE, 1));
+        icon.setColorFilter(TEXT);
+        icon.setOnClickListener(action);
+        return icon;
+    }
+
+    private void updateGamingControllers() {
+        if (gamingControllerButton == null && gamingControllerList == null) return;
+        List<String> controllers = new ArrayList<>();
+        InputManager manager = getSystemService(InputManager.class);
+        for (int id : manager.getInputDeviceIds()) {
+            InputDevice device = manager.getInputDevice(id);
+            if (device == null || device.isVirtual() || (Build.VERSION.SDK_INT >= 27 && !device.isEnabled())) continue;
+            if (device.supportsSource(InputDevice.SOURCE_GAMEPAD) || device.supportsSource(InputDevice.SOURCE_JOYSTICK))
+                controllers.add(device.getName());
+        }
+        if (gamingControllerButton != null) {
+            gamingControllerButton.setColorFilter(controllers.isEmpty() ? MUTED : ACCENT);
+            gamingControllerButton.setContentDescription(controllers.isEmpty() ? "Controles: nenhum conectado"
+                    : "Controles conectados: " + controllers.size());
+        }
+        if (gamingControllerList != null) {
+            gamingControllerList.setText(controllers.isEmpty() ? "Nenhum controle conectado ao celular."
+                    : String.join("\n\n", controllers) + "\n\nConectados ao celular");
+        }
+    }
+
+    private void showGamingControllers() {
+        LinearLayout panel = gamingDialogPanel();
+        TextView list = text("", 16, TEXT, false);
+        gamingControllerList = list;
+        panel.addView(list);
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Controles").setView(panel)
+                .setPositiveButton("Fechar", null).create();
+        dialog.setOnDismissListener(ignored -> gamingControllerList = null);
+        updateGamingControllers();
+        dialog.show();
+    }
+
+    private void showGamingSettings() {
+        LinearLayout panel = gamingDialogPanel();
+        String username = classicsRepository.raUsername();
+        boolean configured = !username.isEmpty() && !classicsRepository.raKey().isEmpty();
+        panel.addView(text("RetroAchievements", 18, TEXT, true));
+        panel.addView(text(configured ? "Conta configurada · " + username : "Conecte a conta para consultar conquistas.",
+                13, Color.rgb(173, 180, 190), false), margins(-1, 5, -1, 0));
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Configurações").setView(panel)
+                .setPositiveButton("Fechar", null).create();
+        panel.addView(gamingAction(configured ? "Gerenciar conta" : "Configurar conta", true, v -> {
+            dialog.dismiss();
+            showGamingRetroAccount();
+        }), margins(-1, 14, -1, 0, 44));
+        dialog.show();
+    }
+
+    private void showGamingRetroAccount() {
+        LinearLayout panel = gamingDialogPanel();
+        EditText username = pairingField("Usuário RetroAchievements", classicsRepository.raUsername());
+        EditText key = pairingField("Web API Key", "");
+        key.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        String storedKey = classicsRepository.raKey();
+        if (!storedKey.isEmpty()) key.setHint("Nova Web API Key (opcional para a mesma conta)");
+        panel.addView(username, margins(-1, 0, -1, 8, 48));
+        panel.addView(key, new LinearLayout.LayoutParams(-1, dp(48)));
+        ScrollView fields = new ScrollView(this);
+        fields.addView(panel);
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("RetroAchievements").setView(fields)
+                .setNegativeButton("Cancelar", null).setPositiveButton("Salvar", null).create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String account = username.getText().toString().trim();
+            String apiKey = key.getText().toString().trim();
+            if (apiKey.isEmpty() && account.equalsIgnoreCase(classicsRepository.raUsername())) apiKey = storedKey;
+            try {
+                classicsRepository.configureRetroAchievements(account, apiKey);
+                dialog.dismiss();
+                Toast.makeText(this, "Conta RetroAchievements salva.", Toast.LENGTH_SHORT).show();
+                refreshCurrentScreen();
+            } catch (Exception error) {
+                key.setError("Preencha usuário e Web API Key para salvar.");
+            }
+        }));
+        dialog.show();
+    }
+
+    private LinearLayout gamingDialogPanel() {
+        LinearLayout panel = column();
+        panel.setPadding(dp(22), dp(11), dp(22), dp(8));
+        return panel;
+    }
+
+    private Button gamingAction(String title, boolean primary, View.OnClickListener action) {
+        Button button = button(title);
+        button.setTextSize(14);
+        button.setTextColor(primary ? BG : TEXT);
+        button.setBackground(background(primary ? ACCENT : SURFACE, 8, LINE, 1));
+        button.setPadding(dp(14), 0, dp(14), 0);
+        button.setOnClickListener(action);
+        return button;
+    }
+
+    private FrameLayout gamingHero(String title, String platform, Game computer, LocalClassic local,
+                                   String playtime, String achievements, Button action) {
+        FrameLayout hero = new FrameLayout(this);
+        int tint = computer != null ? computer.colorEnd : Color.rgb(45, 66, 51);
+        hero.setBackground(new GradientDrawable(GradientDrawable.Orientation.BL_TR, new int[]{BG, tint}));
+        ImageView artwork = new ImageView(this);
+        artwork.setAlpha(.48f);
+        artwork.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        hero.addView(artwork, new FrameLayout.LayoutParams(-1, -1));
+        if (computer != null && !computer.artworkPath.isEmpty()) bridgeClient.loadArtwork(computer, artwork::setImageBitmap);
+        else if (local != null) localArtwork.load(local, artwork::setImageBitmap);
+        View shade = new View(this);
+        shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{BG, Color.argb(203, 9, 10, 12), Color.argb(20, 9, 10, 12)}));
+        hero.addView(shade, new FrameLayout.LayoutParams(-1, -1));
+        LinearLayout info = column();
+        info.setPadding(dp(18), dp(22), dp(18), dp(20));
+        info.addView(text(platform, 14, Color.rgb(192, 201, 207), true));
+        info.addView(text(title, 34, TEXT, true), margins(-1, 4, -1, 8));
+        LinearLayout stats = row();
+        if (playtime != null) stats.addView(gamingMetric(playtime, "Tempo jogado"), margins(-2, 0, 22, 0));
+        if (achievements != null) stats.addView(gamingMetric(achievements, "Progresso"));
+        info.addView(stats, margins(-1, 0, -1, 0));
+        if (action != null) info.addView(action, margins(-2, 14, -1, 0, 44));
+        hero.addView(info, new FrameLayout.LayoutParams(-1, -2));
+        return hero;
+    }
+
+    private View gamingMetric(String value, String label) {
+        LinearLayout metric = column();
+        metric.addView(text(value, 16, TEXT, true));
+        metric.addView(text(label, 12, Color.rgb(173, 180, 190), false));
+        return metric;
+    }
+
+    private List<LocalClassic.Achievement> gamingRetroProgress(LocalClassic game) {
+        return game.progressUsername.equalsIgnoreCase(classicsRepository.raUsername())
+                ? game.achievements : java.util.Collections.emptyList();
+    }
+
+    private LinearLayout gamingAchievements(String source, int unlocked, int total, String emptyMessage, View.OnClickListener refresh) {
+        LinearLayout panel = column();
+        panel.setPadding(dp(15), dp(12), dp(15), dp(12));
+        panel.setBackground(background(SURFACE, 11, LINE, 1));
+        LinearLayout header = row();
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout labels = column();
+        labels.addView(text("Conquistas", 22, TEXT, true));
+        if (!source.isEmpty()) labels.addView(text(source, 13, Color.rgb(173, 180, 190), false));
+        header.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
+        if (refresh != null) header.addView(gamingAction("Atualizar", false, refresh), margins(-2, 0, -1, 0, 44));
+        panel.addView(header);
+        if (total > 0) {
+            int percent = Math.round(unlocked * 100f / total);
+            panel.addView(text(unlocked + " de " + total + " desbloqueadas  ·  " + percent + "%", 14, ACCENT, true),
+                    margins(-1, 8, -1, 5));
+            panel.addView(progress(percent));
+        } else {
+            panel.addView(text(emptyMessage, 13, Color.rgb(173, 180, 190), false), margins(-1, 9, -1, 0));
+        }
+        return panel;
+    }
+
+    private LinearLayout gamingBadgeShelf(LinearLayout panel, int badgeCount) {
+        LinearLayout shelf = row();
+        if (badgeCount > 0) {
+            HorizontalScrollView horizontal = new HorizontalScrollView(this);
+            horizontal.setHorizontalScrollBarEnabled(false);
+            horizontal.addView(shelf);
+            panel.addView(horizontal, margins(-1, 12, -1, 0));
+        }
+        return shelf;
+    }
+
+    private View gamingBadgeCard(String title, boolean unlocked, ImageView image) {
+        LinearLayout card = row();
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(9), dp(8), dp(9), dp(8));
+        card.setBackground(background(RAISED, 8, LINE, 1));
+        card.addView(image, margins(40, 0, 9, 0, 40));
+        LinearLayout copy = column();
+        TextView label = text(title, 12, TEXT, true);
+        label.setMaxLines(2);
+        label.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        copy.addView(label);
+        copy.addView(text(unlocked ? "Desbloqueada" : "Bloqueada", 10, Color.rgb(173, 180, 190), false));
+        card.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        return card;
+    }
+
     private void showGamingMode() {
         ScrollView scroll = scroll(); LinearLayout page = page(); scroll.addView(page);
-        LinearLayout header = row(); header.setGravity(Gravity.CENTER_VERTICAL);
-        Button exit = button("←  SAIR"); exit.setTextSize(9); exit.setTextColor(TEXT); exit.setBackground(background(SURFACE, 22, LINE, 1));
-        exit.setContentDescription("Sair do Gaming Mode");
-        exit.setOnClickListener(v -> showHome()); header.addView(exit, new LinearLayout.LayoutParams(dp(94), dp(42)));
-        LinearLayout title = column(); title.setPadding(dp(16), 0, 0, 0); title.addView(eyebrow("BRUMCLASSICS · GAMING MODE"));
-        title.addView(text("Prontos para jogar", 25, TEXT, true), margins(-1, 3, -1, 0)); header.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
-        header.addView(text("connected".equals(syncState) ? "● PC CONECTADO" : "○ PC OFFLINE", 8, "connected".equals(syncState) ? ACCENT : MUTED, true));
-        page.addView(header);
-
+        page.addView(gamingHeader(false));
         List<LocalClassic> localGames = new ArrayList<>(classicsRepository.all());
         List<Game> installedGames = new ArrayList<>();
         for (Game game : games) if (game.installed) installedGames.add(game);
         localGames.sort((left, right) -> left.title.compareToIgnoreCase(right.title));
         installedGames.sort((left, right) -> left.title.compareToIgnoreCase(right.title));
+
+        LocalClassic recentLocal = null;
+        for (LocalClassic local : localGames)
+            if (local.lastPlayedAt > 0 && (recentLocal == null || local.lastPlayedAt > recentLocal.lastPlayedAt))
+                recentLocal = local;
+        Game recentComputer = HomeLibrary.lastPlayed(installedGames);
+        if (recentLocal != null || !localGames.isEmpty()) {
+            LocalClassic featured = recentLocal != null ? recentLocal : localGames.get(0);
+            Game linked = launcherGameFor(featured);
+            Button open = gamingAction("Detalhes", true, v -> showGamingClassicGame(featured));
+            page.addView(gamingHero(featured.title, classicPlatform(featured), linked, featured,
+                    formatClassicTime(featured.creditedSeconds), null, open), margins(-1, 10, -1, 0));
+        } else if (recentComputer != null) {
+            Button open = gamingAction("Detalhes", true, v -> showGamingGame(recentComputer));
+            page.addView(gamingHero(recentComputer.title, recentComputer.platform, recentComputer, null,
+                    recentComputer.playedLabel(), null, open), margins(-1, 10, -1, 0));
+        }
 
         if (!localGames.isEmpty()) {
             page.addView(sectionHeading("NO CELULAR", localGames.size() + " JOGOS", null), margins(-1, 24, -1, 12));
@@ -1141,29 +1394,71 @@ public final class MainActivity extends Activity {
     }
 
     private void showGamingClassicGame(LocalClassic game) {
-        currentClassicId = game.id; ScrollView scroll = scroll(); LinearLayout page = page(); scroll.addView(page);
-        page.addView(backHeader("GAMING MODE", this::showGamingMode)); Game launcherGame = launcherGameFor(game);
-        LinearLayout.LayoutParams coverParams = margins(224, 22, -1, 0, 314); coverParams.gravity = Gravity.CENTER_HORIZONTAL;
-        if (launcherGame != null) page.addView(cover(launcherGame, 224, 314), coverParams); else page.addView(localClassicArtwork(game, 314), coverParams);
-        TextView route = eyebrow("CLASSICS · PRONTO NESTE APARELHO"); route.setGravity(Gravity.CENTER); page.addView(route, margins(-1, 20, -1, 8));
-        TextView title = text(game.title, 28, TEXT, true); title.setGravity(Gravity.CENTER); page.addView(title);
-        page.addView(text("Sistema e controles serão preparados automaticamente.", 9, MUTED, false), margins(-1, 10, -1, 18));
-        Button play = primaryButton("JOGAR"); play.setOnClickListener(v -> launchLocalClassic(game)); page.addView(play, new LinearLayout.LayoutParams(-1, dp(50)));
-        LinearLayout ready = column(); ready.setPadding(dp(15), dp(15), dp(15), dp(15)); ready.setBackground(background(SURFACE, 7, LINE, 1));
-        ready.addView(eyebrow("PREPARAÇÃO AUTOMÁTICA")); ready.addView(text("✓ Jogo localizado\n✓ Sistema identificado\n✓ BRUM Core ou fallback escolhido automaticamente", 9, TEXT, false), margins(-1, 9, -1, 0));
-        page.addView(ready, margins(-1, 22, -1, 0));
-        Button details = button("DETALHES, HORAS E CONQUISTAS"); details.setTextColor(ACCENT); details.setBackground(background(SURFACE, 5, ACCENT, 1));
-        details.setOnClickListener(v -> { classicDetailsReturnScreen = "gaming"; showClassicDetails(game); }); page.addView(details, margins(-1, 10, -1, 30, 46));
+        currentClassicId = game.id;
+        ScrollView scroll = scroll();
+        LinearLayout page = page();
+        scroll.addView(page);
+        page.addView(gamingHeader(true));
+        Game linked = launcherGameFor(game);
+        List<LocalClassic.Achievement> earned = gamingRetroProgress(game);
+        String summary = earned.isEmpty() ? null : game.unlockedCount() + " de " + earned.size() + " conquistas";
+        Button play = gamingAction("Jogar no celular", true, v -> launchLocalClassic(game));
+        page.addView(gamingHero(game.title, classicPlatform(game), linked, game,
+                formatClassicTime(game.creditedSeconds), summary, play), margins(-1, 10, -1, 0));
+        String unavailable = game.raGameId <= 0 ? "Vincule o ID oficial do jogo para carregar as conquistas."
+                : classicsRepository.raUsername().isEmpty() || classicsRepository.raKey().isEmpty()
+                ? "Configure a conta RetroAchievements na engrenagem." : "Nenhuma conquista carregada. Use Atualizar para consultar o progresso.";
+        LinearLayout achievements = gamingAchievements("RetroAchievements", game.unlockedCount(), earned.size(),
+                unavailable, v -> syncClassic(game, true));
+        LinearLayout shelf = gamingBadgeShelf(achievements, earned.size());
+        for (int i = 0; i < Math.min(4, earned.size()); i++) {
+            LocalClassic.Achievement item = earned.get(i);
+            shelf.addView(gamingBadgeCard(item.title, item.unlocked, achievementBadge(item.unlocked, item.badgeUrl())),
+                    margins(166, 0, 10, 0));
+        }
+        Button details = gamingAction(earned.isEmpty() ? "Editar vínculo do jogo" : "Ver todas as conquistas", false, v -> {
+            if (earned.isEmpty()) editClassicLinks(game);
+            else showGamingClassicAchievements(game, earned);
+        });
+        achievements.addView(details, margins(-1, 10, -1, 0, 44));
+        page.addView(achievements, margins(-1, 16, -1, 16));
         setScreen("gaming-classic-details", scroll);
     }
 
+    private void showGamingClassicAchievements(LocalClassic game, List<LocalClassic.Achievement> items) {
+        android.widget.ListView list = new android.widget.ListView(this);
+        list.setPadding(dp(16), dp(8), dp(16), dp(8));
+        list.setBackgroundColor(BG);
+        list.setAdapter(new android.widget.BaseAdapter() {
+            @Override public int getCount() { return items.size(); }
+            @Override public LocalClassic.Achievement getItem(int position) { return items.get(position); }
+            @Override public long getItemId(int position) { return position; }
+            @Override public boolean isEnabled(int position) { return false; }
+            @Override public View getView(int position, View convertView, android.view.ViewGroup parent) {
+                LocalClassic.Achievement item = getItem(position);
+                if (convertView != null && convertView.getTag() == item) return convertView;
+                View card = gamingBadgeCard(item.title, item.unlocked, achievementBadge(item.unlocked, item.badgeUrl()));
+                card.setTag(item);
+                return card;
+            }
+        });
+        new AlertDialog.Builder(this).setTitle("Conquistas · " + game.title).setView(list)
+                .setPositiveButton("Fechar", null).show();
+    }
+
     private void showGamingGame(Game game) {
-        gamingGameId = game.id; ScrollView scroll = scroll(); LinearLayout page = page(); scroll.addView(page);
-        page.addView(backHeader("GAMING MODE", this::showGamingMode));
-        LinearLayout.LayoutParams coverParams = margins(224, 22, -1, 0, 314); coverParams.gravity = Gravity.CENTER_HORIZONTAL; page.addView(cover(game, 224, 314), coverParams);
-        TextView route = eyebrow("PC · CANAL SEGURO"); route.setGravity(Gravity.CENTER); page.addView(route, margins(-1, 20, -1, 8));
-        TextView title = text(game.title, 28, TEXT, true); title.setGravity(Gravity.CENTER); page.addView(title);
-        if (!game.description.trim().isEmpty()) page.addView(text(game.description, 10, MUTED, false), margins(-1, 11, -1, 0));
+        gamingGameId = game.id;
+        ScrollView scroll = scroll();
+        LinearLayout page = page();
+        scroll.addView(page);
+        page.addView(gamingHeader(true));
+        int unlocked = 0;
+        for (Game.Achievement item : game.achievements) if (item.unlocked) unlocked++;
+        String summary = game.achievements.isEmpty() ? null : unlocked + " de " + game.achievements.size() + " conquistas";
+        if (summary == null && game.achievementsAvailable) summary = game.progressLabel();
+        page.addView(gamingHero(game.title, game.platform, game, null, game.playedLabel(), summary, null),
+                margins(-1, 10, -1, 0));
+        if (!game.description.trim().isEmpty()) page.addView(text(game.description, 12, TEXT, false), margins(-1, 14, -1, 0));
         org.json.JSONObject streamingStatus = experience.optJSONObject("streaming");
         boolean streamingReady = streamingStatus != null && streamingStatus.optBoolean("available", false);
         TextView launchState = text(game.installed ? ("connected".equals(syncState) ? (streamingReady ? "PRONTO PARA JOGAR NO CELULAR" : "STREAMING PRECISA SER CONFIGURADO NO PC") : "COMPUTADOR FORA DE ALCANCE") : "INSTALAÇÃO NÃO CONFIRMADA", 8, game.installed && "connected".equals(syncState) && streamingReady ? ACCENT : MUTED, true);
@@ -1196,8 +1491,22 @@ public final class MainActivity extends Activity {
             : streamingStatus.optString("message", "Configure o Sunshine no computador.");
         streaming.addView(eyebrow("STREAMING · " + (streamingReady ? "PRONTO" : "AÇÃO NECESSÁRIA"))); streaming.addView(text(streamDetail, 9, MUTED, false), margins(-1, 8, -1, 0));
         streaming.setOnClickListener(v -> showStreamingRoadmap()); page.addView(streaming, margins(-1, 23, -1, 0));
-        Button details = button("VER PERFIL COMPLETO DO JOGO"); details.setTextColor(ACCENT); details.setBackground(background(SURFACE, 5, ACCENT, 1));
-        details.setOnClickListener(v -> { detailsReturnScreen = "gaming"; showDetails(game); }); page.addView(details, margins(-1, 10, -1, 30, 46));
+        LinearLayout achievements = gamingAchievements(isClassicGame(game) ? "RetroAchievements" : "",
+                unlocked, game.achievements.size(),
+                game.achievementsAvailable ? game.progressLabel() : "O progresso ainda não foi sincronizado.", null);
+        LinearLayout shelf = gamingBadgeShelf(achievements, game.achievements.size());
+        for (int i = 0; i < Math.min(4, game.achievements.size()); i++) {
+            Game.Achievement item = game.achievements.get(i);
+            shelf.addView(gamingBadgeCard(item.title, item.unlocked, achievementBadge(item)), margins(166, 0, 10, 0));
+        }
+        if (!game.achievements.isEmpty()) achievements.addView(gamingAction("Ver todas as conquistas", false,
+                v -> showAchievementBrowser(game)), margins(-1, 10, -1, 0, 44));
+        page.addView(achievements, margins(-1, 16, -1, 0));
+        Button details = gamingAction("Ver perfil completo do jogo", false, v -> {
+            detailsReturnScreen = "gaming-details";
+            showDetails(game);
+        });
+        page.addView(details, margins(-1, 10, -1, 24, 46));
         setScreen("gaming-details", scroll);
     }
 
@@ -1316,13 +1625,14 @@ public final class MainActivity extends Activity {
         page.addView(noteCard("MESMO JOGO NO LAUNCHER", launcherGame == null ? "Não vinculado" : launcherGame.title));
         page.addView(noteCard("RETROACHIEVEMENTS", game.raGameId > 0 ? "ID " + game.raGameId : "ID não informado"), margins(-1, 6, -1, 0));
 
-        page.addView(sectionHeading("CONQUISTAS · " + game.unlockedCount() + "/" + game.achievements.size(), "ATUALIZAR", v -> syncClassic(game, true)), margins(-1, 28, -1, 10));
-        if (game.achievements.isEmpty()) page.addView(text("Informe o ID oficial e configure a Web API Key em Perfil → CLASSICS no Android.", 9, MUTED, false));
+        List<LocalClassic.Achievement> earned = gamingRetroProgress(game);
+        page.addView(sectionHeading("CONQUISTAS · " + (earned.isEmpty() ? "—" : game.unlockedCount() + "/" + earned.size()), "ATUALIZAR", v -> syncClassic(game, true)), margins(-1, 28, -1, 10));
+        if (earned.isEmpty()) page.addView(text("Informe o ID oficial e configure a Web API Key em Perfil → CLASSICS no Android.", 9, MUTED, false));
         int shown = 0;
-        for (LocalClassic.Achievement achievement : game.achievements) {
+        for (LocalClassic.Achievement achievement : earned) {
             if (shown++ >= 100) break;
             LinearLayout row = row(); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(13), dp(13), dp(13), dp(13)); row.setBackground(background(SURFACE, 3, LINE, 1));
-            row.addView(text(achievement.unlocked ? "◆" : "◇", 15, achievement.unlocked ? ACCENT : MUTED, true), new LinearLayout.LayoutParams(dp(30), -2));
+            row.addView(achievementBadge(achievement.unlocked, achievement.badgeUrl()), margins(40, 0, 10, 0, 40));
             LinearLayout copy = column(); copy.addView(text(achievement.title, 11, achievement.unlocked ? TEXT : MUTED, true));
             if (!achievement.description.isEmpty()) copy.addView(text(achievement.description, 8, MUTED, false), margins(-1, 4, -1, 0));
             row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
@@ -1389,7 +1699,7 @@ public final class MainActivity extends Activity {
         form.addView(raId, new LinearLayout.LayoutParams(-1, dp(48))); form.addView(linked, margins(-1, 12, -1, 7)); form.addView(choose, new LinearLayout.LayoutParams(-1, dp(44)));
         AlertDialog dialog = new AlertDialog.Builder(this).setTitle("VÍNCULOS · " + game.title).setView(form).setNegativeButton("CANCELAR", null).setPositiveButton("SALVAR", null).create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-            try { int id = raId.getText().toString().trim().isEmpty() ? 0 : Integer.parseInt(raId.getText().toString().trim()); classicsRepository.updateLinks(game.id, id, selected[0]); dialog.dismiss(); showClassicDetails(classicsRepository.find(game.id)); }
+            try { int id = raId.getText().toString().trim().isEmpty() ? 0 : Integer.parseInt(raId.getText().toString().trim()); classicsRepository.updateLinks(game.id, id, selected[0]); dialog.dismiss(); if ("gaming-classic-details".equals(currentScreen)) refreshCurrentScreen(); else showClassicDetails(classicsRepository.find(game.id)); }
             catch (Exception error) { raId.setError("Informe um número válido."); }
         })); dialog.show();
     }
@@ -1480,10 +1790,11 @@ public final class MainActivity extends Activity {
     private void syncClassic(LocalClassic game, boolean announce) {
         if (game == null) return;
         String username = classicsRepository.raUsername(); String key = classicsRepository.raKey();
-        if (game.raGameId > 0 && !username.isEmpty() && !key.isEmpty()) {
-            retroAchievements.fetch(game.raGameId, username, key, new RetroAchievementsClient.Callback() {
+        final int requestedGameId = game.raGameId;
+        if (requestedGameId > 0 && !username.isEmpty() && !key.isEmpty()) {
+            retroAchievements.fetch(requestedGameId, username, key, new RetroAchievementsClient.Callback() {
                 @Override public void onSuccess(String title, List<LocalClassic.Achievement> achievements) {
-                    try { classicsRepository.updateProgress(game.id, username, title, achievements); }
+                    try { if (!classicsRepository.updateProgress(game.id, requestedGameId, username, title, achievements)) return; }
                     catch (Exception error) { Toast.makeText(MainActivity.this, "Não foi possível salvar as conquistas.", Toast.LENGTH_LONG).show(); return; }
                     LocalClassic current = classicsRepository.find(game.id);
                     if (current != null && !current.launcherGameId.isEmpty() && bridgeClient.isConfigured()) bridgeClient.syncClassicAchievements(current.launcherGameId, current.raGameId, username, new BridgeClient.ClassicsCallback() {
@@ -2062,24 +2373,37 @@ public final class MainActivity extends Activity {
     }
 
     private ImageView achievementBadge(Game.Achievement achievement) {
+        return achievementBadge(achievement.unlocked, achievement.badgeUrl);
+    }
+
+    private ImageView achievementBadge(boolean unlocked, String badgeUrl) {
         ImageView image = new ImageView(this);
         image.setScaleType(ImageView.ScaleType.CENTER_CROP);
         image.setPadding(dp(6), dp(6), dp(6), dp(6));
         image.setBackground(background(RAISED, 7, LINE, 1));
-        image.setImageResource(achievement.unlocked ? android.R.drawable.btn_star_big_on : android.R.drawable.ic_lock_lock);
-        image.setColorFilter(achievement.unlocked ? ACCENT : MUTED);
-        image.setAlpha(achievement.unlocked ? 1f : .55f);
-        String source = achievement.badgeUrl == null ? "" : achievement.badgeUrl.trim();
+        image.setImageResource(unlocked ? android.R.drawable.btn_star_big_on : android.R.drawable.ic_lock_lock);
+        image.setColorFilter(unlocked ? ACCENT : MUTED);
+        image.setAlpha(unlocked ? 1f : .55f);
+        String source = badgeUrl == null ? "" : badgeUrl.trim();
         if (source.isEmpty()) return image;
-        modelExecutor.execute(() -> {
+        Bitmap cached = gamingBadgeCache.get(source);
+        if (cached != null) {
+            image.clearColorFilter();
+            image.setPadding(0, 0, 0, 0);
+            image.setImageBitmap(cached);
+            return image;
+        }
+        badgeExecutor.execute(() -> {
             HttpURLConnection connection = null;
             try {
                 URL url = new URL(source);
                 String host = url.getHost().toLowerCase(Locale.ROOT);
-                if (!"https".equalsIgnoreCase(url.getProtocol()) || !(host.endsWith("steamstatic.com") || host.endsWith("akamaihd.net"))) return;
+                boolean knownHost = host.equals("i.retroachievements.org") || host.equals("steamstatic.com")
+                    || host.endsWith(".steamstatic.com") || host.equals("akamaihd.net") || host.endsWith(".akamaihd.net");
+                if (!"https".equalsIgnoreCase(url.getProtocol()) || !knownHost) return;
                 connection = (HttpURLConnection) url.openConnection();
                 connection.setConnectTimeout(6000); connection.setReadTimeout(8000); connection.setInstanceFollowRedirects(false);
-                connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android/0.25.0");
+                connection.setRequestProperty("User-Agent", "BRUMCLASSICS-Android");
                 if (connection.getResponseCode() != 200 || connection.getContentLengthLong() > 2 * 1024 * 1024) return;
                 byte[] buffer = new byte[8192]; int read; int total = 0;
                 ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -2087,8 +2411,17 @@ public final class MainActivity extends Activity {
                     while ((read = input.read(buffer)) != -1) { total += read; if (total > 2 * 1024 * 1024) return; output.write(buffer, 0, read); }
                 }
                 byte[] bytes = output.toByteArray();
-                Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                if (bitmap != null) handler.post(() -> { image.clearColorFilter(); image.setPadding(0, 0, 0, 0); image.setImageBitmap(bitmap); });
+                BitmapFactory.Options options = new BitmapFactory.Options();
+                options.inJustDecodeBounds = true;
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
+                if (options.outWidth < 1 || options.outHeight < 1 || options.outWidth > 4096 || options.outHeight > 4096) return;
+                options.inJustDecodeBounds = false;
+                options.inSampleSize = Math.max(1, Math.max(options.outWidth, options.outHeight) / 128);
+                Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, options);
+                if (bitmap != null) {
+                    gamingBadgeCache.put(source, bitmap);
+                    handler.post(() -> { image.clearColorFilter(); image.setPadding(0, 0, 0, 0); image.setImageBitmap(bitmap); });
+                }
             } catch (Exception ignored) { }
             finally { if (connection != null) connection.disconnect(); }
         });

@@ -8,8 +8,8 @@ settings:
     SWIFT_VERSION: "5.9"
     SWIFT_OBJC_BRIDGING_HEADER: BRUMCLASSICSMobile/BRUMCLASSICSMobile-Bridging-Header.h
     CLANG_CXX_LANGUAGE_STANDARD: c++17
-    CURRENT_PROJECT_VERSION: 35
-    MARKETING_VERSION: 0.15.1
+    CURRENT_PROJECT_VERSION: 49
+    MARKETING_VERSION: 0.16.0
 targets:
   BRUMCLASSICSMobile:
     type: application
@@ -20,6 +20,7 @@ targets:
       - sdk: AudioToolbox.framework
       - sdk: AVFoundation.framework
       - sdk: GameController.framework
+      - sdk: OpenGLES.framework
       - sdk: QuartzCore.framework
     settings:
       base:
@@ -38,6 +39,9 @@ targets:
     platform: iOS
     sources:
       - path: BRUMCLASSICSMobileTests
+        excludes: [Fixtures]
+      - path: build/test-fixtures/BrumTestCore.dylib
+        buildPhase: resources
     dependencies:
       - target: BRUMCLASSICSMobile
   BRUMCLASSICSMobileUITests:

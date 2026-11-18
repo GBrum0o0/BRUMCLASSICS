@@ -1,32 +1,69 @@
 import SwiftUI
 
 enum IntegratedEmulatorSupport {
-    static func supports(_ rom: ROMFolderGame) -> Bool {
-        core(for: rom) != nil
+    static func supports(_ rom: ROMFolderGame, includeExperimental: Bool = CoreRegistry.experimentalBuild, frameworksDirectory: URL? = nil) -> Bool {
+        core(for: rom, includeExperimental: includeExperimental, frameworksDirectory: frameworksDirectory) != nil
     }
 
-    static func core(for rom: ROMFolderGame) -> CoreDescriptor? {
-        let system: EmulatedSystemID?
-        switch (rom.filename as NSString).pathExtension.lowercased() {
-        case "gb": system = .gameBoy
-        case "gbc": system = .gameBoyColor
-        case "gba": system = .gameBoyAdvance
-        case "nds": system = .nintendoDS
-        case "neo": system = .neoGeo
-        case "sms": system = .masterSystem
-        case "gg": system = .gameGear
-        case "nes": system = .nintendoEntertainmentSystem
-        case "pce": system = .pcEngine
-        case "sfc", "smc": system = .superNintendo
-        case "ws": system = .wonderSwan
-        case "wsc": system = .wonderSwanColor
-        default: system = nil
+    static func core(for rom: ROMFolderGame, includeExperimental: Bool = CoreRegistry.experimentalBuild, frameworksDirectory: URL? = nil) -> CoreDescriptor? {
+        system(for: rom).flatMap { CoreRegistry.installedCore(for: $0, includeExperimental: includeExperimental, frameworksDirectory: frameworksDirectory) }
+    }
+
+    static func availabilityReason(for rom: ROMFolderGame) -> String {
+        guard let system = system(for: rom) else { return "O formato deste arquivo não identifica um sistema integrado. Para discos e arquivos de arcade, organize a ROM na pasta do console correspondente." }
+        return CoreRegistry.installation(for: system).reason
+    }
+
+    static func system(for rom: ROMFolderGame) -> EmulatedSystemID? {
+        let ext = (rom.filename as NSString).pathExtension.lowercased()
+        switch ext {
+        case "gb": return .gameBoy
+        case "gbc": return .gameBoyColor
+        case "gba": return .gameBoyAdvance
+        case "nds": return .nintendoDS
+        case "neo": return .neoGeo
+        case "sms": return .masterSystem
+        case "gg": return .gameGear
+        case "nes": return .nintendoEntertainmentSystem
+        case "pce": return .pcEngine
+        case "sfc", "smc": return .superNintendo
+        case "ws": return .wonderSwan
+        case "wsc": return .wonderSwanColor
+        case "n64", "z64", "v64": return .nintendo64
+        case "md", "gen", "smd": return .megaDrive
+        case "32x": return .sega32X
+        case "a26": return .atari2600
+        case "gdi": return .dreamcast
+        case "cso": return .playStationPortable
+        case "3ds", "3dsx", "z3dsx", "cci", "zcci", "cxi", "zcxi": return .nintendo3DS
+        case "rvz", "gcz": return .gameCube
+        default: break
         }
-        return system.flatMap(CoreRegistry.core(for:))
+        let folders = rom.relativePath.lowercased().replacingOccurrences(of: "\\", with: "/")
+            .split(separator: "/").dropLast()
+        // Nearest recognized directory wins, but only for a supported format.
+        for folder in folders.reversed() {
+            switch folder {
+            case "ps1", "psx": return ["cue", "chd", "pbp", "m3u", "bin", "iso"].contains(ext) ? .playStation : nil
+            case "ps2" where ["iso", "bin", "chd", "m3u"].contains(ext): return .playStation2
+            case "saturn" where ["cue", "chd", "m3u"].contains(ext): return .saturn
+            case "sega cd", "segacd", "mega cd", "megacd": return ["cue", "chd", "iso"].contains(ext) ? .segaCD : nil
+            case "arcade", "fbneo", "mame": return ["zip", "7z"].contains(ext) ? .arcade : nil
+            case "psp" where ["iso", "pbp"].contains(ext): return .playStationPortable
+            case "dreamcast" where ["chd", "cdi", "m3u"].contains(ext): return .dreamcast
+            case "3ds" where ["app", "elf", "axf"].contains(ext): return .nintendo3DS
+            case "gamecube" where ["iso", "ciso", "gcm"].contains(ext): return .gameCube
+            default: continue
+            }
+        }
+        return nil
     }
 
-    static func routeLabel(_ rom: ROMFolderGame) -> String {
-        core(for: rom).map { "JOGAR · BRUM CORE · \($0.displayName.uppercased())" } ?? "JOGAR · RETROARCH"
+    static func routeLabel(_ rom: ROMFolderGame, includeExperimental: Bool = CoreRegistry.experimentalBuild, frameworksDirectory: URL? = nil) -> String {
+        guard let core = core(for: rom, includeExperimental: includeExperimental, frameworksDirectory: frameworksDirectory) else {
+            return system(for: rom) == .nintendo3DS ? "INDISPONÍVEL · BRUM CORE" : "JOGAR · RETROARCH"
+        }
+        return CoreRegistry.experimental.contains(core) ? "TESTAR · BRUM CORE" : "JOGAR · BRUM CORE"
     }
 }
 
@@ -40,6 +77,7 @@ struct IntegratedEmulatorView: View {
     @State private var failure = ""
     @State private var finishing = false
     @State private var choosingROMFolder = false
+    @State private var startingSession: Task<Void, Never>?
 
     init(rom: ROMFolderGame, returnsToPortrait: Bool = true) {
         self.rom = rom
@@ -50,7 +88,7 @@ struct IntegratedEmulatorView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             if let launch {
-                BrumLibretroController(launch: launch, onExit: finish)
+                BrumLibretroController(launch: launch, onReady: beginPlay, onExit: finish)
                     .ignoresSafeArea()
             } else if !failure.isEmpty {
                 VStack(spacing: 18) {
@@ -98,14 +136,23 @@ struct IntegratedEmulatorView: View {
         guard !finishing else { return }
         finishing = true
         Task {
-            await pocket.finishIntegratedPlay(launcher: launcher)
+            if let startingSession {
+                await startingSession.value
+                await pocket.finishIntegratedPlay(launcher: launcher)
+            }
             dismiss()
         }
+    }
+
+    private func beginPlay() {
+        guard !finishing, startingSession == nil else { return }
+        startingSession = Task { await pocket.beginIntegratedPlay(rom, launcher: launcher) }
     }
 }
 
 private struct BrumLibretroController: UIViewControllerRepresentable {
     let launch: EmulationLaunchDescriptor
+    let onReady: () -> Void
     let onExit: () -> Void
 
     func makeUIViewController(context: Context) -> UIViewController {
@@ -122,6 +169,7 @@ private struct BrumLibretroController: UIViewControllerRepresentable {
             retroAchievementsGameID: launch.retroAchievementsGameID,
             saveIdentifier: launch.saveIdentifier,
             legacySaveBasename: launch.legacySaveBasename,
+            onReady: onReady,
             onExit: onExit
         )
     }
