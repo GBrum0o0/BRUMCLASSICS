@@ -65,6 +65,8 @@ import com.brumclassics.mobile.classics.LocalClassic;
 import com.brumclassics.mobile.classics.LocalArtworkClient;
 import com.brumclassics.mobile.classics.RetroAchievementsClient;
 import com.brumclassics.mobile.emulation.IntegratedEmulatorActivity;
+import com.brumclassics.mobile.murb.MurbRemoteClient;
+import com.brumclassics.mobile.murb.MurbRemoteGamepadActivity;
 import com.brumclassics.mobile.emulation.IntegratedEmulatorLaunch;
 import com.brumclassics.mobile.sync.BridgeClient;
 import com.brumclassics.mobile.sync.MobileSyncState;
@@ -1152,11 +1154,17 @@ public final class MainActivity extends Activity {
 
     private void showGamingControllers() {
         LinearLayout panel = gamingDialogPanel();
-        TextView list = text("", 16, TEXT, false);
+        TextView list = text("", 15, TEXT, false);
         gamingControllerList = list;
         panel.addView(list);
+        panel.addView(text("Gamepad Virtual BRUM Core · Executa no celular\nD-Pad contínuo em cruz, analógico por sistema e toque DS/3DS.",
+                12, Color.rgb(173, 180, 190), false), margins(-1, 14, -1, 0));
         AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Controles").setView(panel)
                 .setPositiveButton("Fechar", null).create();
+        panel.addView(gamingAction("Gamepad M.U.R.B para PC (LAN)", true, v -> {
+            dialog.dismiss();
+            showMurbRemoteDialog();
+        }), margins(-1, 14, -1, 0, 44));
         dialog.setOnDismissListener(ignored -> gamingControllerList = null);
         updateGamingControllers();
         dialog.show();
@@ -1166,15 +1174,79 @@ public final class MainActivity extends Activity {
         LinearLayout panel = gamingDialogPanel();
         String username = classicsRepository.raUsername();
         boolean configured = !username.isEmpty() && !classicsRepository.raKey().isEmpty();
+        android.content.SharedPreferences prefs = getSharedPreferences("brum_mobile_prefs", MODE_PRIVATE);
         panel.addView(text("RetroAchievements", 18, TEXT, true));
         panel.addView(text(configured ? "Conta configurada · " + username : "Conecte a conta para consultar conquistas.",
                 13, Color.rgb(173, 180, 190), false), margins(-1, 5, -1, 0));
+
+        Switch haptics = new Switch(this);
+        haptics.setText("Vibração tátil nos botões virtuais");
+        haptics.setTextColor(TEXT);
+        haptics.setChecked(prefs.getBoolean("virtual_haptics", true));
+        haptics.setOnCheckedChangeListener((button, checked) -> prefs.edit().putBoolean("virtual_haptics", checked).apply());
+        panel.addView(haptics, margins(-1, 14, -1, 4));
+
+        Switch autoHide = new Switch(this);
+        autoHide.setText("Ocultar controle na tela com joystick conectado");
+        autoHide.setTextColor(TEXT);
+        autoHide.setChecked(prefs.getBoolean("auto_hide_pad_with_controller", false));
+        autoHide.setOnCheckedChangeListener((button, checked) -> prefs.edit().putBoolean("auto_hide_pad_with_controller", checked).apply());
+        panel.addView(autoHide, margins(-1, 6, -1, 4));
+
+        Switch defaultFill = new Switch(this);
+        defaultFill.setText("Preencher tela por padrão ao abrir jogo");
+        defaultFill.setTextColor(TEXT);
+        defaultFill.setChecked(prefs.getBoolean("default_fill_display", false));
+        defaultFill.setOnCheckedChangeListener((button, checked) -> prefs.edit().putBoolean("default_fill_display", checked).apply());
+        panel.addView(defaultFill, margins(-1, 6, -1, 8));
+
         AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Configurações").setView(panel)
                 .setPositiveButton("Fechar", null).create();
-        panel.addView(gamingAction(configured ? "Gerenciar conta" : "Configurar conta", true, v -> {
+        panel.addView(gamingAction(configured ? "Gerenciar conta RetroAchievements" : "Configurar conta RetroAchievements", true, v -> {
             dialog.dismiss();
             showGamingRetroAccount();
-        }), margins(-1, 14, -1, 0, 44));
+        }), margins(-1, 10, -1, 0, 44));
+        dialog.show();
+    }
+
+    private void showMurbRemoteDialog() {
+        android.content.SharedPreferences prefs = getSharedPreferences("brum_murb_remote", MODE_PRIVATE);
+        LinearLayout panel = gamingDialogPanel();
+        panel.addView(text("Depende do PC · Rede Local (WebSocket 8089)", 13, ACCENT, true));
+        panel.addView(text("Cole o link `murb://...` do QR Code ou informe IP, porta e token exibidos no PC.",
+                12, Color.rgb(173, 180, 190), false), margins(-1, 4, -1, 10));
+        EditText uriOrIp = pairingField("murb://... ou IP do PC", prefs.getString("host", ""));
+        EditText portField = pairingField("Porta", String.valueOf(prefs.getInt("port", 8089)));
+        portField.setInputType(InputType.TYPE_CLASS_NUMBER);
+        EditText tokenField = pairingField("Token M.U.R.B", prefs.getString("token", ""));
+        EditText sysField = pairingField("Sistema (ds, 3ds, wiiu, gamepad)", prefs.getString("sys", "ds"));
+        panel.addView(uriOrIp, margins(-1, 0, -1, 8, 46));
+        panel.addView(portField, margins(-1, 0, -1, 8, 46));
+        panel.addView(tokenField, margins(-1, 0, -1, 8, 46));
+        panel.addView(sysField, new LinearLayout.LayoutParams(-1, dp(46)));
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(panel);
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Gamepad M.U.R.B para PC")
+                .setView(scroll).setNegativeButton("Cancelar", null).setPositiveButton("Conectar", null).create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String raw = uriOrIp.getText().toString().trim();
+            MurbRemoteClient.PairingTarget parsed = MurbRemoteClient.parseUri(raw);
+            String host = parsed != null ? parsed.host : raw;
+            int port = parsed != null ? parsed.port : 8089;
+            String token = parsed != null ? parsed.token : tokenField.getText().toString().trim().toUpperCase(Locale.ROOT);
+            String sys = parsed != null ? parsed.system : MurbRemoteClient.normalizeSystem(sysField.getText().toString());
+            if (parsed == null) {
+                try { port = Integer.parseInt(portField.getText().toString().trim()); }
+                catch (Exception e) { portField.setError("Porta inválida."); return; }
+            }
+            if (host.isEmpty() || token.isEmpty() || port < 1 || port > 65535) {
+                uriOrIp.setError("Informe link `murb://` ou IP e token válidos.");
+                return;
+            }
+            prefs.edit().putString("host", host).putInt("port", port).putString("token", token).putString("sys", sys).apply();
+            dialog.dismiss();
+            startActivity(MurbRemoteGamepadActivity.intent(this, host, port, token, sys));
+        }));
         dialog.show();
     }
 
@@ -1405,6 +1477,11 @@ public final class MainActivity extends Activity {
         Button play = gamingAction("Jogar no celular", true, v -> launchLocalClassic(game));
         page.addView(gamingHero(game.title, classicPlatform(game), linked, game,
                 formatClassicTime(game.creditedSeconds), summary, play), margins(-1, 10, -1, 0));
+        CoreRegistry.Descriptor core = CoreRegistry.integratedCore(null, game.filename);
+        String executionText = core != null
+                ? "Executa no celular (offline) · BRUM Core " + core.displayName + " (" + core.license + ")\nDepende do PC/rede: sincronizar conquistas e iniciar no computador."
+                : "Executa no celular via RetroArch externo (quando suportado).\nDepende do PC/rede: sincronização de conquistas e catálogo.";
+        page.addView(noteCard("EXECUÇÃO E INFORMAÇÕES · " + game.filename, executionText), margins(-1, 12, -1, 0));
         String unavailable = game.raGameId <= 0 ? "Vincule o ID oficial do jogo para carregar as conquistas."
                 : classicsRepository.raUsername().isEmpty() || classicsRepository.raKey().isEmpty()
                 ? "Configure a conta RetroAchievements na engrenagem." : "Nenhuma conquista carregada. Use Atualizar para consultar o progresso.";
@@ -1458,6 +1535,9 @@ public final class MainActivity extends Activity {
         if (summary == null && game.achievementsAvailable) summary = game.progressLabel();
         page.addView(gamingHero(game.title, game.platform, game, null, game.playedLabel(), summary, null),
                 margins(-1, 10, -1, 0));
+        page.addView(noteCard("DEPENDE DO PC · " + game.platform.toUpperCase(Locale.ROOT),
+                "Gênero: " + (game.genre.isEmpty() ? (game.category.isEmpty() ? "Clássico" : game.category) : game.genre) + " · Executa no computador via Streaming / B-CARD."),
+                margins(-1, 12, -1, 0));
         if (!game.description.trim().isEmpty()) page.addView(text(game.description, 12, TEXT, false), margins(-1, 14, -1, 0));
         org.json.JSONObject streamingStatus = experience.optJSONObject("streaming");
         boolean streamingReady = streamingStatus != null && streamingStatus.optBoolean("available", false);
@@ -1483,6 +1563,9 @@ public final class MainActivity extends Activity {
                 @Override public void onError(String safeMessage) { launchState.setText(safeMessage.toUpperCase(Locale.ROOT)); launchState.setTextColor(Color.rgb(255, 118, 118)); pcOnly.setText("TENTAR NOVAMENTE"); pcOnly.setEnabled(true); }
             });
         }); page.addView(pcOnly, margins(-1, 10, -1, 0, 46));
+        Button murbPad = button("ABRIR GAMEPAD M.U.R.B PARA PC"); murbPad.setTextColor(TEXT); murbPad.setBackground(background(SURFACE, 5, LINE, 1));
+        murbPad.setOnClickListener(v -> showMurbRemoteDialog());
+        page.addView(murbPad, margins(-1, 10, -1, 0, 46));
 
         LinearLayout streaming = column(); streaming.setPadding(dp(15), dp(15), dp(15), dp(15)); streaming.setBackground(background(SURFACE, 7, LINE, 1));
         org.json.JSONObject network = streamingStatus == null ? null : streamingStatus.optJSONObject("network");

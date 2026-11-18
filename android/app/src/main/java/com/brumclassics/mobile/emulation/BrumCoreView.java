@@ -35,6 +35,10 @@ final class BrumCoreView extends View implements Runnable {
     private AudioTrack audioTrack;
     private long playedNanos;
     private final RectF displayTarget = new RectF();
+    private final Paint reticlePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private float touchScreenX;
+    private float touchScreenY;
+    private boolean touchActive;
 
     BrumCoreView(Context context, BrumCoreBridge core, RuntimeErrorListener errorListener) {
         super(context);
@@ -43,6 +47,9 @@ final class BrumCoreView extends View implements Runnable {
         setBackgroundColor(Color.BLACK);
         paint.setAntiAlias(false);
         paint.setFilterBitmap(false);
+        reticlePaint.setStyle(Paint.Style.STROKE);
+        reticlePaint.setStrokeWidth(4f);
+        reticlePaint.setColor(Color.rgb(157, 255, 59));
         prepareAudio();
     }
 
@@ -57,7 +64,12 @@ final class BrumCoreView extends View implements Runnable {
     void pauseEmulation() {
         running = false;
         inputMask.set(0);
+        touchActive = false;
         core.setPointer(0, 0, false);
+        core.setAnalog(0, 0, 0f);
+        core.setAnalog(0, 1, 0f);
+        core.setAnalog(1, 0, 0f);
+        core.setAnalog(1, 1, 0f);
         if (audioTrack != null) { audioTrack.pause(); audioTrack.flush(); }
         Thread thread = emulationThread;
         if (thread != null && thread != Thread.currentThread()) {
@@ -81,6 +93,10 @@ final class BrumCoreView extends View implements Runnable {
             int next = pressed ? current | bit : current & ~bit;
             if (inputMask.compareAndSet(current, next)) return;
         }
+    }
+
+    void setAnalog(int stick, int axis, float value) {
+        core.setAnalog(stick, axis, value);
     }
 
     void setFastForward(boolean enabled) {
@@ -173,6 +189,9 @@ final class BrumCoreView extends View implements Runnable {
             displayTarget.set(target);
             canvas.drawBitmap(bitmap, source, target, paint);
         }
+        if (touchActive) {
+            canvas.drawCircle(touchScreenX, touchScreenY, 24f, reticlePaint);
+        }
     }
 
     @Override public boolean onTouchEvent(MotionEvent event) {
@@ -180,10 +199,15 @@ final class BrumCoreView extends View implements Runnable {
         if (action != MotionEvent.ACTION_DOWN && action != MotionEvent.ACTION_MOVE && action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL) return true;
         RectF target;
         synchronized (bitmapLock) { target = new RectF(displayTarget); }
-        boolean pressed = action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL && target.width() > 0 && target.height() > 0;
+        boolean inside = target.contains(event.getX(), event.getY());
+        boolean pressed = action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL && target.width() > 0 && target.height() > 0 && inside;
         float x = target.width() <= 0 ? 0 : ((event.getX() - target.left) / target.width()) * 2f - 1f;
         float y = target.height() <= 0 ? 0 : ((event.getY() - target.top) / target.height()) * 2f - 1f;
-        core.setPointer(x, y, pressed && target.contains(event.getX(), event.getY()));
+        touchActive = pressed;
+        touchScreenX = event.getX();
+        touchScreenY = event.getY();
+        core.setPointer(x, y, pressed);
+        postInvalidateOnAnimation();
         return true;
     }
 

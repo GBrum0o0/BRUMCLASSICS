@@ -14,6 +14,8 @@ const required = [
   'BRUMCLASSICSMobile/BridgeClient.swift', 'BRUMCLASSICSMobile/Models.swift',
   'BRUMCLASSICSMobile/NotificationsView.swift',
   'BRUMCLASSICSMobile/GamingModeView.swift',
+  'BRUMCLASSICSMobile/GamingModeComponents.swift',
+  'BRUMCLASSICSMobile/MurbRemoteGamepad.swift',
   'BRUMCLASSICSMobile/PersonalUpdateService.swift',
   'BRUMCLASSICSMobile/ProfileView.swift', 'BRUMCLASSICSMobile/BCardView.swift',
   'BRUMCLASSICSMobile/ROMFolderLibrary.swift',

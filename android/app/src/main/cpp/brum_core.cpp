@@ -250,6 +250,10 @@ public:
         pointerX = x; pointerY = y; pointerPressed = pressed;
     }
 
+    void setAnalog(unsigned stick, unsigned axis, int16_t value) {
+        if (stick < 2 && axis < 2) analogAxes[stick * 2 + axis].store(value, std::memory_order_relaxed);
+    }
+
     void persist() {
         if (!gameLoaded) return;
         void *memory = core.getMemoryData(BRUM_RETRO_MEMORY_SAVE_RAM);
@@ -323,6 +327,7 @@ public:
     double frameRate = 60.0;
     std::atomic<int16_t> pointerX{0}, pointerY{0};
     std::atomic<bool> pointerPressed{false};
+    std::atomic<int16_t> analogAxes[4]{{0}, {0}, {0}, {0}};
     bool shutdownRequested = false;
     HardwareContext hardware;
 
@@ -441,7 +446,9 @@ private:
     static size_t audioBatch(const int16_t *data, size_t frames) { pushAudio(data, frames * 2); return frames; }
     static void inputPoll() {}
     static int16_t inputState(unsigned port, unsigned device, unsigned index, unsigned id) {
-        CoreSession *session = activeSession; if (!session || port != 0 || index != 0) return 0;
+        CoreSession *session = activeSession; if (!session || port != 0) return 0;
+        if (device == BRUM_RETRO_DEVICE_ANALOG && index < 2 && id < 2) return session->analogAxes[index * 2 + id].load(std::memory_order_relaxed);
+        if (index != 0) return 0;
         if (device == BRUM_RETRO_DEVICE_JOYPAD && id <= 15) return (session->inputMask & (1u << id)) ? 1 : 0;
         if (device == BRUM_RETRO_DEVICE_POINTER) {
             if (id == BRUM_RETRO_DEVICE_ID_POINTER_X) return session->pointerX.load(std::memory_order_relaxed);
@@ -488,6 +495,15 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeSetPointer(JNIEnv *, jclass, jlong handle, jint x, jint y, jboolean pressed) {
     auto *session = reinterpret_cast<CoreSession *>(handle);
     if (session) session->setPointer(static_cast<int16_t>(std::clamp(x, -32767, 32767)), static_cast<int16_t>(std::clamp(y, -32767, 32767)), pressed == JNI_TRUE);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeSetAnalog(JNIEnv *, jclass, jlong handle, jint stick, jint axis, jint value) {
+    auto *session = reinterpret_cast<CoreSession *>(handle);
+    if (session && stick >= 0 && axis >= 0) {
+        session->setAnalog(static_cast<unsigned>(stick), static_cast<unsigned>(axis),
+                           static_cast<int16_t>(std::clamp(value, -32767, 32767)));
+    }
 }
 
 extern "C" JNIEXPORT jlong JNICALL

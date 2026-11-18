@@ -20,7 +20,12 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 28) {
-                HStack { BrumLogo(); Spacer(); ConnectionDot(state: store.connection) }.padding(.top, 8)
+                HStack(spacing: 10) {
+                    BrumLogo()
+                    Spacer()
+                    ConnectionDot(state: store.connection)
+                    TopControlAndSettingsActions(identifierPrefix: "home")
+                }.padding(.top, 8)
                 VStack(alignment: .leading, spacing: 8) {
                     Text(greeting).font(.system(size: 20, weight: .bold)).foregroundStyle(BrumTheme.primary)
                     Text("Sua biblioteca,\nem qualquer lugar.").font(.system(size: 40, weight: .black)).foregroundStyle(BrumTheme.text)

@@ -2,11 +2,13 @@ import SwiftUI
 import AVFoundation
 
 struct PairingScannerView: UIViewControllerRepresentable {
+    var validator: ((URL) -> Bool)? = nil
     let onCode: (URL) -> Void
     let onError: (String) -> Void
 
     func makeUIViewController(context: Context) -> ScannerController {
         let controller = ScannerController()
+        controller.validator = validator ?? { PairingPayload(url: $0) != nil }
         controller.onCode = onCode
         controller.onError = onError
         return controller
@@ -15,6 +17,7 @@ struct PairingScannerView: UIViewControllerRepresentable {
 }
 
 final class ScannerController: UIViewController, AVCaptureMetadataOutputObjectsDelegate {
+    var validator: ((URL) -> Bool)?
     var onCode: ((URL) -> Void)?
     var onError: ((String) -> Void)?
     private let session = AVCaptureSession()
@@ -43,7 +46,7 @@ final class ScannerController: UIViewController, AVCaptureMetadataOutputObjectsD
     override func viewWillDisappear(_ animated: Bool) { super.viewWillDisappear(animated); if session.isRunning { session.stopRunning() } }
 
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
-        guard !completed, let code = metadataObjects.first as? AVMetadataMachineReadableCodeObject, let raw = code.stringValue, let url = URL(string: raw), PairingPayload(url: url) != nil else { return }
+        guard !completed, let code = metadataObjects.first as? AVMetadataMachineReadableCodeObject, let raw = code.stringValue, let url = URL(string: raw), (validator?(url) ?? (PairingPayload(url: url) != nil)) else { return }
         completed = true; session.stopRunning(); AppHaptics.success(); onCode?(url)
     }
 }

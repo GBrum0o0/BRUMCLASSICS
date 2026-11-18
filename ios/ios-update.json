@@ -4,8 +4,8 @@
   "minimumIos": "16.0",
   "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.16.0",
   "notes": [
-    "O Gaming Mode abre os detalhes do jogo pela capa, com tempo jogado e progresso de conquistas quando disponível.",
-    "O ícone de controle mostra os dispositivos reconhecidos pelo celular.",
-    "A engrenagem dá acesso às configurações da conta RetroAchievements."
+    "Gaming Mode com detalhes completos do jogo (capa, informações, horas jogadas, conquistas RetroAchievements) e separação clara entre execução no iPhone e funções que dependem do PC.",
+    "Cabeçalho unificado com ícone de controle (controles físicos conectados, Gamepad Virtual e ponte Gamepad M.U.R.B LAN) e engrenagem de Configurações/RetroAchievements.",
+    "Gamepad Virtual multitoque aprimorado com D-Pad em cruz, ocultação PAD, mira de toque DS/3DS, controles físicos via GCController e segunda tela M.U.R.B em tempo real."
   ]
 }

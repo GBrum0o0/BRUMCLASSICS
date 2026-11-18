@@ -10,8 +10,8 @@
 
 <p align="center">
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.28"><strong>Windows 2.1.28</strong></a> ·
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.24.0"><strong>Android 0.24.0</strong></a> ·
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.0"><strong>iOS 0.15.0</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.26.0"><strong>Android 0.26.0</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.16.0"><strong>iOS 0.16.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
   <a href="PRIVACY.md">Privacidade</a> ·
   <a href="SECURITY.md">Segurança</a>
@@ -86,12 +86,12 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
 | Windows | 2.1.28 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.28) |
-| Android | 0.24.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.24.0) · [Guia](docs/MOVEL.md) |
-| iOS pessoal | 0.15.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.15.0) · [Guia](ios/README-IOS.md) |
+| Android | 0.26.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.26.0) · [Guia](docs/MOVEL.md) |
+| iOS pessoal | 0.16.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.16.0) · [Guia](ios/README-IOS.md) |
 
 Os hashes SHA-256 acompanham os arquivos publicados. O GitHub hospeda executáveis, APKs e IPAs somente em Releases; esses binários não entram no histórico do repositório.
 
-A versão pessoal para iPhone é compilada separadamente em **Actions → Build iOS pessoal**. O artefato contém um IPA sem assinatura para instalação com AltStore ou Sideloadly. Android 0.24.0 e iOS 0.15.0 incluem Gaming Mode, BRUM Core multicore e os novos núcleos GPL. O código móvel usa GPL-3.0-or-later; launcher de PC e marca permanecem sob licenças separadas. Consulte [o licenciamento móvel](MOBILE-LICENSING.md), [as instruções do iOS](ios/README-IOS.md) e a [política de cores integrados](docs/CORES-INTEGRADOS.md).
+A versão pessoal para iPhone é compilada separadamente em **Actions → Build iOS pessoal**. O artefato contém um IPA sem assinatura para instalação com Sideloadly, Brum iOS Bridge ou AltStore. Android 0.26.0 e iOS 0.16.0 incluem Gaming Mode renovado, BRUM Core multicore, conquistas RetroAchievements, Gamepad Virtual multitoque refinado e Gamepad M.U.R.B LAN com segunda tela DS/3DS. O código móvel usa GPL-3.0-or-later; launcher de PC e marca permanecem sob licenças separadas. Consulte [o licenciamento móvel](MOBILE-LICENSING.md), [as instruções do iOS](ios/README-IOS.md) e a [política de cores integrados](docs/CORES-INTEGRADOS.md).
 
 ## Versões atuais
 

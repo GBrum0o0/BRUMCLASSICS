@@ -4,13 +4,21 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.hardware.input.InputManager;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -24,6 +32,9 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 public final class IntegratedEmulatorActivity extends Activity {
     public static final String RESULT_GAME_ID = "gameId";
@@ -33,13 +44,29 @@ public final class IntegratedEmulatorActivity extends Activity {
         KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_Y, KeyEvent.KEYCODE_BUTTON_SELECT,
         KeyEvent.KEYCODE_BUTTON_START, KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
         KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_BUTTON_A,
-        KeyEvent.KEYCODE_BUTTON_X, KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_R1
+        KeyEvent.KEYCODE_BUTTON_X, KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_R1,
+        KeyEvent.KEYCODE_BUTTON_L2, KeyEvent.KEYCODE_BUTTON_R2,
+        KeyEvent.KEYCODE_BUTTON_THUMBL, KeyEvent.KEYCODE_BUTTON_THUMBR
     };
 
     private IntegratedEmulatorLaunch launch;
     private BrumCoreView emulatorView;
     private ParcelFileDescriptor romDescriptor;
     private boolean closing;
+    private final List<View> padOverlayViews = new ArrayList<>();
+    private VirtualDPadView dpadView;
+    private VirtualAnalogView analogView;
+    private Button controlsToggleButton;
+    private Button padModeButton;
+    private boolean manualControlsHidden;
+    private boolean autoHideWithController;
+    private boolean virtualHapticsEnabled = true;
+    private boolean useAnalogStick;
+    private final InputManager.InputDeviceListener inputListener = new InputManager.InputDeviceListener() {
+        @Override public void onInputDeviceAdded(int deviceId) { syncControllerOverlay(true); }
+        @Override public void onInputDeviceChanged(int deviceId) { syncControllerOverlay(false); }
+        @Override public void onInputDeviceRemoved(int deviceId) { syncControllerOverlay(true); }
+    };
 
     public static Intent intent(Context context, IntegratedEmulatorLaunch launch) {
         Intent intent = new Intent(context, IntegratedEmulatorActivity.class);
@@ -72,7 +99,12 @@ public final class IntegratedEmulatorActivity extends Activity {
             }
             BrumCoreBridge bridge = new BrumCoreBridge(corePath, romPath, launch);
             emulatorView = new BrumCoreView(this, bridge, this::showRuntimeFailure);
+            SharedPreferences prefs = getSharedPreferences("brum_mobile_prefs", MODE_PRIVATE);
+            virtualHapticsEnabled = prefs.getBoolean("virtual_haptics", true);
+            autoHideWithController = prefs.getBoolean("auto_hide_pad_with_controller", false);
+            if (prefs.getBoolean("default_fill_display", false)) emulatorView.toggleFillDisplay();
             setContentView(buildInterface());
+            syncControllerOverlay(false);
         } catch (Throwable error) {
             showFailure(error.getMessage() == null ? "O BRUM Core não conseguiu abrir este jogo." : error.getMessage());
         }
@@ -80,10 +112,13 @@ public final class IntegratedEmulatorActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume(); hideSystemUI();
+        getSystemService(InputManager.class).registerInputDeviceListener(inputListener, new Handler(Looper.getMainLooper()));
+        syncControllerOverlay(false);
         if (emulatorView != null) emulatorView.resumeEmulation();
     }
 
     @Override protected void onPause() {
+        getSystemService(InputManager.class).unregisterInputDeviceListener(inputListener);
         if (emulatorView != null) {
             emulatorView.pauseEmulation();
             try { SaveManifestStore.update(this, launch); } catch (Exception ignored) {}
@@ -115,12 +150,23 @@ public final class IntegratedEmulatorActivity extends Activity {
             float y = axis(event, MotionEvent.AXIS_HAT_Y, MotionEvent.AXIS_Y);
             emulatorView.setButton(6, x < -0.45f); emulatorView.setButton(7, x > 0.45f);
             emulatorView.setButton(4, y < -0.45f); emulatorView.setButton(5, y > 0.45f);
+            emulatorView.setAnalog(0, 0, clampAxis(event.getAxisValue(MotionEvent.AXIS_X)));
+            emulatorView.setAnalog(0, 1, clampAxis(event.getAxisValue(MotionEvent.AXIS_Y)));
+            emulatorView.setAnalog(1, 0, clampAxis(event.getAxisValue(MotionEvent.AXIS_Z)));
+            emulatorView.setAnalog(1, 1, clampAxis(event.getAxisValue(MotionEvent.AXIS_RZ)));
+            emulatorView.setButton(12, event.getAxisValue(MotionEvent.AXIS_LTRIGGER) > 0.25f);
+            emulatorView.setButton(13, event.getAxisValue(MotionEvent.AXIS_RTRIGGER) > 0.25f);
             return true;
         }
         return super.dispatchGenericMotionEvent(event);
     }
 
+    private static float clampAxis(float value) {
+        return Math.abs(value) < 0.08f ? 0f : Math.max(-1f, Math.min(1f, value));
+    }
+
     private FrameLayout buildInterface() {
+        padOverlayViews.clear();
         FrameLayout root = new FrameLayout(this); root.setBackgroundColor(Color.BLACK);
         root.addView(emulatorView, new FrameLayout.LayoutParams(-1, -1));
 
@@ -129,38 +175,168 @@ public final class IntegratedEmulatorActivity extends Activity {
         FrameLayout.LayoutParams exitParams = frame(104, 44, Gravity.TOP | Gravity.START); exitParams.setMargins(dp(14), dp(12), 0, 0); root.addView(exit, exitParams);
 
         TextView title = label(launch.title, 13, Color.WHITE, true); title.setSingleLine(true); title.setGravity(Gravity.CENTER);
-        FrameLayout.LayoutParams titleParams = frame(300, 42, Gravity.TOP | Gravity.CENTER_HORIZONTAL); titleParams.topMargin = dp(13); root.addView(title, titleParams);
+        FrameLayout.LayoutParams titleParams = frame(240, 42, Gravity.TOP | Gravity.CENTER_HORIZONTAL); titleParams.topMargin = dp(13); root.addView(title, titleParams);
 
         LinearLayout tools = new LinearLayout(this); tools.setOrientation(LinearLayout.HORIZONTAL); tools.setGravity(Gravity.CENTER); tools.setPadding(0, 0, 0, 0);
-        Button states = control("SLOTS"); Button display = control("INTEIRA"); Button fast = control("≫  5×");
+        controlsToggleButton = control("PAD");
+        Button states = control("SLOTS");
+        Button display = control(emulatorView.fillsDisplay() ? "CORTAR" : "INTEIRA");
+        Button fast = control("≫  5×");
+        controlsToggleButton.setOnClickListener(v -> {
+            manualControlsHidden = !manualControlsHidden;
+            syncControllerOverlay(false);
+        });
         states.setOnClickListener(v -> showStateMenu());
         display.setOnClickListener(v -> { emulatorView.toggleFillDisplay(); display.setText(emulatorView.fillsDisplay() ? "CORTAR" : "INTEIRA"); });
         fast.setOnClickListener(v -> { emulatorView.setFastForward(!emulatorView.isFastForward()); fast.setTextColor(emulatorView.isFastForward() ? Color.BLACK : Color.WHITE); fast.setBackground(controlBackground(emulatorView.isFastForward())); });
-        tools.addView(states, new LinearLayout.LayoutParams(dp(66), dp(44)));
-        LinearLayout.LayoutParams displayParams = new LinearLayout.LayoutParams(dp(100), dp(44)); displayParams.leftMargin = dp(8); tools.addView(display, displayParams);
-        LinearLayout.LayoutParams fastParams = new LinearLayout.LayoutParams(dp(82), dp(44)); fastParams.leftMargin = dp(8); tools.addView(fast, fastParams);
-        FrameLayout.LayoutParams toolsParams = frame(272, 44, Gravity.TOP | Gravity.END); toolsParams.setMargins(0, dp(12), dp(14), 0); root.addView(tools, toolsParams);
+        tools.addView(controlsToggleButton, new LinearLayout.LayoutParams(dp(56), dp(44)));
+        LinearLayout.LayoutParams stateParams = new LinearLayout.LayoutParams(dp(64), dp(44)); stateParams.leftMargin = dp(6); tools.addView(states, stateParams);
+        LinearLayout.LayoutParams displayParams = new LinearLayout.LayoutParams(dp(86), dp(44)); displayParams.leftMargin = dp(6); tools.addView(display, displayParams);
+        LinearLayout.LayoutParams fastParams = new LinearLayout.LayoutParams(dp(74), dp(44)); fastParams.leftMargin = dp(6); tools.addView(fast, fastParams);
+        FrameLayout.LayoutParams toolsParams = frame(304, 44, Gravity.TOP | Gravity.END); toolsParams.setMargins(0, dp(12), dp(14), 0); root.addView(tools, toolsParams);
 
-        addPadButton(root, "↑", 4, Gravity.BOTTOM | Gravity.START, 78, 126);
-        addPadButton(root, "↓", 5, Gravity.BOTTOM | Gravity.START, 78, 18);
-        addPadButton(root, "←", 6, Gravity.BOTTOM | Gravity.START, 20, 72);
-        addPadButton(root, "→", 7, Gravity.BOTTOM | Gravity.START, 136, 72);
-        addPadButton(root, "B", 0, Gravity.BOTTOM | Gravity.END, 136, 42);
-        addPadButton(root, "A", 8, Gravity.BOTTOM | Gravity.END, 34, 88);
-        addPadButton(root, "Y", 1, Gravity.BOTTOM | Gravity.END, 194, 88);
-        addPadButton(root, "X", 9, Gravity.BOTTOM | Gravity.END, 136, 144);
+        String sys = launch.systemId == null ? "" : launch.systemId.toLowerCase(Locale.ROOT);
+        boolean isAnalog = "ps2".equals(sys);
+        useAnalogStick = isAnalog;
 
-        addShoulderButton(root, "L", 10, Gravity.TOP | Gravity.START, 16);
-        addShoulderButton(root, "R", 11, Gravity.TOP | Gravity.END, 16);
+        dpadView = new VirtualDPadView(this);
+        FrameLayout.LayoutParams dpadParams = frame(152, 152, Gravity.BOTTOM | Gravity.START);
+        dpadParams.setMargins(dp(20), 0, 0, dp(20));
+        root.addView(dpadView, dpadParams);
+        padOverlayViews.add(dpadView);
 
-        Button select = gameButton("SELECT", 2); Button start = gameButton("START", 3);
-        FrameLayout.LayoutParams selectParams = frame(82, 40, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL); selectParams.setMargins(0, 0, dp(47), dp(18)); root.addView(select, selectParams);
-        FrameLayout.LayoutParams startParams = frame(82, 40, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL); startParams.setMargins(dp(47), 0, 0, dp(18)); root.addView(start, startParams);
+        if (isAnalog) {
+            analogView = new VirtualAnalogView(this);
+            FrameLayout.LayoutParams stickParams = frame(152, 152, Gravity.BOTTOM | Gravity.START);
+            stickParams.setMargins(dp(20), 0, 0, dp(20));
+            root.addView(analogView, stickParams);
+            padOverlayViews.add(analogView);
+
+            padModeButton = control("D-PAD");
+            padModeButton.setOnClickListener(v -> toggleAnalogPadMode());
+            FrameLayout.LayoutParams modeParams = frame(72, 34, Gravity.BOTTOM | Gravity.START);
+            modeParams.setMargins(dp(20), 0, 0, dp(180));
+            root.addView(padModeButton, modeParams);
+            padOverlayViews.add(padModeButton);
+            updateAnalogPadVisibility(false);
+        }
+
+        buildActionButtonsForSystem(root, sys);
 
         String raStatus = launch.retroAchievementsGameId > 0 ? " · RA ID " + launch.retroAchievementsGameId + " (PREPARAÇÃO)" : "";
-        TextView status = label("BRUM CORE · " + launch.coreDisplayName + " · " + launch.systemId.toUpperCase() + raStatus, 9, ACCENT, true);
+        TextView status = label("BRUM CORE · " + launch.coreDisplayName + " · " + launch.systemId.toUpperCase(Locale.ROOT) + raStatus, 9, ACCENT, true);
         FrameLayout.LayoutParams statusParams = frame(260, 28, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL); statusParams.bottomMargin = dp(65); root.addView(status, statusParams);
         return root;
+    }
+
+    private void buildActionButtonsForSystem(FrameLayout root, String sys) {
+        boolean isTwoBtn = "gb".equals(sys) || "gbc".equals(sys) || "nes".equals(sys) || "pce".equals(sys)
+            || "sms".equals(sys) || "gg".equals(sys) || "gba".equals(sys);
+        boolean hasShoulders = !("gb".equals(sys) || "gbc".equals(sys) || "nes".equals(sys)
+            || "pce".equals(sys) || "sms".equals(sys) || "gg".equals(sys) || "ws".equals(sys) || "wsc".equals(sys));
+        if ("neogeo".equals(sys)) {
+            addPadButton(root, "A", 0, Gravity.BOTTOM | Gravity.END, 198, 42);
+            addPadButton(root, "B", 8, Gravity.BOTTOM | Gravity.END, 138, 42);
+            addPadButton(root, "C", 1, Gravity.BOTTOM | Gravity.END, 78, 42);
+            addPadButton(root, "D", 9, Gravity.BOTTOM | Gravity.END, 18, 42);
+        } else if ("ws".equals(sys) || "wsc".equals(sys)) {
+            addPadButton(root, "Y▲", 13, Gravity.BOTTOM | Gravity.END, 96, 152);
+            addPadButton(root, "Y◀", 10, Gravity.BOTTOM | Gravity.END, 152, 98);
+            addPadButton(root, "Y▶", 11, Gravity.BOTTOM | Gravity.END, 40, 98);
+            addPadButton(root, "Y▼", 12, Gravity.BOTTOM | Gravity.END, 96, 44);
+            addPadButton(root, "B", 0, Gravity.BOTTOM | Gravity.END, 152, 24);
+            addPadButton(root, "A", 8, Gravity.BOTTOM | Gravity.END, 40, 24);
+        } else if (isTwoBtn) {
+            boolean sms = "sms".equals(sys) || "gg".equals(sys);
+            boolean pce = "pce".equals(sys);
+            addPadButton(root, pce ? "II" : sms ? "1" : "B", 0, Gravity.BOTTOM | Gravity.END, 118, 56);
+            addPadButton(root, pce ? "I" : sms ? "2" : "A", 8, Gravity.BOTTOM | Gravity.END, 34, 88);
+        } else {
+            boolean ps = "ps2".equals(sys);
+            addPadButton(root, ps ? "×" : "B", 0, Gravity.BOTTOM | Gravity.END, 126, 36);
+            addPadButton(root, ps ? "○" : "A", 8, Gravity.BOTTOM | Gravity.END, 34, 86);
+            addPadButton(root, ps ? "□" : "Y", 1, Gravity.BOTTOM | Gravity.END, 184, 86);
+            addPadButton(root, ps ? "△" : "X", 9, Gravity.BOTTOM | Gravity.END, 126, 138);
+        }
+
+        if (hasShoulders) {
+            boolean ps = "ps2".equals(sys);
+            addShoulderButton(root, ps ? "L1" : "L", 10, Gravity.TOP | Gravity.START, 16);
+            addShoulderButton(root, ps ? "R1" : "R", 11, Gravity.TOP | Gravity.END, 16);
+            if (ps) {
+                addShoulderButton(root, "L2", 12, Gravity.TOP | Gravity.START, 92);
+                addShoulderButton(root, "R2", 13, Gravity.TOP | Gravity.END, 92);
+            }
+        }
+
+        if (!"sms".equals(sys) && !"gg".equals(sys)) {
+            Button select = gameButton("ws".equals(sys) || "wsc".equals(sys) ? "GIRAR" : "SELECT", 2);
+            FrameLayout.LayoutParams selectParams = frame(82, 40, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+            selectParams.setMargins(0, 0, dp(47), dp(18));
+            root.addView(select, selectParams);
+            padOverlayViews.add(select);
+        }
+        Button start = gameButton("START", 3);
+        FrameLayout.LayoutParams startParams = frame(82, 40, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        startParams.setMargins("sms".equals(sys) || "gg".equals(sys) ? 0 : dp(47), 0, 0, dp(18));
+        root.addView(start, startParams);
+        padOverlayViews.add(start);
+    }
+
+    private void toggleAnalogPadMode() {
+        useAnalogStick = !useAnalogStick;
+        if (emulatorView != null) {
+            emulatorView.setAnalog(0, 0, 0f);
+            emulatorView.setAnalog(0, 1, 0f);
+            for (int bit = 4; bit <= 7; bit++) emulatorView.setButton(bit, false);
+        }
+        if (padModeButton != null) padModeButton.setText(useAnalogStick ? "D-PAD" : "STICK");
+        syncControllerOverlay(false);
+    }
+
+    private boolean hasPhysicalController() {
+        InputManager manager = getSystemService(InputManager.class);
+        if (manager == null) return false;
+        for (int id : manager.getInputDeviceIds()) {
+            InputDevice device = manager.getInputDevice(id);
+            if (device == null || device.isVirtual()) continue;
+            if (Build.VERSION.SDK_INT >= 27 && !device.isEnabled()) continue;
+            if (device.supportsSource(InputDevice.SOURCE_GAMEPAD) || device.supportsSource(InputDevice.SOURCE_JOYSTICK)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void updateAnalogPadVisibility(boolean hidden) {
+        if (analogView == null) {
+            if (dpadView != null) dpadView.setVisibility(hidden ? View.GONE : View.VISIBLE);
+            return;
+        }
+        analogView.setVisibility(!hidden && useAnalogStick ? View.VISIBLE : View.GONE);
+        if (dpadView != null) dpadView.setVisibility(!hidden && !useAnalogStick ? View.VISIBLE : View.GONE);
+        if (padModeButton != null) padModeButton.setVisibility(hidden ? View.GONE : View.VISIBLE);
+    }
+
+    private void syncControllerOverlay(boolean notify) {
+        boolean hasPhysical = hasPhysicalController();
+        boolean hidden = manualControlsHidden || (autoHideWithController && hasPhysical);
+        for (View view : padOverlayViews) {
+            view.setVisibility(hidden ? View.GONE : View.VISIBLE);
+        }
+        updateAnalogPadVisibility(hidden);
+        if (hidden && emulatorView != null) {
+            for (int id = 0; id < 16; id++) emulatorView.setButton(id, false);
+            emulatorView.setAnalog(0, 0, 0f);
+            emulatorView.setAnalog(0, 1, 0f);
+        }
+        if (controlsToggleButton != null) {
+            controlsToggleButton.setTextColor(hidden ? Color.BLACK : (hasPhysical ? ACCENT : Color.WHITE));
+            controlsToggleButton.setBackground(controlBackground(hidden));
+        }
+        if (notify) {
+            Toast.makeText(this, hasPhysical ? "Controle físico conectado." : "Controle desconectado · modo tátil ativo.", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void showStateMenu() {
@@ -205,17 +381,24 @@ public final class IntegratedEmulatorActivity extends Activity {
     private void addPadButton(FrameLayout root, String text, int id, int gravity, int horizontal, int bottom) {
         Button button = gameButton(text, id);
         FrameLayout.LayoutParams params = frame(58, 58, gravity); params.setMargins(dp(horizontal), 0, dp(horizontal), dp(bottom)); root.addView(button, params);
+        padOverlayViews.add(button);
     }
 
     private void addShoulderButton(FrameLayout root, String text, int id, int gravity, int horizontal) {
         Button button = gameButton(text, id);
         FrameLayout.LayoutParams params = frame(68, 42, gravity); params.setMargins(dp(horizontal), dp(66), dp(horizontal), 0); root.addView(button, params);
+        padOverlayViews.add(button);
     }
 
     private Button gameButton(String text, int id) {
         Button button = control(text); button.setTextSize(text.length() > 2 ? 9 : 20); button.setAlpha(.76f);
         button.setOnTouchListener((view, event) -> {
-            if (event.getActionMasked() == MotionEvent.ACTION_DOWN) { emulatorView.setButton(id, true); view.setPressed(true); return true; }
+            if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                emulatorView.setButton(id, true);
+                view.setPressed(true);
+                if (virtualHapticsEnabled) view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+                return true;
+            }
             if (event.getActionMasked() == MotionEvent.ACTION_UP || event.getActionMasked() == MotionEvent.ACTION_CANCEL) { emulatorView.setButton(id, false); view.setPressed(false); return true; }
             return true;
         });
@@ -285,6 +468,126 @@ public final class IntegratedEmulatorActivity extends Activity {
             if (controller != null) { controller.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars()); controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE); }
         } else {
             getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+        }
+    }
+
+    private final class VirtualDPadView extends View {
+        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint cross = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint arrow = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private int mask;
+
+        VirtualDPadView(Context context) {
+            super(context);
+            cross.setColor(Color.argb(30, 255, 255, 255));
+            arrow.setTextAlign(Paint.Align.CENTER);
+            arrow.setTypeface(Typeface.DEFAULT_BOLD);
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            float cx = getWidth() / 2f, cy = getHeight() / 2f;
+            float r = Math.min(cx, cy) - dp(2);
+            fill.setStyle(Paint.Style.FILL);
+            fill.setColor(Color.argb(210, 20, 23, 29));
+            canvas.drawCircle(cx, cy, r, fill);
+            fill.setStyle(Paint.Style.STROKE);
+            fill.setStrokeWidth(dp(2));
+            fill.setColor(Color.argb(80, 255, 255, 255));
+            canvas.drawCircle(cx, cy, r, fill);
+            float armLong = r * 0.72f, armHalf = dp(16);
+            canvas.drawRoundRect(cx - armLong, cy - armHalf, cx + armLong, cy + armHalf, dp(6), dp(6), cross);
+            canvas.drawRoundRect(cx - armHalf, cy - armLong, cx + armHalf, cy + armLong, dp(6), dp(6), cross);
+            arrow.setTextSize(dp(18));
+            drawDir(canvas, 1, "▲", cx, cy - r * 0.54f + dp(6));
+            drawDir(canvas, 2, "▼", cx, cy + r * 0.54f + dp(6));
+            drawDir(canvas, 4, "◀", cx - r * 0.54f, cy + dp(6));
+            drawDir(canvas, 8, "▶", cx + r * 0.54f, cy + dp(6));
+        }
+
+        private void drawDir(Canvas canvas, int bit, String symbol, float x, float y) {
+            arrow.setColor((mask & bit) != 0 ? ACCENT : Color.WHITE);
+            canvas.drawText(symbol, x, y, arrow);
+        }
+
+        @Override public boolean onTouchEvent(MotionEvent event) {
+            int action = event.getActionMasked();
+            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                applyMask(0);
+                return true;
+            }
+            float dx = event.getX() - getWidth() / 2f;
+            float dy = event.getY() - getHeight() / 2f;
+            float threshold = (Math.min(getWidth(), getHeight()) / 2f) * 0.18f;
+            int next = 0;
+            if (dy < -threshold) next |= 1;
+            if (dy > threshold) next |= 2;
+            if (dx < -threshold) next |= 4;
+            if (dx > threshold) next |= 8;
+            if (action == MotionEvent.ACTION_DOWN && next != 0 && virtualHapticsEnabled) {
+                performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            }
+            applyMask(next);
+            return true;
+        }
+
+        private void applyMask(int next) {
+            if (mask == next) return;
+            mask = next;
+            if (emulatorView != null) {
+                emulatorView.setButton(4, (mask & 1) != 0);
+                emulatorView.setButton(5, (mask & 2) != 0);
+                emulatorView.setButton(6, (mask & 4) != 0);
+                emulatorView.setButton(7, (mask & 8) != 0);
+            }
+            invalidate();
+        }
+    }
+
+    private final class VirtualAnalogView extends View {
+        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private float nx, ny;
+
+        VirtualAnalogView(Context context) {
+            super(context);
+            ring.setStyle(Paint.Style.STROKE);
+            ring.setStrokeWidth(dp(2));
+            ring.setColor(Color.argb(80, 255, 255, 255));
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            float cx = getWidth() / 2f, cy = getHeight() / 2f;
+            float r = Math.min(cx, cy) - dp(2);
+            fill.setColor(Color.argb(210, 20, 23, 29));
+            canvas.drawCircle(cx, cy, r, fill);
+            canvas.drawCircle(cx, cy, r, ring);
+            float knobR = dp(22);
+            float travel = Math.max(1f, r - knobR - dp(4));
+            fill.setColor(Color.argb(235, 157, 255, 59));
+            canvas.drawCircle(cx + nx * travel, cy + ny * travel, knobR, fill);
+        }
+
+        @Override public boolean onTouchEvent(MotionEvent event) {
+            int action = event.getActionMasked();
+            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                nx = 0f; ny = 0f;
+                if (emulatorView != null) { emulatorView.setAnalog(0, 0, 0f); emulatorView.setAnalog(0, 1, 0f); }
+                invalidate();
+                return true;
+            }
+            float cx = getWidth() / 2f, cy = getHeight() / 2f;
+            float travel = Math.max(1f, Math.min(cx, cy) - dp(26));
+            float dx = (event.getX() - cx) / travel;
+            float dy = (event.getY() - cy) / travel;
+            float mag = (float) Math.hypot(dx, dy);
+            nx = mag > 1f ? dx / mag : dx;
+            ny = mag > 1f ? dy / mag : dy;
+            if (emulatorView != null) {
+                emulatorView.setAnalog(0, 0, nx);
+                emulatorView.setAnalog(0, 1, ny);
+            }
+            invalidate();
+            return true;
         }
     }
 }

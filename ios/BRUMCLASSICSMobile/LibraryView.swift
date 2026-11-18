@@ -58,5 +58,5 @@ struct FilterChip: View {
 
 struct PageHeader: View {
     let kicker: String; let title: String; let subtitle: String
-    var body: some View { VStack(alignment: .leading, spacing: 7) { HStack { BrumLogo(); Spacer(); Text(kicker).font(.caption2.bold()).tracking(1.7).foregroundStyle(BrumTheme.muted) }; Text(title).font(.system(size: 36, weight: .black)).foregroundStyle(BrumTheme.text).padding(.top, 18); Text(subtitle.uppercased()).font(.caption.bold()).tracking(1).foregroundStyle(BrumTheme.muted) } }
+    var body: some View { VStack(alignment: .leading, spacing: 7) { HStack(spacing: 10) { BrumLogo(); Spacer(); TopControlAndSettingsActions(identifierPrefix: "page") }; Text(title).font(.system(size: 36, weight: .black)).foregroundStyle(BrumTheme.text).padding(.top, 18); HStack { Text(subtitle.uppercased()).font(.caption.bold()).tracking(1).foregroundStyle(BrumTheme.muted); Spacer(); Text(kicker).font(.caption2.bold()).tracking(1.7).foregroundStyle(BrumTheme.muted) } } }
 }

@@ -212,7 +212,7 @@ private struct GamingROMDetailView: View {
     @State private var confirmNativeUpload = false
     @State private var confirmNativeDownload = false
     @State private var actionMessage = ""
-    @State private var showAssociation = false
+    @State private var associationTarget: PocketClassic?
 
     private var record: PocketClassic? {
         pocket.games.first { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }
@@ -256,13 +256,21 @@ private struct GamingROMDetailView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     GamingHero(title: rom.title, platform: system?.rawValue.uppercased() ?? "CLASSICS",
                                artwork: GamingArtwork(game: pocket.launcherGame(for: rom, launcher: store), rom: rom)) {
-                        GamingMetrics(time: localTime, timeLabel: "Tempo neste iPhone", earned: progress?.unlocked,
-                                      total: progress?.achievements.count)
+                        VStack(alignment: .leading, spacing: 10) {
+                            ExecutionBadge(kind: installedCore != nil ? .onPhone : canUseRetroArch ? .externalApp : .unavailable)
+                            GamingMetrics(time: localTime, timeLabel: "Tempo neste iPhone", earned: progress?.unlocked,
+                                          total: progress?.achievements.count)
+                        }
                     }
                     BrumCard {
                         VStack(alignment: .leading, spacing: 8) {
                             BrumSectionLabel(text: "EXECUÇÃO NESTE IPHONE")
                             Text(routeDescription).font(.subheadline).foregroundStyle(BrumTheme.muted)
+                            Text(executionScopeSummary).font(.caption).foregroundStyle(BrumTheme.muted)
+                            if system == .nintendoDS || system == .nintendo3DS {
+                                Text("Segunda tela e toque: \(system == .nintendoDS ? "SkyEmu oferece 8 layouts de tela dupla e toque direto integrado." : "Azahar 3DS suporta tela dupla e toque na build experimental.")")
+                                    .font(.caption2).foregroundStyle(BrumTheme.primary)
+                            }
                             if system == .nintendo3DS {
                                 Text("Build \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?") · Azahar: \(installedCore == nil ? "arquivo ausente" : "arquivo presente")")
                                     .font(.caption2).foregroundStyle(BrumTheme.muted)
@@ -270,6 +278,14 @@ private struct GamingROMDetailView: View {
                             }
                         }
                     }
+                    GamingInfoCard(title: "Informações da ROM", items: [
+                        GamingInfoItem(label: "Sistema", value: system.map { MurbProtocol.displaySystemName($0.rawValue) } ?? "Não identificado"),
+                        GamingInfoItem(label: "Núcleo", value: installedCore.map { "\($0.displayName) (\($0.license))" } ?? (canUseRetroArch ? "RetroArch externo" : "Sem núcleo instalado")),
+                        GamingInfoItem(label: "Arquivo", value: rom.filename),
+                        GamingInfoItem(label: "Tamanho", value: ByteCountFormatter.string(fromByteCount: rom.fileSize, countStyle: .file)),
+                        GamingInfoItem(label: "RetroAchievements", value: Int(record?.retroAchievementID ?? "").map { "ID \($0)" } ?? "Não vinculado"),
+                        GamingInfoItem(label: "Launcher PC", value: linkedPCGame?.title ?? "Não vinculado")
+                    ])
                     if let core = installedCore {
                         Button { launchIntegrated = true } label: {
                             Text("\(CoreRegistry.experimental.contains(core) ? "TESTAR" : "JOGAR") NO BRUM CORE · \(core.displayName.uppercased())").frame(maxWidth: .infinity)
@@ -309,21 +325,21 @@ private struct GamingROMDetailView: View {
                     GamingAchievements(title: "RetroAchievements", items: progress?.achievements ?? [],
                                        earned: progress?.unlocked, total: progress?.achievements.count,
                                        emptyMessage: localAchievementMessage)
-                    if let record {
-                        Button(Int(record.retroAchievementID) == nil ? "Vincular jogo ao RetroAchievements" : "Ver vínculo e sincronização") {
-                            showAssociation = true
-                        }.font(.subheadline.weight(.semibold)).tint(BrumTheme.primary)
-                    }
+                    Button(Int(record?.retroAchievementID ?? "") == nil ? "Vincular jogo ao RetroAchievements" : "Ver vínculo e sincronização") {
+                        if let record {
+                            associationTarget = record
+                        } else {
+                            Task { associationTarget = await pocket.ensureClassicRecord(for: rom) }
+                        }
+                    }.font(.subheadline.weight(.semibold)).tint(BrumTheme.primary)
                     if !actionMessage.isEmpty { Text(actionMessage).font(.caption).foregroundStyle(BrumTheme.muted) }
                     if let message = pocket.message { Text(message).font(.caption).foregroundStyle(.orange) }
                 }.frame(maxWidth: 1000, alignment: .leading).padding(20).frame(maxWidth: .infinity)
             }
         }.background(BrumTheme.background.ignoresSafeArea())
-        .sheet(isPresented: $showAssociation) {
-            if let record {
-                NavigationStack { PocketGameView(id: record.id) }
-                    .preferredColorScheme(.dark)
-            }
+        .sheet(item: $associationTarget) { target in
+            NavigationStack { PocketGameView(id: target.id) }
+                .preferredColorScheme(.dark)
         }
         .onAppear { GamingOrientation.request(.landscape) }
         .sheet(item: $pocket.pendingROMShare) { ticket in
@@ -363,6 +379,13 @@ private struct GamingROMDetailView: View {
         if Int(record?.retroAchievementID ?? "") == nil { return "Vincule este jogo ao RetroAchievements para consultar o progresso." }
         if progress != nil { return "O RetroAchievements não retornou conquistas para este título." }
         return "O progresso aparece após sincronizar o jogo vinculado."
+    }
+
+    private var executionScopeSummary: String {
+        if installedCore != nil {
+            return "No celular (offline): emulação, gamepad virtual/físico e saves locais. Depende do PC/rede: sincronizar save nativo, iniciar no computador e consultar RetroAchievements."
+        }
+        return "No celular: execução externa via RetroArch quando suportado. Depende do PC/rede: B-CARD no computador e sincronização."
     }
 
     private var routeDescription: String {
@@ -411,6 +434,7 @@ private struct GamingGameView: View {
     @State private var launchState = ""
     @State private var launching = false
     @State private var openingClient = false
+    @State private var showMurbRemote = false
 
     private var streaming: StreamingStatus? { store.snapshot.experience?.streaming }
 
@@ -423,12 +447,27 @@ private struct GamingGameView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     GamingHero(title: game.title, platform: game.platform, artwork: GamingArtwork(game: game)) {
-                        GamingMetrics(time: game.playtimeLabel, timeLabel: "Tempo jogado",
-                                      earned: hasAchievementTotals ? game.achievementsCollected : nil,
-                                      total: hasAchievementTotals ? game.achievementsTotal : nil)
+                        VStack(alignment: .leading, spacing: 10) {
+                            ExecutionBadge(kind: game.installed ? .dependsOnPC : .unavailable)
+                            GamingMetrics(time: game.playtimeLabel, timeLabel: "Tempo jogado",
+                                          earned: hasAchievementTotals ? game.achievementsCollected : nil,
+                                          total: hasAchievementTotals ? game.achievementsTotal : nil)
+                        }
                     }
+                    GamingInfoCard(title: "Informações do jogo", items: [
+                        GamingInfoItem(label: "Plataforma", value: game.platform),
+                        GamingInfoItem(label: "Gênero", value: game.genre),
+                        GamingInfoItem(label: "Origem", value: game.store),
+                        GamingInfoItem(label: "Status", value: game.statusLabel),
+                        GamingInfoItem(label: "Tamanho", value: game.sizeBytes > 0 ? ByteCountFormatter.string(fromByteCount: game.sizeBytes, countStyle: .file) : ""),
+                        GamingInfoItem(label: "Execução", value: "Depende do PC (B-CARD / Streaming / M.U.R.B)")
+                    ])
                     Button(action: playStream) { HStack { if launching { ProgressView().tint(.black) }; Text(streamPlayLabel) }.frame(maxWidth: .infinity) }
                         .buttonStyle(PrimaryButtonStyle()).disabled(!canPlay || launching).opacity(canPlay ? 1 : 0.38)
+                    Button { showMurbRemote = true } label: {
+                        Text("USAR GAMEPAD M.U.R.B PARA ESTE JOGO NO PC").font(.caption.bold()).frame(maxWidth: .infinity).frame(height: 44)
+                    }
+                    .buttonStyle(.bordered).tint(BrumTheme.primary)
                     Button(action: playOnPC) { Text("SOMENTE INICIAR NO COMPUTADOR").font(.caption.bold()).frame(maxWidth: .infinity).frame(height: 44) }
                         .buttonStyle(.bordered).tint(BrumTheme.primary).disabled(!canStartOnPC || launching).opacity(canStartOnPC ? 1 : 0.38)
                     if !launchState.isEmpty { Text(launchState).font(.caption).foregroundStyle(launchState.contains("não") ? Color.orange : BrumTheme.primary) }
@@ -450,6 +489,10 @@ private struct GamingGameView: View {
             }
         }.background(BrumTheme.background.ignoresSafeArea())
         .onAppear { GamingOrientation.request(.landscape) }
+        .sheet(isPresented: $showMurbRemote) {
+            MurbRemoteGamepadLauncherSheet()
+                .preferredColorScheme(.dark)
+        }
     }
 
     private var routeLabel: String { "PC · CANAL SEGURO" }

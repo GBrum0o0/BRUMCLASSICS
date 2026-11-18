@@ -14,8 +14,22 @@ struct GameDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     GameCoverView(game: game, cornerRadius: 16).aspectRatio(0.72, contentMode: .fit).frame(maxWidth: 310).frame(maxWidth: .infinity)
-                    VStack(alignment: .leading, spacing: 8) { Text(game.title).font(.system(size: 34, weight: .black)).foregroundStyle(BrumTheme.text); Text("\(game.platform.uppercased()) · \(game.genre.uppercased())").font(.caption.bold()).tracking(1).foregroundStyle(BrumTheme.primary); Text(game.description).font(.body).foregroundStyle(BrumTheme.muted) }
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            ExecutionBadge(kind: game.installed ? .dependsOnPC : .unavailable)
+                            Spacer()
+                        }
+                        Text(game.title).font(.system(size: 34, weight: .black)).foregroundStyle(BrumTheme.text)
+                        Text("\(game.platform.uppercased()) · \(game.genre.uppercased())").font(.caption.bold()).tracking(1).foregroundStyle(BrumTheme.primary)
+                        Text(game.description).font(.body).foregroundStyle(BrumTheme.muted)
+                    }
                     HStack { DetailMetric(label: "TEMPO", value: game.playtimeLabel); DetailMetric(label: "CONQUISTAS", value: game.achievementsAvailable || game.allowsManualAchievements ? "\(game.achievementsCollected ?? 0)/\(game.achievementsTotal ?? 0)" : "INDISP."); DetailMetric(label: "STATUS", value: game.statusLabel) }
+                    GamingInfoCard(title: "Informações do jogo", items: [
+                        GamingInfoItem(label: "Plataforma", value: game.platform),
+                        GamingInfoItem(label: "Loja / Origem", value: game.store),
+                        GamingInfoItem(label: "Tamanho", value: game.sizeBytes > 0 ? ByteCountFormatter.string(fromByteCount: game.sizeBytes, countStyle: .file) : ""),
+                        GamingInfoItem(label: "Execução", value: game.installed ? "Computador (B-CARD / Streaming / M.U.R.B)" : "Instalação não confirmada no PC")
+                    ])
                     HStack { Button(game.favorite ? "REMOVER FAVORITO" : "FAVORITAR") { Task { await store.setLibraryState(game: game, favorite: !game.favorite, wantToPlay: game.wantToPlay) } }; Button(game.wantToPlay ? "REMOVER DA LISTA" : "QUERO JOGAR") { Task { await store.setLibraryState(game: game, favorite: game.favorite, wantToPlay: !game.wantToPlay) } } }.font(.caption.bold()).foregroundStyle(BrumTheme.primary)
                     NotesSummary(notes: game.notes) { editNotes = true }
                     if game.installed { Button("ABRIR B-CARD") { showBCard = true }.buttonStyle(PrimaryButtonStyle()) }
@@ -72,7 +86,18 @@ struct AchievementList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            BrumSectionLabel(text: "CONQUISTAS")
+            BrumSectionLabel(text: game.isClassic && game.achievementsAvailable ? "CONQUISTAS · RETROACHIEVEMENTS" : "CONQUISTAS")
+            if let total = game.achievementsTotal, total > 0, let collected = game.achievementsCollected {
+                HStack {
+                    Text("\(collected) de \(total) desbloqueadas")
+                        .font(.caption.bold()).foregroundStyle(BrumTheme.primary)
+                    Spacer()
+                    Text("\(game.achievementProgress)%")
+                        .font(.caption.bold()).foregroundStyle(BrumTheme.muted)
+                }
+                ProgressView(value: GamingAchievements.fraction(earned: collected, total: total))
+                    .tint(BrumTheme.primary)
+            }
             if !game.achievements.isEmpty {
                 TextField("Buscar conquista", text: $search)
                     .textInputAutocapitalization(.never).autocorrectionDisabled()

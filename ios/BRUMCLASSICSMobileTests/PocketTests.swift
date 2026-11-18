@@ -21,6 +21,48 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(GamingAchievements.fraction(earned: 0, total: 0), 0)
     }
 
+    func testMurbPairingPayloadAndFrameDecoder() throws {
+        let validDS = try XCTUnwrap(URL(string: "murb://ds?ip=192.168.1.50&port=8089&token=abcd12&session=s1"))
+        let ds = try XCTUnwrap(MurbPairingPayload.parse(validDS))
+        XCTAssertEqual(ds.host, "192.168.1.50")
+        XCTAssertEqual(ds.port, 8089)
+        XCTAssertEqual(ds.token, "ABCD12")
+        XCTAssertEqual(ds.system, "ds")
+        XCTAssertEqual(ds.streamURL?.absoluteString, "ws://192.168.1.50:8089/stream?token=ABCD12")
+        XCTAssertTrue(MurbProtocol.supportsDualScreen(ds.system))
+        XCTAssertFalse(MurbProtocol.hasAnalogStick(ds.system))
+
+        let valid3DS = try XCTUnwrap(URL(string: "murb://3ds?ip=10.0.0.4&token=XYZ999&sys=n3ds"))
+        let parsed3DS = try XCTUnwrap(MurbPairingPayload.parse(valid3DS))
+        XCTAssertEqual(parsed3DS.system, "3ds")
+        XCTAssertEqual(parsed3DS.port, 8089)
+        XCTAssertTrue(MurbProtocol.supportsDualScreen(parsed3DS.system))
+        XCTAssertTrue(MurbProtocol.hasAnalogStick(parsed3DS.system))
+
+        XCTAssertNil(MurbPairingPayload.parse(URL(string: "murb://ds?ip=192.168.1.1")!))
+        XCTAssertNil(MurbPairingPayload.parse(URL(string: "murb://ds?ip=192.168.1.1&port=99999&token=AA")!))
+        XCTAssertNil(MurbPairingPayload.parse(URL(string: "https://example.com/?ip=1.2.3.4&token=AA")!))
+
+        var frameData = Data(count: 16 + 4 * 2 * 2)
+        frameData[0] = 0x42; frameData[1] = 0x52; frameData[2] = 0x55; frameData[3] = 0x4D // 'MURB' LE
+        frameData[4] = 7
+        frameData[8] = 4 // width = 4
+        frameData[10] = 2 // height = 2
+        // First pixel: pure red in RGB565 (0xF800) LE -> 0x00, 0xF8
+        frameData[16] = 0x00; frameData[17] = 0xF8
+        let decoded = try XCTUnwrap(MurbProtocol.decodeVideoFrame(frameData))
+        XCTAssertEqual(decoded.sequence, 7)
+        XCTAssertEqual(decoded.width, 4)
+        XCTAssertEqual(decoded.height, 2)
+        XCTAssertEqual(decoded.image.width, 4)
+        XCTAssertEqual(decoded.image.height, 2)
+
+        var badMagic = frameData
+        badMagic[0] = 0x00
+        XCTAssertNil(MurbProtocol.decodeVideoFrame(badMagic))
+        XCTAssertNil(MurbProtocol.decodeVideoFrame(frameData.prefix(20)))
+    }
+
     func testNativeSaveProfileBindingRejectsAnotherProfileOrComputer() throws {
         let digest = (UUID().uuidString.replacingOccurrences(of: "-", with: "") +
                       UUID().uuidString.replacingOccurrences(of: "-", with: "")).lowercased()

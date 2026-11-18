@@ -252,6 +252,21 @@ actor PocketRAClient {
             $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame && $0.importedIntoRetroArch
         }
     }
+    func ensureClassicRecord(for rom: ROMFolderGame) async -> PocketClassic? {
+        if let existing = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }) {
+            return existing
+        }
+        guard loaded else { return nil }
+        let created = PocketClassic(id: UUID(), title: rom.title, filename: rom.filename)
+        let next = games + [created]
+        do {
+            try await files.save(next)
+            games = next
+            return created
+        } catch {
+            return nil
+        }
+    }
     private func recordLaunch(_ game: PocketClassic, launcher: AppStore) async {
         var launched = game
         launched.lastPlayedAt = Date()
@@ -727,7 +742,13 @@ struct PocketGameView: View {
     var body: some View {
         ScrollView { VStack(alignment: .leading, spacing: 18) {
             if let game {
-                Text(game.title).font(.largeTitle.bold())
+                GamingHero(
+                    title: game.title,
+                    platform: (integratedROM.flatMap { IntegratedEmulatorSupport.system(for: $0)?.rawValue.uppercased() } ?? "CLASSICS"),
+                    artwork: GamingArtwork(game: launcher.snapshot.games.first { $0.id == game.launcherGameID }, rom: integratedROM)
+                ) {
+                    ExecutionBadge(kind: integratedROM != nil ? .onPhone : .externalApp)
+                }
                 if let integratedROM {
                     Button("JOGAR NO BRUM CORE") { selectedROM = integratedROM }.buttonStyle(PrimaryButtonStyle())
                     Text("Este arquivo abre dentro do BRUMCLASSICS, sem importação para outro aplicativo.").font(.caption).foregroundStyle(BrumTheme.muted)
@@ -788,10 +809,16 @@ struct PocketAchievementList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("\(progress.unlocked)/\(progress.achievements.count) CONQUISTAS").font(.headline).foregroundStyle(BrumTheme.primary)
+            ProgressView(value: GamingAchievements.fraction(earned: progress.unlocked, total: progress.achievements.count))
+                .tint(BrumTheme.primary)
             Text("\(progress.username) · atualizado \(progress.updatedAt.formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(BrumTheme.muted)
             ForEach(progress.achievements) { item in
-                HStack(alignment: .top) { Image(systemName: item.unlocked ? "checkmark.seal.fill" : "lock.fill").foregroundStyle(item.unlocked ? BrumTheme.primary : BrumTheme.muted)
-                    VStack(alignment: .leading) { Text(item.title).font(.subheadline.bold()); Text(item.description).font(.caption).foregroundStyle(BrumTheme.muted) }
+                HStack(spacing: 12) {
+                    AchievementBadge(item: item)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.title).font(.subheadline.bold()).foregroundStyle(BrumTheme.text)
+                        Text(item.description).font(.caption).foregroundStyle(BrumTheme.muted)
+                    }
                 }
             }
         }

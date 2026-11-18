@@ -2,12 +2,12 @@ import GameController
 import SwiftUI
 import UIKit
 
-struct GamingHeader<Leading: View>: View {
-    @EnvironmentObject private var store: AppStore
+struct TopControlAndSettingsActions: View {
     @Environment(\.scenePhase) private var scenePhase
+    let identifierPrefix: String
     @State private var controllers: [GCController] = []
     @State private var activePanel: Panel?
-    @ViewBuilder let leading: () -> Leading
+    @State private var showMurbRemote = false
 
     private enum Panel: String, Identifiable {
         case settings, controllers
@@ -15,19 +15,13 @@ struct GamingHeader<Leading: View>: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            leading().foregroundStyle(BrumTheme.text)
-            Spacer()
-            ConnectionDot(state: store.connection)
+        HStack(spacing: 10) {
             icon("gamecontroller", label: controllers.isEmpty ? "Controles" : "Controles conectados",
                  highlighted: !controllers.isEmpty) { activePanel = .controllers }
-                .accessibilityIdentifier("gaming-mode-controllers")
+                .accessibilityIdentifier("\(identifierPrefix)-controllers")
             icon("gearshape", label: "Configurações") { activePanel = .settings }
-                .accessibilityIdentifier("gaming-mode-settings")
+                .accessibilityIdentifier("\(identifierPrefix)-settings")
         }
-        .padding(.horizontal, 20).padding(.vertical, 4)
-        .background(BrumTheme.background)
-        .overlay(alignment: .bottom) { Rectangle().fill(BrumTheme.line).frame(height: 1) }
         .onAppear(perform: refreshControllers)
         .onChange(of: scenePhase) { phase in
             if phase == .active { refreshControllers() }
@@ -49,6 +43,10 @@ struct GamingHeader<Leading: View>: View {
             }
             .preferredColorScheme(.dark)
         }
+        .sheet(isPresented: $showMurbRemote) {
+            MurbRemoteGamepadLauncherSheet()
+                .preferredColorScheme(.dark)
+        }
     }
 
     private func icon(_ name: String, label: String, highlighted: Bool = false, action: @escaping () -> Void) -> some View {
@@ -63,12 +61,56 @@ struct GamingHeader<Leading: View>: View {
 
     private var controllerList: some View {
         List {
-            if controllers.isEmpty {
-                Text("Nenhum controle conectado.")
-                    .accessibilityIdentifier("gaming-mode-no-controllers")
+            Section("Controles físicos no celular") {
+                if controllers.isEmpty {
+                    Text("Nenhum controle conectado.")
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("gaming-mode-no-controllers")
+                }
+                ForEach(Array(controllers.enumerated()), id: \.element) { index, controller in
+                    HStack(spacing: 12) {
+                        Image(systemName: "gamecontroller.fill").foregroundStyle(BrumTheme.primary)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("P\(index + 1) · \(controller.vendorName ?? "Controle Bluetooth / USB")")
+                                .font(.subheadline.weight(.semibold))
+                            Text(controllerDetail(controller))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if let battery = controller.battery {
+                            Text("\(Int((battery.batteryLevel * 100).rounded()))%")
+                                .font(.caption2.monospacedDigit()).foregroundStyle(BrumTheme.primary)
+                        }
+                    }
+                }
+                Text("Controles físicos conectados ao iPhone são encaminhados automaticamente aos jogos do BRUM Core e ao Gamepad M.U.R.B.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
-            ForEach(controllers, id: \.self) { controller in
-                Label(controller.vendorName ?? "Controle", systemImage: "gamecontroller.fill")
+
+            Section("Gamepad Virtual integrado") {
+                HStack {
+                    Label("BRUM Core (Multitoque + Analógico)", systemImage: "iphone.landscape")
+                    Spacer()
+                    ExecutionBadge(kind: .onPhone)
+                }
+                Text("Inclui D-Pad em cruz, analógicos virtuais por console, botões táteis e segundas telas de DS/3DS com toque direto.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+            Section("Gamepad para PC (M.U.R.B Engine)") {
+                HStack {
+                    Label("Controle + 2ª Tela DS/3DS na LAN", systemImage: "desktopcomputer")
+                    Spacer()
+                    ExecutionBadge(kind: .dependsOnPC)
+                }
+                Button("Abrir Gamepad M.U.R.B para PC") {
+                    activePanel = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        showMurbRemote = true
+                    }
+                }
+                Text("Pareia via QR Code `murb://` ou reconexão direta na rede local quando um jogo estiver em execução no computador.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         .navigationTitle("Controles")
@@ -80,8 +122,30 @@ struct GamingHeader<Leading: View>: View {
         }
     }
 
+    private func controllerDetail(_ controller: GCController) -> String {
+        let profile = controller.extendedGamepad != nil ? "Controle completo" : "Controle básico"
+        return "\(profile) · ponte ativa"
+    }
+
     private func refreshControllers() {
         controllers = GCController.controllers().filter { !$0.isSnapshot }
+    }
+}
+
+struct GamingHeader<Leading: View>: View {
+    @EnvironmentObject private var store: AppStore
+    @ViewBuilder let leading: () -> Leading
+
+    var body: some View {
+        HStack(spacing: 12) {
+            leading().foregroundStyle(BrumTheme.text)
+            Spacer()
+            ConnectionDot(state: store.connection)
+            TopControlAndSettingsActions(identifierPrefix: "gaming-mode")
+        }
+        .padding(.horizontal, 20).padding(.vertical, 4)
+        .background(BrumTheme.background)
+        .overlay(alignment: .bottom) { Rectangle().fill(BrumTheme.line).frame(height: 1) }
     }
 }
 
@@ -89,6 +153,9 @@ private struct GamingSettingsPanel: View {
     @EnvironmentObject private var pocket: PocketClassicsStore
     @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("BrumVirtualControlHapticsEnabled") private var virtualHaptics = true
+    @AppStorage("BrumAutoHidePadWithController") private var autoHidePadWithController = false
+    @AppStorage("BrumDefaultScreenFillEnabled") private var defaultFillDisplay = false
     @State private var username = ""
     @State private var key = ""
     @State private var feedback = ""
@@ -110,10 +177,19 @@ private struct GamingSettingsPanel: View {
                     .font(.caption).foregroundStyle(.secondary)
                 if !feedback.isEmpty { Text(feedback).font(.caption) }
             }
-            Button("Atualizar horas e conquistas") {
-                Task { await pocket.sync(launcher: store, force: true) }
-            }.disabled(pocket.busy)
-            if !pocket.status.isEmpty { Text(pocket.status).font(.caption).foregroundStyle(.secondary) }
+            Section("Controles e BRUM Core") {
+                Toggle("Vibração tátil nos botões virtuais", isOn: $virtualHaptics)
+                Toggle("Ocultar controles na tela com joystick conectado", isOn: $autoHidePadWithController)
+                Toggle("Preencher tela por padrão ao iniciar jogo", isOn: $defaultFillDisplay)
+            }
+            Section("Biblioteca local e Launcher PC") {
+                LabeledContent("Pasta de ROMs", value: pocket.romFolderConfigured ? pocket.romFolderName : "Não definida")
+                LabeledContent("Launcher PC", value: store.connection == .online ? "Conectado (\(store.configuration?.host ?? "LAN"))" : "Offline (biblioteca em cache)")
+                Button("Atualizar horas e conquistas") {
+                    Task { await pocket.sync(launcher: store, force: true) }
+                }.disabled(pocket.busy)
+                if !pocket.status.isEmpty { Text(pocket.status).font(.caption).foregroundStyle(.secondary) }
+            }
         }
         .navigationTitle("Configurações")
         .navigationBarTitleDisplayMode(.inline)
@@ -254,6 +330,83 @@ struct GamingAchievements: View {
                     }
                 }
             }.frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+struct ExecutionBadge: View {
+    enum Kind: Equatable {
+        case onPhone
+        case externalApp
+        case dependsOnPC
+        case unavailable
+
+        var title: String {
+            switch self {
+            case .onPhone: return "Executa no celular"
+            case .externalApp: return "App externo"
+            case .dependsOnPC: return "Depende do PC"
+            case .unavailable: return "Indisponível aqui"
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .onPhone: return "iphone"
+            case .externalApp: return "arrow.up.forward.app"
+            case .dependsOnPC: return "desktopcomputer"
+            case .unavailable: return "exclamationmark.circle"
+            }
+        }
+
+        var tint: Color {
+            switch self {
+            case .onPhone: return BrumTheme.primary
+            case .externalApp: return BrumTheme.text
+            case .dependsOnPC, .unavailable: return .orange
+            }
+        }
+    }
+
+    let kind: Kind
+
+    var body: some View {
+        Label(kind.title, systemImage: kind.icon)
+            .font(.caption2.bold())
+            .foregroundStyle(kind.tint)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(kind.tint.opacity(0.14), in: Capsule())
+            .overlay(Capsule().stroke(kind.tint.opacity(0.35), lineWidth: 1))
+    }
+}
+
+struct GamingInfoItem: Identifiable, Equatable {
+    let label: String
+    let value: String
+    var id: String { label }
+}
+
+struct GamingInfoCard: View {
+    let title: String
+    let items: [GamingInfoItem]
+
+    var body: some View {
+        let nonEmpty = items.filter { !$0.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        if !nonEmpty.isEmpty {
+            BrumCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    BrumSectionLabel(text: title)
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 12)], alignment: .leading, spacing: 10) {
+                        ForEach(nonEmpty) { item in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.label.uppercased()).font(.caption2.bold()).foregroundStyle(BrumTheme.muted)
+                                Text(item.value).font(.subheadline.weight(.semibold)).foregroundStyle(BrumTheme.text)
+                            }.frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }.frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
     }
 }

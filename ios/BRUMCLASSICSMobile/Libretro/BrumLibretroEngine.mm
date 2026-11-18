@@ -96,9 +96,11 @@ typedef struct {
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
     if (!self) return nil;
-    self.backgroundColor = [UIColor colorWithWhite:0.10 alpha:0.84];
-    self.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.35].CGColor;
-    self.layer.borderWidth = 2;
+    self.multipleTouchEnabled = YES;
+    self.exclusiveTouch = NO;
+    self.backgroundColor = [UIColor colorWithWhite:0.09 alpha:0.84];
+    self.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.28].CGColor;
+    self.layer.borderWidth = 1.5;
     _thumb = [[UIView alloc] init];
     _thumb.backgroundColor = [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:0.92];
     _thumb.userInteractionEnabled = NO;
@@ -162,14 +164,28 @@ typedef struct {
 
 @implementation BrumVirtualDPad {
     NSArray<UILabel *> *_arrows;
+    UIView *_horizontalBar;
+    UIView *_verticalBar;
     uint8_t _mask;
 }
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
     if (!self) return nil;
-    self.backgroundColor = [UIColor colorWithWhite:0.10 alpha:0.84];
-    self.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.35].CGColor;
-    self.layer.borderWidth = 2;
+    self.multipleTouchEnabled = YES;
+    self.exclusiveTouch = NO;
+    self.backgroundColor = [UIColor colorWithWhite:0.09 alpha:0.84];
+    self.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.28].CGColor;
+    self.layer.borderWidth = 1.5;
+    _horizontalBar = [[UIView alloc] init];
+    _horizontalBar.backgroundColor = [UIColor colorWithWhite:1 alpha:0.09];
+    _horizontalBar.layer.cornerRadius = 6;
+    _horizontalBar.userInteractionEnabled = NO;
+    [self addSubview:_horizontalBar];
+    _verticalBar = [[UIView alloc] init];
+    _verticalBar.backgroundColor = [UIColor colorWithWhite:1 alpha:0.09];
+    _verticalBar.layer.cornerRadius = 6;
+    _verticalBar.userInteractionEnabled = NO;
+    [self addSubview:_verticalBar];
     NSMutableArray<UILabel *> *arrows = [NSMutableArray array];
     for (NSString *symbol in @[@"▲", @"▼", @"◀", @"▶"]) {
         UILabel *label = [[UILabel alloc] init];
@@ -191,8 +207,14 @@ typedef struct {
 - (uint8_t)mask { return _mask; }
 - (void)layoutSubviews {
     [super layoutSubviews];
-    self.layer.cornerRadius = MIN(self.bounds.size.width, self.bounds.size.height) / 4;
+    self.layer.cornerRadius = MIN(self.bounds.size.width, self.bounds.size.height) / 2;
     const CGFloat cx = CGRectGetMidX(self.bounds), cy = CGRectGetMidY(self.bounds);
+    const CGFloat armLong = MIN(self.bounds.size.width, self.bounds.size.height) * 0.72;
+    const CGFloat armThick = 34;
+    _horizontalBar.bounds = CGRectMake(0, 0, armLong, armThick);
+    _horizontalBar.center = CGPointMake(cx, cy);
+    _verticalBar.bounds = CGRectMake(0, 0, armThick, armLong);
+    _verticalBar.center = CGPointMake(cx, cy);
     const CGFloat dx = self.bounds.size.width * 0.30, dy = self.bounds.size.height * 0.29;
     NSArray<NSValue *> *positions = @[
         [NSValue valueWithCGPoint:CGPointMake(cx, cy - dy)],
@@ -243,7 +265,7 @@ typedef struct {
 @class BrumLibretroViewController;
 static __weak BrumLibretroViewController *BrumCurrentHost;
 
-@interface BrumLibretroViewController () {
+@interface BrumLibretroViewController () <UIGestureRecognizerDelegate> {
 @public
     void *_coreHandle;
     BrumRetroFunctions _core;
@@ -302,6 +324,12 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     UIButton *_fastForwardButton;
     UIButton *_displayModeButton;
     UIButton *_stateButton;
+    UIButton *_controlsButton;
+    UIView *_touchReticle;
+    NSMutableArray<UIView *> *_padOverlayViews;
+    BOOL _controlsHidden;
+    BOOL _manualControlsHidden;
+    BOOL _autoHideWithController;
     BrumVirtualStick *_virtualStick;
     BrumVirtualStick *_rightVirtualStick;
     UIView *_digitalPad;
@@ -366,6 +394,10 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
 - (void)layoutScreens;
 - (brum::Rect)availableGameRect;
 - (void)showScreenMenu;
+- (void)toggleControlsVisibility;
+- (void)applyVirtualControlsVisibility;
+- (void)physicalControllerChanged:(NSNotification *)notification;
+- (void)syncPhysicalControllerUIWithToast:(BOOL)showToast;
 - (void)updatePauseState;
 - (BOOL)configureHardware:(brum_retro_hw_render_callback *)callback;
 - (BOOL)initializeHardware:(NSError **)error;
@@ -679,17 +711,40 @@ static size_t BrumAudioBatch(const int16_t *data, size_t frames) {
     return frames;
 }
 
+static GCController *BrumActiveController(void) {
+    for (GCController *controller in GCController.controllers) {
+        if (!controller.isSnapshot) return controller;
+    }
+    return nil;
+}
+
 static void BrumInputPoll(void) {
     BrumLibretroViewController *host = BrumCurrentHost;
     if (!host) return;
     host->_input.release(brum::InputSource::controller);
-    GCExtendedGamepad *pad = GCController.controllers.firstObject.extendedGamepad;
-    if (!pad) return;
+    GCController *controller = BrumActiveController();
+    if (!controller) return;
+    GCExtendedGamepad *pad = controller.extendedGamepad;
+    if (!pad) {
+        GCMicroGamepad *micro = controller.microGamepad;
+        if (micro) {
+            host->_input.set(brum::InputSource::controller, 0, micro.buttonA.isPressed);
+            host->_input.set(brum::InputSource::controller, 1, micro.buttonX.isPressed);
+            host->_input.set(brum::InputSource::controller, 3, micro.buttonMenu.isPressed);
+            host->_input.set(brum::InputSource::controller, 4, micro.dpad.up.isPressed);
+            host->_input.set(brum::InputSource::controller, 5, micro.dpad.down.isPressed);
+            host->_input.set(brum::InputSource::controller, 6, micro.dpad.left.isPressed);
+            host->_input.set(brum::InputSource::controller, 7, micro.dpad.right.isPressed);
+        }
+        return;
+    }
     NSArray<GCControllerButtonInput *> *buttons = @[pad.buttonB, pad.buttonY, pad.buttonOptions ?: pad.buttonMenu, pad.buttonMenu,
         pad.dpad.up, pad.dpad.down, pad.dpad.left, pad.dpad.right, pad.buttonA, pad.buttonX,
         pad.leftShoulder, pad.rightShoulder, pad.leftTrigger, pad.rightTrigger];
     for (NSUInteger i = 0; i < buttons.count; i++) host->_input.set(brum::InputSource::controller, (unsigned)i, buttons[i].isPressed);
     host->_input.set(brum::InputSource::controller, 2, pad.buttonOptions.isPressed);
+    host->_input.set(brum::InputSource::controller, 12, pad.leftTrigger.isPressed || pad.leftTrigger.value > 0.25f);
+    host->_input.set(brum::InputSource::controller, 13, pad.rightTrigger.isPressed || pad.rightTrigger.value > 0.25f);
     if ([host->_emulatedSystemID isEqualToString:@"psx"] ||
         [host->_emulatedSystemID isEqualToString:@"psp"] ||
         [host->_emulatedSystemID isEqualToString:@"dreamcast"] ||
@@ -808,6 +863,8 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _pixelFormat = BRUM_RETRO_PIXEL_FORMAT_0RGB1555;
     // FIT is the safe default; cropping is an explicit user choice.
     _screenFillsDisplay = NO;
+    _screenFillsDisplay = [NSUserDefaults.standardUserDefaults boolForKey:@"BrumDefaultScreenFillEnabled"];
+    _autoHideWithController = [NSUserDefaults.standardUserDefaults boolForKey:@"BrumAutoHidePadWithController"];
     _audioLock = OS_UNFAIR_LOCK_INIT;
     _audioCapacity = 262144;
     _audioRing = (int16_t *)calloc(_audioCapacity, sizeof(int16_t));
@@ -1048,6 +1105,15 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
                                                  selector:@selector(audioSessionInterrupted:)
                                                      name:AVAudioSessionInterruptionNotification
                                                    object:AVAudioSession.sharedInstance];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(physicalControllerChanged:)
+                                                     name:GCControllerDidConnectNotification
+                                                   object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(physicalControllerChanged:)
+                                                     name:GCControllerDidDisconnectNotification
+                                                   object:nil];
+        [self syncPhysicalControllerUIWithToast:NO];
     }
 }
 
@@ -1204,7 +1270,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 }
 
 - (void)buildInterface {
+    self.view.multipleTouchEnabled = YES;
     _virtualButtons = [NSMutableArray array];
+    _padOverlayViews = [NSMutableArray array];
     _virtualFeedback = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
     id hapticPreference = [NSUserDefaults.standardUserDefaults objectForKey:@"BrumVirtualControlHapticsEnabled"];
     _virtualHapticsEnabled = !hapticPreference || [hapticPreference boolValue];
@@ -1212,6 +1280,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _performanceHUDEnabled = [NSUserDefaults.standardUserDefaults boolForKey:@"BrumCorePerformanceHUD"];
     _screen = [[UIImageView alloc] init];
     _screen.translatesAutoresizingMaskIntoConstraints = NO;
+    _screen.multipleTouchEnabled = YES;
     _screen.backgroundColor = [UIColor colorWithWhite:0.02 alpha:1];
     _screen.layer.magnificationFilter = kCAFilterNearest;
     _screen.clipsToBounds = YES;
@@ -1220,12 +1289,22 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     touch.minimumPressDuration = 0;
     touch.allowableMovement = CGFLOAT_MAX;
     touch.cancelsTouchesInView = NO;
+    touch.delegate = self;
     [_screen addGestureRecognizer:touch];
     [self.view addSubview:_screen];
     _singleScreenLayer = [CALayer layer];
     _singleScreenLayer.magnificationFilter = kCAFilterNearest;
     _singleScreenLayer.contentsGravity = kCAGravityResize;
     [_screen.layer addSublayer:_singleScreenLayer];
+
+    _touchReticle = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 30, 30)];
+    _touchReticle.layer.cornerRadius = 15;
+    _touchReticle.layer.borderWidth = 2.0;
+    _touchReticle.layer.borderColor = [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:0.92].CGColor;
+    _touchReticle.backgroundColor = [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:0.18];
+    _touchReticle.userInteractionEnabled = NO;
+    _touchReticle.hidden = YES;
+    [_screen addSubview:_touchReticle];
 
     UILabel *title = [[UILabel alloc] init];
     title.translatesAutoresizingMaskIntoConstraints = NO;
@@ -1261,6 +1340,13 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _stateButton.accessibilityLabel = @"Estados rápidos";
     [_stateButton addTarget:self action:@selector(showStateMenu) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:_stateButton];
+
+    _controlsButton = [self controlButton:@"" identifier:-1];
+    UIImageSymbolConfiguration *padSymbol = [UIImageSymbolConfiguration configurationWithPointSize:14 weight:UIImageSymbolWeightBold];
+    [_controlsButton setImage:[[UIImage systemImageNamed:@"gamecontroller.fill"] imageWithConfiguration:padSymbol] forState:UIControlStateNormal];
+    _controlsButton.accessibilityLabel = @"Mostrar ou ocultar controles na tela";
+    [_controlsButton addTarget:self action:@selector(toggleControlsVisibility) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:_controlsButton];
 
     _statusLabel = [[UILabel alloc] init];
     _statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
@@ -1308,9 +1394,14 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     leftShoulder.hidden = !profile || (!profile->shoulders && !profile->triggers);
     rightShoulder.hidden = leftShoulder.hidden;
     [self.view addSubview:leftShoulder]; [self.view addSubview:rightShoulder];
+    if (!leftShoulder.hidden) {
+        [_padOverlayViews addObject:leftShoulder];
+        [_padOverlayViews addObject:rightShoulder];
+    }
     if (isGameCube) {
         UIButton *z = [self controlButton:@"Z" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_R];
         [self.view addSubview:z];
+        [_padOverlayViews addObject:z];
         [NSLayoutConstraint activateConstraints:@[
             [z.trailingAnchor constraintEqualToAnchor:rightShoulder.leadingAnchor constant:-8],
             [z.centerYAnchor constraintEqualToAnchor:rightShoulder.centerYAnchor]
@@ -1320,6 +1411,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         UIButton *zl = [self controlButton:@"ZL" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_L2];
         UIButton *zr = [self controlButton:@"ZR" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_R2];
         [self.view addSubview:zl]; [self.view addSubview:zr];
+        [_padOverlayViews addObject:zl]; [_padOverlayViews addObject:zr];
         [NSLayoutConstraint activateConstraints:@[
             [zl.leadingAnchor constraintEqualToAnchor:leftShoulder.trailingAnchor constant:8],
             [zl.centerYAnchor constraintEqualToAnchor:leftShoulder.centerYAnchor],
@@ -1333,6 +1425,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         UIButton *l2 = [self controlButton:@"L2" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_L2];
         UIButton *r2 = [self controlButton:@"R2" identifier:BRUM_RETRO_DEVICE_ID_JOYPAD_R2];
         [self.view addSubview:l2]; [self.view addSubview:r2];
+        [_padOverlayViews addObject:l2]; [_padOverlayViews addObject:r2];
         [NSLayoutConstraint activateConstraints:@[
             [l2.leadingAnchor constraintEqualToAnchor:leftShoulder.trailingAnchor constant:8],
             [l2.centerYAnchor constraintEqualToAnchor:leftShoulder.centerYAnchor],
@@ -1344,12 +1437,14 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     menu.axis = UILayoutConstraintAxisHorizontal;
     menu.spacing = 10;
     [self.view addSubview:up]; [self.view addSubview:actions]; [self.view addSubview:menu];
+    [_padOverlayViews addObjectsFromArray:@[up, actions, menu]];
     if (isGameCube || is3DS) {
         _rightVirtualStick = [[BrumVirtualStick alloc] initWithFrame:CGRectZero];
         _rightVirtualStick.translatesAutoresizingMaskIntoConstraints = NO;
         _rightVirtualStick.accessibilityLabel = isGameCube ? @"Stick C" : @"C-Stick";
         [_rightVirtualStick addTarget:self action:@selector(rightVirtualStickChanged:) forControlEvents:UIControlEventValueChanged];
         [self.view addSubview:_rightVirtualStick];
+        [_padOverlayViews addObject:_rightVirtualStick];
         [NSLayoutConstraint activateConstraints:@[
             [_rightVirtualStick.widthAnchor constraintEqualToConstant:106],
             [_rightVirtualStick.heightAnchor constraintEqualToConstant:106],
@@ -1372,6 +1467,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         _padModeButton.accessibilityValue = @"Analógico ativo";
         [_padModeButton addTarget:self action:@selector(toggleAnalogPadMode) forControlEvents:UIControlEventTouchUpInside];
         [self.view addSubview:_padModeButton];
+        [_padOverlayViews addObject:_padModeButton];
     }
 
     UILayoutGuide *safe = self.view.safeAreaLayoutGuide;
@@ -1388,9 +1484,12 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         [_stateButton.trailingAnchor constraintEqualToAnchor:_displayModeButton.leadingAnchor constant:-10],
         [_stateButton.centerYAnchor constraintEqualToAnchor:_displayModeButton.centerYAnchor],
         [_stateButton.widthAnchor constraintEqualToConstant:64],
+        [_controlsButton.trailingAnchor constraintEqualToAnchor:_stateButton.leadingAnchor constant:-10],
+        [_controlsButton.centerYAnchor constraintEqualToAnchor:_stateButton.centerYAnchor],
+        [_controlsButton.widthAnchor constraintEqualToConstant:54],
         [title.centerXAnchor constraintEqualToAnchor:safe.centerXAnchor], [title.centerYAnchor constraintEqualToAnchor:close.centerYAnchor],
         [title.leadingAnchor constraintGreaterThanOrEqualToAnchor:close.trailingAnchor constant:8],
-        [title.trailingAnchor constraintLessThanOrEqualToAnchor:_stateButton.leadingAnchor constant:-8],
+        [title.trailingAnchor constraintLessThanOrEqualToAnchor:_controlsButton.leadingAnchor constant:-8],
         [_statusLabel.centerXAnchor constraintEqualToAnchor:safe.centerXAnchor], [_statusLabel.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:2],
         [_screen.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor], [_screen.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
         [_screen.topAnchor constraintEqualToAnchor:self.view.topAnchor], [_screen.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
@@ -1415,6 +1514,8 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 - (UIButton *)controlButton:(NSString *)text identifier:(NSInteger)identifier {
     UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
     button.translatesAutoresizingMaskIntoConstraints = NO;
+    button.multipleTouchEnabled = YES;
+    button.exclusiveTouch = NO;
     button.tag = identifier;
     [button setTitle:text forState:UIControlStateNormal];
     [button setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
@@ -1595,9 +1696,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [_virtualStick reset];
     [_primaryDPad reset];
     [_secondaryDPad reset];
-    _virtualStick.hidden = _dpadMode;
+    _virtualStick.hidden = _controlsHidden || _dpadMode;
     _virtualStick.enabled = !_dpadMode && !_paused;
-    _digitalPad.hidden = !_dpadMode;
+    _digitalPad.hidden = _controlsHidden || !_dpadMode;
     [_padModeButton setTitle:_dpadMode ? @"STICK" : @"D-PAD" forState:UIControlStateNormal];
     _padModeButton.accessibilityValue = _dpadMode ? @"D-pad ativo" : @"Analógico ativo";
 }
@@ -1633,9 +1734,18 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     return pad;
 }
 
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
+    return touch.view == _screen || touch.view == self.view;
+}
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
+    return YES;
+}
+
 - (void)screenTouch:(UILongPressGestureRecognizer *)gesture {
     if (_paused || !_frameWidth || !_frameHeight || !(self.capabilities & BrumBackendTouch)) {
         _pointerPressed = NO;
+        _touchReticle.hidden = YES;
         return;
     }
     CGPoint point = [gesture locationInView:_screen];
@@ -1646,6 +1756,8 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         _pointerY = (int16_t)lrint((touch.atlas.y * 2 - 1) * 32767);
         // SkyEmu treats Y == 0 as pen-up, including the first lower-screen row.
         if (_pointerPressed && [_coreID isEqualToString:@"skyemu"]) _pointerY = MAX(1, _pointerY);
+        _touchReticle.hidden = !_pointerPressed;
+        if (_pointerPressed) _touchReticle.center = point;
         return;
     }
     const auto local = _singleViewport.toContent({point.x, point.y});
@@ -1654,6 +1766,10 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     if (_pointerPressed) {
         _pointerX = (int16_t)lrint((local->x * 2 - 1) * 32767);
         _pointerY = (int16_t)lrint((local->y * 2 - 1) * 32767);
+        _touchReticle.center = point;
+        _touchReticle.hidden = NO;
+    } else {
+        _touchReticle.hidden = YES;
     }
 }
 
@@ -1714,6 +1830,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         _screenProfileWidth = _frameWidth;
         _screenProfileHeight = _frameHeight;
         _screenManager.screens = brum::libretroScreens(_coreID.UTF8String, _frameWidth, _frameHeight);
+        [self updateDisplayModeButton];
         [self layoutScreens];
     }
     if (_screenManager.screens.size() == 1) {
@@ -1750,7 +1867,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     available.size.height -= 52;
     // The translucent controls overlay the game only when the screen is too
     // narrow to reserve their space without collapsing the viewport.
-    if (_directionControl && _actionControl) {
+    if (!_controlsHidden && _directionControl && _actionControl) {
         const CGFloat gap = 12;
         if (available.size.width > available.size.height &&
             CGRectGetMinX(_actionControl.frame) - CGRectGetMaxX(_directionControl.frame) > 180) {
@@ -1852,6 +1969,56 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _statusLabel.text = _fastForwardEnabled ? @"AVANÇO RÁPIDO · 5×" : [NSString stringWithFormat:@"BRUM CORE · %@", _coreDisplayName];
 }
 
+- (void)toggleControlsVisibility {
+    _manualControlsHidden = !_manualControlsHidden;
+    [self applyVirtualControlsVisibility];
+}
+
+- (void)applyVirtualControlsVisibility {
+    const BOOL hasPhysical = BrumActiveController() != nil;
+    const BOOL nextHidden = _manualControlsHidden || (_autoHideWithController && hasPhysical);
+    _controlsHidden = nextHidden;
+    if (nextHidden) {
+        [self releaseInputSource:BrumInputVirtualPad];
+        [self releaseVirtualControls];
+        [_primaryDPad reset];
+        [_secondaryDPad reset];
+        [_virtualStick reset];
+        [_rightVirtualStick reset];
+    }
+    for (UIView *control in _padOverlayViews) {
+        control.hidden = nextHidden;
+    }
+    if (_digitalPad) _digitalPad.hidden = nextHidden || !_dpadMode;
+    if (_padModeButton) _padModeButton.hidden = nextHidden;
+    if (_virtualStick) _virtualStick.hidden = nextHidden || _dpadMode;
+
+    UIColor *accent = [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:1];
+    const BOOL controlsActive = !nextHidden;
+    _controlsButton.backgroundColor = controlsActive ? [UIColor colorWithWhite:0.1 alpha:0.82] : accent;
+    _controlsButton.tintColor = controlsActive ? (hasPhysical ? accent : UIColor.whiteColor) : UIColor.blackColor;
+    _controlsButton.layer.borderColor = (controlsActive ? (hasPhysical ? accent : [UIColor colorWithWhite:1 alpha:0.16]) : accent).CGColor;
+    _controlsButton.accessibilityValue = nextHidden ? @"Ocultos" : @"Visíveis";
+    [self layoutScreens];
+}
+
+- (void)physicalControllerChanged:(NSNotification *)notification {
+    [self releaseInputSource:BrumInputController];
+    [self syncPhysicalControllerUIWithToast:YES];
+}
+
+- (void)syncPhysicalControllerUIWithToast:(BOOL)showToast {
+    GCController *controller = BrumActiveController();
+    [self applyVirtualControlsVisibility];
+    if (!showToast || _stopped) return;
+    if (controller) {
+        NSString *name = controller.vendorName ?: @"Controle físico";
+        [self showStateStatus:[NSString stringWithFormat:@"CONTROLE CONECTADO · %@", name.uppercaseString] error:NO];
+    } else {
+        [self showStateStatus:@"CONTROLE DESCONECTADO · MODO TÁTIL" error:NO];
+    }
+}
+
 - (void)toggleDisplayMode {
     if (self.capabilities & BrumBackendMultipleScreens) { [self showScreenMenu]; return; }
     _screenFillsDisplay = !_screenFillsDisplay;
@@ -1861,10 +2028,14 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 
 - (void)updateDisplayModeButton {
     UIColor *accent = [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:1];
+    const BOOL multiScreen = _screenManager.screens.size() > 1;
+    UIImageSymbolConfiguration *displaySymbol = [UIImageSymbolConfiguration configurationWithPointSize:14 weight:UIImageSymbolWeightBlack];
+    [_displayModeButton setImage:[[UIImage systemImageNamed:(multiScreen ? @"rectangle.split.2x1" : @"arrow.up.left.and.arrow.down.right")] imageWithConfiguration:displaySymbol] forState:UIControlStateNormal];
     _displayModeButton.backgroundColor = _screenFillsDisplay ? accent : [UIColor colorWithWhite:0.1 alpha:0.82];
     _displayModeButton.tintColor = _screenFillsDisplay ? UIColor.blackColor : UIColor.whiteColor;
     _displayModeButton.layer.borderColor = (_screenFillsDisplay ? accent : [UIColor colorWithWhite:1 alpha:0.16]).CGColor;
-    _displayModeButton.accessibilityValue = _screenFillsDisplay ? @"Preencher tela" : @"Mostrar imagem inteira";
+    _displayModeButton.accessibilityLabel = multiScreen ? @"Layouts das duas telas" : @"Modo de exibição";
+    _displayModeButton.accessibilityValue = multiScreen ? @"Duas telas" : (_screenFillsDisplay ? @"Preencher tela" : @"Mostrar imagem inteira");
     _displayModeButton.accessibilityTraits = _screenFillsDisplay ? UIAccessibilityTraitButton | UIAccessibilityTraitSelected : UIAccessibilityTraitButton;
 }
 
