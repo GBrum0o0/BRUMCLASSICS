@@ -537,7 +537,7 @@ final class PocketTests: XCTestCase {
         let pcGames = try JSONDecoder().decode([Game].self, from: pcGamesData)
         let library = GamingModeCatalog.library(local: [dsROM], records: [], computer: pcGames)
         XCTAssertEqual(library.count, 2)
-        XCTAssertEqual(library.map(\.id), ["local:ds/mario kart ds (usa).nds", "pc:pc-wiiu-1"])
+        XCTAssertEqual(library.map(\.id), ["pc:pc-wiiu-1", "local:ds/mario kart ds (usa).nds"])
 
         let multiNicInfo = BridgeClient.MurbRemoteSessionInfo(
             available: true, host: "172.25.0.1", port: 8089, token: "abc123",
