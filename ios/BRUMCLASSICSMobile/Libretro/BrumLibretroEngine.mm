@@ -379,6 +379,8 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     BOOL _hardwareInitialized;
     brum_retro_system_av_info _pendingAVInfo;
     BOOL _hasPendingAVInfo;
+    CGColorSpaceRef _rgbColorSpace;
+    std::vector<uint8_t> _hwReadbackRGBA;
 }
 
 - (void)closeEmulator;
@@ -630,47 +632,64 @@ static void BrumVideo(const void *data, unsigned width, unsigned height, size_t 
     if (data != BrumHardwareFrameBuffer && (pitch < (size_t)width * bytesPerPixel || pitch > SIZE_MAX / height)) return;
     host->_frameWidth = width;
     host->_frameHeight = height;
-    NSMutableData *pixels = [NSMutableData dataWithLength:(NSUInteger)width * height * 4];
-    uint32_t *target = (uint32_t *)pixels.mutableBytes;
+    const NSUInteger byteCount = (NSUInteger)width * height * 4;
+    uint32_t *target = (uint32_t *)malloc(byteCount);
+    if (!target) return;
+    NSData *pixels = [NSData dataWithBytesNoCopy:target length:byteCount freeWhenDone:YES];
     if (data == BrumHardwareFrameBuffer) {
         if (!host->_hardwareInitialized || width > (unsigned)host->_hardwareSurfaceSize || height > (unsigned)host->_hardwareSurfaceSize) return;
         glBindFramebuffer(GL_FRAMEBUFFER, host->_hardwareFramebuffer);
-        NSMutableData *rgba = [NSMutableData dataWithLength:(NSUInteger)width * height * 4];
+        host->_hwReadbackRGBA.resize(byteCount);
         glPixelStorei(GL_PACK_ALIGNMENT, 1);
-        glReadPixels(0, 0, (GLsizei)width, (GLsizei)height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.mutableBytes);
+        glReadPixels(0, 0, (GLsizei)width, (GLsizei)height, GL_RGBA, GL_UNSIGNED_BYTE, host->_hwReadbackRGBA.data());
         if (glGetError() != GL_NO_ERROR) return;
-        const uint8_t *source = (const uint8_t *)rgba.bytes;
+        const uint8_t *source = host->_hwReadbackRGBA.data();
         for (unsigned y = 0; y < height; y++) {
             unsigned sourceY = host->_hardwareCallback.bottom_left_origin ? height - 1 - y : y;
+            const uint8_t *srcRow = source + (size_t)sourceY * width * 4;
+            uint32_t *dstRow = target + (size_t)y * width;
             for (unsigned x = 0; x < width; x++) {
-                size_t offset = ((size_t)sourceY * width + x) * 4;
-                target[(size_t)y * width + x] = ((uint32_t)source[offset] << 16) |
-                    ((uint32_t)source[offset + 1] << 8) | source[offset + 2];
+                const size_t offset = (size_t)x * 4;
+                dstRow[x] = ((uint32_t)srcRow[offset] << 16) |
+                    ((uint32_t)srcRow[offset + 1] << 8) | srcRow[offset + 2];
             }
         }
-    } else for (unsigned y = 0; y < height; y++) {
-        if (host->_pixelFormat == BRUM_RETRO_PIXEL_FORMAT_XRGB8888) {
+    } else if (host->_pixelFormat == BRUM_RETRO_PIXEL_FORMAT_XRGB8888) {
+        for (unsigned y = 0; y < height; y++) {
             const uint32_t *source = (const uint32_t *)((const uint8_t *)data + y * pitch);
             memcpy(target + (size_t)y * width, source, (size_t)width * 4);
-        } else {
+        }
+    } else {
+        static uint8_t lut5[32];
+        static uint8_t lut6[64];
+        static dispatch_once_t onceToken;
+        dispatch_once(&onceToken, ^{
+            for (unsigned i = 0; i < 32; ++i) lut5[i] = (uint8_t)((i << 3) | (i >> 2));
+            for (unsigned i = 0; i < 64; ++i) lut6[i] = (uint8_t)((i << 2) | (i >> 4));
+        });
+        const BOOL is565 = host->_pixelFormat == BRUM_RETRO_PIXEL_FORMAT_RGB565;
+        for (unsigned y = 0; y < height; y++) {
             const uint16_t *source = (const uint16_t *)((const uint8_t *)data + y * pitch);
-            for (unsigned x = 0; x < width; x++) {
-                uint16_t value = source[x];
-                unsigned red, green, blue;
-                if (host->_pixelFormat == BRUM_RETRO_PIXEL_FORMAT_RGB565) {
-                    red = ((value >> 11) & 31) * 255 / 31;
-                    green = ((value >> 5) & 63) * 255 / 63;
-                    blue = (value & 31) * 255 / 31;
-                } else {
-                    red = ((value >> 10) & 31) * 255 / 31;
-                    green = ((value >> 5) & 31) * 255 / 31;
-                    blue = (value & 31) * 255 / 31;
+            uint32_t *dstRow = target + (size_t)y * width;
+            if (is565) {
+                for (unsigned x = 0; x < width; x++) {
+                    const uint16_t value = source[x];
+                    dstRow[x] = ((uint32_t)lut5[(value >> 11) & 31] << 16) |
+                                ((uint32_t)lut6[(value >> 5) & 63] << 8) |
+                                (uint32_t)lut5[value & 31];
                 }
-                target[(size_t)y * width + x] = (red << 16) | (green << 8) | blue;
+            } else {
+                for (unsigned x = 0; x < width; x++) {
+                    const uint16_t value = source[x];
+                    dstRow[x] = ((uint32_t)lut5[(value >> 10) & 31] << 16) |
+                                ((uint32_t)lut5[(value >> 5) & 31] << 8) |
+                                (uint32_t)lut5[value & 31];
+                }
             }
         }
     }
-    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    CGColorSpaceRef ownedSpace = host->_rgbColorSpace ? NULL : CGColorSpaceCreateDeviceRGB();
+    CGColorSpaceRef colorSpace = host->_rgbColorSpace ?: ownedSpace;
     CGDataProviderRef provider = CGDataProviderCreateWithCFData((__bridge CFDataRef)pixels);
     CGBitmapInfo bitmap = kCGBitmapByteOrder32Little | kCGImageAlphaNoneSkipFirst;
     CGImageRef image = CGImageCreate(width, height, 8, 32, (size_t)width * 4, colorSpace, bitmap, provider, NULL, false, kCGRenderingIntentDefault);
@@ -680,7 +699,7 @@ static void BrumVideo(const void *data, unsigned width, unsigned height, size_t 
         CGImageRelease(image);
     }
     CGDataProviderRelease(provider);
-    CGColorSpaceRelease(colorSpace);
+    if (ownedSpace) CGColorSpaceRelease(ownedSpace);
     if (host->_performanceHUDEnabled) host->_hostVideoSeconds += CACurrentMediaTime() - started;
 }
 
@@ -802,6 +821,7 @@ static int16_t BrumInputState(unsigned port, unsigned device, unsigned index, un
         if (identifier == BRUM_RETRO_DEVICE_ID_POINTER_X) return host->_pointerX;
         if (identifier == BRUM_RETRO_DEVICE_ID_POINTER_Y) return host->_pointerY;
         if (identifier == BRUM_RETRO_DEVICE_ID_POINTER_PRESSED) return host->_pointerPressed ? 1 : 0;
+        if (identifier == BRUM_RETRO_DEVICE_ID_POINTER_COUNT) return host->_pointerPressed ? 1 : 0;
         return 0;
     }
     if (device != BRUM_RETRO_DEVICE_JOYPAD || identifier > 15) return 0;
@@ -893,6 +913,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _screenFillsDisplay = [NSUserDefaults.standardUserDefaults boolForKey:@"BrumDefaultScreenFillEnabled"];
     _autoHideWithController = [NSUserDefaults.standardUserDefaults boolForKey:@"BrumAutoHidePadWithController"];
     _audioLock = OS_UNFAIR_LOCK_INIT;
+    _rgbColorSpace = CGColorSpaceCreateDeviceRGB();
     _audioCapacity = 262144;
     _audioRing = (int16_t *)calloc(_audioCapacity, sizeof(int16_t));
     // 2048x2048 bounds the experimental GLES adapter's native output while
@@ -1781,8 +1802,8 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         _pointerPressed = touch.pressed && (gesture.state == UIGestureRecognizerStateBegan || gesture.state == UIGestureRecognizerStateChanged);
         _pointerX = (int16_t)lrint((touch.atlas.x * 2 - 1) * 32767);
         _pointerY = (int16_t)lrint((touch.atlas.y * 2 - 1) * 32767);
-        // SkyEmu treats Y == 0 as pen-up, including the first lower-screen row.
-        if (_pointerPressed && [_coreID isEqualToString:@"skyemu"]) _pointerY = MAX(1, _pointerY);
+        // Dual-screen cores treat Y == 0 on the lower half as pen-up or boundary.
+        if (_pointerPressed && touch.screenID == "secondary") _pointerY = MAX(1, _pointerY);
         _touchReticle.hidden = !_pointerPressed;
         if (_pointerPressed) _touchReticle.center = point;
         return;
@@ -2454,6 +2475,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [self stopCore];
     if (_coreHandle) dlclose(_coreHandle);
+    if (_rgbColorSpace) { CGColorSpaceRelease(_rgbColorSpace); _rgbColorSpace = NULL; }
     free(_audioRing);
 }
 

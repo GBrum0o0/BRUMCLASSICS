@@ -1,11 +1,12 @@
 {
-  "version": "0.18.0",
-  "build": 51,
+  "version": "0.19.0",
+  "build": 52,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.18.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.19.0",
   "notes": [
-    "Biblioteca e Gaming Mode sem duplicação: quando o mesmo jogo existe no computador e na pasta de ROMs do celular, aparece apenas uma capa unificada.",
-    "Tela cheia edge-to-edge sem barras pretas desperdiçadas e sem esticar nem deformar a imagem original de cada console.",
-    "Gamepad M.U.R.B remoto revisado para jogos de PC (Xbox 360 virtual ViGEmBus), Nintendo DS e Wii U (16:9), com conexão priorizando o IP pareado da rede local."
+    "Correção do joystick no Nintendo Wii U (Cemu) e controle físico com analógico direito (rStickX/rStickY).",
+    "Correção do toque no Nintendo DS e 3DS (remoto M.U.R.B e núcleos locais com POINTER_COUNT e tela secundária).",
+    "Redução de latência no Gamepad M.U.R.B (decodificação RGB565 fora da thread principal, renderização em CALayer GPU, coalescência de inputs e tela cheia proporcional 16:9/4:3).",
+    "Otimização do Gaming Mode com cache de catálogo O(N + M) e formatador de datas compartilhado."
   ]
 }

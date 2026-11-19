@@ -37,6 +37,9 @@ final class BrumCoreView extends View implements Runnable {
     private volatile boolean fillDisplay;
     private AudioTrack audioTrack;
     private long playedNanos;
+    private final Rect sourceRect = new Rect();
+    private final RectF targetRect = new RectF();
+    private final RectF touchTarget = new RectF();
     private final RectF displayTarget = new RectF();
     private final Paint reticlePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private float touchScreenX;
@@ -203,15 +206,18 @@ final class BrumCoreView extends View implements Runnable {
         super.onDraw(canvas);
         synchronized (bitmapLock) {
             if (bitmap == null) return;
-            float scaleX = getWidth() / (float) bitmap.getWidth();
-            float scaleY = getHeight() / (float) bitmap.getHeight();
+            int bw = bitmap.getWidth();
+            int bh = bitmap.getHeight();
+            float scaleX = getWidth() / (float) bw;
+            float scaleY = getHeight() / (float) bh;
             float scale = fillDisplay ? Math.max(scaleX, scaleY) : Math.min(scaleX, scaleY);
-            float width = bitmap.getWidth() * scale; float height = bitmap.getHeight() * scale;
-            Rect source = new Rect(0, 0, bitmap.getWidth(), bitmap.getHeight());
-            RectF target = new RectF((getWidth() - width) / 2f, (getHeight() - height) / 2f,
+            float width = bw * scale;
+            float height = bh * scale;
+            sourceRect.set(0, 0, bw, bh);
+            targetRect.set((getWidth() - width) / 2f, (getHeight() - height) / 2f,
                 (getWidth() + width) / 2f, (getHeight() + height) / 2f);
-            displayTarget.set(target);
-            canvas.drawBitmap(bitmap, source, target, paint);
+            displayTarget.set(targetRect);
+            canvas.drawBitmap(bitmap, sourceRect, targetRect, paint);
         }
         if (touchActive) {
             canvas.drawCircle(touchScreenX, touchScreenY, 24f, reticlePaint);
@@ -221,15 +227,25 @@ final class BrumCoreView extends View implements Runnable {
     @Override public boolean onTouchEvent(MotionEvent event) {
         int action = event.getActionMasked();
         if (action != MotionEvent.ACTION_DOWN && action != MotionEvent.ACTION_MOVE && action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL) return true;
-        RectF target;
-        synchronized (bitmapLock) { target = new RectF(displayTarget); }
-        boolean inside = target.contains(event.getX(), event.getY());
-        boolean pressed = action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL && target.width() > 0 && target.height() > 0 && inside;
-        float x = target.width() <= 0 ? 0 : ((event.getX() - target.left) / target.width()) * 2f - 1f;
-        float y = target.height() <= 0 ? 0 : ((event.getY() - target.top) / target.height()) * 2f - 1f;
+        synchronized (bitmapLock) { touchTarget.set(displayTarget); }
+        float tw = touchTarget.width();
+        float th = touchTarget.height();
+        boolean inside = tw > 0 && th > 0 && touchTarget.contains(event.getX(), event.getY());
+        boolean pressed;
+        if (action == MotionEvent.ACTION_DOWN) {
+            pressed = inside;
+        } else if (action == MotionEvent.ACTION_MOVE) {
+            pressed = touchActive && tw > 0 && th > 0;
+        } else {
+            pressed = false;
+        }
+        float clampedX = tw <= 0 ? 0f : Math.max(touchTarget.left, Math.min(touchTarget.right, event.getX()));
+        float clampedY = th <= 0 ? 0f : Math.max(touchTarget.top, Math.min(touchTarget.bottom, event.getY()));
+        float x = tw <= 0 ? 0f : Math.max(-1f, Math.min(1f, ((clampedX - touchTarget.left) / tw) * 2f - 1f));
+        float y = th <= 0 ? 0f : Math.max(-1f, Math.min(1f, ((clampedY - touchTarget.top) / th) * 2f - 1f));
         touchActive = pressed;
-        touchScreenX = event.getX();
-        touchScreenY = event.getY();
+        touchScreenX = clampedX;
+        touchScreenY = clampedY;
         core.setPointer(x, y, pressed);
         postInvalidateOnAnimation();
         return true;

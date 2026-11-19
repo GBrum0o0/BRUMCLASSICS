@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class MurbRemoteClient {
     public static final int MAGIC = MurbRemoteProtocol.MAGIC;
@@ -119,10 +120,61 @@ public final class MurbRemoteClient {
     private Socket socket;
     private InputStream input;
     private OutputStream output;
+    private static final class PendingFrame {
+        final byte[] pixels;
+        final int width;
+        final int height;
+        final int sequence;
+
+        PendingFrame(byte[] pixels, int width, int height, int sequence) {
+            this.pixels = pixels;
+            this.width = width;
+            this.height = height;
+            this.sequence = sequence;
+        }
+    }
+
     private Thread receiveThread;
     private Thread pingThread;
     private HandlerThread sendThread;
     private Handler sendHandler;
+    private final AtomicReference<String> pendingInputJson = new AtomicReference<>(null);
+    private final AtomicBoolean inputFlushScheduled = new AtomicBoolean(false);
+    private final AtomicReference<PendingFrame> pendingFrame = new AtomicReference<>(null);
+    private final AtomicBoolean framePostScheduled = new AtomicBoolean(false);
+
+    private final Runnable flushInputTask = new Runnable() {
+        @Override public void run() {
+            while (running.get() && connected.get()) {
+                String next = pendingInputJson.getAndSet(null);
+                if (next != null) {
+                    try {
+                        sendText(next);
+                    } catch (Exception ignored) {
+                    }
+                }
+                inputFlushScheduled.set(false);
+                if (pendingInputJson.get() == null || !inputFlushScheduled.compareAndSet(false, true)) {
+                    break;
+                }
+            }
+        }
+    };
+
+    private final Runnable flushFrameTask = new Runnable() {
+        @Override public void run() {
+            while (running.get()) {
+                PendingFrame frame = pendingFrame.getAndSet(null);
+                if (frame != null) {
+                    listener.onVideoFrame(frame.pixels, frame.width, frame.height, frame.sequence);
+                }
+                framePostScheduled.set(false);
+                if (pendingFrame.get() == null || !framePostScheduled.compareAndSet(false, true)) {
+                    break;
+                }
+            }
+        }
+    };
 
     public MurbRemoteClient(String host, int port, String token, Listener listener) {
         this.host = host;
@@ -148,6 +200,10 @@ public final class MurbRemoteClient {
     public void disconnect() {
         running.set(false);
         connected.set(false);
+        pendingInputJson.set(null);
+        pendingFrame.set(null);
+        inputFlushScheduled.set(false);
+        framePostScheduled.set(false);
         if (sendThread != null) {
             sendThread.quitSafely();
             sendThread = null;
@@ -165,6 +221,10 @@ public final class MurbRemoteClient {
     }
 
     public void sendInput(int buttons, boolean touching, int touchX, int touchY, int stickX, int stickY) {
+        sendInput(buttons, touching, touchX, touchY, stickX, stickY, 0, 0);
+    }
+
+    public void sendInput(int buttons, boolean touching, int touchX, int touchY, int stickX, int stickY, int rStickX, int rStickY) {
         if (!connected.get())
             return;
         final String json = "{\"type\":\"input\",\"buttons\":" + buttons
@@ -172,15 +232,15 @@ public final class MurbRemoteClient {
                 + ",\"x\":" + touchX
                 + ",\"y\":" + touchY
                 + ",\"stickX\":" + stickX
-                + ",\"stickY\":" + stickY + "}";
+                + ",\"stickY\":" + stickY
+                + ",\"rStickX\":" + rStickX
+                + ",\"rStickY\":" + rStickY + "}";
         Handler handler = sendHandler;
         if (handler != null) {
-            handler.post(() -> {
-                try {
-                    sendText(json);
-                } catch (Exception ignored) {
-                }
-            });
+            pendingInputJson.set(json);
+            if (inputFlushScheduled.compareAndSet(false, true)) {
+                handler.post(flushInputTask);
+            }
         }
     }
 
@@ -261,7 +321,10 @@ public final class MurbRemoteClient {
                 if (frame != null) {
                     byte[] pixels = new byte[frame.pixelBytes];
                     System.arraycopy(payload, 16, pixels, 0, frame.pixelBytes);
-                    mainHandler.post(() -> listener.onVideoFrame(pixels, frame.width, frame.height, frame.sequence));
+                    pendingFrame.set(new PendingFrame(pixels, frame.width, frame.height, frame.sequence));
+                    if (framePostScheduled.compareAndSet(false, true)) {
+                        mainHandler.post(flushFrameTask);
+                    }
                 }
             } else if (opcode == 1) {
                 try {

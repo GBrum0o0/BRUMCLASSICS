@@ -202,6 +202,10 @@ enum MurbProtocol {
         }
     }
 
+    private static let rgbColorSpace = CGColorSpaceCreateDeviceRGB()
+    private static let lut5: [UInt8] = (0..<32).map { UInt8(($0 << 3) | ($0 >> 2)) }
+    private static let lut6: [UInt8] = (0..<64).map { UInt8(($0 << 2) | ($0 >> 4)) }
+
     static func decodeVideoFrame(_ data: Data) -> DecodedFrame? {
         guard data.count >= 16 else { return nil }
         func readLE16(_ offset: Int) -> UInt16 {
@@ -221,25 +225,30 @@ enum MurbProtocol {
         let pixelCount = width * height
         guard data.count >= 16 + pixelCount * 2 else { return nil }
 
-        var rgba = [UInt8](repeating: 255, count: pixelCount * 4)
+        let byteCount = pixelCount * 4
+        let rawPtr = UnsafeMutableRawPointer.allocate(byteCount: byteCount, alignment: 4)
+        let dst = rawPtr.assumingMemoryBound(to: UInt8.self)
         data.withUnsafeBytes { rawBuffer in
             guard let base = rawBuffer.baseAddress else { return }
             let src = base.advanced(by: 16).assumingMemoryBound(to: UInt8.self)
-            for index in 0..<pixelCount {
-                let lo = UInt16(src[index * 2])
-                let hi = UInt16(src[index * 2 + 1])
-                let pixel = lo | (hi << 8)
-                let r5 = (pixel >> 11) & 0x1F
-                let g6 = (pixel >> 5) & 0x3F
-                let b5 = pixel & 0x1F
-                let out = index * 4
-                rgba[out] = UInt8((r5 << 3) | (r5 >> 2))
-                rgba[out + 1] = UInt8((g6 << 2) | (g6 >> 4))
-                rgba[out + 2] = UInt8((b5 << 3) | (b5 >> 2))
-                rgba[out + 3] = 255
+            lut5.withUnsafeBufferPointer { l5 in
+                lut6.withUnsafeBufferPointer { l6 in
+                    let p5 = l5.baseAddress!
+                    let p6 = l6.baseAddress!
+                    for index in 0..<pixelCount {
+                        let pixel = Int(src[index * 2]) | (Int(src[index * 2 + 1]) << 8)
+                        let out = index * 4
+                        dst[out] = p5[(pixel >> 11) & 0x1F]
+                        dst[out + 1] = p6[(pixel >> 5) & 0x3F]
+                        dst[out + 2] = p5[pixel & 0x1F]
+                        dst[out + 3] = 255
+                    }
+                }
             }
         }
-        let cfData = Data(rgba) as CFData
+        let cfData = Data(bytesNoCopy: rawPtr, count: byteCount, deallocator: .custom { ptr, _ in
+            ptr.deallocate()
+        }) as CFData
         guard let provider = CGDataProvider(data: cfData),
               let image = CGImage(
                   width: width,
@@ -247,7 +256,7 @@ enum MurbProtocol {
                   bitsPerComponent: 8,
                   bitsPerPixel: 32,
                   bytesPerRow: width * 4,
-                  space: CGColorSpaceCreateDeviceRGB(),
+                  space: rgbColorSpace,
                   bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
                   provider: provider,
                   decode: nil,
@@ -257,9 +266,9 @@ enum MurbProtocol {
         return DecodedFrame(sequence: sequence, width: width, height: height, image: image)
     }
 
-    static func physicalControllerMask() -> (buttons: Int, stickX: Int, stickY: Int, deviceName: String?) {
+    static func physicalControllerMask() -> (buttons: Int, stickX: Int, stickY: Int, rStickX: Int, rStickY: Int, deviceName: String?) {
         guard let controller = GCController.controllers().first(where: { !$0.isSnapshot }),
-              let pad = controller.extendedGamepad else { return (0, 0, 0, nil) }
+              let pad = controller.extendedGamepad else { return (0, 0, 0, 0, 0, nil) }
         var mask = 0
         if pad.buttonB.isPressed { mask |= buttonA }
         if pad.buttonA.isPressed { mask |= buttonB }
@@ -279,7 +288,16 @@ enum MurbProtocol {
         if pad.rightThumbstickButton?.isPressed == true { mask |= buttonR3 }
         let stickX = Int((Double(pad.leftThumbstick.xAxis.value) * 32767.0).rounded())
         let stickY = Int((-Double(pad.leftThumbstick.yAxis.value) * 32767.0).rounded())
-        return (mask, max(-32767, min(32767, stickX)), max(-32767, min(32767, stickY)), controller.vendorName ?? "Controle")
+        let rStickX = Int((Double(pad.rightThumbstick.xAxis.value) * 32767.0).rounded())
+        let rStickY = Int((-Double(pad.rightThumbstick.yAxis.value) * 32767.0).rounded())
+        return (
+            mask,
+            max(-32767, min(32767, stickX)),
+            max(-32767, min(32767, stickY)),
+            max(-32767, min(32767, rStickX)),
+            max(-32767, min(32767, rStickY)),
+            controller.vendorName ?? "Controle"
+        )
     }
 }
 
@@ -326,11 +344,13 @@ final class MurbRemoteSession: ObservableObject {
     }
 
     @Published private(set) var state: ConnectionState = .disconnected
-    @Published private(set) var secondScreenImage: UIImage?
     @Published private(set) var fps = 0
     @Published private(set) var rttMs = 0
     @Published private(set) var activeSystem: String
     @Published private(set) var physicalControllerName: String?
+
+    var onVideoFrame: ((CGImage) -> Void)?
+    private(set) var latestFrame: CGImage?
 
     let target: MurbPairingPayload
 
@@ -340,6 +360,7 @@ final class MurbRemoteSession: ObservableObject {
     private var pingTask: Task<Void, Never>?
     private var reconnectTask: Task<Void, Never>?
     private var pollTimer: Timer?
+    private var controllerObservers: [NSObjectProtocol] = []
     private var active = false
     private var frameCounter = 0
     private var lastFPSDate = Date()
@@ -351,6 +372,8 @@ final class MurbRemoteSession: ObservableObject {
     private var virtualStickX = 0
     private var virtualStickY = 0
     private var lastSentSignature = ""
+    private var isSendingInput = false
+    private var pendingInputPayload: String?
 
     init(target: MurbPairingPayload) {
         self.target = target
@@ -359,8 +382,8 @@ final class MurbRemoteSession: ObservableObject {
 
     func start() {
         active = true
+        installControllerObservers()
         refreshPhysicalController()
-        startPollTimer()
         connectSocket()
     }
 
@@ -368,6 +391,10 @@ final class MurbRemoteSession: ObservableObject {
         active = false
         reconnectTask?.cancel(); reconnectTask = nil
         pollTimer?.invalidate(); pollTimer = nil
+        for observer in controllerObservers {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        controllerObservers.removeAll()
         sendNeutralInput()
         tearDownSocket()
         state = .disconnected
@@ -389,16 +416,38 @@ final class MurbRemoteSession: ObservableObject {
         dispatchCombinedInput(force: false)
     }
 
-    private func refreshPhysicalController() {
-        physicalControllerName = GCController.controllers().first(where: { !$0.isSnapshot })?.vendorName
+    private func installControllerObservers() {
+        guard controllerObservers.isEmpty else { return }
+        let nc = NotificationCenter.default
+        controllerObservers.append(nc.addObserver(forName: .GCControllerDidConnect, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.refreshPhysicalController() }
+        })
+        controllerObservers.append(nc.addObserver(forName: .GCControllerDidDisconnect, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.refreshPhysicalController()
+                self?.dispatchCombinedInput(force: true)
+            }
+        })
     }
 
-    private func startPollTimer() {
-        pollTimer?.invalidate()
+    private func refreshPhysicalController() {
+        let name = GCController.controllers().first(where: { !$0.isSnapshot })?.vendorName
+        if physicalControllerName != name {
+            physicalControllerName = name
+        }
+        if name != nil {
+            startPollTimerIfNeeded()
+        } else {
+            pollTimer?.invalidate()
+            pollTimer = nil
+        }
+    }
+
+    private func startPollTimerIfNeeded() {
+        guard pollTimer == nil else { return }
         pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self, self.active else { return }
-                self.refreshPhysicalController()
                 self.dispatchCombinedInput(force: false)
             }
         }
@@ -410,32 +459,47 @@ final class MurbRemoteSession: ObservableObject {
         let combinedButtons = virtualButtons | physical.buttons
         let stickX = abs(physical.stickX) > abs(virtualStickX) ? physical.stickX : virtualStickX
         let stickY = abs(physical.stickY) > abs(virtualStickY) ? physical.stickY : virtualStickY
-        let signature = "\(combinedButtons)|\(virtualTouching ? 1 : 0)|\(virtualTouchX)|\(virtualTouchY)|\(stickX)|\(stickY)"
+        let rStickX = physical.rStickX
+        let rStickY = physical.rStickY
+        let signature = "\(combinedButtons)|\(virtualTouching ? 1 : 0)|\(virtualTouchX)|\(virtualTouchY)|\(stickX)|\(stickY)|\(rStickX)|\(rStickY)"
         guard force || signature != lastSentSignature else { return }
         lastSentSignature = signature
-        let payload: [String: Any] = [
-            "type": "input",
-            "buttons": combinedButtons,
-            "touching": virtualTouching,
-            "x": virtualTouchX,
-            "y": virtualTouchY,
-            "stickX": stickX,
-            "stickY": stickY
-        ]
-        guard let json = try? JSONSerialization.data(withJSONObject: payload),
-              let text = String(data: json, encoding: .utf8) else { return }
-        task.send(.string(text)) { _ in }
+        let text = "{\"type\":\"input\",\"buttons\":\(combinedButtons),\"touching\":\(virtualTouching ? "true" : "false"),\"x\":\(virtualTouchX),\"y\":\(virtualTouchY),\"stickX\":\(stickX),\"stickY\":\(stickY),\"rStickX\":\(rStickX),\"rStickY\":\(rStickY)}"
+        if isSendingInput {
+            // Keep only the newest state while an in-flight WebSocket write is completing
+            pendingInputPayload = text
+            return
+        }
+        sendInputNow(text, via: task)
+    }
+
+    private func sendInputNow(_ text: String, via socket: URLSessionWebSocketTask) {
+        isSendingInput = true
+        socket.send(.string(text)) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.isSendingInput = false
+                if let queued = self.pendingInputPayload, let activeSocket = self.task, self.state == .connected {
+                    self.pendingInputPayload = nil
+                    self.sendInputNow(queued, via: activeSocket)
+                }
+            }
+        }
     }
 
     private func sendNeutralInput() {
+        pendingInputPayload = nil
+        isSendingInput = false
         guard let task else { return }
-        let payload = "{\"type\":\"input\",\"buttons\":0,\"touching\":false,\"x\":0,\"y\":0,\"stickX\":0,\"stickY\":0}"
+        let payload = "{\"type\":\"input\",\"buttons\":0,\"touching\":false,\"x\":0,\"y\":0,\"stickX\":0,\"stickY\":0,\"rStickX\":0,\"rStickY\":0}"
         task.send(.string(payload)) { _ in }
     }
 
     private func tearDownSocket() {
         receiveTask?.cancel(); receiveTask = nil
         pingTask?.cancel(); pingTask = nil
+        pendingInputPayload = nil
+        isSendingInput = false
         task?.cancel(with: .normalClosure, reason: nil)
         task = nil
     }
@@ -455,13 +519,29 @@ final class MurbRemoteSession: ObservableObject {
         let initPingMs = Int64(Date().timeIntervalSince1970 * 1000)
         socket.send(.string("{\"type\":\"ping\",\"ts\":\(initPingMs)}")) { _ in }
 
-        receiveTask = Task { [weak self] in
+        receiveTask = Task.detached(priority: .userInitiated) { [weak self] in
             while !Task.isCancelled {
                 do {
                     let message = try await socket.receive()
-                    await MainActor.run { self?.handle(message) }
+                    switch message {
+                    case .data(let data):
+                        // Decode RGB565 -> CGImage off the main thread to keep touch/UI latency minimal
+                        if let decoded = MurbProtocol.decodeVideoFrame(data) {
+                            await MainActor.run { [weak self] in
+                                self?.deliverDecodedFrame(decoded.image)
+                            }
+                        }
+                    case .string(let text):
+                        await MainActor.run { [weak self] in
+                            self?.handleText(text)
+                        }
+                    @unknown default:
+                        break
+                    }
                 } catch {
-                    await MainActor.run { self?.handleDisconnect(error.localizedDescription) }
+                    await MainActor.run { [weak self] in
+                        self?.handleDisconnect(error.localizedDescription)
+                    }
                     return
                 }
             }
@@ -478,31 +558,31 @@ final class MurbRemoteSession: ObservableObject {
         }
     }
 
-    private func handle(_ message: URLSessionWebSocketTask.Message) {
-        switch message {
-        case .data(let data):
-            guard let decoded = MurbProtocol.decodeVideoFrame(data) else { return }
-            secondScreenImage = UIImage(cgImage: decoded.image)
-            frameCounter += 1
-            let now = Date()
-            if now.timeIntervalSince(lastFPSDate) >= 1.0 {
-                fps = frameCounter
-                frameCounter = 0
-                lastFPSDate = now
+    private func deliverDecodedFrame(_ image: CGImage) {
+        latestFrame = image
+        onVideoFrame?(image)
+        frameCounter += 1
+        let now = Date()
+        if now.timeIntervalSince(lastFPSDate) >= 1.0 {
+            fps = frameCounter
+            frameCounter = 0
+            lastFPSDate = now
+        }
+    }
+
+    private func handleText(_ text: String) {
+        guard let data = text.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+        if let sys = object["sys"] as? String, !sys.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let normalized = MurbProtocol.normalizeSystem(sys)
+            if activeSystem != normalized {
+                activeSystem = normalized
             }
-        case .string(let text):
-            guard let data = text.data(using: .utf8),
-                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
-            if let sys = object["sys"] as? String, !sys.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                activeSystem = MurbProtocol.normalizeSystem(sys)
-            }
-            if let ts = (object["ts"] as? NSNumber)?.int64Value,
-               object["pong"] != nil || (object["type"] as? String) == "pong" {
-                let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
-                rttMs = max(0, Int(nowMs - ts))
-            }
-        @unknown default:
-            break
+        }
+        if let ts = (object["ts"] as? NSNumber)?.int64Value,
+           object["pong"] != nil || (object["type"] as? String) == "pong" {
+            let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+            rttMs = max(0, Int(nowMs - ts))
         }
     }
 
@@ -677,7 +757,7 @@ struct MurbRemoteGamepadView: View {
             BrumTheme.deepBackground.ignoresSafeArea()
             MurbRemotePadCanvas(
                 system: session.activeSystem,
-                screenImage: session.secondScreenImage,
+                session: session,
                 showControls: isDualScreen ? showControls : true,
                 fillScreen: fillScreen
             ) { buttons, touching, tx, ty, sx, sy in
@@ -733,7 +813,7 @@ struct MurbRemoteGamepadView: View {
                         Button {
                             fillScreen.toggle()
                         } label: {
-                            Text(fillScreen ? "4:3" : "Tela cheia")
+                            Text(fillScreen ? (MurbProtocol.normalizeSystem(session.activeSystem) == "wiiu" ? "16:9" : "4:3") : "Tela cheia")
                                 .font(.caption2.bold())
                                 .padding(.horizontal, 10).frame(height: 36)
                                 .background(BrumTheme.surface.opacity(0.9), in: Capsule())
@@ -843,7 +923,7 @@ private struct MurbP2InviteSheet: View {
 
 private struct MurbRemotePadCanvas: UIViewRepresentable {
     let system: String
-    let screenImage: UIImage?
+    let session: MurbRemoteSession
     let showControls: Bool
     let fillScreen: Bool
     let onInput: (Int, Bool, Int, Int, Int, Int) -> Void
@@ -851,13 +931,40 @@ private struct MurbRemotePadCanvas: UIViewRepresentable {
     func makeUIView(context: Context) -> MurbRemotePadUIView {
         let view = MurbRemotePadUIView()
         view.onInput = onInput
-        view.apply(system: system, image: screenImage, showControls: showControls, fillScreen: fillScreen)
+        session.onVideoFrame = { [weak view] cgImage in
+            view?.updateVideoFrame(cgImage)
+        }
+        view.apply(system: system, showControls: showControls, fillScreen: fillScreen)
+        if let existing = session.latestFrame {
+            view.updateVideoFrame(existing)
+        }
         return view
     }
 
     func updateUIView(_ uiView: MurbRemotePadUIView, context: Context) {
         uiView.onInput = onInput
-        uiView.apply(system: system, image: screenImage, showControls: showControls, fillScreen: fillScreen)
+        session.onVideoFrame = { [weak uiView] cgImage in
+            uiView?.updateVideoFrame(cgImage)
+        }
+        uiView.apply(system: system, showControls: showControls, fillScreen: fillScreen)
+    }
+}
+
+private final class MurbRemoteOverlayView: UIView {
+    weak var owner: MurbRemotePadUIView?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isUserInteractionEnabled = false
+        isOpaque = false
+        backgroundColor = .clear
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func draw(_ rect: CGRect) {
+        owner?.drawOverlay(in: rect)
     }
 }
 
@@ -870,11 +977,35 @@ private final class MurbRemotePadUIView: UIView {
         var rect: CGRect
     }
 
+    private let videoHostView: UIView = {
+        let v = UIView()
+        v.isUserInteractionEnabled = false
+        v.backgroundColor = .clear
+        return v
+    }()
+    private let overlayView = MurbRemoteOverlayView()
+    private let screenLayer: CALayer = {
+        let l = CALayer()
+        l.magnificationFilter = .nearest
+        l.contentsGravity = .resize
+        l.backgroundColor = UIColor(white: 0.06, alpha: 1).cgColor
+        l.borderColor = UIColor(white: 1, alpha: 0.16).cgColor
+        l.borderWidth = 1
+        l.actions = [
+            "contents": NSNull(),
+            "bounds": NSNull(),
+            "position": NSNull(),
+            "frame": NSNull(),
+            "hidden": NSNull()
+        ]
+        return l
+    }()
+
     private var system = "ds"
     private var showControls = true
     private var fillScreen = false
     private var useStickForAnalog = true
-    private var screenImage: UIImage?
+    private var hasReceivedFrame = false
     private var screenRect = CGRect.zero
     private var zones: [Zone] = []
     private var dpadRect = CGRect.zero
@@ -896,26 +1027,47 @@ private final class MurbRemotePadUIView: UIView {
         super.init(frame: frame)
         isMultipleTouchEnabled = true
         backgroundColor = UIColor(red: 0.02, green: 0.024, blue: 0.03, alpha: 1)
+        videoHostView.frame = bounds
+        videoHostView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        videoHostView.layer.addSublayer(screenLayer)
+        addSubview(videoHostView)
+        overlayView.frame = bounds
+        overlayView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        overlayView.owner = self
+        addSubview(overlayView)
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    func apply(system: String, image: UIImage?, showControls: Bool, fillScreen: Bool) {
+    func updateVideoFrame(_ cgImage: CGImage) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        screenLayer.contents = cgImage
+        CATransaction.commit()
+        if !hasReceivedFrame {
+            hasReceivedFrame = true
+            overlayView.setNeedsDisplay()
+        }
+    }
+
+    func apply(system: String, showControls: Bool, fillScreen: Bool) {
         let layoutChanged = self.system != system || self.showControls != showControls || self.fillScreen != fillScreen
         self.system = system
-        self.screenImage = image
         self.showControls = showControls
         self.fillScreen = fillScreen
         if layoutChanged {
             rebuildZones()
+            overlayView.setNeedsDisplay()
         }
-        setNeedsDisplay()
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        videoHostView.frame = bounds
+        overlayView.frame = bounds
         rebuildZones()
+        overlayView.setNeedsDisplay()
     }
 
     private func rebuildZones() {
@@ -926,18 +1078,33 @@ private final class MurbRemotePadUIView: UIView {
 
         let safe = bounds.inset(by: safeAreaInsets)
         if MurbProtocol.supportsDualScreen(system) {
+            let targetAspect: CGFloat = MurbProtocol.normalizeSystem(system) == "wiiu" ? (16.0 / 9.0) : (4.0 / 3.0)
             if fillScreen {
-                screenRect = bounds
-            } else {
-                let targetAspect: CGFloat = MurbProtocol.normalizeSystem(system) == "wiiu" ? (16.0 / 9.0) : (4.0 / 3.0)
+                // Edge-to-edge maximized aspect-fit without stretching or cutting touch edges
                 let availW = max(0, bounds.width)
                 let availH = max(0, bounds.height)
                 let w = min(availW, availH * targetAspect)
                 let h = w / targetAspect
                 screenRect = CGRect(x: bounds.midX - w / 2, y: bounds.midY - h / 2, width: w, height: h)
+            } else {
+                let topMargin = safe.minY + 48
+                let availW = max(0, safe.width - 16)
+                let availH = max(40, bounds.height - topMargin - max(8, safeAreaInsets.bottom))
+                let w = min(availW, availH * targetAspect)
+                let h = w / targetAspect
+                screenRect = CGRect(x: bounds.midX - w / 2, y: topMargin + (availH - h) / 2, width: w, height: h)
             }
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            screenLayer.isHidden = false
+            screenLayer.frame = screenRect
+            CATransaction.commit()
         } else {
             screenRect = .zero
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            screenLayer.isHidden = true
+            CATransaction.commit()
         }
 
         guard showControls else {
@@ -993,19 +1160,10 @@ private final class MurbRemotePadUIView: UIView {
         }
     }
 
-    override func draw(_ rect: CGRect) {
+    fileprivate func drawOverlay(in rect: CGRect) {
         guard let ctx = UIGraphicsGetCurrentContext() else { return }
         if !screenRect.isEmpty {
-            ctx.setFillColor(UIColor(white: 0.06, alpha: 1).cgColor)
-            ctx.fill(screenRect)
-            if let cgImage = screenImage?.cgImage {
-                ctx.saveGState()
-                ctx.translateBy(x: 0, y: screenRect.minY + screenRect.maxY)
-                ctx.scaleBy(x: 1, y: -1)
-                ctx.interpolationQuality = .none
-                ctx.draw(cgImage, in: screenRect)
-                ctx.restoreGState()
-            } else {
+            if !hasReceivedFrame {
                 let placeholder = "AGUARDANDO SEGUNDA TELA DO PC" as NSString
                 placeholder.draw(
                     at: CGPoint(x: max(screenRect.minX + 12, screenRect.midX - 115), y: screenRect.midY - 8),
@@ -1013,9 +1171,6 @@ private final class MurbRemotePadUIView: UIView {
                                      .foregroundColor: UIColor(white: 0.55, alpha: 1)]
                 )
             }
-            ctx.setStrokeColor(UIColor(white: 1, alpha: 0.16).cgColor)
-            ctx.setLineWidth(1)
-            ctx.stroke(screenRect)
             if let ripple = lastTouchRipple, screenTouchID != nil {
                 ctx.setStrokeColor(UIColor(red: 0.62, green: 1, blue: 0.23, alpha: 0.95).cgColor)
                 ctx.setLineWidth(2.5)
@@ -1114,7 +1269,7 @@ private final class MurbRemotePadUIView: UIView {
                 dpadTouchID = nil; dpadMask = 0
                 stickTouchID = nil; stickVector = .zero
                 rebuildZones()
-                setNeedsDisplay()
+                overlayView.setNeedsDisplay()
                 emit()
                 continue
             }
@@ -1139,7 +1294,7 @@ private final class MurbRemotePadUIView: UIView {
                 updateScreenTouch(at: point)
             }
         }
-        setNeedsDisplay()
+        overlayView.setNeedsDisplay()
         emit()
     }
 
@@ -1158,7 +1313,7 @@ private final class MurbRemotePadUIView: UIView {
                 }
             }
         }
-        setNeedsDisplay()
+        overlayView.setNeedsDisplay()
         emit()
     }
 
@@ -1178,7 +1333,7 @@ private final class MurbRemotePadUIView: UIView {
             if id == stickTouchID { stickTouchID = nil; stickVector = .zero }
             if id == screenTouchID { screenTouchID = nil; lastTouchRipple = nil }
         }
-        setNeedsDisplay()
+        overlayView.setNeedsDisplay()
         emit()
     }
 

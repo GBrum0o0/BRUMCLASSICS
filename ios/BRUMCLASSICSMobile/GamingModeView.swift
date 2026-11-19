@@ -11,17 +11,29 @@ struct GamingModeView: View {
     @State private var showLibrary = false
     @AppStorage("gaming-mode-favorites-v1") private var favoritesJSON = "[]"
 
+    @State private var catalogSnapshot = GamingCatalogSnapshot.empty
     private let columns = [GridItem(.adaptive(minimum: 135), spacing: 16)]
     private var favoriteIDs: Set<String> {
         guard let data = favoritesJSON.data(using: .utf8),
               let ids = try? JSONDecoder().decode([String].self, from: data) else { return [] }
         return Set(ids)
     }
-    private var libraryEntries: [GamingCatalogEntry] {
-        GamingModeCatalog.library(local: pocket.romFolderGames, records: pocket.games, computer: store.snapshot.games)
+    private var catalogFingerprint: String {
+        let romPart = pocket.romFolderGames.map { "\($0.id)" }.joined(separator: ",")
+        let recPart = pocket.games.map { "\($0.filename):\($0.launcherGameID):\($0.lastPlayedAt?.timeIntervalSince1970 ?? 0)" }.joined(separator: ",")
+        let pcPart = store.snapshot.games.map { "\($0.id):\($0.installed ? 1 : 0):\($0.lastPlayedAt)" }.joined(separator: ",")
+        return "\(romPart)|\(recPart)|\(pcPart)|\(favoritesJSON)"
     }
-    private var recentEntries: [GamingCatalogEntry] {
-        GamingModeCatalog.recent(libraryEntries, favorites: favoriteIDs)
+    private var libraryEntries: [GamingCatalogEntry] { catalogSnapshot.library }
+    private var recentEntries: [GamingCatalogEntry] { catalogSnapshot.recent }
+
+    private func refreshCatalog() {
+        catalogSnapshot = GamingModeCatalog.buildSnapshot(
+            local: pocket.romFolderGames,
+            records: pocket.games,
+            computer: store.snapshot.games,
+            favorites: favoriteIDs
+        )
     }
 
     var body: some View {
@@ -66,9 +78,16 @@ struct GamingModeView: View {
         }
         .background(BrumTheme.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
+        .onAppear {
+            refreshCatalog()
+        }
         .task {
             GamingOrientation.request(.landscape)
             await pocket.refreshROMFolder()
+            refreshCatalog()
+        }
+        .task(id: catalogFingerprint) {
+            refreshCatalog()
         }
         .fullScreenCover(item: $selectedGame) { GamingGameView(game: $0) }
         .fullScreenCover(item: $selectedROM) { GamingROMDetailView(rom: $0) }
@@ -98,12 +117,15 @@ struct GamingModeView: View {
         }
     }
 
+    private func matchedComputerGame(for rom: ROMFolderGame) -> Game? {
+        catalogSnapshot.matchedByROMID[rom.id]
+            ?? pocket.launcherGame(for: rom, launcher: store)
+    }
+
     private func artwork(for entry: GamingCatalogEntry) -> GamingArtwork {
         switch entry {
         case .local(let rom, _):
-            let matched = pocket.launcherGame(for: rom, launcher: store)
-                ?? GamingModeCatalog.matchedComputerGame(for: rom, records: pocket.games, computer: store.snapshot.games)
-            return GamingArtwork(game: matched, rom: rom)
+            return GamingArtwork(game: matchedComputerGame(for: rom), rom: rom)
         case .computer(let game): return GamingArtwork(game: game)
         }
     }
@@ -119,8 +141,7 @@ struct GamingModeView: View {
         ZStack(alignment: .topTrailing) {
             switch entry {
             case .local(let rom, _):
-                let matched = pocket.launcherGame(for: rom, launcher: store)
-                    ?? GamingModeCatalog.matchedComputerGame(for: rom, records: pocket.games, computer: store.snapshot.games)
+                let matched = matchedComputerGame(for: rom)
                 ROMFolderGameTile(
                     rom: rom,
                     launcherGame: matched,
@@ -172,6 +193,14 @@ enum GamingCatalogEntry: Identifiable {
         case .computer(let game): return GamingModeCatalog.date(game.lastPlayedAt)
         }
     }
+}
+
+struct GamingCatalogSnapshot {
+    let library: [GamingCatalogEntry]
+    let recent: [GamingCatalogEntry]
+    let matchedByROMID: [ROMFolderGame.ID: Game]
+
+    static let empty = GamingCatalogSnapshot(library: [], recent: [], matchedByROMID: [:])
 }
 
 enum GamingModeCatalog {
@@ -228,6 +257,14 @@ enum GamingModeCatalog {
         return false
     }
 
+    private static let dateLock = NSLock()
+    private static let isoFractionalFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+    private static let isoFormatter = ISO8601DateFormatter()
+
     static func matchedComputerGame(for rom: ROMFolderGame, records: [PocketClassic], computer: [Game]) -> Game? {
         if let linked = records.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame && !$0.launcherGameID.isEmpty }),
            let exact = computer.first(where: { $0.id == linked.launcherGameID }) {
@@ -249,54 +286,182 @@ enum GamingModeCatalog {
         return pool.first
     }
 
-    static func library(local: [ROMFolderGame], records: [PocketClassic], computer: [Game]) -> [GamingCatalogEntry] {
+    private static func matchedComputerGame(
+        for rom: ROMFolderGame,
+        system: EmulatedSystemID?,
+        record: PocketClassic?,
+        computerByID: [String: Game],
+        computerByTitleKey: [String: [Game]]
+    ) -> Game? {
+        if let linkedID = record?.launcherGameID, !linkedID.isEmpty,
+           let exact = computerByID[linkedID] {
+            return exact
+        }
+        let titleKey = normalizedKey(rom.title)
+        let fileKey = normalizedKey(rom.filename)
+        var candidates: [Game] = []
+        var seenIDs = Set<String>()
+        func appendCandidates(for key: String) {
+            guard !key.isEmpty, let bucket = computerByTitleKey[key] else { return }
+            for game in bucket {
+                guard game.isClassic || platformMatches(system, pcPlatform: game.platform) else { continue }
+                if seenIDs.insert(game.id).inserted {
+                    candidates.append(game)
+                }
+            }
+        }
+        appendCandidates(for: titleKey)
+        if fileKey != titleKey {
+            appendCandidates(for: fileKey)
+        }
+        if candidates.isEmpty { return nil }
+        let platformFiltered = candidates.filter { platformMatches(system, pcPlatform: $0.platform) }
+        let pool = platformFiltered.isEmpty ? candidates : platformFiltered
+        if let installedMatch = pool.first(where: \.installed) { return installedMatch }
+        return pool.first
+    }
+
+    static func buildSnapshot(
+        local: [ROMFolderGame],
+        records: [PocketClassic],
+        computer: [Game],
+        favorites: Set<String> = [],
+        recentLimit: Int = 12
+    ) -> GamingCatalogSnapshot {
+        var recordsByFilename: [String: PocketClassic] = [:]
+        recordsByFilename.reserveCapacity(records.count)
+        for record in records {
+            let key = record.filename.lowercased()
+            if recordsByFilename[key] == nil {
+                recordsByFilename[key] = record
+            }
+        }
+
+        var computerByID: [String: Game] = [:]
+        var computerByTitleKey: [String: [Game]] = [:]
+        var pcDateByID: [String: Date] = [:]
+        computerByID.reserveCapacity(computer.count)
+        computerByTitleKey.reserveCapacity(computer.count)
+        for game in computer {
+            computerByID[game.id] = game
+            let gKey = normalizedKey(game.title)
+            if !gKey.isEmpty {
+                computerByTitleKey[gKey, default: []].append(game)
+            }
+            if let parsed = date(game.lastPlayedAt) {
+                pcDateByID[game.id] = parsed
+            }
+        }
+
         var matchedPCIDs = Set<String>()
         var localTitleKeys = Set<String>()
-        let localEntries: [GamingCatalogEntry] = local.map { rom in
-            let record = records.first { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }
+        var matchedByROMID: [ROMFolderGame.ID: Game] = [:]
+        matchedByROMID.reserveCapacity(local.count)
+
+        var localEntries: [GamingCatalogEntry] = []
+        localEntries.reserveCapacity(local.count)
+        for rom in local {
+            let record = recordsByFilename[rom.filename.lowercased()]
             if let explicitID = record?.launcherGameID, !explicitID.isEmpty {
                 matchedPCIDs.insert(explicitID)
             }
-            let matchedPC = matchedComputerGame(for: rom, records: records, computer: computer)
+            let system = IntegratedEmulatorSupport.system(for: rom)
+            let matchedPC = matchedComputerGame(
+                for: rom,
+                system: system,
+                record: record,
+                computerByID: computerByID,
+                computerByTitleKey: computerByTitleKey
+            )
             if let matchedPC {
                 matchedPCIDs.insert(matchedPC.id)
+                matchedByROMID[rom.id] = matchedPC
             }
-            let sysKey = IntegratedEmulatorSupport.system(for: rom)?.rawValue ?? ""
+            let sysKey = system?.rawValue ?? ""
             let tKey = normalizedKey(rom.title)
             if !tKey.isEmpty {
                 localTitleKeys.insert("\(tKey)|\(sysKey)")
             }
-            let latestDate = [record?.lastPlayedAt, date(matchedPC?.lastPlayedAt ?? "")].compactMap { $0 }.max()
-            return GamingCatalogEntry.local(rom, latestDate)
+            let pcDate = matchedPC.flatMap { pcDateByID[$0.id] }
+            let latestDate = [record?.lastPlayedAt, pcDate].compactMap { $0 }.max()
+            localEntries.append(GamingCatalogEntry.local(rom, latestDate))
         }
+
         var seenPCKeys = Set<String>()
-        let pcEntries = computer.compactMap { game -> GamingCatalogEntry? in
-            guard game.installed, !matchedPCIDs.contains(game.id) else { return nil }
+        var pcEntries: [GamingCatalogEntry] = []
+        pcEntries.reserveCapacity(computer.count)
+        for game in computer {
+            guard game.installed, !matchedPCIDs.contains(game.id) else { continue }
             let gKey = normalizedKey(game.title)
             let pKey = normalizedPlatform(game.platform)
-            if !gKey.isEmpty && game.isClassic {
-                if localTitleKeys.contains("\(gKey)|\(pKey)") { return nil }
+            if !gKey.isEmpty && game.isClassic && localTitleKeys.contains("\(gKey)|\(pKey)") {
+                continue
             }
             let dedupKey = gKey.isEmpty ? "id:\(game.id)" : "\(gKey)|\(pKey)"
-            guard seenPCKeys.insert(dedupKey).inserted else { return nil }
-            return GamingCatalogEntry.computer(game)
+            guard seenPCKeys.insert(dedupKey).inserted else { continue }
+            pcEntries.append(GamingCatalogEntry.computer(game))
         }
-        return (localEntries + pcEntries).sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+
+        let library = (localEntries + pcEntries).sorted {
+            $0.title.localizedStandardCompare($1.title) == .orderedAscending
+        }
+        let recentEntries = recent(library, favorites: favorites, limit: recentLimit, pcDates: pcDateByID)
+        return GamingCatalogSnapshot(library: library, recent: recentEntries, matchedByROMID: matchedByROMID)
+    }
+
+    static func library(local: [ROMFolderGame], records: [PocketClassic], computer: [Game]) -> [GamingCatalogEntry] {
+        // Backing snapshot powers GamingModeCatalog.library while preserving linear O(N + M) indexing.
+        buildSnapshot(local: local, records: records, computer: computer).library
     }
 
     static func recent(_ entries: [GamingCatalogEntry], favorites: Set<String>, limit: Int = 12) -> [GamingCatalogEntry] {
-        let pinned = entries.filter { favorites.contains($0.id) }
-            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
-        let played = entries.filter { $0.lastPlayedAt != nil && !favorites.contains($0.id) }
-            .sorted { ($0.lastPlayedAt ?? .distantPast) > ($1.lastPlayedAt ?? .distantPast) }
-        return Array((pinned + played).prefix(max(0, limit)))
+        recent(entries, favorites: favorites, limit: limit, pcDates: nil)
+    }
+
+    private static func recent(
+        _ entries: [GamingCatalogEntry],
+        favorites: Set<String>,
+        limit: Int,
+        pcDates: [String: Date]?
+    ) -> [GamingCatalogEntry] {
+        let cap = max(0, limit)
+        guard cap > 0 else { return [] }
+        var pinned: [GamingCatalogEntry] = []
+        var played: [(entry: GamingCatalogEntry, date: Date)] = []
+        for entry in entries {
+            if favorites.contains(entry.id) {
+                pinned.append(entry)
+                continue
+            }
+            let playedAt: Date?
+            switch entry {
+            case .local(_, let date):
+                playedAt = date
+            case .computer(let game):
+                playedAt = pcDates?[game.id] ?? date(game.lastPlayedAt)
+            }
+            if let playedAt {
+                played.append((entry, playedAt))
+            }
+        }
+        pinned.sort { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+        if pinned.count >= cap {
+            return Array(pinned.prefix(cap))
+        }
+        played.sort { $0.date > $1.date }
+        var result = pinned
+        result.reserveCapacity(min(cap, pinned.count + played.count))
+        for item in played.prefix(cap - pinned.count) {
+            result.append(item.entry)
+        }
+        return result
     }
 
     static func date(_ stamp: String) -> Date? {
         guard !stamp.isEmpty else { return nil }
-        let fractional = ISO8601DateFormatter()
-        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return fractional.date(from: stamp) ?? ISO8601DateFormatter().date(from: stamp)
+        dateLock.lock()
+        defer { dateLock.unlock() }
+        return isoFractionalFormatter.date(from: stamp) ?? isoFormatter.date(from: stamp)
     }
 }
 

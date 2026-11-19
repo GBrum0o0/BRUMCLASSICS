@@ -52,6 +52,8 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
     private int physicalButtons;
     private int physicalStickX;
     private int physicalStickY;
+    private int physicalRStickX;
+    private int physicalRStickY;
     private int virtualButtons;
     private boolean virtualTouching;
     private int virtualTouchX;
@@ -201,7 +203,7 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
         int combined = virtualButtons | physicalButtons;
         int sx = Math.abs(physicalStickX) > Math.abs(virtualStickX) ? physicalStickX : virtualStickX;
         int sy = Math.abs(physicalStickY) > Math.abs(virtualStickY) ? physicalStickY : virtualStickY;
-        client.sendInput(combined, virtualTouching, virtualTouchX, virtualTouchY, sx, sy);
+        client.sendInput(combined, virtualTouching, virtualTouchX, virtualTouchY, sx, sy, physicalRStickX, physicalRStickY);
     }
 
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
@@ -229,6 +231,8 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
 
             physicalStickX = Math.round(clamp(event.getAxisValue(MotionEvent.AXIS_X)) * 32767f);
             physicalStickY = Math.round(clamp(event.getAxisValue(MotionEvent.AXIS_Y)) * 32767f);
+            physicalRStickX = Math.round(clamp(event.getAxisValue(MotionEvent.AXIS_Z)) * 32767f);
+            physicalRStickY = Math.round(clamp(event.getAxisValue(MotionEvent.AXIS_RZ)) * 32767f);
             float l2 = event.getAxisValue(MotionEvent.AXIS_LTRIGGER);
             float r2 = event.getAxisValue(MotionEvent.AXIS_RTRIGGER);
             if (l2 > 0.25f) physicalButtons |= MurbRemoteClient.BTN_L2; else physicalButtons &= ~MurbRemoteClient.BTN_L2;
@@ -333,6 +337,10 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
 
     @Override protected void onPause() {
         physicalButtons = 0;
+        physicalStickX = 0;
+        physicalStickY = 0;
+        physicalRStickX = 0;
+        physicalRStickY = 0;
         virtualButtons = 0;
         virtualTouching = false;
         dispatchCombinedInput();
@@ -411,6 +419,7 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
             strokePaint.setStyle(Paint.Style.STROKE);
             textPaint.setTypeface(Typeface.DEFAULT_BOLD);
             textPaint.setTextAlign(Paint.Align.CENTER);
+            bitmapPaint.setFilterBitmap(true);
         }
 
         void setListener(Listener listener) { this.listener = listener; }
@@ -446,16 +455,14 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
             float topPad = 52f * d;
 
             if (MurbRemoteClient.supportsDualScreen(system)) {
-                if (fillScreen) {
-                    screenRect.set(10f * d, topPad, w - 10f * d, h - 10f * d);
-                } else {
-                    float availW = w - 20f * d;
-                    float availH = Math.max(40f * d, h - topPad - 10f * d);
-                    float aspect = "wiiu".equals(system) ? (16f / 9f) : (4f / 3f);
-                    float sw = Math.min(availW, availH * aspect);
-                    float sh = sw / aspect;
-                    screenRect.set((w - sw) / 2f, topPad + (availH - sh) / 2f, (w + sw) / 2f, topPad + (availH + sh) / 2f);
-                }
+                float horizPad = fillScreen ? 8f * d : 20f * d;
+                float availW = Math.max(40f * d, w - horizPad);
+                float availH = Math.max(40f * d, h - (fillScreen ? 8f * d : topPad + 10f * d));
+                float aspect = "wiiu".equals(system) ? (16f / 9f) : (4f / 3f);
+                float sw = Math.min(availW, availH * aspect);
+                float sh = sw / aspect;
+                float topY = fillScreen ? (h - sh) / 2f : topPad + (availH - sh) / 2f;
+                screenRect.set((w - sw) / 2f, topY, (w + sw) / 2f, topY + sh);
             }
 
             if (!showControls) return;

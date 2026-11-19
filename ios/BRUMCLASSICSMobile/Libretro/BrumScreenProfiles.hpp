@@ -5,11 +5,13 @@ namespace brum {
 // Atlas layouts belong to adapters, never to ScreenManager. Unrecognized output
 // stays a single surface rather than guessing and sending touch to the wrong area.
 inline std::vector<Screen> libretroScreens(const std::string& core, unsigned width, unsigned height) {
-    if (core == "skyemu" && width == 256 && height == 384)
+    if ((core == "skyemu" || core == "melonds" || core == "desmume") &&
+        width >= 256 && height >= 384 && (height * 2u == width * 3u))
         return {{"primary", "video", {0, 0, 1, 0.5}, 256, 192, false},
                 {"secondary", "video", {0, 0.5, 1, 0.5}, 256, 192, true}};
-    // Azahar software adapter fixes the default top/bottom layout at 1x.
-    if (core == "azahar" && width == 400 && height == 480)
+    // Azahar/Citra software & scaled adapters keep the 400:480 (5:6) top/bottom layout.
+    if ((core == "azahar" || core == "citra") &&
+        width >= 400 && height >= 480 && (width * 6u == height * 5u))
         return {{"primary", "video", {0, 0, 1, 0.5}, 400, 240, false},
                 {"secondary", "video", {0.1, 0.5, 0.8, 0.5}, 320, 240, true}};
     return {{"primary", "video", {0, 0, 1, 1}, static_cast<double>(width), static_cast<double>(height), false}};

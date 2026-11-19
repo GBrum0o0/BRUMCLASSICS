@@ -247,6 +247,7 @@ public:
     }
 
     void setPointer(int16_t x, int16_t y, bool pressed) {
+        if (pressed && y == 0) y = 1;
         pointerX = x; pointerY = y; pointerPressed = pressed;
     }
 
@@ -466,7 +467,9 @@ private:
         if (device == BRUM_RETRO_DEVICE_POINTER && port == 0) {
             if (id == BRUM_RETRO_DEVICE_ID_POINTER_X) return session->pointerX.load(std::memory_order_relaxed);
             if (id == BRUM_RETRO_DEVICE_ID_POINTER_Y) return session->pointerY.load(std::memory_order_relaxed);
-            if (id == BRUM_RETRO_DEVICE_ID_POINTER_PRESSED) return session->pointerPressed.load(std::memory_order_relaxed) ? 1 : 0;
+            if (id == BRUM_RETRO_DEVICE_ID_POINTER_PRESSED || id == BRUM_RETRO_DEVICE_ID_POINTER_COUNT) {
+                return session->pointerPressed.load(std::memory_order_relaxed) ? 1 : 0;
+            }
         }
         return 0;
     }
