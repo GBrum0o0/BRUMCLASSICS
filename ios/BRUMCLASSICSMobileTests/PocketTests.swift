@@ -525,6 +525,29 @@ final class PocketTests: XCTestCase {
                        ["local:3ds/jogo.3ds", "local:n64/outro.z64"])
         XCTAssertNotNil(GamingModeCatalog.date("2026-10-07T10:30:00.123Z"))
     }
+    func testGamingModeCatalogDeduplicatesLocalROMMatchingPCGameByTitleAndPlatformAndPreferFallbackHost() throws {
+        let dsROM = ROMFolderGame(relativePath: "DS/Mario Kart DS (USA).nds", filename: "Mario Kart DS (USA).nds", title: "Mario Kart DS", fileSize: 100)
+        let pcGamesData = """
+        [
+          {"id":"pc-ds-dup","title":"Mario Kart DS","description":"","category":"classic","platform":"Nintendo DS","store":"local","genre":"","collectionId":"","sizeBytes":0,"playtimeMinutes":45,"playtimeAvailable":true,"achievementsCollected":null,"achievementsTotal":null,"achievementsAvailable":false,"achievements":[],"storyCompleted":false,"favorite":false,"wantToPlay":false,"libraryStateRevision":0,"notes":{"whereStopped":"","objectives":"","tips":"","commands":"","revision":0,"updatedAt":""},"installed":true,"integrityStatus":"verified","lastPlayedAt":"","artworkPath":""},
+          {"id":"pc-wiiu-1","title":"Mario Kart 8","description":"","category":"classic","platform":"Wii U","store":"local","genre":"","collectionId":"","sizeBytes":0,"playtimeMinutes":90,"playtimeAvailable":true,"achievementsCollected":null,"achievementsTotal":null,"achievementsAvailable":false,"achievements":[],"storyCompleted":false,"favorite":false,"wantToPlay":false,"libraryStateRevision":0,"notes":{"whereStopped":"","objectives":"","tips":"","commands":"","revision":0,"updatedAt":""},"installed":true,"integrityStatus":"verified","lastPlayedAt":"","artworkPath":""},
+          {"id":"pc-wiiu-2","title":"Mario Kart 8 (USA)","description":"","category":"classic","platform":"Nintendo Wii U","store":"local","genre":"","collectionId":"","sizeBytes":0,"playtimeMinutes":10,"playtimeAvailable":true,"achievementsCollected":null,"achievementsTotal":null,"achievementsAvailable":false,"achievements":[],"storyCompleted":false,"favorite":false,"wantToPlay":false,"libraryStateRevision":0,"notes":{"whereStopped":"","objectives":"","tips":"","commands":"","revision":0,"updatedAt":""},"installed":true,"integrityStatus":"verified","lastPlayedAt":"","artworkPath":""}
+        ]
+        """.data(using: .utf8)!
+        let pcGames = try JSONDecoder().decode([Game].self, from: pcGamesData)
+        let library = GamingModeCatalog.library(local: [dsROM], records: [], computer: pcGames)
+        XCTAssertEqual(library.count, 2)
+        XCTAssertEqual(library.map(\.id), ["local:ds/mario kart ds (usa).nds", "pc:pc-wiiu-1"])
+
+        let multiNicInfo = BridgeClient.MurbRemoteSessionInfo(
+            available: true, host: "172.25.0.1", port: 8089, token: "abc123",
+            session: "s9", qrUri: "murb://gamepad?ip=172.25.0.1&port=8089&token=abc123",
+            p2QrUri: nil, system: "gamepad"
+        )
+        let preferred = try XCTUnwrap(MurbPairingPayload.resolve(from: multiNicInfo, fallbackHost: "192.168.1.44", preferFallbackHost: true))
+        XCTAssertEqual(preferred.host, "192.168.1.44")
+        XCTAssertEqual(preferred.system, "gamepad")
+    }
     func testDiscStagingCopiesTracksAndRemovesOnlyFailedPrivateCopy() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let source = root.appendingPathComponent("source")

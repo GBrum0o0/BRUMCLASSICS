@@ -102,4 +102,58 @@ public final class ClassicsRules {
         if (region != null) for (String candidate : candidates) if (candidate.contains(region)) return candidate;
         return candidates.get(0);
     }
+
+    public static String normalizedPlatform(String value) {
+        if (value == null) return "";
+        String lower = value.trim().toLowerCase(Locale.ROOT);
+        switch (lower) {
+            case "gb": case "game boy": return "gb";
+            case "gbc": case "game boy color": return "gbc";
+            case "gba": case "game boy advance": return "gba";
+            case "ds": case "nds": case "nintendo ds": return "nds";
+            case "3ds": case "n3ds": case "nintendo 3ds": case "citra": case "azahar": return "3ds";
+            case "nes": case "nintendo": case "famicom": case "nintendo entertainment system": return "nes";
+            case "sfc": case "snes": case "super nintendo": case "super famicom": return "snes";
+            case "n64": case "nintendo 64": case "z64": case "v64": return "n64";
+            case "gc": case "gamecube": case "nintendo gamecube": return "gamecube";
+            case "wii": case "nintendo wii": return "wii";
+            case "wiiu": case "wii u": case "nintendo wii u": case "cemu": return "wiiu";
+            case "psx": case "ps1": case "playstation": case "playstation 1": return "ps1";
+            case "ps2": case "playstation 2": return "ps2";
+            case "psp": case "playstation portable": return "psp";
+            case "md": case "gen": case "genesis": case "megadrive": case "mega drive": case "sega genesis": return "megadrive";
+            case "sms": case "master system": case "sega master system": return "sms";
+            case "gg": case "gamegear": case "game gear": return "gamegear";
+            case "segacd": case "sega cd": case "mega cd": return "segacd";
+            case "32x": case "sega 32x": return "32x";
+            case "saturn": case "sega saturn": return "saturn";
+            case "dreamcast": case "sega dreamcast": return "dreamcast";
+            case "pce": case "pc engine": case "turbografx-16": case "turbografx 16": return "pce";
+            case "neogeo": case "neo geo": case "neo-geo": return "neogeo";
+            case "ws": case "wonderswan": return "ws";
+            case "wsc": case "wonderswan color": return "wsc";
+            case "a2600": case "atari2600": case "atari 2600": return "atari2600";
+            case "arcade": case "fbneo": case "mame": return "arcade";
+            default: return lower;
+        }
+    }
+
+    public static boolean platformMatches(String a, String b) {
+        String pA = normalizedPlatform(a);
+        String pB = normalizedPlatform(b);
+        if (pA.isEmpty() || pB.isEmpty()) return false;
+        if (pA.equals(pB)) return true;
+        if (("gb".equals(pA) || "gbc".equals(pA)) && ("gb".equals(pB) || "gbc".equals(pB))) return true;
+        return ("ws".equals(pA) || "wsc".equals(pA)) && ("ws".equals(pB) || "wsc".equals(pB));
+    }
+
+    public static boolean sameClassicGame(String titleA, String platformA, String titleB, String platformB) {
+        String normA = normalizedTitle(titleA);
+        String normB = normalizedTitle(titleB);
+        if (normA.isEmpty() || !normA.equals(normB)) return false;
+        String pA = normalizedPlatform(platformA);
+        String pB = normalizedPlatform(platformB);
+        if (pA.isEmpty() || pB.isEmpty()) return true;
+        return platformMatches(pA, pB);
+    }
 }

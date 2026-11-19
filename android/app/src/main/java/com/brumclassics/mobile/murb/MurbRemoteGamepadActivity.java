@@ -85,6 +85,11 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
         super.onCreate(savedInstanceState);
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        if (Build.VERSION.SDK_INT >= 28) {
+            WindowManager.LayoutParams lp = getWindow().getAttributes();
+            lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            getWindow().setAttributes(lp);
+        }
         hideSystemUI();
 
         host = getIntent().getStringExtra("host");
@@ -127,7 +132,7 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
         });
         scaleToggle = pillButton("Tela cheia", false, v -> {
             canvasView.setFillScreen(!canvasView.isFillScreen());
-            scaleToggle.setText(canvasView.isFillScreen() ? "4:3" : "Tela cheia");
+            scaleToggle.setText(canvasView.isFillScreen() ? ("wiiu".equals(system) ? "16:9" : "4:3") : "Tela cheia");
         });
         TextView reconnect = pillButton("Reconectar", false, v -> startClient());
 
@@ -179,6 +184,7 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
         boolean dual = MurbRemoteClient.supportsDualScreen(system);
         modeToggle.setVisibility(dual ? View.VISIBLE : View.GONE);
         scaleToggle.setVisibility(dual ? View.VISIBLE : View.GONE);
+        scaleToggle.setText(canvasView.isFillScreen() ? ("wiiu".equals(system) ? "16:9" : "4:3") : "Tela cheia");
         if (!dual) canvasView.setShowControls(true);
         updateControlsToggle();
     }
@@ -346,6 +352,7 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
     @SuppressWarnings("deprecation")
     private void hideSystemUI() {
         if (Build.VERSION.SDK_INT >= 30) {
+            getWindow().setDecorFitsSystemWindows(false);
             WindowInsetsController c = getWindow().getInsetsController();
             if (c != null) {
                 c.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
@@ -354,6 +361,8 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
         } else {
             getWindow().getDecorView().setSystemUiVisibility(
                 View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
             );
         }
     }
@@ -442,7 +451,7 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
                 } else {
                     float availW = w - 20f * d;
                     float availH = Math.max(40f * d, h - topPad - 10f * d);
-                    float aspect = 4f / 3f;
+                    float aspect = "wiiu".equals(system) ? (16f / 9f) : (4f / 3f);
                     float sw = Math.min(availW, availH * aspect);
                     float sh = sw / aspect;
                     screenRect.set((w - sw) / 2f, topPad + (availH - sh) / 2f, (w + sw) / 2f, topPad + (availH + sh) / 2f);
@@ -457,22 +466,23 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
             else dpadRect.set(cx - 68f * d, cy - 68f * d, cx + 68f * d, cy + 68f * d);
             if (analog) modeSwitchRect.set(cx - 34f * d, cy - 106f * d, cx + 34f * d, cy - 78f * d);
 
-            zones.add(new Zone(MurbRemoteClient.BTN_L, "L", new RectF(16f * d, 56f * d, 84f * d, 96f * d), false));
-            zones.add(new Zone(MurbRemoteClient.BTN_R, "R", new RectF(w - 84f * d, 56f * d, w - 16f * d, 96f * d), false));
+            boolean xbox = "gamepad".equals(system);
+            zones.add(new Zone(MurbRemoteClient.BTN_L, xbox ? "LB" : "L", new RectF(16f * d, 56f * d, 84f * d, 96f * d), false));
+            zones.add(new Zone(MurbRemoteClient.BTN_R, xbox ? "RB" : "R", new RectF(w - 84f * d, 56f * d, w - 16f * d, 96f * d), false));
             if (analog) {
-                zones.add(new Zone(MurbRemoteClient.BTN_L2, "L2", new RectF(92f * d, 56f * d, 152f * d, 96f * d), false));
-                zones.add(new Zone(MurbRemoteClient.BTN_R2, "R2", new RectF(w - 152f * d, 56f * d, w - 92f * d, 96f * d), false));
+                zones.add(new Zone(MurbRemoteClient.BTN_L2, xbox ? "LT" : "L2", new RectF(92f * d, 56f * d, 152f * d, 96f * d), false));
+                zones.add(new Zone(MurbRemoteClient.BTN_R2, xbox ? "RT" : "R2", new RectF(w - 152f * d, 56f * d, w - 92f * d, 96f * d), false));
             }
-            zones.add(new Zone(MurbRemoteClient.BTN_SELECT, "SELECT", new RectF(w / 2f - 84f * d, h - 46f * d, w / 2f - 6f * d, h - 12f * d), false));
+            zones.add(new Zone(MurbRemoteClient.BTN_SELECT, xbox ? "BACK" : "SELECT", new RectF(w / 2f - 84f * d, h - 46f * d, w / 2f - 6f * d, h - 12f * d), false));
             zones.add(new Zone(MurbRemoteClient.BTN_START, "START", new RectF(w / 2f + 6f * d, h - 46f * d, w / 2f + 84f * d, h - 12f * d), false));
 
             float rx = w - 104f * d, ry = h - 98f * d;
             float r = 27f * d, dist = 50f * d;
             boolean ps = "ps1".equals(system) || "ps2".equals(system) || "psp".equals(system);
-            zones.add(new Zone(MurbRemoteClient.BTN_X, ps ? "△" : "X", new RectF(rx - r, ry - dist - r, rx + r, ry - dist + r), true));
-            zones.add(new Zone(MurbRemoteClient.BTN_B, ps ? "×" : "B", new RectF(rx - r, ry + dist - r, rx + r, ry + dist + r), true));
-            zones.add(new Zone(MurbRemoteClient.BTN_Y, ps ? "□" : "Y", new RectF(rx - dist - r, ry - r, rx - dist + r, ry + r), true));
-            zones.add(new Zone(MurbRemoteClient.BTN_A, ps ? "○" : "A", new RectF(rx + dist - r, ry - r, rx + dist + r, ry + r), true));
+            zones.add(new Zone(MurbRemoteClient.BTN_X, ps ? "△" : (xbox ? "Y" : "X"), new RectF(rx - r, ry - dist - r, rx + r, ry - dist + r), true));
+            zones.add(new Zone(MurbRemoteClient.BTN_B, ps ? "×" : (xbox ? "A" : "B"), new RectF(rx - r, ry + dist - r, rx + r, ry + dist + r), true));
+            zones.add(new Zone(MurbRemoteClient.BTN_Y, ps ? "□" : (xbox ? "X" : "Y"), new RectF(rx - dist - r, ry - r, rx - dist + r, ry + r), true));
+            zones.add(new Zone(MurbRemoteClient.BTN_A, ps ? "○" : (xbox ? "B" : "A"), new RectF(rx + dist - r, ry - r, rx + dist + r, ry + r), true));
         }
 
         @Override protected void onDraw(Canvas canvas) {

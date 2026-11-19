@@ -1430,9 +1430,31 @@ public final class MainActivity extends Activity {
         ScrollView scroll = scroll(); LinearLayout page = page(); scroll.addView(page);
         page.addView(gamingHeader(false));
         List<LocalClassic> localGames = new ArrayList<>(classicsRepository.all());
-        List<Game> installedGames = new ArrayList<>();
-        for (Game game : games) if (game.installed) installedGames.add(game);
         localGames.sort((left, right) -> left.title.compareToIgnoreCase(right.title));
+        java.util.Set<String> matchedPcIds = new java.util.HashSet<>();
+        for (LocalClassic local : localGames) {
+            if (!local.launcherGameId.isEmpty()) matchedPcIds.add(local.launcherGameId);
+            Game linked = launcherGameFor(local);
+            if (linked != null) matchedPcIds.add(linked.id);
+        }
+        java.util.Set<String> seenPcKeys = new java.util.HashSet<>();
+        List<Game> installedGames = new ArrayList<>();
+        for (Game game : games) {
+            if (!game.installed || matchedPcIds.contains(game.id)) continue;
+            boolean duplicatedByLocal = false;
+            for (LocalClassic local : localGames) {
+                if (ClassicsRules.sameClassicGame(local.title, local.systemId, game.title, game.platform)) {
+                    duplicatedByLocal = true;
+                    break;
+                }
+            }
+            if (duplicatedByLocal) continue;
+            String pcTitleKey = ClassicsRules.normalizedTitle(game.title);
+            if (!pcTitleKey.isEmpty() && !seenPcKeys.add(pcTitleKey + "|" + ClassicsRules.normalizedPlatform(game.platform))) {
+                continue;
+            }
+            installedGames.add(game);
+        }
         installedGames.sort((left, right) -> left.title.compareToIgnoreCase(right.title));
 
         LocalClassic recentLocal = null;
@@ -1860,9 +1882,22 @@ public final class MainActivity extends Activity {
     private Game launcherGameFor(LocalClassic local) {
         if (local == null) return null;
         if (!local.launcherGameId.isEmpty()) for (Game game : games) if (game.id.equals(local.launcherGameId)) return game;
-        String wanted = ClassicsRules.normalizedTitle(local.title); Game match = null; int count = 0;
-        for (Game game : games) if (isClassicGame(game) && ClassicsRules.normalizedTitle(game.title).equals(wanted)) { match = game; count++; }
-        return count == 1 ? match : null;
+        String wanted = ClassicsRules.normalizedTitle(local.title);
+        if (wanted.isEmpty()) return null;
+        Game platformMatch = null;
+        Game titleMatch = null;
+        int titleCount = 0;
+        for (Game game : games) {
+            if (!isClassicGame(game) && !ClassicsRules.platformMatches(local.systemId, game.platform)) continue;
+            if (!ClassicsRules.normalizedTitle(game.title).equals(wanted)) continue;
+            if (ClassicsRules.platformMatches(local.systemId, game.platform)) {
+                if (platformMatch == null || (!platformMatch.installed && game.installed)) platformMatch = game;
+            }
+            titleMatch = game;
+            titleCount++;
+        }
+        if (platformMatch != null) return platformMatch;
+        return titleCount == 1 ? titleMatch : null;
     }
 
     private void launchLocalClassic(LocalClassic game) {
@@ -1959,7 +1994,12 @@ public final class MainActivity extends Activity {
                 String p2Qr = remote == null ? "" : remote.optString("p2QrUri", "");
                 com.brumclassics.mobile.murb.MurbRemoteClient.PairingTarget target = com.brumclassics.mobile.murb.MurbRemoteClient.parseUri(qr);
                 String host = target != null ? target.host : (remote == null ? "" : remote.optString("host", ""));
-                if (host.isEmpty() || "127.0.0.1".equals(host) || "0.0.0.0".equals(host)) host = bridgeClient.pairedHost();
+                String pairedHost = bridgeClient.pairedHost();
+                if (pairedHost != null && !pairedHost.isEmpty() && !"127.0.0.1".equals(pairedHost) && !"0.0.0.0".equals(pairedHost)) {
+                    host = pairedHost;
+                } else if (host.isEmpty() || "127.0.0.1".equals(host) || "0.0.0.0".equals(host)) {
+                    host = pairedHost == null ? "" : pairedHost;
+                }
                 int port = target != null ? target.port : (remote == null ? 8089 : remote.optInt("port", 8089));
                 String token = target != null ? target.token : (remote == null ? "" : remote.optString("token", ""));
                 String sys = target != null ? target.system : com.brumclassics.mobile.murb.MurbRemoteClient.normalizeSystem(remote == null ? "gamepad" : remote.optString("system", "gamepad"));

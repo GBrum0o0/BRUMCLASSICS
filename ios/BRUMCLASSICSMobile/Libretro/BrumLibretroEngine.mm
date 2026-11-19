@@ -1887,27 +1887,16 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [self layoutScreens];
 }
 
+- (BOOL)prefersStatusBarHidden {
+    return YES;
+}
+
+- (BOOL)prefersHomeIndicatorAutoHidden {
+    return YES;
+}
+
 - (brum::Rect)availableGameRect {
-    const CGRect safe = UIEdgeInsetsInsetRect(_screen.bounds, self.view.safeAreaInsets);
-    CGRect available = CGRectInset(safe, 8, 8);
-    available.origin.y += 52; // Persistent session actions and title.
-    available.size.height -= 52;
-    // The translucent controls overlay the game only when the screen is too
-    // narrow to reserve their space without collapsing the viewport.
-    if (!_controlsHidden && _directionControl && _actionControl) {
-        const CGFloat gap = 12;
-        if (available.size.width > available.size.height &&
-            CGRectGetMinX(_actionControl.frame) - CGRectGetMaxX(_directionControl.frame) > 180) {
-            const CGFloat left = MAX(CGRectGetMinX(available), CGRectGetMaxX(_directionControl.frame) + gap);
-            const CGFloat right = MIN(CGRectGetMaxX(available), CGRectGetMinX(_actionControl.frame) - gap);
-            available.origin.x = left;
-            available.size.width = right - left;
-        } else {
-            const CGFloat bottom = MIN(CGRectGetMinY(_directionControl.frame), CGRectGetMinY(_actionControl.frame)) - gap;
-            if (bottom - available.origin.y > 120) available.size.height = MIN(available.size.height, bottom - available.origin.y);
-        }
-    }
-    return {available.origin.x, available.origin.y, MAX(0, available.size.width), MAX(0, available.size.height)};
+    return {0, 0, MAX(0, _screen.bounds.size.width), MAX(0, _screen.bounds.size.height)};
 }
 
 - (void)layoutScreens {

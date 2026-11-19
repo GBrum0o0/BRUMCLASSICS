@@ -114,6 +114,8 @@ struct IntegratedEmulatorView: View {
         .onDisappear {
             if returnsToPortrait { GamingOrientation.request(.portrait) }
         }
+        .statusBarHidden(true)
+        .persistentSystemOverlays(.hidden)
         .task { await prepare() }
         .fileImporter(isPresented: $choosingROMFolder, allowedContentTypes: [.folder]) { result in
             switch result {

@@ -21,22 +21,22 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class MurbRemoteClient {
     public static final int MAGIC = MurbRemoteProtocol.MAGIC;
-    public static final int BTN_A      = 0x0001;
-    public static final int BTN_B      = 0x0002;
+    public static final int BTN_A = 0x0001;
+    public static final int BTN_B = 0x0002;
     public static final int BTN_SELECT = 0x0004;
-    public static final int BTN_START  = 0x0008;
-    public static final int BTN_RIGHT  = 0x0010;
-    public static final int BTN_LEFT   = 0x0020;
-    public static final int BTN_UP     = 0x0040;
-    public static final int BTN_DOWN   = 0x0080;
-    public static final int BTN_R      = 0x0100;
-    public static final int BTN_L      = 0x0200;
-    public static final int BTN_X      = 0x0400;
-    public static final int BTN_Y      = 0x0800;
-    public static final int BTN_L2     = 0x1000;
-    public static final int BTN_R2     = 0x2000;
-    public static final int BTN_L3     = 0x4000;
-    public static final int BTN_R3     = 0x8000;
+    public static final int BTN_START = 0x0008;
+    public static final int BTN_RIGHT = 0x0010;
+    public static final int BTN_LEFT = 0x0020;
+    public static final int BTN_UP = 0x0040;
+    public static final int BTN_DOWN = 0x0080;
+    public static final int BTN_R = 0x0100;
+    public static final int BTN_L = 0x0200;
+    public static final int BTN_X = 0x0400;
+    public static final int BTN_Y = 0x0800;
+    public static final int BTN_L2 = 0x1000;
+    public static final int BTN_R2 = 0x2000;
+    public static final int BTN_L3 = 0x4000;
+    public static final int BTN_R3 = 0x8000;
 
     public static final class PairingTarget {
         public final String host;
@@ -54,10 +54,15 @@ public final class MurbRemoteClient {
 
     public interface Listener {
         void onConnected();
+
         void onDisconnected();
+
         void onVideoFrame(byte[] rgb565Pixels, int width, int height, int sequence);
+
         void onPingRtt(int rttMs);
+
         void onSystemIdentified(String system);
+
         void onError(String message);
     }
 
@@ -74,20 +79,25 @@ public final class MurbRemoteClient {
     }
 
     public static PairingTarget parseUri(String raw) {
-        if (raw == null || !raw.trim().toLowerCase(Locale.ROOT).startsWith("murb://")) return null;
+        if (raw == null || !raw.trim().toLowerCase(Locale.ROOT).startsWith("murb://"))
+            return null;
         try {
             Uri uri = Uri.parse(raw.trim());
             String ip = uri.getQueryParameter("ip");
-            if (ip == null || ip.trim().isEmpty()) ip = uri.getQueryParameter("host");
+            if (ip == null || ip.trim().isEmpty())
+                ip = uri.getQueryParameter("host");
             String token = uri.getQueryParameter("token");
             String portStr = uri.getQueryParameter("port");
             int port = (portStr == null || portStr.trim().isEmpty()) ? 8089 : Integer.parseInt(portStr.trim());
-            if (ip == null || ip.trim().isEmpty() || token == null || token.trim().isEmpty() || port < 1 || port > 65535) {
+            if (ip == null || ip.trim().isEmpty() || token == null || token.trim().isEmpty() || port < 1
+                    || port > 65535) {
                 return null;
             }
             String sys = uri.getQueryParameter("sys");
-            if (sys == null || sys.trim().isEmpty()) sys = uri.getHost();
-            return new PairingTarget(ip.trim(), port, token.trim().toUpperCase(Locale.ROOT), MurbRemoteProtocol.normalizeSystem(sys));
+            if (sys == null || sys.trim().isEmpty())
+                sys = uri.getHost();
+            return new PairingTarget(ip.trim(), port, token.trim().toUpperCase(Locale.ROOT),
+                    MurbRemoteProtocol.normalizeSystem(sys));
         } catch (Exception ignored) {
             return null;
         }
@@ -126,7 +136,8 @@ public final class MurbRemoteClient {
     }
 
     public void connect() {
-        if (running.getAndSet(true)) return;
+        if (running.getAndSet(true))
+            return;
         sendThread = new HandlerThread("MurbWsSender");
         sendThread.start();
         sendHandler = new Handler(sendThread.getLooper());
@@ -143,24 +154,32 @@ public final class MurbRemoteClient {
             sendHandler = null;
         }
         try {
-            if (socket != null && !socket.isClosed()) socket.close();
-        } catch (Exception ignored) {}
-        if (receiveThread != null) receiveThread.interrupt();
-        if (pingThread != null) pingThread.interrupt();
+            if (socket != null && !socket.isClosed())
+                socket.close();
+        } catch (Exception ignored) {
+        }
+        if (receiveThread != null)
+            receiveThread.interrupt();
+        if (pingThread != null)
+            pingThread.interrupt();
     }
 
     public void sendInput(int buttons, boolean touching, int touchX, int touchY, int stickX, int stickY) {
-        if (!connected.get()) return;
+        if (!connected.get())
+            return;
         final String json = "{\"type\":\"input\",\"buttons\":" + buttons
-            + ",\"touching\":" + touching
-            + ",\"x\":" + touchX
-            + ",\"y\":" + touchY
-            + ",\"stickX\":" + stickX
-            + ",\"stickY\":" + stickY + "}";
+                + ",\"touching\":" + touching
+                + ",\"x\":" + touchX
+                + ",\"y\":" + touchY
+                + ",\"stickX\":" + stickX
+                + ",\"stickY\":" + stickY + "}";
         Handler handler = sendHandler;
         if (handler != null) {
             handler.post(() -> {
-                try { sendText(json); } catch (Exception ignored) {}
+                try {
+                    sendText(json);
+                } catch (Exception ignored) {
+                }
             });
         }
     }
@@ -177,22 +196,23 @@ public final class MurbRemoteClient {
             random.nextBytes(keyBytes);
             String wsKey = Base64.encodeToString(keyBytes, Base64.NO_WRAP);
             String handshake = "GET /stream?token=" + token + " HTTP/1.1\r\n"
-                + "Host: " + host + ":" + port + "\r\n"
-                + "Upgrade: websocket\r\n"
-                + "Connection: Upgrade\r\n"
-                + "Sec-WebSocket-Key: " + wsKey + "\r\n"
-                + "Sec-WebSocket-Version: 13\r\n\r\n";
+                    + "Host: " + host + ":" + port + "\r\n"
+                    + "Upgrade: websocket\r\n"
+                    + "Connection: Upgrade\r\n"
+                    + "Sec-WebSocket-Key: " + wsKey + "\r\n"
+                    + "Sec-WebSocket-Version: 13\r\n\r\n";
             output.write(handshake.getBytes(StandardCharsets.UTF_8));
             output.flush();
 
             byte[] buf = new byte[2048];
             int read = input.read(buf);
-            if (read <= 0) throw new IllegalStateException("Resposta vazia do PC.");
+            if (read <= 0)
+                throw new IllegalStateException("Resposta vazia do PC.");
             String response = new String(buf, 0, read, StandardCharsets.UTF_8);
             if (!response.contains("101 Switching Protocols")) {
                 mainHandler.post(() -> listener.onError(response.contains("403")
-                    ? "Token de sessão inválido ou expirado."
-                    : "Falha ao conectar com o PC."));
+                        ? "Token de sessão inválido ou expirado."
+                        : "Falha ao conectar com o PC."));
                 socket.close();
                 return;
             }
@@ -227,11 +247,14 @@ public final class MurbRemoteClient {
             } else if (payloadLen == 127) {
                 readFully(input, hdr, 2, 8);
                 len = 0;
-                for (int i = 0; i < 8; i++) len = (len << 8) | (hdr[2 + i] & 0xFF);
+                for (int i = 0; i < 8; i++)
+                    len = (len << 8) | (hdr[2 + i] & 0xFF);
             }
-            if (len < 0 || len > 8L * 1024L * 1024L) break;
+            if (len < 0 || len > 8L * 1024L * 1024L)
+                break;
             byte[] payload = new byte[(int) len];
-            if (len > 0) readFully(input, payload, 0, (int) len);
+            if (len > 0)
+                readFully(input, payload, 0, (int) len);
 
             if (opcode == 2) {
                 MurbRemoteProtocol.FrameHeader frame = MurbRemoteProtocol.parseFrameHeader(payload);
@@ -254,7 +277,8 @@ public final class MurbRemoteClient {
                             mainHandler.post(() -> listener.onPingRtt(rtt));
                         }
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             } else if (opcode == 8) {
                 break;
             }
@@ -264,18 +288,20 @@ public final class MurbRemoteClient {
     private void runPingLoop() {
         while (running.get() && connected.get()) {
             try {
-                Thread.sleep(1000);
                 if (connected.get()) {
                     sendText("{\"type\":\"ping\",\"ts\":" + System.currentTimeMillis() + "}");
                 }
+                Thread.sleep(1000);
             } catch (InterruptedException e) {
                 break;
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
     }
 
     private synchronized void sendText(String text) throws Exception {
-        if (output == null || !connected.get()) return;
+        if (output == null || !connected.get())
+            return;
         byte[] payload = text.getBytes(StandardCharsets.UTF_8);
         byte[] mask = new byte[4];
         random.nextBytes(mask);
@@ -296,7 +322,8 @@ public final class MurbRemoteClient {
         }
         output.write(header);
         byte[] masked = new byte[len];
-        for (int i = 0; i < len; i++) masked[i] = (byte) (payload[i] ^ mask[i % 4]);
+        for (int i = 0; i < len; i++)
+            masked[i] = (byte) (payload[i] ^ mask[i % 4]);
         output.write(masked);
         output.flush();
     }
@@ -305,7 +332,8 @@ public final class MurbRemoteClient {
         int n = 0;
         while (n < len) {
             int count = in.read(buf, off + n, len - n);
-            if (count < 0) throw new IllegalStateException("Conexão encerrada.");
+            if (count < 0)
+                throw new IllegalStateException("Conexão encerrada.");
             n += count;
         }
     }

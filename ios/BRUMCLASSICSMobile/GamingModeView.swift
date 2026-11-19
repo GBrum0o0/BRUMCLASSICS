@@ -100,7 +100,10 @@ struct GamingModeView: View {
 
     private func artwork(for entry: GamingCatalogEntry) -> GamingArtwork {
         switch entry {
-        case .local(let rom, _): return GamingArtwork(game: pocket.launcherGame(for: rom, launcher: store), rom: rom)
+        case .local(let rom, _):
+            let matched = pocket.launcherGame(for: rom, launcher: store)
+                ?? GamingModeCatalog.matchedComputerGame(for: rom, records: pocket.games, computer: store.snapshot.games)
+            return GamingArtwork(game: matched, rom: rom)
         case .computer(let game): return GamingArtwork(game: game)
         }
     }
@@ -116,9 +119,11 @@ struct GamingModeView: View {
         ZStack(alignment: .topTrailing) {
             switch entry {
             case .local(let rom, _):
+                let matched = pocket.launcherGame(for: rom, launcher: store)
+                    ?? GamingModeCatalog.matchedComputerGame(for: rom, records: pocket.games, computer: store.snapshot.games)
                 ROMFolderGameTile(
                     rom: rom,
-                    launcherGame: pocket.launcherGame(for: rom, launcher: store),
+                    launcherGame: matched,
                     retroArchReady: pocket.isImportedIntoRetroArch(rom),
                     integratedCoreName: IntegratedEmulatorSupport.core(for: rom)?.displayName,
                     opensDetails: true
@@ -176,13 +181,106 @@ enum GamingModeCatalog {
         return RetroArchAppStoreLaunchRules.supports(filename: rom.filename) || imported
     }
 
-    static func library(local: [ROMFolderGame], records: [PocketClassic], computer: [Game]) -> [GamingCatalogEntry] {
-        let localFiles = Set(local.map { $0.filename.lowercased() })
-        let linkedPCIDs = Set(records.filter { localFiles.contains($0.filename.lowercased()) && !$0.launcherGameID.isEmpty }.map(\.launcherGameID))
-        let localEntries = local.map { rom in
-            GamingCatalogEntry.local(rom, records.first { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }?.lastPlayedAt)
+    static func normalizedKey(_ value: String) -> String {
+        RetroArchLibraryRules.normalizedTitle(ROMTitleRules.clean(value))
+    }
+
+    static func normalizedPlatform(_ value: String) -> String {
+        let lower = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        switch lower {
+        case "gb", "game boy": return "gb"
+        case "gbc", "game boy color": return "gbc"
+        case "gba", "game boy advance": return "gba"
+        case "ds", "nds", "nintendo ds": return "nds"
+        case "3ds", "n3ds", "nintendo 3ds": return "3ds"
+        case "nes", "nintendo", "famicom", "nintendo entertainment system": return "nes"
+        case "sfc", "snes", "super nintendo", "super famicom": return "sfc"
+        case "n64", "nintendo 64": return "n64"
+        case "gc", "gamecube", "nintendo gamecube": return "gamecube"
+        case "wii", "nintendo wii": return "wii"
+        case "wiiu", "wii u", "nintendo wii u": return "wiiu"
+        case "psx", "ps1", "playstation", "playstation 1": return "psx"
+        case "ps2", "playstation 2": return "ps2"
+        case "psp", "playstation portable": return "psp"
+        case "md", "genesis", "mega drive", "sega genesis": return "md"
+        case "sms", "master system", "sega master system": return "sms"
+        case "gg", "game gear": return "gg"
+        case "segacd", "sega cd", "mega cd": return "segacd"
+        case "32x", "sega 32x": return "32x"
+        case "saturn", "sega saturn": return "saturn"
+        case "dreamcast", "sega dreamcast": return "dreamcast"
+        case "pce", "pc engine", "turbografx-16", "turbografx 16": return "pce"
+        case "neogeo", "neo geo", "neo-geo": return "neogeo"
+        case "ws", "wonderswan": return "ws"
+        case "wsc", "wonderswan color": return "wsc"
+        case "a2600", "atari2600", "atari 2600": return "atari2600"
+        case "arcade", "fbneo", "mame": return "arcade"
+        default: return lower
         }
-        let pcEntries = computer.filter { $0.installed && !linkedPCIDs.contains($0.id) }.map(GamingCatalogEntry.computer)
+    }
+
+    static func platformMatches(_ system: EmulatedSystemID?, pcPlatform: String) -> Bool {
+        guard let system else { return false }
+        let pcNorm = normalizedPlatform(pcPlatform)
+        if pcNorm == system.rawValue { return true }
+        if (system == .gameBoy || system == .gameBoyColor) && (pcNorm == "gb" || pcNorm == "gbc") { return true }
+        if (system == .wonderSwan || system == .wonderSwanColor) && (pcNorm == "ws" || pcNorm == "wsc") { return true }
+        return false
+    }
+
+    static func matchedComputerGame(for rom: ROMFolderGame, records: [PocketClassic], computer: [Game]) -> Game? {
+        if let linked = records.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame && !$0.launcherGameID.isEmpty }),
+           let exact = computer.first(where: { $0.id == linked.launcherGameID }) {
+            return exact
+        }
+        let system = IntegratedEmulatorSupport.system(for: rom)
+        let titleKey = normalizedKey(rom.title)
+        let fileKey = normalizedKey(rom.filename)
+        let candidates = computer.filter { game in
+            guard game.isClassic || platformMatches(system, pcPlatform: game.platform) else { return false }
+            let gKey = normalizedKey(game.title)
+            guard !gKey.isEmpty else { return false }
+            return gKey == titleKey || (!fileKey.isEmpty && gKey == fileKey)
+        }
+        if candidates.isEmpty { return nil }
+        let platformFiltered = candidates.filter { platformMatches(system, pcPlatform: $0.platform) }
+        let pool = platformFiltered.isEmpty ? candidates : platformFiltered
+        if let installedMatch = pool.first(where: \.installed) { return installedMatch }
+        return pool.first
+    }
+
+    static func library(local: [ROMFolderGame], records: [PocketClassic], computer: [Game]) -> [GamingCatalogEntry] {
+        var matchedPCIDs = Set<String>()
+        var localTitleKeys = Set<String>()
+        let localEntries: [GamingCatalogEntry] = local.map { rom in
+            let record = records.first { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }
+            if let explicitID = record?.launcherGameID, !explicitID.isEmpty {
+                matchedPCIDs.insert(explicitID)
+            }
+            let matchedPC = matchedComputerGame(for: rom, records: records, computer: computer)
+            if let matchedPC {
+                matchedPCIDs.insert(matchedPC.id)
+            }
+            let sysKey = IntegratedEmulatorSupport.system(for: rom)?.rawValue ?? ""
+            let tKey = normalizedKey(rom.title)
+            if !tKey.isEmpty {
+                localTitleKeys.insert("\(tKey)|\(sysKey)")
+            }
+            let latestDate = [record?.lastPlayedAt, date(matchedPC?.lastPlayedAt ?? "")].compactMap { $0 }.max()
+            return GamingCatalogEntry.local(rom, latestDate)
+        }
+        var seenPCKeys = Set<String>()
+        let pcEntries = computer.compactMap { game -> GamingCatalogEntry? in
+            guard game.installed, !matchedPCIDs.contains(game.id) else { return nil }
+            let gKey = normalizedKey(game.title)
+            let pKey = normalizedPlatform(game.platform)
+            if !gKey.isEmpty && game.isClassic {
+                if localTitleKeys.contains("\(gKey)|\(pKey)") { return nil }
+            }
+            let dedupKey = gKey.isEmpty ? "id:\(game.id)" : "\(gKey)|\(pKey)"
+            guard seenPCKeys.insert(dedupKey).inserted else { return nil }
+            return GamingCatalogEntry.computer(game)
+        }
         return (localEntries + pcEntries).sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
@@ -248,8 +346,15 @@ private struct GamingROMDetailView: View {
         GamingModeCatalog.canOfferRetroArch(for: rom, imported: pocket.isImportedIntoRetroArch(rom))
     }
     private var linkedPCGame: Game? {
-        guard let link = record, !link.launcherGameID.isEmpty else { return nil }
-        return store.snapshot.games.first { $0.id == link.launcherGameID && $0.installed }
+        if let link = record, !link.launcherGameID.isEmpty,
+           let explicit = store.snapshot.games.first(where: { $0.id == link.launcherGameID && $0.installed }) {
+            return explicit
+        }
+        if let matched = GamingModeCatalog.matchedComputerGame(for: rom, records: pocket.games, computer: store.snapshot.games),
+           matched.installed {
+            return matched
+        }
+        return nil
     }
 
     var body: some View {
@@ -715,7 +820,7 @@ private struct GamingGameView: View {
         )
         switch result {
         case .success(let launch):
-            if let target = MurbRemoteLaunchTarget.from(launch.remoteGamepad, fallbackHost: store.configuration?.host, gameTitle: title, playerNumber: myPlayerNumber) {
+            if let target = MurbRemoteLaunchTarget.from(launch.remoteGamepad, fallbackHost: store.configuration?.host, gameTitle: title, playerNumber: myPlayerNumber, preferFallbackHost: true) {
                 MurbRemoteStore().remember(target.payload)
                 return (target, launch.message ?? "Jogo aberto no computador; joystick virtual ativo.", false)
             }

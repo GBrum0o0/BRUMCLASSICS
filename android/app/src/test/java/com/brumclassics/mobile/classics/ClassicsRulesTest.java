@@ -50,6 +50,12 @@ public final class ClassicsRulesTest {
         SaveManifest same = SaveManifest.next(manifest, first, "mgba", "save-a", 32, 2000, "phone");
         SaveManifest changed = SaveManifest.next(same, first, "mgba", "save-b", 32, 3000, "phone");
         if (manifest.generation != 1 || same.generation != 1 || changed.generation != 2) throw new AssertionError("Geração de save incorreta");
+        if (!"nds".equals(ClassicsRules.normalizedPlatform("Nintendo DS"))) throw new AssertionError("Plataforma DS não normalizada");
+        if (!"wiiu".equals(ClassicsRules.normalizedPlatform("Wii U"))) throw new AssertionError("Plataforma Wii U não normalizada");
+        if (!ClassicsRules.platformMatches("nds", "DS")) throw new AssertionError("Plataformas DS deveriam coincidir");
+        if (!ClassicsRules.sameClassicGame("Pokemon Diamond", "nds", "Pokémon Diamond (USA)", "Nintendo DS")) throw new AssertionError("Jogo DS local/PC deveria coincidir para evitar duplicação");
+        if (!ClassicsRules.sameClassicGame("Mario Kart 8", "wiiu", "Mario Kart 8", "Wii U")) throw new AssertionError("Jogo Wii U deveria coincidir");
+        if (ClassicsRules.sameClassicGame("Sonic", "megadrive", "Sonic", "snes")) throw new AssertionError("Plataformas diferentes não podem coincidir");
         System.out.println("ClassicsRulesTest: OK");
     }
 }

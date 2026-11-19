@@ -1,11 +1,11 @@
 {
-  "version": "0.17.0",
-  "build": 50,
+  "version": "0.18.0",
+  "build": 51,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.17.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.18.0",
   "notes": [
-    "Pasta de ROMs no topo das Configurações do Gaming Mode para selecionar a pasta no celular e atualizar os jogos imediatamente.",
-    "Botões JOGAR, GAMEPAD e MULTIJOGADOR LOCAL logo no topo da ficha de cada jogo (no Gaming Mode e na biblioteca); tocar em GAMEPAD abre o jogo no PC e inicia o joystick virtual M.U.R.B conectado no celular.",
-    "Co-op em rede local (PC P1 + Celular P2, Celular P1 + PC P2, 2 Celulares com QR P2), múltiplas portas P1–P4 no BRUM Core, RetroAchievements e segunda tela DS/3DS."
+    "Biblioteca e Gaming Mode sem duplicação: quando o mesmo jogo existe no computador e na pasta de ROMs do celular, aparece apenas uma capa unificada.",
+    "Tela cheia edge-to-edge sem barras pretas desperdiçadas e sem esticar nem deformar a imagem original de cada console.",
+    "Gamepad M.U.R.B remoto revisado para jogos de PC (Xbox 360 virtual ViGEmBus), Nintendo DS e Wii U (16:9), com conexão priorizando o IP pareado da rede local."
   ]
 }

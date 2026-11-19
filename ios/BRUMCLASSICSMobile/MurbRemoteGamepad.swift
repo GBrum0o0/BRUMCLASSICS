@@ -55,19 +55,21 @@ struct MurbPairingPayload: Codable, Equatable {
         return components.url
     }
 
-    static func resolve(from info: BridgeClient.MurbRemoteSessionInfo?, fallbackHost: String?) -> MurbPairingPayload? {
+    static func resolve(from info: BridgeClient.MurbRemoteSessionInfo?, fallbackHost: String?, preferFallbackHost: Bool = false) -> MurbPairingPayload? {
         guard let info, info.available == true else { return nil }
+        let cleanedFallback = (fallbackHost ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallbackUsable = !cleanedFallback.isEmpty && cleanedFallback != "127.0.0.1" && cleanedFallback != "0.0.0.0"
         if let rawQR = info.qrUri, let url = URL(string: rawQR), var parsed = parse(url) {
-            if parsed.host.isEmpty || parsed.host == "127.0.0.1" || parsed.host == "0.0.0.0",
-               let fallback = fallbackHost?.trimmingCharacters(in: .whitespacesAndNewlines), !fallback.isEmpty {
-                parsed.host = fallback
+            if fallbackUsable && (preferFallbackHost || parsed.host.isEmpty || parsed.host == "127.0.0.1" || parsed.host == "0.0.0.0") {
+                parsed.host = cleanedFallback
             }
             return parsed
         }
         let host = {
+            if preferFallbackHost && fallbackUsable { return cleanedFallback }
             let candidate = (info.host ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             if !candidate.isEmpty && candidate != "127.0.0.1" && candidate != "0.0.0.0" { return candidate }
-            return (fallbackHost ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            return cleanedFallback
         }()
         let token = (info.token ?? "").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         let port = info.port ?? 8089
@@ -100,12 +102,13 @@ struct MurbRemoteLaunchTarget: Identifiable {
         _ info: BridgeClient.MurbRemoteSessionInfo?,
         fallbackHost: String?,
         gameTitle: String,
-        playerNumber: Int
+        playerNumber: Int,
+        preferFallbackHost: Bool = false
     ) -> MurbRemoteLaunchTarget? {
-        guard let payload = MurbPairingPayload.resolve(from: info, fallbackHost: fallbackHost) else { return nil }
+        guard let payload = MurbPairingPayload.resolve(from: info, fallbackHost: fallbackHost, preferFallbackHost: preferFallbackHost) else { return nil }
         var p2Payload: MurbPairingPayload?
         if let rawP2 = info?.p2QrUri, let urlP2 = URL(string: rawP2), var parsedP2 = MurbPairingPayload.parse(urlP2) {
-            if (parsedP2.host.isEmpty || parsedP2.host == "127.0.0.1" || parsedP2.host == "0.0.0.0") && !payload.host.isEmpty {
+            if !payload.host.isEmpty && (preferFallbackHost || parsedP2.host.isEmpty || parsedP2.host == "127.0.0.1" || parsedP2.host == "0.0.0.0") {
                 parsedP2.host = payload.host
             }
             p2Payload = parsedP2
@@ -449,6 +452,8 @@ final class MurbRemoteSession: ObservableObject {
         state = .connected
         lastSentSignature = ""
         dispatchCombinedInput(force: true)
+        let initPingMs = Int64(Date().timeIntervalSince1970 * 1000)
+        socket.send(.string("{\"type\":\"ping\",\"ts\":\(initPingMs)}")) { _ in }
 
         receiveTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -920,18 +925,16 @@ private final class MurbRemotePadUIView: UIView {
         modeSwitchRect = .zero
 
         let safe = bounds.inset(by: safeAreaInsets)
-        let topBarOffset: CGFloat = 50
-        let contentRect = CGRect(x: safe.minX + 12, y: safe.minY + topBarOffset,
-                                 width: max(0, safe.width - 24), height: max(0, safe.height - topBarOffset - 10))
-
         if MurbProtocol.supportsDualScreen(system) {
             if fillScreen {
-                screenRect = contentRect
+                screenRect = bounds
             } else {
-                let targetAspect: CGFloat = 4.0 / 3.0
-                let w = min(contentRect.width, contentRect.height * targetAspect)
+                let targetAspect: CGFloat = MurbProtocol.normalizeSystem(system) == "wiiu" ? (16.0 / 9.0) : (4.0 / 3.0)
+                let availW = max(0, bounds.width)
+                let availH = max(0, bounds.height)
+                let w = min(availW, availH * targetAspect)
                 let h = w / targetAspect
-                screenRect = CGRect(x: contentRect.midX - w / 2, y: contentRect.midY - h / 2, width: w, height: h)
+                screenRect = CGRect(x: bounds.midX - w / 2, y: bounds.midY - h / 2, width: w, height: h)
             }
         } else {
             screenRect = .zero
@@ -946,6 +949,7 @@ private final class MurbRemotePadUIView: UIView {
         }
 
         let hasAnalog = MurbProtocol.hasAnalogStick(system)
+        let isPcGamepad = MurbProtocol.normalizeSystem(system) == "gamepad"
         let leftCenter = CGPoint(x: safe.minX + 104, y: safe.maxY - 106)
         if hasAnalog && useStickForAnalog {
             stickRect = CGRect(x: leftCenter.x - 68, y: leftCenter.y - 68, width: 136, height: 136)
@@ -957,15 +961,15 @@ private final class MurbRemotePadUIView: UIView {
         }
 
         // Shoulder triggers
-        zones.append(Zone(bit: MurbProtocol.buttonL, label: "L", rect: CGRect(x: safe.minX + 18, y: safe.minY + 56, width: 74, height: 42)))
-        zones.append(Zone(bit: MurbProtocol.buttonR, label: "R", rect: CGRect(x: safe.maxX - 92, y: safe.minY + 56, width: 74, height: 42)))
+        zones.append(Zone(bit: MurbProtocol.buttonL, label: isPcGamepad ? "LB" : "L", rect: CGRect(x: safe.minX + 18, y: safe.minY + 56, width: 74, height: 42)))
+        zones.append(Zone(bit: MurbProtocol.buttonR, label: isPcGamepad ? "RB" : "R", rect: CGRect(x: safe.maxX - 92, y: safe.minY + 56, width: 74, height: 42)))
         if hasAnalog {
-            zones.append(Zone(bit: MurbProtocol.buttonL2, label: "L2", rect: CGRect(x: safe.minX + 100, y: safe.minY + 56, width: 62, height: 42)))
-            zones.append(Zone(bit: MurbProtocol.buttonR2, label: "R2", rect: CGRect(x: safe.maxX - 162, y: safe.minY + 56, width: 62, height: 42)))
+            zones.append(Zone(bit: MurbProtocol.buttonL2, label: isPcGamepad ? "LT" : "L2", rect: CGRect(x: safe.minX + 100, y: safe.minY + 56, width: 62, height: 42)))
+            zones.append(Zone(bit: MurbProtocol.buttonR2, label: isPcGamepad ? "RT" : "R2", rect: CGRect(x: safe.maxX - 162, y: safe.minY + 56, width: 62, height: 42)))
         }
 
         // Menu buttons
-        zones.append(Zone(bit: MurbProtocol.buttonSelect, label: "SELECT", rect: CGRect(x: safe.midX - 88, y: safe.maxY - 46, width: 78, height: 36)))
+        zones.append(Zone(bit: MurbProtocol.buttonSelect, label: isPcGamepad ? "BACK" : "SELECT", rect: CGRect(x: safe.midX - 88, y: safe.maxY - 46, width: 78, height: 36)))
         zones.append(Zone(bit: MurbProtocol.buttonStart, label: "START", rect: CGRect(x: safe.midX + 10, y: safe.maxY - 46, width: 78, height: 36)))
 
         // Face diamond
@@ -976,6 +980,11 @@ private final class MurbRemotePadUIView: UIView {
         if MurbProtocol.isTwoButtonClassic(system) {
             zones.append(Zone(bit: MurbProtocol.buttonB, label: "B", rect: CGRect(x: rightCenter.x - 56, y: rightCenter.y - 16, width: 60, height: 60)))
             zones.append(Zone(bit: MurbProtocol.buttonA, label: "A", rect: CGRect(x: rightCenter.x + 16, y: rightCenter.y - 36, width: 60, height: 60)))
+        } else if isPcGamepad {
+            zones.append(Zone(bit: MurbProtocol.buttonX, label: "Y", rect: CGRect(x: rightCenter.x - size / 2, y: rightCenter.y - dist - size / 2, width: size, height: size)))
+            zones.append(Zone(bit: MurbProtocol.buttonB, label: "A", rect: CGRect(x: rightCenter.x - size / 2, y: rightCenter.y + dist - size / 2, width: size, height: size)))
+            zones.append(Zone(bit: MurbProtocol.buttonY, label: "X", rect: CGRect(x: rightCenter.x - dist - size / 2, y: rightCenter.y - size / 2, width: size, height: size)))
+            zones.append(Zone(bit: MurbProtocol.buttonA, label: "B", rect: CGRect(x: rightCenter.x + dist - size / 2, y: rightCenter.y - size / 2, width: size, height: size)))
         } else {
             zones.append(Zone(bit: MurbProtocol.buttonX, label: psLabels ? "△" : "X", rect: CGRect(x: rightCenter.x - size / 2, y: rightCenter.y - dist - size / 2, width: size, height: size)))
             zones.append(Zone(bit: MurbProtocol.buttonB, label: psLabels ? "×" : "B", rect: CGRect(x: rightCenter.x - size / 2, y: rightCenter.y + dist - size / 2, width: size, height: size)))
