@@ -188,6 +188,31 @@ public final class ClassicsRepository {
         );
     }
 
+    public synchronized IntegratedEmulatorLaunch prepareSaveSyncTarget(LocalClassic game) throws Exception {
+        LocalClassic stored = find(game.id);
+        if (stored == null) throw new IllegalStateException("Atualize a pasta de ROMs antes de sincronizar o save.");
+        String previousIdentity = stored.canonicalGameId;
+        ensureIdentity(stored);
+        if (!CoreRegistry.supportsIntegrated(stored.systemId, stored.filename)) {
+            throw new IllegalStateException("Este jogo ainda não usa um núcleo integrado compatível com save direto.");
+        }
+        CoreRegistry.Descriptor core = CoreRegistry.integratedCore(stored.systemId, stored.filename);
+        if (core == null) throw new IllegalStateException("Nenhum núcleo integrado disponível para este sistema.");
+        File root = new File(context.getFilesDir(), "integrated-emulator");
+        File systemDirectory = new File(root, "system");
+        File saveDirectory = new File(new File(root, "saves"), stored.systemId);
+        if ((!systemDirectory.isDirectory() && !systemDirectory.mkdirs()) || (!saveDirectory.isDirectory() && !saveDirectory.mkdirs())) {
+            throw new IllegalStateException("Não foi possível criar a pasta segura de saves.");
+        }
+        if (!stored.canonicalGameId.equals(previousIdentity)) save();
+        return new IntegratedEmulatorLaunch(
+            stored.id, stored.title, stored.canonicalGameId, stored.systemId, stored.contentSha256,
+            core.id, core.displayName, core.version, core.androidLibraryName, stored.raGameId,
+            null, stored.uri, new File(saveDirectory, stored.contentSha256 + ".srm"),
+            new File(saveDirectory, stored.contentSha256 + ".save.json"), systemDirectory
+        );
+    }
+
     public synchronized SessionResult finishIntegratedSession(String gameId, long elapsedSeconds) throws Exception {
         LocalClassic game = find(gameId);
         if (game == null) return null;

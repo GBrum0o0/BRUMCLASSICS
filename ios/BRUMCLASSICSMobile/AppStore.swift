@@ -60,6 +60,23 @@ final class AppStore: ObservableObject {
         try await bridge.uploadNativeSave(save, identity: identity, gameID: gameID, profileID: profileID)
     }
 
+    func directSyncNativeSave(_ save: VerifiedLocalBatterySave,
+                              identity: CanonicalGameIdentity,
+                              gameID: String?,
+                              profileID: String,
+                              baseRevision: String?,
+                              forceApply: Bool) async throws -> DirectSaveSyncResponse {
+        guard connection == .online else { throw BridgeError.unreachable }
+        return try await bridge.directSyncNativeSave(
+            save,
+            identity: identity,
+            gameID: gameID,
+            profileID: profileID,
+            baseRevision: baseRevision,
+            forceApply: forceApply
+        )
+    }
+
     func stageNativeSave(for identity: CanonicalGameIdentity, candidate: NativeSaveCandidate,
                          file: NativeSaveFile) async throws -> URL {
         guard connection == .online else { throw BridgeError.unreachable }

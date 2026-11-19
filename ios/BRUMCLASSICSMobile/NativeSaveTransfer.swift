@@ -7,6 +7,30 @@ struct NativeSaveCandidatesResponse: Decodable, Sendable {
     let downloadEnabled: Bool
     let activeProfileId: String
     let candidates: [NativeSaveCandidate]
+    let directSyncEnabled: Bool?
+    let resolvedGameId: String?
+    let pcActiveRevisionId: String?
+    let pcGameRunning: Bool?
+
+    init(protocolVersion: Int,
+         transferEnabled: Bool,
+         downloadEnabled: Bool,
+         activeProfileId: String,
+         candidates: [NativeSaveCandidate],
+         directSyncEnabled: Bool? = nil,
+         resolvedGameId: String? = nil,
+         pcActiveRevisionId: String? = nil,
+         pcGameRunning: Bool? = nil) {
+        self.protocolVersion = protocolVersion
+        self.transferEnabled = transferEnabled
+        self.downloadEnabled = downloadEnabled
+        self.activeProfileId = activeProfileId
+        self.candidates = candidates
+        self.directSyncEnabled = directSyncEnabled
+        self.resolvedGameId = resolvedGameId
+        self.pcActiveRevisionId = pcActiveRevisionId
+        self.pcGameRunning = pcGameRunning
+    }
 
     func validated(for canonicalGameID: String) throws -> [NativeSaveCandidate] {
         guard protocolVersion == 1, downloadEnabled, !activeProfileId.isEmpty,
@@ -24,10 +48,32 @@ struct NativeSaveUploadReceipt: Decodable, Sendable {
     let size: Int
 }
 
+struct DirectSaveSyncResponse: Decodable, Sendable {
+    let requestId: String
+    let status: String
+    let applied: Bool?
+    let versionId: String?
+    let revisionId: String?
+    let gameId: String?
+    let previousSavePreserved: Bool?
+    let pcRevisionId: String?
+    let mobileRevisionId: String?
+    let message: String?
+}
+
+enum NativeSaveSyncAction: Equatable, Sendable {
+    case inSync
+    case upload
+    case download
+    case conflict
+}
+
 private struct NativeSaveProfileBinding: Codable {
     let canonicalGameID: String
     let profileID: String
     let launcherFingerprint: String
+    var lastSyncedRevision: String?
+    var lastSyncedAt: Date?
 }
 
 private struct NativeSaveInstallJournal: Codable {
@@ -224,13 +270,18 @@ enum NativeSaveTransfer {
             throw error
         }
     }
-    private static func bindingFile(for identity: CanonicalGameIdentity) throws -> URL {
-        guard let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            throw BridgeError.invalidResponse("Armazenamento local indisponível.")
+    private static func bindingFile(for identity: CanonicalGameIdentity, bindingsRoot: URL? = nil) throws -> URL {
+        let baseDirectory: URL
+        if let bindingsRoot {
+            baseDirectory = bindingsRoot
+        } else {
+            guard let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+                throw BridgeError.invalidResponse("Armazenamento local indisponível.")
+            }
+            baseDirectory = support.appendingPathComponent("NativeSaveTransfers", isDirectory: true)
+                .appendingPathComponent("Bindings", isDirectory: true)
         }
-        return support.appendingPathComponent("NativeSaveTransfers", isDirectory: true)
-            .appendingPathComponent("Bindings", isDirectory: true)
-            .appendingPathComponent("\(identity.systemID.rawValue)-\(identity.contentSHA256).json")
+        return baseDirectory.appendingPathComponent("\(identity.systemID.rawValue)-\(identity.contentSHA256).json")
     }
 
     static func checkProfileBinding(for identity: CanonicalGameIdentity, profileID: String,
@@ -254,9 +305,61 @@ enum NativeSaveTransfer {
         try checkProfileBinding(for: identity, profileID: profileID, launcherFingerprint: launcherFingerprint)
         let file = try bindingFile(for: identity)
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let existing = (try? Data(contentsOf: file)).flatMap { try? JSONDecoder().decode(NativeSaveProfileBinding.self, from: $0) }
         let binding = NativeSaveProfileBinding(canonicalGameID: identity.canonicalGameID,
-                                               profileID: profileID, launcherFingerprint: launcherFingerprint.uppercased())
+                                               profileID: profileID,
+                                               launcherFingerprint: launcherFingerprint.uppercased(),
+                                               lastSyncedRevision: existing?.lastSyncedRevision,
+                                               lastSyncedAt: existing?.lastSyncedAt)
         try JSONEncoder().encode(binding).write(to: file, options: [.atomic, .completeFileProtectionUnlessOpen])
+    }
+
+    static func readLastSyncedRevision(for identity: CanonicalGameIdentity, bindingsRoot: URL? = nil) -> String? {
+        guard let file = try? bindingFile(for: identity, bindingsRoot: bindingsRoot),
+              FileManager.default.fileExists(atPath: file.path),
+              let data = try? Data(contentsOf: file),
+              let binding = try? JSONDecoder().decode(NativeSaveProfileBinding.self, from: data),
+              binding.canonicalGameID == identity.canonicalGameID,
+              let revision = binding.lastSyncedRevision?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !revision.isEmpty else {
+            return nil
+        }
+        return revision
+    }
+
+    static func recordSyncedRevision(_ revisionID: String,
+                                     for identity: CanonicalGameIdentity,
+                                     profileID: String,
+                                     launcherFingerprint: String,
+                                     bindingsRoot: URL? = nil) throws {
+        let trimmed = revisionID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        if bindingsRoot == nil {
+            try checkProfileBinding(for: identity, profileID: profileID, launcherFingerprint: launcherFingerprint)
+        }
+        let file = try bindingFile(for: identity, bindingsRoot: bindingsRoot)
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let binding = NativeSaveProfileBinding(canonicalGameID: identity.canonicalGameID,
+                                               profileID: profileID,
+                                               launcherFingerprint: launcherFingerprint.uppercased(),
+                                               lastSyncedRevision: trimmed,
+                                               lastSyncedAt: Date())
+        try JSONEncoder().encode(binding).write(to: file, options: [.atomic, .completeFileProtectionUnlessOpen])
+    }
+
+    static func classifySync(localRevision: String?, remoteRevision: String?, baseRevision: String?) -> NativeSaveSyncAction {
+        let local = (localRevision ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let remote = (remoteRevision ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let base = (baseRevision ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if local.isEmpty && remote.isEmpty { return .inSync }
+        if local == remote { return .inSync }
+        if local.isEmpty { return .download }
+        if remote.isEmpty { return .upload }
+        if !base.isEmpty {
+            if local == base { return .download }
+            if remote == base { return .upload }
+        }
+        return .conflict
     }
     // Cross-platform v2 revision: semantic filename role, SHA-256 and size,
     // encoded as length-prefixed UTF-8 and big-endian integers. A renamed

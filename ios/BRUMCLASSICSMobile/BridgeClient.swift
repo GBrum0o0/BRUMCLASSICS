@@ -162,6 +162,101 @@ actor BridgeClient {
         throw BridgeError.notPaired
     }
 
+    func directSyncNativeSave(_ save: VerifiedLocalBatterySave,
+                              identity: CanonicalGameIdentity,
+                              gameID: String?,
+                              profileID: String,
+                              baseRevision: String?,
+                              forceApply: Bool) async throws -> DirectSaveSyncResponse {
+        guard !profileID.isEmpty,
+              let escapedIdentity = identity.canonicalGameID.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              try NativeSaveTransfer.sha256(of: save.file) == save.sha256 else {
+            throw BridgeError.invalidResponse("O save local mudou antes da sincronização. Nenhum progresso foi substituído.")
+        }
+        let requestID = UUID().uuidString.lowercased()
+        var queryItems = ["canonicalGameId=\(escapedIdentity)"]
+        if let gameID, !gameID.isEmpty,
+           let escapedGame = gameID.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+            queryItems.append("gameId=\(escapedGame)")
+        }
+        if let baseRevision, !baseRevision.isEmpty,
+           let escapedBase = baseRevision.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+            queryItems.append("baseRevision=\(escapedBase)")
+        }
+        if forceApply {
+            queryItems.append("forceApply=1")
+        }
+        let path = "/v1/classics/saves/direct-sync/\(requestID)?\(queryItems.joined(separator: "&"))"
+        var lastNetworkError: Error?
+        for host in try pairedHosts() {
+            guard var request = try makeRequest(path: path, authenticated: true, overrideHost: host) else { throw BridgeError.notPaired }
+            request.httpMethod = "PUT"
+            request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+            request.setValue(String(save.size), forHTTPHeaderField: "Content-Length")
+            request.setValue(save.sha256, forHTTPHeaderField: "X-BRUMCLASSICS-SHA256")
+            request.setValue(profileID, forHTTPHeaderField: "X-BRUMCLASSICS-Profile-ID")
+            do {
+                let (data, response) = try await session.upload(for: request, fromFile: save.file)
+                guard let http = response as? HTTPURLResponse else { throw BridgeError.invalidResponse("Resposta de sincronização inválida.") }
+                if http.statusCode == 401 { throw BridgeError.unauthorized }
+                if http.statusCode == 404 {
+                    let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                    if (object?["error"] as? String) == "NATIVE_SAVE_GAME_NOT_FOUND" {
+                        throw BridgeError.server((object?["message"] as? String) ?? "Este jogo não foi encontrado na biblioteca do PC para sincronizar o save.")
+                    }
+                    if let fallbackGameID = gameID, !fallbackGameID.isEmpty {
+                        try await uploadNativeSave(save, identity: identity, gameID: fallbackGameID, profileID: profileID)
+                        return DirectSaveSyncResponse(
+                            requestId: requestID,
+                            status: "quarantined",
+                            applied: false,
+                            versionId: nil,
+                            revisionId: save.revisionId,
+                            gameId: fallbackGameID,
+                            previousSavePreserved: nil,
+                            pcRevisionId: nil,
+                            mobileRevisionId: save.revisionId,
+                            message: "O Launcher PC recebeu o save na caixa de entrada."
+                        )
+                    }
+                    throw BridgeError.server("Atualize o Launcher PC para usar sincronização direta de saves.")
+                }
+                if http.statusCode == 409 {
+                    if let conflictResponse = try? JSONDecoder().decode(DirectSaveSyncResponse.self, from: data),
+                       conflictResponse.status == "conflict" {
+                        activeHost = host
+                        return conflictResponse
+                    }
+                    let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                    if let message = object?["message"] as? String, !message.isEmpty {
+                        throw BridgeError.server(message)
+                    }
+                    throw BridgeError.conflict
+                }
+                if http.statusCode == 423 {
+                    let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                    throw BridgeError.server((object?["message"] as? String) ?? "O jogo está em execução no PC. Feche-o no computador antes de sincronizar.")
+                }
+                guard (200...299).contains(http.statusCode),
+                      let receipt = try? JSONDecoder().decode(DirectSaveSyncResponse.self, from: data),
+                      receipt.requestId == requestID else {
+                    let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                    throw BridgeError.server((object?["message"] as? String) ?? "O PC não confirmou a sincronização direta do save.")
+                }
+                activeHost = host
+                return receipt
+            } catch let error as BridgeError { throw error }
+            catch let error as URLError where [.cannotConnectToHost, .timedOut, .networkConnectionLost, .notConnectedToInternet, .dnsLookupFailed, .cannotFindHost].contains(error.code) {
+                lastNetworkError = error
+                continue
+            } catch let error as URLError where error.code == .cancelled || error.code == .serverCertificateUntrusted {
+                throw BridgeError.invalidCertificate
+            } catch { throw BridgeError.invalidResponse("Não foi possível sincronizar o save: \(error.localizedDescription)") }
+        }
+        if lastNetworkError != nil { throw BridgeError.unreachable }
+        throw BridgeError.notPaired
+    }
+
     // Only stages verified bytes. Applying a save requires a separate conflict
     // decision and must never happen while the emulated game is running.
     func stageNativeSave(for identity: CanonicalGameIdentity, candidate: NativeSaveCandidate, file: NativeSaveFile) async throws -> URL {

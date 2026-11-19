@@ -110,11 +110,29 @@ actor PocketRAClient {
     }
 }
 
+enum DirectSaveConflictChoice: Sendable {
+    case keepPhone
+    case usePC
+}
+
+enum DirectSaveSyncOutcome: Sendable {
+    case synced(String)
+    case upToDate(String)
+    case quarantined(String)
+    case conflict(pcRevisionID: String?, phoneRevisionID: String?, gameID: String?)
+}
+
 @MainActor final class PocketClassicsStore: ObservableObject {
+    static let autoSaveSyncKey = "brum-auto-save-sync-v1"
+    static var autoSaveSyncEnabled: Bool {
+        (UserDefaults.standard.object(forKey: autoSaveSyncKey) as? Bool) ?? true
+    }
+
     @Published private(set) var games: [PocketClassic] = []
     @Published private(set) var busy = false
     @Published var message: String?
     @Published private(set) var status = ""
+    @Published private(set) var lastSaveSyncSummary = ""
     @Published private(set) var runtimeRecords: [PocketRuntimeRecord] = []
     @Published private(set) var runtimeConfigured = false
     @Published private(set) var runtimeStatus = ""
@@ -128,6 +146,7 @@ actor PocketRAClient {
     private let runtime = PocketRuntimeFiles()
     private let playSessions = PocketPlaySessionFiles()
     private var integratedSessionActive = false
+    private var activeIntegratedROM: ROMFolderGame?
     private let retroArchFiles = RetroArchLibraryFiles()
     private let romFolder = ROMFolderAccess()
     private var timeBusy = false
@@ -296,6 +315,10 @@ actor PocketRAClient {
             record.title = matched.title
             await update(record)
         }
+        activeIntegratedROM = rom
+        if Self.autoSaveSyncEnabled && launcher.connection == .online {
+            await runBoundedPreLaunchSync(rom, launcher: launcher)
+        }
         let staged = try await romFolder.stageForIntegratedPlay(rom)
         return try await Task.detached(priority: .userInitiated) {
             try EmulationLaunchBuilder.prepare(
@@ -308,6 +331,7 @@ actor PocketRAClient {
         }.value
     }
     func beginIntegratedPlay(_ rom: ROMFolderGame, launcher: AppStore) async {
+        activeIntegratedROM = rom
         guard let record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }) else { return }
         integratedSessionActive = true
         do { try await runtime.prepare(record, allGames: games) }
@@ -318,14 +342,209 @@ actor PocketRAClient {
         } catch { runtimeStatus = "O jogo iniciou, mas o registro da sessão falhou: \(error.localizedDescription)" }
     }
     func finishIntegratedPlay(launcher: AppStore) async {
+        let finishedROM = activeIntegratedROM
+        activeIntegratedROM = nil
         integratedSessionActive = false
         await finishPlaySession(launcher: launcher)
+        if let finishedROM, Self.autoSaveSyncEnabled, launcher.connection == .online {
+            do {
+                let outcome = try await syncNativeSaveDirectly(finishedROM, launcher: launcher)
+                switch outcome {
+                case .conflict:
+                    lastSaveSyncSummary = "Conflito no Auto Save Sync: toque em Sincronizar Save com PC."
+                case .synced(let text), .upToDate(let text), .quarantined(let text):
+                    lastSaveSyncSummary = text
+                }
+            } catch {
+                lastSaveSyncSummary = "Save local mantido; sincronização pendente: \(error.localizedDescription)"
+            }
+        }
+    }
+    private func runBoundedPreLaunchSync(_ rom: ROMFolderGame, launcher: AppStore) async {
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { @MainActor [weak self] in
+                guard let self else { return }
+                do {
+                    let outcome = try await self.syncNativeSaveDirectly(rom, launcher: launcher, pullOnly: true)
+                    switch outcome {
+                    case .conflict:
+                        self.lastSaveSyncSummary = "Conflito detectado no Save Sync — toque em Sincronizar Save para escolher."
+                    case .synced(let text):
+                        self.lastSaveSyncSummary = text
+                    case .upToDate, .quarantined:
+                        break
+                    }
+                } catch {
+                    self.lastSaveSyncSummary = "Save local mantido para esta sessão."
+                }
+            }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: 2_500_000_000)
+            }
+            _ = await group.next()
+            group.cancelAll()
+        }
+    }
+    func syncNativeSaveDirectly(_ rom: ROMFolderGame,
+                                launcher: AppStore,
+                                conflictChoice: DirectSaveConflictChoice? = nil,
+                                pullOnly: Bool = false) async throws -> DirectSaveSyncOutcome {
+        guard IntegratedEmulatorSupport.supports(rom) else {
+            throw PocketError.message("Este jogo não usa um núcleo integrado compatível com save nativo.")
+        }
+        let stagedROM = try await romFolder.stageForIntegratedPlay(rom)
+        let expectedSystem = IntegratedEmulatorSupport.system(for: rom)
+        let identity = try await Task.detached(priority: .userInitiated) {
+            try ROMContentInspector.inspect(url: stagedROM, filename: rom.filename, expectedSystem: expectedSystem)
+        }.value
+        guard launcher.connection == .online,
+              let fingerprint = launcher.configuration?.fingerprint else {
+            throw BridgeError.unreachable
+        }
+        let catalog = try await launcher.nativeSaveCatalog(for: identity)
+        if catalog.pcGameRunning == true {
+            throw PocketError.message("Feche este jogo no computador antes de sincronizar o save.")
+        }
+        try NativeSaveTransfer.checkProfileBinding(for: identity, profileID: catalog.activeProfileId,
+                                                   launcherFingerprint: fingerprint)
+        let recordMatch = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame })
+        let catalogGameID = catalog.resolvedGameId?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedGameID = [recordMatch?.launcherGameID,
+                              launcherGame(for: rom, launcher: launcher)?.id,
+                              catalogGameID,
+                              catalog.candidates.first?.gameId]
+            .compactMap { value -> String? in
+                guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else { return nil }
+                return trimmed
+            }
+            .first
+        let matchingCandidate = catalog.candidates.first(where: { candidate in
+            (resolvedGameID == nil || candidate.gameId == resolvedGameID) &&
+            candidate.files.count == 1 &&
+            (candidate.files.first?.name.lowercased().hasSuffix(".srm") ?? false)
+        }) ?? catalog.candidates.first(where: { candidate in
+            candidate.files.count == 1 &&
+            (candidate.files.first?.name.lowercased().hasSuffix(".srm") ?? false)
+        })
+        let pcActiveTrimmed = catalog.pcActiveRevisionId?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let pcRevision = (pcActiveTrimmed?.isEmpty == false ? pcActiveTrimmed : nil) ?? matchingCandidate?.revisionId
+        let local = try NativeSaveTransfer.inspectLocalBatterySave(for: identity)
+        let baseRevision = NativeSaveTransfer.readLastSyncedRevision(for: identity)
+
+        let action: NativeSaveSyncAction
+        switch conflictChoice {
+        case .keepPhone: action = .upload
+        case .usePC: action = .download
+        case nil: action = NativeSaveTransfer.classifySync(localRevision: local?.revisionId,
+                                                           remoteRevision: pcRevision,
+                                                           baseRevision: baseRevision)
+        }
+
+        switch action {
+        case .inSync:
+            if let agreedRevision = local?.revisionId ?? pcRevision {
+                try NativeSaveTransfer.recordSyncedRevision(agreedRevision, for: identity,
+                                                            profileID: catalog.activeProfileId,
+                                                            launcherFingerprint: fingerprint)
+            }
+            let msg = "Save já sincronizado com o PC."
+            lastSaveSyncSummary = msg
+            return .upToDate(msg)
+
+        case .download:
+            guard catalog.downloadEnabled,
+                  let candidate = matchingCandidate,
+                  let file = candidate.files.first else {
+                let msg = local == nil
+                    ? "Nenhum save nativo encontrado ainda para este jogo."
+                    : "O PC ainda não possui um backup de bateria compatível para esta ROM."
+                if local == nil {
+                    lastSaveSyncSummary = msg
+                    return .upToDate(msg)
+                }
+                throw PocketError.message(msg)
+            }
+            if local?.revisionId == candidate.revisionId {
+                try NativeSaveTransfer.recordSyncedRevision(candidate.revisionId, for: identity,
+                                                            profileID: catalog.activeProfileId,
+                                                            launcherFingerprint: fingerprint)
+                let msg = "Save já sincronizado com o PC."
+                lastSaveSyncSummary = msg
+                return .upToDate(msg)
+            }
+            let stagedFile = try await launcher.stageNativeSave(for: identity, candidate: candidate, file: file)
+            defer {
+                let temporaryDirectory = stagedFile.deletingLastPathComponent()
+                if UUID(uuidString: temporaryDirectory.lastPathComponent) != nil {
+                    try? FileManager.default.removeItem(at: temporaryDirectory)
+                }
+            }
+            if pullOnly { try Task.checkCancellation() }
+            _ = try NativeSaveTransfer.installStagedBatterySave(stagedFile, identity: identity,
+                                                                candidate: candidate, allowReplace: true)
+            try NativeSaveTransfer.recordSyncedRevision(candidate.revisionId, for: identity,
+                                                        profileID: catalog.activeProfileId,
+                                                        launcherFingerprint: fingerprint)
+            let msg = "Save do PC aplicado automaticamente no iPhone."
+            lastSaveSyncSummary = msg
+            return .synced(msg)
+
+        case .upload:
+            if pullOnly {
+                return .upToDate("Save local mais recente pronto para enviar ao sair.")
+            }
+            guard let local else {
+                let msg = "Este jogo ainda não possui save nativo do BRUM Core no iPhone."
+                lastSaveSyncSummary = msg
+                return .upToDate(msg)
+            }
+            let receipt = try await launcher.directSyncNativeSave(
+                local,
+                identity: identity,
+                gameID: resolvedGameID,
+                profileID: catalog.activeProfileId,
+                baseRevision: baseRevision,
+                forceApply: conflictChoice == .keepPhone
+            )
+            switch receipt.status {
+            case "applied":
+                let syncedRev = receipt.revisionId ?? local.revisionId
+                try NativeSaveTransfer.recordSyncedRevision(syncedRev, for: identity,
+                                                            profileID: catalog.activeProfileId,
+                                                            launcherFingerprint: fingerprint)
+                let msg = "Save do iPhone aplicado diretamente no PC."
+                lastSaveSyncSummary = msg
+                return .synced(msg)
+            case "in-sync":
+                let syncedRev = receipt.revisionId ?? local.revisionId
+                try NativeSaveTransfer.recordSyncedRevision(syncedRev, for: identity,
+                                                            profileID: catalog.activeProfileId,
+                                                            launcherFingerprint: fingerprint)
+                let msg = "Save já sincronizado com o PC."
+                lastSaveSyncSummary = msg
+                return .upToDate(msg)
+            case "conflict":
+                let msg = "Conflito de save: tanto o iPhone quanto o PC têm progresso diferente."
+                lastSaveSyncSummary = msg
+                return .conflict(pcRevisionID: receipt.pcRevisionId ?? pcRevision,
+                                 phoneRevisionID: receipt.mobileRevisionId ?? local.revisionId,
+                                 gameID: receipt.gameId ?? resolvedGameID)
+            default:
+                try NativeSaveTransfer.bindProfile(for: identity, profileID: catalog.activeProfileId,
+                                                   launcherFingerprint: fingerprint)
+                let msg = receipt.message ?? "Save enviado para a caixa de entrada no Cofre de Saves do PC."
+                lastSaveSyncSummary = msg
+                return .quarantined(msg)
+            }
+
+        case .conflict:
+            let msg = "Conflito de save: tanto o iPhone quanto o PC têm progresso diferente."
+            lastSaveSyncSummary = msg
+            return .conflict(pcRevisionID: pcRevision, phoneRevisionID: local?.revisionId, gameID: resolvedGameID)
+        }
     }
     func sendNativeSaveToPC(_ rom: ROMFolderGame, launcher: AppStore) async throws -> String {
-        guard IntegratedEmulatorSupport.supports(rom),
-              let system = IntegratedEmulatorSupport.system(for: rom),
-              Set<EmulatedSystemID>([.gameBoy, .gameBoyColor, .gameBoyAdvance,
-                                     .nintendoEntertainmentSystem, .superNintendo]).contains(system) else {
+        guard IntegratedEmulatorSupport.supports(rom) else {
             throw PocketError.message("Este jogo não usa um núcleo integrado compatível com save nativo.")
         }
         guard let record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }),
@@ -362,10 +581,7 @@ actor PocketRAClient {
             : "Save enviado e verificado. No PC, abra Cofre de Saves e escolha APLICAR AO BRUM CORE PC."
     }
     func receiveNativeSaveFromPC(_ rom: ROMFolderGame, launcher: AppStore) async throws -> String {
-        guard IntegratedEmulatorSupport.supports(rom),
-              let system = IntegratedEmulatorSupport.system(for: rom),
-              Set<EmulatedSystemID>([.gameBoy, .gameBoyColor, .gameBoyAdvance,
-                                     .nintendoEntertainmentSystem, .superNintendo]).contains(system) else {
+        guard IntegratedEmulatorSupport.supports(rom) else {
             throw PocketError.message("Este jogo não usa um núcleo integrado compatível com save nativo.")
         }
         guard let record = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }),

@@ -478,8 +478,8 @@ private struct GamingROMDetailView: View {
     @State private var showMurbManual = false
     @State private var activeMurbTarget: MurbRemoteLaunchTarget?
     @State private var syncingNativeSave = false
-    @State private var confirmNativeUpload = false
-    @State private var confirmNativeDownload = false
+    @State private var showSaveConflictDialog = false
+    @State private var saveConflictDetail = ""
     @State private var actionMessage = ""
     @State private var associationTarget: PocketClassic?
 
@@ -502,11 +502,7 @@ private struct GamingROMDetailView: View {
 
     private var installedCore: CoreDescriptor? { IntegratedEmulatorSupport.core(for: rom) }
     private var system: EmulatedSystemID? { IntegratedEmulatorSupport.system(for: rom) }
-    private var pcNativeSaveCompatible: Bool {
-        guard let system else { return false }
-        return Set<EmulatedSystemID>([.gameBoy, .gameBoyColor, .gameBoyAdvance,
-                                      .nintendoEntertainmentSystem, .superNintendo]).contains(system)
-    }
+    private var pcNativeSaveCompatible: Bool { installedCore != nil }
     private var canUseRetroArch: Bool {
         GamingModeCatalog.canOfferRetroArch(for: rom, imported: pocket.isImportedIntoRetroArch(rom))
     }
@@ -593,19 +589,24 @@ private struct GamingROMDetailView: View {
                         Text(pocket.isImportedIntoRetroArch(rom) ? "RetroArch pronto" : "Importar ROM para o RetroArch ao jogar")
                             .font(.caption).foregroundStyle(BrumTheme.muted)
                     }
-                    if let game = linkedPCGame {
-                        if installedCore != nil && pcNativeSaveCompatible {
-                            Button { confirmNativeUpload = true } label: {
-                                Text("ENVIAR SAVE NATIVO PARA O PC").frame(maxWidth: .infinity).frame(height: 44)
+                    if installedCore != nil {
+                        Button {
+                            syncingNativeSave = true
+                            Task {
+                                await performDirectSaveSync(choice: nil)
+                                syncingNativeSave = false
                             }
-                            .buttonStyle(.bordered).tint(BrumTheme.primary)
-                            .disabled(store.connection != .online || syncingNativeSave)
-                            Button { confirmNativeDownload = true } label: {
-                                Text("RECEBER SAVE NATIVO DO PC").frame(maxWidth: .infinity).frame(height: 44)
+                        } label: {
+                            HStack(spacing: 8) {
+                                if syncingNativeSave { ProgressView().tint(BrumTheme.primary).controlSize(.small) }
+                                Text(syncingNativeSave ? "SINCRONIZANDO SAVE…" : "SINCRONIZAR SAVE COM PC")
                             }
-                            .buttonStyle(.bordered).tint(BrumTheme.primary)
-                            .disabled(store.connection != .online || syncingNativeSave)
+                            .frame(maxWidth: .infinity).frame(height: 44)
                         }
+                        .buttonStyle(.bordered).tint(BrumTheme.primary)
+                        .disabled(store.connection != .online || syncingNativeSave)
+                    }
+                    if let game = linkedPCGame {
                         Button {
                             launchingOnPC = true
                             Task {
@@ -628,6 +629,9 @@ private struct GamingROMDetailView: View {
                         }
                     }.font(.subheadline.weight(.semibold)).tint(BrumTheme.primary)
                     if !actionMessage.isEmpty { Text(actionMessage).font(.caption).foregroundStyle(BrumTheme.muted) }
+                    if !pocket.lastSaveSyncSummary.isEmpty && pocket.lastSaveSyncSummary != actionMessage {
+                        Text(pocket.lastSaveSyncSummary).font(.caption).foregroundStyle(BrumTheme.muted)
+                    }
                     if let message = pocket.message { Text(message).font(.caption).foregroundStyle(.orange) }
                 }.frame(maxWidth: 1000, alignment: .leading).padding(20).frame(maxWidth: .infinity)
             }
@@ -672,29 +676,39 @@ private struct GamingROMDetailView: View {
             )
             .preferredColorScheme(.dark)
         }
-        .confirmationDialog("Enviar o save deste iPhone ao perfil ativo no PC?", isPresented: $confirmNativeUpload) {
-            Button("Enviar save") {
+        .confirmationDialog("Conflito de save entre iPhone e PC", isPresented: $showSaveConflictDialog, titleVisibility: .visible) {
+            Button("Usar save deste iPhone (enviar ao PC)") {
                 syncingNativeSave = true
                 Task {
-                    do { actionMessage = try await pocket.sendNativeSaveToPC(rom, launcher: store) }
-                    catch { actionMessage = error.localizedDescription }
+                    await performDirectSaveSync(choice: .keepPhone)
                     syncingNativeSave = false
                 }
             }
+            Button("Usar save do PC (aplicar no iPhone)") {
+                syncingNativeSave = true
+                Task {
+                    await performDirectSaveSync(choice: .usePC)
+                    syncingNativeSave = false
+                }
+            }
+            Button("Cancelar", role: .cancel) {}
         } message: {
-            Text("O save local ainda não tem vínculo de perfil. Este envio associa os bytes ao perfil atualmente aberto no Launcher Beta. Nenhum save do PC será substituído automaticamente.")
+            Text(saveConflictDetail.isEmpty ? "Tanto este iPhone quanto o computador possuem saves diferentes. Escolha qual versão manter (um backup da versão substituída é preservado)." : saveConflictDetail)
         }
-        .confirmationDialog("Receber o save do perfil ativo no PC?", isPresented: $confirmNativeDownload) {
-            Button("Receber e aplicar save") {
-                syncingNativeSave = true
-                Task {
-                    do { actionMessage = try await pocket.receiveNativeSaveFromPC(rom, launcher: store) }
-                    catch { actionMessage = error.localizedDescription }
-                    syncingNativeSave = false
-                }
+    }
+
+    private func performDirectSaveSync(choice: DirectSaveConflictChoice?) async {
+        do {
+            let outcome = try await pocket.syncNativeSaveDirectly(rom, launcher: store, conflictChoice: choice)
+            switch outcome {
+            case .synced(let text), .upToDate(let text), .quarantined(let text):
+                actionMessage = text
+            case .conflict:
+                saveConflictDetail = "Tanto o iPhone quanto o computador possuem progresso diferente para este jogo. Escolha qual versão deseja manter."
+                showSaveConflictDialog = true
             }
-        } message: {
-            Text("Se houver progresso diferente no iPhone, o save atual será guardado para recuperação antes da aplicação do backup do PC. Feche o jogo antes de continuar.")
+        } catch {
+            actionMessage = error.localizedDescription
         }
     }
 

@@ -157,6 +157,7 @@ private struct GamingSettingsPanel: View {
     @AppStorage("BrumVirtualControlHapticsEnabled") private var virtualHaptics = true
     @AppStorage("BrumAutoHidePadWithController") private var autoHidePadWithController = false
     @AppStorage("BrumDefaultScreenFillEnabled") private var defaultFillDisplay = false
+    @AppStorage(PocketClassicsStore.autoSaveSyncKey) private var autoSaveSync = true
     @State private var username = ""
     @State private var key = ""
     @State private var feedback = ""
@@ -204,9 +205,13 @@ private struct GamingSettingsPanel: View {
             }
             Section("Launcher PC e sincronização") {
                 LabeledContent("Launcher PC", value: store.connection == .online ? "Conectado (\(store.configuration?.host ?? "LAN"))" : "Offline (biblioteca em cache)")
+                Toggle("Auto Save Sync com o PC (ao abrir/sair)", isOn: $autoSaveSync)
                 Button("Atualizar horas e conquistas") {
                     Task { await pocket.sync(launcher: store, force: true) }
                 }.disabled(pocket.busy)
+                if !pocket.lastSaveSyncSummary.isEmpty {
+                    Text(pocket.lastSaveSyncSummary).font(.caption).foregroundStyle(.secondary)
+                }
                 if !pocket.status.isEmpty { Text(pocket.status).font(.caption).foregroundStyle(.secondary) }
             }
         }

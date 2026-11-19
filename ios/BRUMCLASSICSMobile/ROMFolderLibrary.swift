@@ -1,6 +1,6 @@
 import Foundation
 
-struct ROMFolderGame: Codable, Equatable, Identifiable {
+struct ROMFolderGame: Codable, Equatable, Identifiable, Sendable {
     let relativePath: String
     let filename: String
     let title: String

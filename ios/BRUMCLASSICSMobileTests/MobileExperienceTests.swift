@@ -83,4 +83,28 @@ final class MobileExperienceTests: XCTestCase {
         XCTAssertNotNil(GamingModeCatalog.date("2026-10-10T12:00:00.250Z"))
         XCTAssertNotNil(GamingModeCatalog.date("2026-10-08T08:00:00Z"))
     }
+
+    func testNativeSaveTransferClassifySyncAndRevisionTracking() throws {
+        XCTAssertEqual(NativeSaveTransfer.classifySync(localRevision: nil, remoteRevision: nil, baseRevision: nil), .inSync)
+        XCTAssertEqual(NativeSaveTransfer.classifySync(localRevision: "rev-1", remoteRevision: "rev-1", baseRevision: nil), .inSync)
+        XCTAssertEqual(NativeSaveTransfer.classifySync(localRevision: "", remoteRevision: "rev-2", baseRevision: nil), .download)
+        XCTAssertEqual(NativeSaveTransfer.classifySync(localRevision: "rev-1", remoteRevision: nil, baseRevision: nil), .upload)
+        XCTAssertEqual(NativeSaveTransfer.classifySync(localRevision: "rev-1", remoteRevision: "rev-2", baseRevision: "rev-1"), .download)
+        XCTAssertEqual(NativeSaveTransfer.classifySync(localRevision: "rev-2", remoteRevision: "rev-1", baseRevision: "rev-1"), .upload)
+        XCTAssertEqual(NativeSaveTransfer.classifySync(localRevision: "rev-2", remoteRevision: "rev-3", baseRevision: "rev-1"), .conflict)
+        XCTAssertEqual(NativeSaveTransfer.classifySync(localRevision: "rev-a", remoteRevision: "rev-b", baseRevision: nil), .conflict)
+
+        let identity = CanonicalGameIdentity(systemID: .gameBoyAdvance,
+                                             contentSHA256: String(repeating: "c", count: 64),
+                                             detectionSource: .header)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        XCTAssertNil(NativeSaveTransfer.readLastSyncedRevision(for: identity, bindingsRoot: root))
+
+        let revision = "native:v2:\(String(repeating: "d", count: 64))"
+        let fingerprint = String(repeating: "a1b2c3d4", count: 8)
+        try NativeSaveTransfer.recordSyncedRevision(revision, for: identity, profileID: "primary",
+                                                    launcherFingerprint: fingerprint, bindingsRoot: root)
+        XCTAssertEqual(NativeSaveTransfer.readLastSyncedRevision(for: identity, bindingsRoot: root), revision)
+    }
 }

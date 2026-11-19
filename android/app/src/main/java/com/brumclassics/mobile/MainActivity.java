@@ -319,12 +319,24 @@ public final class MainActivity extends Activity {
                 modelExecutor.execute(() -> {
                     try {
                         ClassicsRepository.SessionResult result = classicsRepository.finishIntegratedSession(gameId, elapsed);
+                        LocalClassic game = result != null ? classicsRepository.find(result.gameId) : classicsRepository.find(gameId);
                         if (result != null) handler.post(() -> {
-                            LocalClassic game = classicsRepository.find(result.gameId);
                             Toast.makeText(this, "Sessão BRUM Core · " + Math.max(0, result.addedSeconds / 60) + " min", Toast.LENGTH_LONG).show();
                             if (game != null) syncClassic(game, false);
                             refreshCurrentScreen();
                         });
+                        android.content.SharedPreferences prefs = getSharedPreferences("brum_mobile_prefs", MODE_PRIVATE);
+                        if (game != null && prefs.getBoolean("auto_save_sync", true) && bridgeClient.isConfigured() && "connected".equals(syncState)) {
+                            try {
+                                IntegratedEmulatorLaunch target = classicsRepository.prepareSaveSyncTarget(game);
+                                Game linked = launcherGameFor(game);
+                                String linkedGameId = linked != null ? linked.id : game.launcherGameId;
+                                BridgeClient.NativeSaveSyncResult pushResult = bridgeClient.syncNativeSaveBlocking(target, linkedGameId, false, null, 5000);
+                                if ("synced".equals(pushResult.status) || "conflict".equals(pushResult.status) || "quarantined".equals(pushResult.status)) {
+                                    handler.post(() -> Toast.makeText(this, pushResult.message, Toast.LENGTH_LONG).show());
+                                }
+                            } catch (Exception ignored) {}
+                        }
                     } catch (Exception error) { handler.post(() -> Toast.makeText(this, error.getMessage(), Toast.LENGTH_LONG).show()); }
                 });
             }
@@ -1245,7 +1257,14 @@ public final class MainActivity extends Activity {
         defaultFill.setTextColor(TEXT);
         defaultFill.setChecked(prefs.getBoolean("default_fill_display", false));
         defaultFill.setOnCheckedChangeListener((button, checked) -> prefs.edit().putBoolean("default_fill_display", checked).apply());
-        panel.addView(defaultFill, margins(-1, 6, -1, 8));
+        panel.addView(defaultFill, margins(-1, 6, -1, 4));
+
+        Switch autoSaveSync = new Switch(this);
+        autoSaveSync.setText("Auto Save Sync com o PC (ao abrir/sair)");
+        autoSaveSync.setTextColor(TEXT);
+        autoSaveSync.setChecked(prefs.getBoolean("auto_save_sync", true));
+        autoSaveSync.setOnCheckedChangeListener((button, checked) -> prefs.edit().putBoolean("auto_save_sync", checked).apply());
+        panel.addView(autoSaveSync, margins(-1, 6, -1, 8));
 
         dialog.show();
     }
@@ -1548,6 +1567,16 @@ public final class MainActivity extends Activity {
                 "MULTIJOGADOR LOCAL",
                 v -> showLocalMultiplayerDialog(game.title, linked, game, game.filename, CoreRegistry.supportsIntegrated(game.systemId, game.filename))
         ), margins(-1, 12, -1, 4));
+        if (CoreRegistry.supportsIntegrated(game.systemId, game.filename)) {
+            TextView syncSaveStatus = text("", 12, Color.rgb(173, 180, 190), false);
+            syncSaveStatus.setVisibility(View.GONE);
+            Button syncSave = gamingAction("SINCRONIZAR SAVE COM PC", false, null);
+            syncSave.setEnabled("connected".equals(syncState));
+            syncSave.setAlpha(syncSave.isEnabled() ? 1f : .42f);
+            syncSave.setOnClickListener(v -> triggerManualSaveSync(game, linked, syncSave, syncSaveStatus, null));
+            page.addView(syncSave, margins(-1, 6, -1, 4, 44));
+            page.addView(syncSaveStatus, margins(-1, 0, -1, 6));
+        }
         CoreRegistry.Descriptor core = CoreRegistry.integratedCore(null, game.filename);
         String executionText = core != null
                 ? "Executa no celular (offline) · BRUM Core " + core.displayName + " (" + core.license + ")\nDepende do PC/rede: sincronizar conquistas e Gamepad M.U.R.B no computador."
@@ -2024,6 +2053,57 @@ public final class MainActivity extends Activity {
         });
     }
 
+    private void triggerManualSaveSync(LocalClassic game, Game linked, Button syncButton, TextView statusLabel, String conflictChoice) {
+        syncButton.setEnabled(false);
+        syncButton.setText("SINCRONIZANDO SAVE…");
+        statusLabel.setVisibility(View.VISIBLE);
+        statusLabel.setTextColor(Color.rgb(173, 180, 190));
+        statusLabel.setText("Verificando save local e no PC…");
+        String linkedGameId = linked != null ? linked.id : game.launcherGameId;
+        modelExecutor.execute(() -> {
+            try {
+                IntegratedEmulatorLaunch target = classicsRepository.prepareSaveSyncTarget(game);
+                bridgeClient.syncNativeSaveAsync(target, linkedGameId, conflictChoice, new BridgeClient.NativeSaveSyncCallback() {
+                    @Override public void onResult(BridgeClient.NativeSaveSyncResult result) {
+                        syncButton.setEnabled("connected".equals(syncState));
+                        syncButton.setText("SINCRONIZAR SAVE COM PC");
+                        statusLabel.setVisibility(View.VISIBLE);
+                        if ("conflict".equals(result.status)) {
+                            statusLabel.setTextColor(Color.rgb(255, 196, 102));
+                            statusLabel.setText(result.message);
+                            new AlertDialog.Builder(MainActivity.this)
+                                    .setTitle("Conflito de save entre celular e PC")
+                                    .setMessage("Tanto este celular quanto o computador possuem progresso diferente para este jogo. Escolha qual versão manter (a versão substituída é preservada).")
+                                    .setPositiveButton("Usar save deste celular", (d, w) -> triggerManualSaveSync(game, linked, syncButton, statusLabel, "keep_phone"))
+                                    .setNeutralButton("Usar save do PC", (d, w) -> triggerManualSaveSync(game, linked, syncButton, statusLabel, "use_pc"))
+                                    .setNegativeButton("Cancelar", null)
+                                    .show();
+                        } else {
+                            statusLabel.setTextColor("synced".equals(result.status) ? ACCENT : Color.rgb(173, 180, 190));
+                            statusLabel.setText(result.message);
+                        }
+                    }
+
+                    @Override public void onError(String safeMessage) {
+                        syncButton.setEnabled("connected".equals(syncState));
+                        syncButton.setText("SINCRONIZAR SAVE COM PC");
+                        statusLabel.setVisibility(View.VISIBLE);
+                        statusLabel.setTextColor(Color.rgb(255, 118, 118));
+                        statusLabel.setText(safeMessage);
+                    }
+                });
+            } catch (Exception error) {
+                handler.post(() -> {
+                    syncButton.setEnabled("connected".equals(syncState));
+                    syncButton.setText("SINCRONIZAR SAVE COM PC");
+                    statusLabel.setVisibility(View.VISIBLE);
+                    statusLabel.setTextColor(Color.rgb(255, 118, 118));
+                    statusLabel.setText(error.getMessage() != null ? error.getMessage() : "Falha ao preparar save local.");
+                });
+            }
+        });
+    }
+
     private void startIntegratedClassic(LocalClassic game) {
         startIntegratedClassic(game, 0);
     }
@@ -2033,6 +2113,17 @@ public final class MainActivity extends Activity {
         modelExecutor.execute(() -> {
             try {
                 IntegratedEmulatorLaunch launch = classicsRepository.prepareIntegratedLaunch(game);
+                android.content.SharedPreferences prefs = getSharedPreferences("brum_mobile_prefs", MODE_PRIVATE);
+                if (prefs.getBoolean("auto_save_sync", true) && bridgeClient.isConfigured() && "connected".equals(syncState)) {
+                    try {
+                        Game linked = launcherGameFor(game);
+                        String linkedGameId = linked != null ? linked.id : game.launcherGameId;
+                        BridgeClient.NativeSaveSyncResult pullResult = bridgeClient.syncNativeSaveBlocking(launch, linkedGameId, true, null, 2500);
+                        if ("conflict".equals(pullResult.status)) {
+                            handler.post(() -> Toast.makeText(this, "Conflito no Auto Save Sync — toque em Sincronizar Save para escolher.", Toast.LENGTH_LONG).show());
+                        }
+                    } catch (Exception ignored) {}
+                }
                 handler.post(() -> startActivityForResult(IntegratedEmulatorActivity.intent(this, launch, virtualPadPort), REQUEST_INTEGRATED_EMULATOR));
             } catch (Exception error) {
                 handler.post(() -> Toast.makeText(this, "Não foi possível iniciar: " + error.getMessage(), Toast.LENGTH_LONG).show());

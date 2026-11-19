@@ -12,8 +12,12 @@ import android.os.Looper;
 import android.util.LruCache;
 import android.util.AtomicFile;
 
+import com.brumclassics.mobile.emulation.IntegratedEmulatorLaunch;
+import com.brumclassics.mobile.emulation.NativeSaveSync;
+import com.brumclassics.mobile.emulation.SaveManifestStore;
 import com.brumclassics.mobile.model.Game;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -26,6 +30,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Locale;
@@ -76,6 +81,351 @@ public final class BridgeClient {
     public interface ClassicsCallback {
         void onResult(JSONObject result);
         void onError(String safeMessage);
+    }
+
+    public static final class NativeSaveSyncResult {
+        public final String status;
+        public final String message;
+        public final String pcRevisionId;
+        public final String mobileRevisionId;
+        public final String gameId;
+
+        public NativeSaveSyncResult(String status, String message, String pcRevisionId, String mobileRevisionId, String gameId) {
+            this.status = status;
+            this.message = message;
+            this.pcRevisionId = pcRevisionId;
+            this.mobileRevisionId = mobileRevisionId;
+            this.gameId = gameId;
+        }
+    }
+
+    public interface NativeSaveSyncCallback {
+        void onResult(NativeSaveSyncResult result);
+        void onError(String safeMessage);
+    }
+
+    public void syncNativeSaveAsync(IntegratedEmulatorLaunch launch, String linkedGameId, String conflictChoice, NativeSaveSyncCallback callback) {
+        if (!isConfigured()) { callback.onError("Conecte este celular ao launcher primeiro."); return; }
+        executor.execute(() -> {
+            try {
+                NativeSaveSyncResult result = syncNativeSaveBlocking(launch, linkedGameId, false, conflictChoice, 12000);
+                post(() -> callback.onResult(result));
+            } catch (Exception error) {
+                post(() -> callback.onError(safeMessage(error)));
+            }
+        });
+    }
+
+    public NativeSaveSyncResult syncNativeSaveBlocking(
+            IntegratedEmulatorLaunch launch,
+            String linkedGameId,
+            boolean pullOnly,
+            String conflictChoice,
+            int timeoutMs) throws Exception {
+        if (!isConfigured()) throw new IllegalStateException("Conecte este celular ao launcher primeiro.");
+        if (launch == null || launch.canonicalGameId == null || launch.canonicalGameId.isEmpty() || launch.saveFile == null) {
+            throw new IllegalStateException("Identidade da ROM indisponível para sincronizar save.");
+        }
+
+        String encodedIdentity = URLEncoder.encode(launch.canonicalGameId, StandardCharsets.UTF_8.name());
+        HttpURLConnection catalogConn = openWithTimeout(
+                baseUrl() + "/v1/classics/saves/native-candidates?canonicalGameId=" + encodedIdentity,
+                "GET", true, timeoutMs);
+        int catalogCode = catalogConn.getResponseCode();
+        String catalogRaw = readResponse(catalogConn, 1024 * 1024);
+        if (catalogCode == 401) {
+            clearPairing();
+            throw new IllegalStateException("A autorização foi revogada no launcher.");
+        }
+        if (catalogCode < 200 || catalogCode >= 300) {
+            throw new IllegalStateException("Não foi possível consultar os saves no PC (" + catalogCode + ").");
+        }
+
+        JSONObject catalog = catalogRaw.isEmpty() ? new JSONObject() : new JSONObject(catalogRaw);
+        if (catalog.optInt("protocolVersion", 0) != 1) {
+            throw new IllegalStateException("Protocolo de saves do PC incompatível.");
+        }
+        String activeProfileId = catalog.optString("activeProfileId", "primary");
+        if (activeProfileId.isEmpty()) activeProfileId = "primary";
+        if (catalog.optBoolean("pcGameRunning", false)) {
+            throw new IllegalStateException("Feche este jogo no computador antes de sincronizar o save.");
+        }
+
+        boolean downloadEnabled = catalog.optBoolean("downloadEnabled", true);
+        String resolvedGameId = catalog.optString("resolvedGameId", "").trim();
+        String pcActiveRevisionId = catalog.optString("pcActiveRevisionId", "").trim();
+        JSONArray candidates = catalog.optJSONArray("candidates");
+
+        String effectiveGameId = linkedGameId != null ? linkedGameId.trim() : "";
+        if (effectiveGameId.isEmpty()) effectiveGameId = resolvedGameId;
+
+        JSONObject matchingCandidate = null;
+        JSONObject matchingFile = null;
+        if (candidates != null) {
+            for (int i = 0; i < candidates.length(); i++) {
+                JSONObject candidate = candidates.optJSONObject(i);
+                if (candidate == null) continue;
+                String cGameId = candidate.optString("gameId", "");
+                if (effectiveGameId.isEmpty()) effectiveGameId = cGameId;
+                JSONArray files = candidate.optJSONArray("files");
+                if (files == null || files.length() != 1) continue;
+                JSONObject file = files.optJSONObject(0);
+                if (file == null) continue;
+                String name = file.optString("name", "").toLowerCase(Locale.ROOT);
+                if (!name.endsWith(".srm")) continue;
+                if (matchingCandidate == null || (!effectiveGameId.isEmpty() && effectiveGameId.equals(cGameId))) {
+                    matchingCandidate = candidate;
+                    matchingFile = file;
+                    if (effectiveGameId.isEmpty() || effectiveGameId.equals(cGameId)) break;
+                }
+            }
+        }
+
+        String pcRevision = !pcActiveRevisionId.isEmpty()
+                ? pcActiveRevisionId
+                : (matchingCandidate != null ? matchingCandidate.optString("revisionId", "").trim() : "");
+
+        String localSha256 = "";
+        String localRevision = "";
+        if (launch.saveFile.isFile() && launch.saveFile.length() > 0) {
+            localSha256 = NativeSaveSync.sha256Hex(launch.saveFile);
+            localRevision = NativeSaveSync.revisionForBatterySave(launch.saveFile.getName(), localSha256, launch.saveFile.length());
+        }
+
+        SharedPreferences syncPrefs = context.getSharedPreferences("brum_native_save_sync", Context.MODE_PRIVATE);
+        String baseKey = "rev:" + launch.canonicalGameId;
+        String baseRevision = syncPrefs.getString(baseKey, "");
+
+        NativeSaveSync.Action action;
+        if ("keep_phone".equals(conflictChoice)) {
+            action = NativeSaveSync.Action.UPLOAD;
+        } else if ("use_pc".equals(conflictChoice)) {
+            action = NativeSaveSync.Action.DOWNLOAD;
+        } else {
+            action = NativeSaveSync.classifySync(localRevision, pcRevision, baseRevision);
+        }
+
+        if (action == NativeSaveSync.Action.IN_SYNC) {
+            String agreed = !localRevision.isEmpty() ? localRevision : pcRevision;
+            if (!agreed.isEmpty()) syncPrefs.edit().putString(baseKey, agreed).apply();
+            return new NativeSaveSyncResult("up-to-date", "Save já sincronizado com o PC.", pcRevision, localRevision, effectiveGameId);
+        }
+
+        if (action == NativeSaveSync.Action.DOWNLOAD) {
+            if (!downloadEnabled || matchingCandidate == null || matchingFile == null) {
+                if (localRevision.isEmpty()) {
+                    return new NativeSaveSyncResult("up-to-date", "Nenhum save nativo encontrado ainda.", pcRevision, "", effectiveGameId);
+                }
+                throw new IllegalStateException("O PC ainda não possui um backup de bateria compatível para esta ROM.");
+            }
+            String candidateRev = matchingCandidate.optString("revisionId", "").trim();
+            if (!candidateRev.isEmpty() && candidateRev.equals(localRevision)) {
+                syncPrefs.edit().putString(baseKey, candidateRev).apply();
+                return new NativeSaveSyncResult("up-to-date", "Save já sincronizado com o PC.", pcRevision, localRevision, effectiveGameId);
+            }
+            String versionId = matchingCandidate.optString("versionId", "");
+            int fileIndex = matchingFile.optInt("fileIndex", 0);
+            String expectedSha = matchingFile.optString("sha256", "");
+            long expectedSize = matchingFile.optLong("size", 0);
+
+            String downloadUrl = baseUrl() + "/v1/classics/saves/native/"
+                    + URLEncoder.encode(versionId, StandardCharsets.UTF_8.name()) + "/" + fileIndex
+                    + "?canonicalGameId=" + encodedIdentity;
+            HttpURLConnection dlConn = openWithTimeout(downloadUrl, "GET", true, timeoutMs);
+            dlConn.setRequestProperty("Accept", "application/octet-stream");
+            dlConn.setRequestProperty("X-BRUMCLASSICS-Profile-ID", activeProfileId);
+            int dlCode = dlConn.getResponseCode();
+            if (dlCode == 401) {
+                clearPairing();
+                throw new IllegalStateException("A autorização foi revogada no launcher.");
+            }
+            if (dlCode != 200) {
+                throw new IllegalStateException("O launcher não disponibilizou o backup de save (" + dlCode + ").");
+            }
+            String headerHash = dlConn.getHeaderField("X-BRUMCLASSICS-SHA256");
+            if (headerHash != null && !headerHash.isEmpty() && !headerHash.equalsIgnoreCase(expectedSha)) {
+                throw new IllegalStateException("O cabeçalho SHA-256 do save recebido diverge.");
+            }
+            File parentDir = launch.saveFile.getParentFile();
+            if (parentDir != null && !parentDir.isDirectory() && !parentDir.mkdirs()) {
+                throw new IllegalStateException("Não foi possível preparar a pasta local de saves.");
+            }
+            File tempDownload = new File(parentDir, launch.saveFile.getName() + ".dl." + UUID.randomUUID() + ".tmp");
+            try {
+                try (InputStream input = dlConn.getInputStream(); FileOutputStream out = new FileOutputStream(tempDownload)) {
+                    byte[] buffer = new byte[64 * 1024];
+                    int read;
+                    long total = 0;
+                    while ((read = input.read(buffer)) >= 0) {
+                        if (read == 0) continue;
+                        total += read;
+                        if (total > 64L * 1024L * 1024L) throw new IllegalStateException("Save excede o limite de segurança.");
+                        out.write(buffer, 0, read);
+                    }
+                    out.getFD().sync();
+                }
+                if (expectedSize > 0 && tempDownload.length() != expectedSize) {
+                    throw new IllegalStateException("Tamanho do save recebido diverge.");
+                }
+                NativeSaveSync.installBatterySaveAtomically(tempDownload, expectedSha, launch.saveFile);
+                SaveManifestStore.update(context, launch);
+                if (!candidateRev.isEmpty()) syncPrefs.edit().putString(baseKey, candidateRev).apply();
+                return new NativeSaveSyncResult("synced", "Save do PC aplicado automaticamente no celular.", pcRevision, candidateRev, effectiveGameId);
+            } finally {
+                if (tempDownload.exists()) tempDownload.delete();
+            }
+        }
+
+        if (action == NativeSaveSync.Action.UPLOAD) {
+            if (pullOnly) {
+                return new NativeSaveSyncResult("up-to-date", "Save local pronto para enviar ao sair.", pcRevision, localRevision, effectiveGameId);
+            }
+            if (localRevision.isEmpty() || !launch.saveFile.isFile()) {
+                return new NativeSaveSyncResult("up-to-date", "Nenhum save local encontrado neste celular.", pcRevision, "", effectiveGameId);
+            }
+            String verifiedHash = NativeSaveSync.sha256Hex(launch.saveFile);
+            if (!verifiedHash.equals(localSha256)) {
+                throw new IllegalStateException("O save local foi alterado antes do envio.");
+            }
+            long fileSize = launch.saveFile.length();
+            String requestId = UUID.randomUUID().toString().toLowerCase(Locale.ROOT);
+            StringBuilder query = new StringBuilder("canonicalGameId=").append(encodedIdentity);
+            if (!effectiveGameId.isEmpty()) {
+                query.append("&gameId=").append(URLEncoder.encode(effectiveGameId, StandardCharsets.UTF_8.name()));
+            }
+            if (!baseRevision.isEmpty()) {
+                query.append("&baseRevision=").append(URLEncoder.encode(baseRevision, StandardCharsets.UTF_8.name()));
+            }
+            if ("keep_phone".equals(conflictChoice)) {
+                query.append("&forceApply=1");
+            }
+            String uploadUrl = baseUrl() + "/v1/classics/saves/direct-sync/" + requestId + "?" + query;
+            HttpURLConnection upConn = openWithTimeout(uploadUrl, "PUT", true, timeoutMs);
+            upConn.setDoOutput(true);
+            upConn.setFixedLengthStreamingMode(fileSize);
+            upConn.setRequestProperty("Content-Type", "application/octet-stream");
+            upConn.setRequestProperty("X-BRUMCLASSICS-SHA256", verifiedHash);
+            upConn.setRequestProperty("X-BRUMCLASSICS-Profile-ID", activeProfileId);
+            try (FileInputStream input = new FileInputStream(launch.saveFile); OutputStream output = upConn.getOutputStream()) {
+                byte[] buffer = new byte[64 * 1024];
+                int read;
+                while ((read = input.read(buffer)) >= 0) {
+                    if (read > 0) output.write(buffer, 0, read);
+                }
+            }
+            int upCode = upConn.getResponseCode();
+            String upRaw = readResponse(upConn, 512 * 1024);
+            JSONObject upJson = upRaw.isEmpty() ? new JSONObject() : safeJson(upRaw);
+
+            if (upCode == 401) {
+                clearPairing();
+                throw new IllegalStateException("A autorização foi revogada no launcher.");
+            }
+            if (upCode == 404) {
+                if ("NATIVE_SAVE_GAME_NOT_FOUND".equals(upJson.optString("error"))) {
+                    throw new IllegalStateException(upJson.optString("message", "Este jogo não foi encontrado na biblioteca do PC."));
+                }
+                if (!effectiveGameId.isEmpty()) {
+                    return uploadNativeInboxFallback(launch, encodedIdentity, effectiveGameId, activeProfileId, verifiedHash, localRevision, timeoutMs);
+                }
+                throw new IllegalStateException("Atualize o Launcher PC para sincronização direta de saves.");
+            }
+            if (upCode == 409) {
+                if ("conflict".equals(upJson.optString("status"))) {
+                    return new NativeSaveSyncResult(
+                            "conflict",
+                            "Conflito de save: tanto o celular quanto o PC têm progresso diferente.",
+                            upJson.optString("pcRevisionId", pcRevision),
+                            upJson.optString("mobileRevisionId", localRevision),
+                            upJson.optString("gameId", effectiveGameId));
+                }
+                throw new IllegalStateException(upJson.optString("message", "Conflito ou estado incompatível no PC."));
+            }
+            if (upCode == 423) {
+                throw new IllegalStateException(upJson.optString("message", "O jogo está aberto no computador."));
+            }
+            if (upCode < 200 || upCode >= 300) {
+                throw new IllegalStateException(upJson.optString("message", "O PC recusou a sincronização direta (" + upCode + ")."));
+            }
+
+            String status = upJson.optString("status", "");
+            if ("applied".equals(status)) {
+                String syncedRev = upJson.optString("revisionId", localRevision);
+                if (!syncedRev.isEmpty()) syncPrefs.edit().putString(baseKey, syncedRev).apply();
+                return new NativeSaveSyncResult("synced", "Save do celular aplicado diretamente no PC.", syncedRev, localRevision, upJson.optString("gameId", effectiveGameId));
+            }
+            if ("in-sync".equals(status)) {
+                String syncedRev = upJson.optString("revisionId", localRevision);
+                if (!syncedRev.isEmpty()) syncPrefs.edit().putString(baseKey, syncedRev).apply();
+                return new NativeSaveSyncResult("up-to-date", "Save já sincronizado com o PC.", syncedRev, localRevision, upJson.optString("gameId", effectiveGameId));
+            }
+            if ("conflict".equals(status)) {
+                return new NativeSaveSyncResult(
+                        "conflict",
+                        "Conflito de save: tanto o celular quanto o PC têm progresso diferente.",
+                        upJson.optString("pcRevisionId", pcRevision),
+                        upJson.optString("mobileRevisionId", localRevision),
+                        upJson.optString("gameId", effectiveGameId));
+            }
+            return new NativeSaveSyncResult(
+                    "quarantined",
+                    upJson.optString("message", "Save enviado para a caixa de entrada no Cofre de Saves do PC."),
+                    pcRevision, localRevision, effectiveGameId);
+        }
+
+        return new NativeSaveSyncResult(
+                "conflict",
+                "Conflito de save: tanto o celular quanto o PC têm progresso diferente.",
+                pcRevision, localRevision, effectiveGameId);
+    }
+
+    private NativeSaveSyncResult uploadNativeInboxFallback(
+            IntegratedEmulatorLaunch launch,
+            String encodedIdentity,
+            String gameId,
+            String profileId,
+            String sha256,
+            String localRevision,
+            int timeoutMs) throws Exception {
+        String requestId = UUID.randomUUID().toString().toLowerCase(Locale.ROOT);
+        String url = baseUrl() + "/v1/classics/saves/native-inbox/" + requestId
+                + "?canonicalGameId=" + encodedIdentity
+                + "&gameId=" + URLEncoder.encode(gameId, StandardCharsets.UTF_8.name());
+        HttpURLConnection conn = openWithTimeout(url, "PUT", true, timeoutMs);
+        conn.setDoOutput(true);
+        conn.setFixedLengthStreamingMode(launch.saveFile.length());
+        conn.setRequestProperty("Content-Type", "application/octet-stream");
+        conn.setRequestProperty("X-BRUMCLASSICS-SHA256", sha256);
+        conn.setRequestProperty("X-BRUMCLASSICS-Profile-ID", profileId);
+        try (FileInputStream input = new FileInputStream(launch.saveFile); OutputStream output = conn.getOutputStream()) {
+            byte[] buffer = new byte[64 * 1024];
+            int read;
+            while ((read = input.read(buffer)) >= 0) {
+                if (read > 0) output.write(buffer, 0, read);
+            }
+        }
+        int code = conn.getResponseCode();
+        if (code == 401) {
+            clearPairing();
+            throw new IllegalStateException("A autorização foi revogada no launcher.");
+        }
+        if (code != 201) {
+            throw new IllegalStateException("O PC não confirmou o recebimento do save na caixa de entrada (" + code + ").");
+        }
+        return new NativeSaveSyncResult("quarantined", "Save enviado para a caixa de entrada no Cofre de Saves do PC.", "", localRevision, gameId);
+    }
+
+    private HttpURLConnection openWithTimeout(String url, String method, boolean authenticated, int timeoutMs) throws Exception {
+        HttpURLConnection conn = open(url, method, authenticated);
+        if (timeoutMs > 0) {
+            conn.setConnectTimeout(timeoutMs);
+            conn.setReadTimeout(timeoutMs);
+        }
+        return conn;
+    }
+
+    private JSONObject safeJson(String raw) {
+        try { return new JSONObject(raw); } catch (Exception ignored) { return new JSONObject(); }
     }
 
     public String pairedHost() { return preferredHost(); }

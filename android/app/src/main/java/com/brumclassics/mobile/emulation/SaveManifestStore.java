@@ -14,10 +14,10 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Locale;
 
-final class SaveManifestStore {
+public final class SaveManifestStore {
     private SaveManifestStore() {}
 
-    static void update(Context context, IntegratedEmulatorLaunch launch) throws Exception {
+    public static void update(Context context, IntegratedEmulatorLaunch launch) throws Exception {
         if (!launch.saveFile.isFile() || launch.saveFile.length() <= 0) return;
         String payloadHash = sha256(launch.saveFile);
         JSONObject previous = read(launch);
