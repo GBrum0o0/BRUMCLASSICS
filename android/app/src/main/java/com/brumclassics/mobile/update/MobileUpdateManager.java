@@ -26,8 +26,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class MobileUpdateManager {
-    public static final String CURRENT_VERSION = "0.26.0";
-    public static final String DISPLAY_VERSION = "0.26.0";
+    public static final String CURRENT_VERSION = "0.27.0";
+    public static final String DISPLAY_VERSION = "0.27.0";
     private static final String RELEASES = "https://api.github.com/repos/GBrum0o0/BRUMCLASSICS/releases?per_page=20";
     private static final long CHECK_INTERVAL_MS = 6L * 60L * 60L * 1000L;
     private static final long MAX_APK_BYTES = 250L * 1024L * 1024L;

@@ -268,6 +268,30 @@ private struct GamingROMDetailView: View {
                                           total: progress?.achievements.count)
                         }
                     }
+                    GamingActionBar(
+                        canPlay: installedCore != nil || canUseRetroArch || linkedPCGame != nil,
+                        playTitle: "JOGAR",
+                        playSubtitle: installedCore != nil ? "No celular · \(installedCore!.displayName)" : (canUseRetroArch ? "No celular · RetroArch" : "No PC"),
+                        gamepadBusy: launchingGamepad,
+                        pcOnline: store.connection == .online,
+                        onPlay: {
+                            if installedCore != nil {
+                                launchIntegrated = true
+                            } else if canUseRetroArch {
+                                Task { await pocket.launchROM(rom, launcher: store) }
+                            } else if let game = linkedPCGame {
+                                launchingOnPC = true
+                                Task {
+                                    let error = await store.launchBCard(game)
+                                    actionMessage = error.map { "Não foi possível iniciar no PC: \($0)" } ?? "Jogo iniciado no computador."
+                                    launchingOnPC = false
+                                }
+                            }
+                        },
+                        onGamepad: launchGamepadFromROM,
+                        onLocalMultiplayer: { showLocalMultiplayer = true }
+                    )
+                    if !actionMessage.isEmpty { Text(actionMessage).font(.caption).foregroundStyle(BrumTheme.primary) }
                     BrumCard {
                         VStack(alignment: .leading, spacing: 8) {
                             BrumSectionLabel(text: "EXECUÇÃO NESTE IPHONE")
@@ -292,29 +316,6 @@ private struct GamingROMDetailView: View {
                         GamingInfoItem(label: "RetroAchievements", value: Int(record?.retroAchievementID ?? "").map { "ID \($0)" } ?? "Não vinculado"),
                         GamingInfoItem(label: "Launcher PC", value: linkedPCGame?.title ?? "Não vinculado")
                     ])
-                    GamingActionBar(
-                        canPlay: installedCore != nil || canUseRetroArch || linkedPCGame != nil,
-                        playTitle: "JOGAR",
-                        playSubtitle: installedCore != nil ? "No celular · \(installedCore!.displayName)" : (canUseRetroArch ? "No celular · RetroArch" : "No PC"),
-                        gamepadBusy: launchingGamepad,
-                        pcOnline: store.connection == .online,
-                        onPlay: {
-                            if installedCore != nil {
-                                launchIntegrated = true
-                            } else if canUseRetroArch {
-                                Task { await pocket.launchROM(rom, launcher: store) }
-                            } else if let game = linkedPCGame {
-                                launchingOnPC = true
-                                Task {
-                                    let error = await store.launchBCard(game)
-                                    actionMessage = error.map { "Não foi possível iniciar no PC: \($0)" } ?? "Jogo iniciado no computador."
-                                    launchingOnPC = false
-                                }
-                            }
-                        },
-                        onGamepad: launchGamepadFromROM,
-                        onLocalMultiplayer: { showLocalMultiplayer = true }
-                    )
                     if let core = installedCore {
                         Text("\(CoreRegistry.experimental.contains(core) ? "TESTAR" : "JOGAR · BRUM CORE") · \(core.displayName)")
                             .font(.caption.bold()).foregroundStyle(BrumTheme.primary)
@@ -463,30 +464,19 @@ private struct GamingROMDetailView: View {
         actionMessage = "Iniciando \(rom.title) no computador e abrindo joystick virtual…"
         let resolvedGameID = linkedPCGame?.id ?? pocket.launcherGame(for: rom, launcher: store)?.id
         Task {
-            let result = await store.launchGamepadOnPC(
+            let outcome = await GamingGamepadLaunch.start(
+                store: store,
                 gameID: resolvedGameID,
                 filename: rom.filename,
                 title: rom.title,
-                mode: "new",
                 players: players,
-                hybridMode: hybridMode
+                hybridMode: hybridMode,
+                myPlayerNumber: myPlayerNumber
             )
-            await MainActor.run {
-                launchingGamepad = false
-                switch result {
-                case .success(let launch):
-                    if let target = MurbRemoteLaunchTarget.from(launch.remoteGamepad, fallbackHost: store.configuration?.host, gameTitle: rom.title, playerNumber: myPlayerNumber) {
-                        MurbRemoteStore().remember(target.payload)
-                        actionMessage = launch.message ?? "Jogo aberto no PC. Joystick virtual conectado."
-                        activeMurbTarget = target
-                    } else {
-                        actionMessage = (launch.message ?? "Jogo iniciado no computador.") + " Conecte o Gamepad M.U.R.B pela tela seguinte."
-                        showMurbManual = true
-                    }
-                case .failure(let error):
-                    actionMessage = error.localizedDescription
-                }
-            }
+            launchingGamepad = false
+            actionMessage = outcome.message
+            if let target = outcome.target { activeMurbTarget = target }
+            else if outcome.openManualSheet { showMurbManual = true }
         }
     }
 }
@@ -551,14 +541,6 @@ private struct GamingGameView: View {
                                           total: hasAchievementTotals ? game.achievementsTotal : nil)
                         }
                     }
-                    GamingInfoCard(title: "Informações do jogo", items: [
-                        GamingInfoItem(label: "Plataforma", value: game.platform),
-                        GamingInfoItem(label: "Gênero", value: game.genre),
-                        GamingInfoItem(label: "Origem", value: game.store),
-                        GamingInfoItem(label: "Status", value: game.statusLabel),
-                        GamingInfoItem(label: "Tamanho", value: game.sizeBytes > 0 ? ByteCountFormatter.string(fromByteCount: game.sizeBytes, countStyle: .file) : ""),
-                        GamingInfoItem(label: "Execução", value: "Depende do PC (B-CARD / Streaming / M.U.R.B)")
-                    ])
                     GamingActionBar(
                         canPlay: canStartOnPC,
                         playTitle: "JOGAR",
@@ -576,6 +558,14 @@ private struct GamingGameView: View {
                             .buttonStyle(.bordered).tint(BrumTheme.primary).disabled(!canStartOnPC || launching).opacity(canStartOnPC ? 1 : 0.38)
                     }
                     if !launchState.isEmpty { Text(launchState).font(.caption).foregroundStyle(launchState.contains("não") ? Color.orange : BrumTheme.primary) }
+                    GamingInfoCard(title: "Informações do jogo", items: [
+                        GamingInfoItem(label: "Plataforma", value: game.platform),
+                        GamingInfoItem(label: "Gênero", value: game.genre),
+                        GamingInfoItem(label: "Origem", value: game.store),
+                        GamingInfoItem(label: "Status", value: game.statusLabel),
+                        GamingInfoItem(label: "Tamanho", value: game.sizeBytes > 0 ? ByteCountFormatter.string(fromByteCount: game.sizeBytes, countStyle: .file) : ""),
+                        GamingInfoItem(label: "Execução", value: "Depende do PC (B-CARD / Streaming / M.U.R.B)")
+                    ])
                     GamingAchievements(title: achievementSource, items: game.achievements,
                                        earned: hasAchievementTotals ? game.achievementsCollected : nil,
                                        total: hasAchievementTotals ? game.achievementsTotal : nil,
@@ -688,35 +678,55 @@ private struct GamingGameView: View {
         launchingGamepad = true
         launchState = "Abrindo \(game.title) no computador e preparando o joystick virtual…"
         Task {
-            let result = await store.launchGamepadOnPC(
+            let outcome = await GamingGamepadLaunch.start(
+                store: store,
                 gameID: game.id,
                 filename: nil,
                 title: game.title,
-                mode: "new",
                 players: players,
-                hybridMode: hybridMode
+                hybridMode: hybridMode,
+                myPlayerNumber: myPlayerNumber
             )
-            await MainActor.run {
-                launchingGamepad = false
-                switch result {
-                case .success(let launch):
-                    if let target = MurbRemoteLaunchTarget.from(launch.remoteGamepad, fallbackHost: store.configuration?.host, gameTitle: game.title, playerNumber: myPlayerNumber) {
-                        MurbRemoteStore().remember(target.payload)
-                        launchState = launch.message ?? "Jogo aberto no computador; joystick virtual ativo."
-                        activeMurbTarget = target
-                    } else {
-                        launchState = launch.message ?? "Jogo aberto no computador. Conecte o Gamepad manualmente."
-                        showMurbRemote = true
-                    }
-                case .failure(let error):
-                    launchState = "Não foi possível abrir o modo Gamepad: \(error.localizedDescription)"
-                }
-            }
+            launchingGamepad = false
+            launchState = outcome.message
+            if let target = outcome.target { activeMurbTarget = target }
+            else if outcome.openManualSheet { showMurbRemote = true }
         }
     }
 }
 
-private struct GamingActionBar: View {
+@MainActor enum GamingGamepadLaunch {
+    static func start(
+        store: AppStore,
+        gameID: String?,
+        filename: String?,
+        title: String,
+        players: Int,
+        hybridMode: String,
+        myPlayerNumber: Int
+    ) async -> (target: MurbRemoteLaunchTarget?, message: String, openManualSheet: Bool) {
+        let result = await store.launchGamepadOnPC(
+            gameID: gameID,
+            filename: filename,
+            title: title,
+            mode: "new",
+            players: players,
+            hybridMode: hybridMode
+        )
+        switch result {
+        case .success(let launch):
+            if let target = MurbRemoteLaunchTarget.from(launch.remoteGamepad, fallbackHost: store.configuration?.host, gameTitle: title, playerNumber: myPlayerNumber) {
+                MurbRemoteStore().remember(target.payload)
+                return (target, launch.message ?? "Jogo aberto no computador; joystick virtual ativo.", false)
+            }
+            return (nil, (launch.message ?? "Jogo aberto no computador.") + " Conecte o Gamepad M.U.R.B pela tela seguinte.", true)
+        case .failure(let error):
+            return (nil, "Não foi possível abrir o modo Gamepad: \(error.localizedDescription)", false)
+        }
+    }
+}
+
+struct GamingActionBar: View {
     let canPlay: Bool
     let playTitle: String
     let playSubtitle: String
@@ -770,7 +780,7 @@ private struct GamingActionBar: View {
     }
 }
 
-private struct LocalMultiplayerSheet: View {
+struct LocalMultiplayerSheet: View {
     @Environment(\.dismiss) private var dismiss
     let gameTitle: String
     let pcAvailable: Bool

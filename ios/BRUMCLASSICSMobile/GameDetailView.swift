@@ -8,6 +8,13 @@ struct GameDetailView: View {
     init(game: Game) { initialGame = game }
     @State private var editNotes = false
     @State private var showBCard = false
+    @State private var launchingGamepad = false
+    @State private var showLocalMultiplayer = false
+    @State private var showMurbRemote = false
+    @State private var activeMurbTarget: MurbRemoteLaunchTarget?
+    @State private var gamepadMessage = ""
+
+    private var canStartOnPC: Bool { game.installed && store.connection == .online }
 
     var body: some View {
         NavigationStack {
@@ -24,6 +31,19 @@ struct GameDetailView: View {
                         Text(game.description).font(.body).foregroundStyle(BrumTheme.muted)
                     }
                     HStack { DetailMetric(label: "TEMPO", value: game.playtimeLabel); DetailMetric(label: "CONQUISTAS", value: game.achievementsAvailable || game.allowsManualAchievements ? "\(game.achievementsCollected ?? 0)/\(game.achievementsTotal ?? 0)" : "INDISP."); DetailMetric(label: "STATUS", value: game.statusLabel) }
+                    GamingActionBar(
+                        canPlay: game.installed,
+                        playTitle: "JOGAR",
+                        playSubtitle: game.installed ? "Abrir via B-CARD" : "Indisponível",
+                        gamepadBusy: launchingGamepad,
+                        pcOnline: canStartOnPC,
+                        onPlay: { showBCard = true },
+                        onGamepad: { startPCGamepad(players: 1, hybridMode: "mobile1-pc2", myPlayerNumber: 1) },
+                        onLocalMultiplayer: { showLocalMultiplayer = true }
+                    )
+                    if !gamepadMessage.isEmpty {
+                        Text(gamepadMessage).font(.caption).foregroundStyle(BrumTheme.primary)
+                    }
                     GamingInfoCard(title: "Informações do jogo", items: [
                         GamingInfoItem(label: "Plataforma", value: game.platform),
                         GamingInfoItem(label: "Loja / Origem", value: game.store),
@@ -40,6 +60,54 @@ struct GameDetailView: View {
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button { dismiss() } label: { Image(systemName: "xmark.circle.fill").font(.title2) } } }
             .sheet(isPresented: $editNotes) { NotesEditor(game: game) }
             .fullScreenCover(isPresented: $showBCard) { BCardView(game: game) }
+            .sheet(isPresented: $showMurbRemote) {
+                MurbRemoteGamepadLauncherSheet().preferredColorScheme(.dark)
+            }
+            .fullScreenCover(item: $activeMurbTarget) { target in
+                MurbRemoteGamepadView(target: target.payload, gameTitle: target.gameTitle, playerNumber: target.playerNumber, p2Payload: target.p2Payload)
+            }
+            .sheet(isPresented: $showLocalMultiplayer) {
+                LocalMultiplayerSheet(
+                    gameTitle: game.title,
+                    pcAvailable: canStartOnPC,
+                    phoneCoopAvailable: false,
+                    onStartPhoneCoop: { _ in },
+                    onStartPCLanMultiplayer: { hybridMode, myPlayerNumber in
+                        showLocalMultiplayer = false
+                        startPCGamepad(players: 2, hybridMode: hybridMode, myPlayerNumber: myPlayerNumber)
+                    },
+                    onOpenManualMurb: {
+                        showLocalMultiplayer = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { showMurbRemote = true }
+                    }
+                )
+                .preferredColorScheme(.dark)
+            }
+        }
+    }
+
+    private func startPCGamepad(players: Int, hybridMode: String, myPlayerNumber: Int) {
+        guard canStartOnPC else {
+            gamepadMessage = "Computador offline ou jogo não confirmado."
+            showMurbRemote = true
+            return
+        }
+        launchingGamepad = true
+        gamepadMessage = "Abrindo \(game.title) no computador e preparando o joystick virtual…"
+        Task {
+            let outcome = await GamingGamepadLaunch.start(
+                store: store,
+                gameID: game.id,
+                filename: nil,
+                title: game.title,
+                players: players,
+                hybridMode: hybridMode,
+                myPlayerNumber: myPlayerNumber
+            )
+            launchingGamepad = false
+            gamepadMessage = outcome.message
+            if let target = outcome.target { activeMurbTarget = target }
+            else if outcome.openManualSheet { showMurbRemote = true }
         }
     }
 }

@@ -24,6 +24,8 @@ final class NavigationTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Controles"].waitForExistence(timeout: 5))
         app.navigationBars["Controles"].buttons["Fechar"].tap()
         app.buttons["gaming-mode-settings"].tap()
+        XCTAssertTrue(app.buttons["gaming-mode-choose-rom-folder"].waitForExistence(timeout: 5))
+        if !app.textFields["gaming-mode-ra-username"].exists { app.swipeUp() }
         XCTAssertTrue(app.textFields["gaming-mode-ra-username"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.secureTextFields["gaming-mode-ra-key"].exists)
         app.navigationBars["Configurações"].buttons["Fechar"].tap()

@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## Launcher 2.1.29 — Modo Gamepad remoto pelo celular (`gamepad_launch`) e co-op LAN
+
+- Adicionado suporte ao comando autenticado `gamepad_launch` em `mobile-bridge.js` e `main.js`, permitindo que o botão **GAMEPAD** no celular inicie automaticamente o jogo no computador e abra o joystick virtual M.U.R.B já conectado na rede local.
+- Implementada a ponte `--desktop-gamepad 1` (`launchDesktopGamepad` em `brum-core-pc-service.js` e `native/brum-core-pc/main.cpp`) para jogos modernos de PC, além de parâmetros de co-op híbrido em rede (`pc1-mobile2`, `mobile1-pc2`, `dual-mobile`) em `brum-input-core.js`. [Notas e detalhes](releases/v2.1.29/RELEASE-NOTES.md).
+
 ## Launcher 2.1.28 — Correção da intro travada e abertura imediata no Wii U (Cemu) e CLASSICS
 
 - Eliminado o atraso de ~8,2 s causado por `Get-PnpDevice` em `controllerService.prepareLaunch` antes da abertura dos jogos, passando a usar sonda nativa imediata (`--probe-controllers`), limite de 250 ms no inventário PnP e cache aquecido em segundo plano na inicialização.

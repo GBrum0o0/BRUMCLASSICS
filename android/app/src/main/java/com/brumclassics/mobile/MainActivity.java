@@ -1182,43 +1182,17 @@ public final class MainActivity extends Activity {
 
     private void showGamingSettings() {
         LinearLayout panel = gamingDialogPanel();
-        String username = classicsRepository.raUsername();
-        boolean configured = !username.isEmpty() && !classicsRepository.raKey().isEmpty();
-        android.content.SharedPreferences prefs = getSharedPreferences("brum_mobile_prefs", MODE_PRIVATE);
-        panel.addView(text("RetroAchievements", 18, TEXT, true));
-        panel.addView(text(configured ? "Conta configurada · " + username : "Conecte a conta para consultar conquistas.",
-                13, Color.rgb(173, 180, 190), false), margins(-1, 5, -1, 0));
+        ScrollView scroll = scroll();
+        scroll.addView(panel);
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Configurações").setView(scroll)
+                .setPositiveButton("Fechar", null).create();
 
-        Switch haptics = new Switch(this);
-        haptics.setText("Vibração tátil nos botões virtuais");
-        haptics.setTextColor(TEXT);
-        haptics.setChecked(prefs.getBoolean("virtual_haptics", true));
-        haptics.setOnCheckedChangeListener((button, checked) -> prefs.edit().putBoolean("virtual_haptics", checked).apply());
-        panel.addView(haptics, margins(-1, 14, -1, 4));
-
-        Switch autoHide = new Switch(this);
-        autoHide.setText("Ocultar controle na tela com joystick conectado");
-        autoHide.setTextColor(TEXT);
-        autoHide.setChecked(prefs.getBoolean("auto_hide_pad_with_controller", false));
-        autoHide.setOnCheckedChangeListener((button, checked) -> prefs.edit().putBoolean("auto_hide_pad_with_controller", checked).apply());
-        panel.addView(autoHide, margins(-1, 6, -1, 4));
-
-        Switch defaultFill = new Switch(this);
-        defaultFill.setText("Preencher tela por padrão ao abrir jogo");
-        defaultFill.setTextColor(TEXT);
-        defaultFill.setChecked(prefs.getBoolean("default_fill_display", false));
-        defaultFill.setOnCheckedChangeListener((button, checked) -> prefs.edit().putBoolean("default_fill_display", checked).apply());
-        panel.addView(defaultFill, margins(-1, 6, -1, 8));
-
-        panel.addView(text("Pasta de ROMs no celular", 16, TEXT, true), margins(-1, 10, -1, 4));
+        panel.addView(text("Pasta de ROMs no celular", 18, TEXT, true));
         panel.addView(text(classicsRepository.romFolderConfigured()
                 ? "Pasta selecionada: " + classicsRepository.romFolderName()
                 : "Nenhuma pasta definida. Selecione uma pasta para colocar suas ROMs lá.",
-                12, Color.rgb(173, 180, 190), false), margins(-1, 0, -1, 8));
-
-        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Configurações").setView(panel)
-                .setPositiveButton("Fechar", null).create();
-        panel.addView(gamingAction(classicsRepository.romFolderConfigured() ? "Alterar pasta de ROMs" : "Selecionar pasta de ROMs", false, v -> {
+                13, Color.rgb(173, 180, 190), false), margins(-1, 5, -1, 8));
+        panel.addView(gamingAction(classicsRepository.romFolderConfigured() ? "Alterar pasta de ROMs" : "Selecionar pasta de ROMs", true, v -> {
             dialog.dismiss();
             reopenGamingAfterFolderPick = true;
             chooseTree(REQUEST_ROM_TREE);
@@ -1238,12 +1212,41 @@ public final class MainActivity extends Activity {
                         handler.post(() -> Toast.makeText(this, error.getMessage(), Toast.LENGTH_LONG).show());
                     }
                 });
-            }), margins(-1, 0, -1, 6, 44));
+            }), margins(-1, 0, -1, 10, 44));
         }
-        panel.addView(gamingAction(configured ? "Gerenciar conta RetroAchievements" : "Configurar conta RetroAchievements", true, v -> {
+
+        String username = classicsRepository.raUsername();
+        boolean configured = !username.isEmpty() && !classicsRepository.raKey().isEmpty();
+        android.content.SharedPreferences prefs = getSharedPreferences("brum_mobile_prefs", MODE_PRIVATE);
+        panel.addView(text("RetroAchievements", 18, TEXT, true), margins(-1, 10, -1, 0));
+        panel.addView(text(configured ? "Conta configurada · " + username : "Conecte a conta para consultar conquistas.",
+                13, Color.rgb(173, 180, 190), false), margins(-1, 5, -1, 6));
+        panel.addView(gamingAction(configured ? "Gerenciar conta RetroAchievements" : "Configurar conta RetroAchievements", false, v -> {
             dialog.dismiss();
             showGamingRetroAccount();
-        }), margins(-1, 4, -1, 0, 44));
+        }), margins(-1, 2, -1, 8, 44));
+
+        Switch haptics = new Switch(this);
+        haptics.setText("Vibração tátil nos botões virtuais");
+        haptics.setTextColor(TEXT);
+        haptics.setChecked(prefs.getBoolean("virtual_haptics", true));
+        haptics.setOnCheckedChangeListener((button, checked) -> prefs.edit().putBoolean("virtual_haptics", checked).apply());
+        panel.addView(haptics, margins(-1, 8, -1, 4));
+
+        Switch autoHide = new Switch(this);
+        autoHide.setText("Ocultar controle na tela com joystick conectado");
+        autoHide.setTextColor(TEXT);
+        autoHide.setChecked(prefs.getBoolean("auto_hide_pad_with_controller", false));
+        autoHide.setOnCheckedChangeListener((button, checked) -> prefs.edit().putBoolean("auto_hide_pad_with_controller", checked).apply());
+        panel.addView(autoHide, margins(-1, 6, -1, 4));
+
+        Switch defaultFill = new Switch(this);
+        defaultFill.setText("Preencher tela por padrão ao abrir jogo");
+        defaultFill.setTextColor(TEXT);
+        defaultFill.setChecked(prefs.getBoolean("default_fill_display", false));
+        defaultFill.setOnCheckedChangeListener((button, checked) -> prefs.edit().putBoolean("default_fill_display", checked).apply());
+        panel.addView(defaultFill, margins(-1, 6, -1, 8));
+
         dialog.show();
     }
 
@@ -1515,11 +1518,6 @@ public final class MainActivity extends Activity {
         Button play = gamingAction("Jogar no celular", true, v -> launchLocalClassic(game));
         page.addView(gamingHero(game.title, classicPlatform(game), linked, game,
                 formatClassicTime(game.creditedSeconds), summary, play), margins(-1, 10, -1, 0));
-        CoreRegistry.Descriptor core = CoreRegistry.integratedCore(null, game.filename);
-        String executionText = core != null
-                ? "Executa no celular (offline) · BRUM Core " + core.displayName + " (" + core.license + ")\nDepende do PC/rede: sincronizar conquistas e Gamepad M.U.R.B no computador."
-                : "Executa no celular via RetroArch externo (quando suportado).\nDepende do PC/rede: Gamepad no computador e sincronização.";
-        page.addView(noteCard("EXECUÇÃO E INFORMAÇÕES · " + game.filename, executionText), margins(-1, 12, -1, 0));
         page.addView(gamingActionTriplet(
                 "JOGAR",
                 v -> launchLocalClassic(game),
@@ -1528,6 +1526,11 @@ public final class MainActivity extends Activity {
                 "MULTIJOGADOR LOCAL",
                 v -> showLocalMultiplayerDialog(game.title, linked, game, game.filename, CoreRegistry.supportsIntegrated(game.systemId, game.filename))
         ), margins(-1, 12, -1, 4));
+        CoreRegistry.Descriptor core = CoreRegistry.integratedCore(null, game.filename);
+        String executionText = core != null
+                ? "Executa no celular (offline) · BRUM Core " + core.displayName + " (" + core.license + ")\nDepende do PC/rede: sincronizar conquistas e Gamepad M.U.R.B no computador."
+                : "Executa no celular via RetroArch externo (quando suportado).\nDepende do PC/rede: Gamepad no computador e sincronização.";
+        page.addView(noteCard("EXECUÇÃO E INFORMAÇÕES · " + game.filename, executionText), margins(-1, 12, -1, 0));
         String unavailable = game.raGameId <= 0 ? "Vincule o ID oficial do jogo para carregar as conquistas."
                 : classicsRepository.raUsername().isEmpty() || classicsRepository.raKey().isEmpty()
                 ? "Configure a conta RetroAchievements na engrenagem." : "Nenhuma conquista carregada. Use Atualizar para consultar o progresso.";
@@ -1581,14 +1584,10 @@ public final class MainActivity extends Activity {
         if (summary == null && game.achievementsAvailable) summary = game.progressLabel();
         page.addView(gamingHero(game.title, game.platform, game, null, game.playedLabel(), summary, null),
                 margins(-1, 10, -1, 0));
-        page.addView(noteCard("DEPENDE DO PC · " + game.platform.toUpperCase(Locale.ROOT),
-                "Gênero: " + (game.genre.isEmpty() ? (game.category.isEmpty() ? "Clássico" : game.category) : game.genre) + " · Executa no computador via Streaming / B-CARD."),
-                margins(-1, 12, -1, 0));
-        if (!game.description.trim().isEmpty()) page.addView(text(game.description, 12, TEXT, false), margins(-1, 14, -1, 0));
         org.json.JSONObject streamingStatus = experience.optJSONObject("streaming");
         boolean streamingReady = streamingStatus != null && streamingStatus.optBoolean("available", false);
         TextView launchState = text(game.installed ? ("connected".equals(syncState) ? (streamingReady ? "PRONTO PARA JOGAR NO CELULAR" : "PRONTO NO COMPUTADOR") : "COMPUTADOR FORA DE ALCANCE") : "INSTALAÇÃO NÃO CONFIRMADA", 8, game.installed && "connected".equals(syncState) ? ACCENT : MUTED, true);
-        launchState.setGravity(Gravity.CENTER); page.addView(launchState, margins(-1, 20, -1, 9));
+        launchState.setGravity(Gravity.CENTER); page.addView(launchState, margins(-1, 12, -1, 6));
         page.addView(gamingActionTriplet(
                 "JOGAR",
                 v -> {
@@ -1623,6 +1622,10 @@ public final class MainActivity extends Activity {
                 });
             }); page.addView(pcOnly, margins(-1, 6, -1, 0, 46));
         }
+        page.addView(noteCard("DEPENDE DO PC · " + game.platform.toUpperCase(Locale.ROOT),
+                "Gênero: " + (game.genre.isEmpty() ? (game.category.isEmpty() ? "Clássico" : game.category) : game.genre) + " · Executa no computador via Streaming / B-CARD."),
+                margins(-1, 12, -1, 0));
+        if (!game.description.trim().isEmpty()) page.addView(text(game.description, 12, TEXT, false), margins(-1, 14, -1, 0));
 
         LinearLayout streaming = column(); streaming.setPadding(dp(15), dp(15), dp(15), dp(15)); streaming.setBackground(background(SURFACE, 7, LINE, 1));
         org.json.JSONObject network = streamingStatus == null ? null : streamingStatus.optJSONObject("network");

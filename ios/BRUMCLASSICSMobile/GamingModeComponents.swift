@@ -165,6 +165,24 @@ private struct GamingSettingsPanel: View {
 
     var body: some View {
         Form {
+            Section("Pasta de ROMs no celular") {
+                Button(pocket.romFolderConfigured ? "Alterar pasta de ROMs" : "Selecionar pasta de ROMs") {
+                    choosingROMFolder = true
+                }
+                .accessibilityIdentifier("gaming-mode-choose-rom-folder")
+                Text(pocket.romFolderConfigured
+                     ? "Pasta atual: \(pocket.romFolderName). Novas ROMs colocadas nela aparecem no Gaming Mode."
+                     : "Nenhuma pasta selecionada — toque acima para escolher onde colocar suas ROMs.")
+                    .font(.caption).foregroundStyle(.secondary)
+                if pocket.romFolderConfigured {
+                    Button("Verificar pasta agora") {
+                        Task { await pocket.refreshROMFolder() }
+                    }
+                    .disabled(pocket.busy)
+                }
+                if !pocket.romFolderStatus.isEmpty { Text(pocket.romFolderStatus).font(.caption).foregroundStyle(.secondary) }
+                if let message = pocket.message, !message.isEmpty { Text(message).font(.caption).foregroundStyle(.orange) }
+            }
             Section("RetroAchievements") {
                 Text(savedAccount.map { "Conta configurada · \($0)" } ?? "Nenhuma conta configurada")
                 TextField("Usuário RetroAchievements", text: $username)
@@ -183,21 +201,6 @@ private struct GamingSettingsPanel: View {
                 Toggle("Vibração tátil nos botões virtuais", isOn: $virtualHaptics)
                 Toggle("Ocultar controles na tela com joystick conectado", isOn: $autoHidePadWithController)
                 Toggle("Preencher tela por padrão ao iniciar jogo", isOn: $defaultFillDisplay)
-            }
-            Section("Pasta de ROMs no celular") {
-                LabeledContent("Pasta selecionada", value: pocket.romFolderConfigured ? pocket.romFolderName : "Não definida")
-                Button(pocket.romFolderConfigured ? "Alterar pasta de ROMs" : "Selecionar pasta de ROMs") {
-                    choosingROMFolder = true
-                }
-                .accessibilityIdentifier("gaming-mode-choose-rom-folder")
-                Button("Verificar pasta agora") {
-                    Task { await pocket.refreshROMFolder() }
-                }
-                .disabled(!pocket.romFolderConfigured || pocket.busy)
-                Text("Escolha uma pasta (No Meu iPhone, Downloads ou iCloud Drive) para colocar suas ROMs; elas aparecem automaticamente no Gaming Mode.")
-                    .font(.caption).foregroundStyle(.secondary)
-                if !pocket.romFolderStatus.isEmpty { Text(pocket.romFolderStatus).font(.caption).foregroundStyle(.secondary) }
-                if let message = pocket.message, !message.isEmpty { Text(message).font(.caption).foregroundStyle(.orange) }
             }
             Section("Launcher PC e sincronização") {
                 LabeledContent("Launcher PC", value: store.connection == .online ? "Conectado (\(store.configuration?.host ?? "LAN"))" : "Offline (biblioteca em cache)")

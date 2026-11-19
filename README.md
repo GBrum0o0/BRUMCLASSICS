@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.28"><strong>Windows 2.1.28</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.29"><strong>Windows 2.1.29</strong></a> ·
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.26.0"><strong>Android 0.26.0</strong></a> ·
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.16.0"><strong>iOS 0.16.0</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.17.0"><strong>iOS 0.17.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
   <a href="PRIVACY.md">Privacidade</a> ·
   <a href="SECURITY.md">Segurança</a>
@@ -85,16 +85,17 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
-| Windows | 2.1.28 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.28) |
-| Android | 0.26.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.26.0) · [Guia](docs/MOVEL.md) |
-| iOS pessoal | 0.16.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.16.0) · [Guia](ios/README-IOS.md) |
+| Windows | 2.1.29 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.29) |
+| Android | 0.26.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.26.0) · [Guia](docs/MOVEL.md) (código em 0.27.0 no CI) |
+| iOS pessoal | 0.17.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.17.0) · [Guia](ios/README-IOS.md) |
 
 Os hashes SHA-256 acompanham os arquivos publicados. O GitHub hospeda executáveis, APKs e IPAs somente em Releases; esses binários não entram no histórico do repositório.
 
-A versão pessoal para iPhone é compilada separadamente em **Actions → Build iOS pessoal**. O artefato contém um IPA sem assinatura para instalação com Sideloadly, Brum iOS Bridge ou AltStore. Android 0.26.0 e iOS 0.16.0 incluem Gaming Mode renovado, BRUM Core multicore, conquistas RetroAchievements, Gamepad Virtual multitoque refinado e Gamepad M.U.R.B LAN com segunda tela DS/3DS. O código móvel usa GPL-3.0-or-later; launcher de PC e marca permanecem sob licenças separadas. Consulte [o licenciamento móvel](MOBILE-LICENSING.md), [as instruções do iOS](ios/README-IOS.md) e a [política de cores integrados](docs/CORES-INTEGRADOS.md).
+A versão pessoal para iPhone é compilada separadamente em **Actions → Build iOS pessoal**. O artefato contém um IPA sem assinatura para instalação com Sideloadly, Brum iOS Bridge ou AltStore. Android 0.27.0 e iOS 0.17.0 incluem seletor da pasta de ROMs no topo das Configurações do Gaming Mode, botões `JOGAR`, `GAMEPAD` e `MULTIJOGADOR LOCAL`, abertura automática no PC com joystick virtual M.U.R.B, BRUM Core multicore (com co-op P1–P4) e RetroAchievements. O código móvel usa GPL-3.0-or-later; launcher de PC e marca permanecem sob licenças separadas. Consulte [o licenciamento móvel](MOBILE-LICENSING.md), [as instruções do iOS](ios/README-IOS.md) e a [política de cores integrados](docs/CORES-INTEGRADOS.md).
 
 ## Versões atuais
 
+- **Launcher 2.1.29:** adiciona suporte completo ao modo **GAMEPAD** remoto pelo celular (`gamepad_launch`), abrindo o jogo no Windows e entregando automaticamente a sessão `murb://` ao joystick virtual no iPhone/Android, ponte desktop (`--desktop-gamepad 1`) para jogos modernos de PC e suporte a multijogador local híbrido em rede (`pc1-mobile2`, `mobile1-pc2`, `dual-mobile`). [Notas e detalhes](releases/v2.1.29/RELEASE-NOTES.md).
 - **Launcher 2.1.28:** correção emergencial para o travamento após a intro de 6 s e abertura dos jogos: remove o bloqueio de ~8,2 s no `Get-PnpDevice` durante `prepareLaunch`, detecta conclusão real de carregamento do **Cemu (Wii U)** via `portable/log.txt` em tela cheia (reduzindo a revelação do *Mario Kart 8* de ~27–37 s para ~8,2 s com remoção imediata de `WS_EX_LAYERED`), garante `FOCUS` incondicional, reduz `onWait` para 20 s e libera saída via `Escape` após espera. [Notas e detalhes](releases/v2.1.28/RELEASE-NOTES.md).
 - **Launcher 2.1.27:** gerenciador de controles simplificado com cartões conectados (PC e Celular `CONECTADO`) e apenas os botões **`TESTAR CONTROLE`** e **`CONFIGURAÇÃO GLOBAL`**, remoção dos bloqueios de encaminhamento físico (`p1BoundSlotMask` / `p1NativeXInputLive`) e isolamento de Gamepad Mobile em `P2` no Wii U (Cemu), eliminação de falsos `Arquivos ausentes` em Wii e pastas adicionadas no CLASSICS (inspeção de `.zip`/`.7z`, deduplicação de compactados com ROM extraída e limpeza de `nkit`), intro sincronizada até `BRUM_CORE_WINDOW_READY` em tela cheia e motor nativo RetroAchievements (`consoleId: 62` no 3DS). [Notas e detalhes](releases/v2.1.27/RELEASE-NOTES.md).
 - **Launcher 2.1.26:** integração completa do **Brum Input Core** como central universal de controles (`P1–P4`, PC físico USB/Bluetooth + Gamepad Mobile LAN), novo botão com ícone de controle imediatamente à esquerda da engrenagem de Configurações, gerenciador visual inspirado no menu de controles do Switch (teste em tempo real de botões/analógicos, troca global `A/B` e `X/Y`, zona morta, vibração, perfis salvos e prioridade de toque Celular vs. Mouse PC), reconhecimento nativo XInput/PnP (incluindo receptores GameSir `3537:2106`/`3537:1040` e estado de standby), arquitetura extensível de adaptadores (`Cemu`, `Dolphin`, `BRUM Core PC`, `RPCS3` e `xemu`) e roteamento direto do perfil global e slots XInput ao Cemu/Wii U com remoção de `<profile>` no Jogador 1 e recuperação explícita de foco pós-briefing (`FOCUS`). [Notas e detalhes](releases/v2.1.26/RELEASE-NOTES.md).
