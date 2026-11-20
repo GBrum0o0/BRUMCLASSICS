@@ -7,8 +7,8 @@ import java.nio.file.Files;
 
 public final class NativeSaveSyncTest {
     public static void main(String[] args) throws Exception {
-        // Cross-platform vector matching PC (native-save-revision.js) and iOS (PocketTests.swift)
-        String expectedVectorRev = "native:v2:e16343ab79a51c63e2854fd7a239f6742186395baf4fe17a891473df751778c0";
+        // Cross-platform vector matching PC (native-save-revision.js) and iOS (NativeSaveTransfer.revision)
+        String expectedVectorRev = "native:v2:f6a38b604731f64c1f5648b461fb78aafe65139426cab5e9d682d920e371d149";
         String saveASha256 = "ecb10d6167fd4cca49af084b27578db864c7c995068f558f785225f289d6f1ec";
         assertEquals(expectedVectorRev, NativeSaveSync.revisionForBatterySave("game.srm", saveASha256, 6));
         assertEquals(expectedVectorRev, NativeSaveSync.revisionForBatterySave(saveASha256 + ".srm", saveASha256, 6));
