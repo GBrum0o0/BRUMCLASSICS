@@ -127,6 +127,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/brum-tests"
           javac -encoding UTF-8 -d "$RUNNER_TEMP/brum-tests" \
+            android/app/src/main/java/com/brumclassics/mobile/GamingModeRules.java \
             android/app/src/main/java/com/brumclassics/mobile/model/Game.java \
             android/app/src/main/java/com/brumclassics/mobile/model/PerformanceLiveState.java \
             android/app/src/main/java/com/brumclassics/mobile/data/HomeLibrary.java \
@@ -141,6 +142,7 @@ jobs:
             android/app/src/main/java/com/brumclassics/mobile/emulation/RetroAchievementsConsole.java \
             android/app/src/main/java/com/brumclassics/mobile/sync/MobileSyncState.java \
             android/app/src/main/java/com/brumclassics/mobile/murb/MurbRemoteProtocol.java \
+            android/app/src/test/java/com/brumclassics/mobile/GamingModeRulesTest.java \
             android/app/src/test/java/com/brumclassics/mobile/data/HomeLibraryTest.java \
             android/app/src/test/java/com/brumclassics/mobile/data/BCardLibraryTest.java \
             android/app/src/test/java/com/brumclassics/mobile/model/PerformanceLiveStateTest.java \
@@ -151,6 +153,7 @@ jobs:
             android/app/src/test/java/com/brumclassics/mobile/sync/MobileSyncStateTest.java \
             android/app/src/test/java/com/brumclassics/mobile/murb/MurbRemoteProtocolTest.java
           for test in \
+            com.brumclassics.mobile.GamingModeRulesTest \
             com.brumclassics.mobile.data.HomeLibraryTest \
             com.brumclassics.mobile.data.BCardLibraryTest \
             com.brumclassics.mobile.model.PerformanceLiveStateTest \

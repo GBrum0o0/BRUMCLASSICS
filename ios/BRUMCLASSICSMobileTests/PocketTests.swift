@@ -525,6 +525,38 @@ final class PocketTests: XCTestCase {
                        ["local:3ds/jogo.3ds", "local:n64/outro.z64"])
         XCTAssertNotNil(GamingModeCatalog.date("2026-10-07T10:30:00.123Z"))
     }
+    func testGamingModeExcludesModernGamesFromCachedLibraryAndFavorites() throws {
+        func game(_ id: String, category: String, installed: Bool) throws -> Game {
+            let payload = """
+            {"id":"\(id)","title":"\(id)","description":"","category":"\(category)","platform":"gba","store":"steam","genre":"","collectionId":"","sizeBytes":0,"playtimeMinutes":20,"playtimeAvailable":true,"achievementsCollected":0,"achievementsTotal":0,"achievementsAvailable":false,"achievements":[],"storyCompleted":false,"favorite":true,"wantToPlay":false,"libraryStateRevision":0,"notes":{"whereStopped":"","objectives":"","tips":"","commands":"","revision":0,"updatedAt":""},"installed":\(installed),"integrityStatus":"verified","lastPlayedAt":"2026-11-20T12:00:00Z","artworkPath":""}
+            """
+            return try JSONDecoder().decode(Game.self, from: Data(payload.utf8))
+        }
+        let computer = try [game("classic", category: "classic", installed: true),
+                            game("steam", category: "modern", installed: true),
+                            game("unknown", category: "", installed: true),
+                            game("missing", category: "classic", installed: false)]
+        let recategorized = try game("classic", category: "modern", installed: true)
+        XCTAssertNotEqual(GamingModeCatalog.computerFingerprint([computer[0]]),
+                          GamingModeCatalog.computerFingerprint([recategorized]))
+        XCTAssertEqual(GamingModeCatalog.computerFingerprint(computer),
+                       GamingModeCatalog.computerFingerprint(computer))
+        XCTAssertTrue(GamingModeCatalog.library(local: [], records: [], computer: [recategorized]).isEmpty)
+        for _ in 0..<3 {
+            let snapshot = GamingModeCatalog.buildSnapshot(local: [], records: [], computer: computer,
+                                                           favorites: ["pc:steam", "pc:classic"])
+            XCTAssertEqual(snapshot.library.map(\.id), ["pc:classic"])
+            XCTAssertEqual(snapshot.recent.map(\.id), ["pc:classic"])
+        }
+        let rom = ROMFolderGame(relativePath: "gba/steam.gba", filename: "steam.gba", title: "steam", fileSize: 100)
+        var stale = PocketClassic(id: UUID(), title: "steam", filename: "steam.gba")
+        stale.launcherGameID = "steam"
+        XCTAssertNil(GamingModeCatalog.matchedComputerGame(for: rom, records: [stale], computer: computer))
+        XCTAssertNil(GamingModeCatalog.matchedComputerGame(for: rom, records: [], computer: computer))
+        let linked = GamingModeCatalog.buildSnapshot(local: [rom], records: [stale], computer: computer)
+        XCTAssertNil(linked.matchedByROMID[rom.id])
+        XCTAssertEqual(computer.count, 4)
+    }
     func testGamingModeCatalogDeduplicatesLocalROMMatchingPCGameByTitleAndPlatformAndPreferFallbackHost() throws {
         let dsROM = ROMFolderGame(relativePath: "DS/Mario Kart DS (USA).nds", filename: "Mario Kart DS (USA).nds", title: "Mario Kart DS", fileSize: 100)
         let pcGamesData = """

@@ -1,12 +1,12 @@
-# BRUMCLASSICS MÓVEL Android 0.24.0 e iOS 0.15.0
+# BRUMCLASSICS MÓVEL Android 0.31.0 e iOS 0.21.0
 
 Jogos cadastrados no launcher como **não oficiais** são sincronizados como itens locais instalados. O aplicativo recebe somente a classificação e o SteamID de referência quando houver; o caminho do executável nunca sai do computador. B-CARD, anotações e BRUMCOMPANION continuam usando a identidade segura enviada pelo launcher.
 
-O **Gaming Mode** reúne ROMs autorizadas e jogos instalados no PC. NES/Famicom, SNES/Super Famicom, Master System, Game Gear, PC Engine/TurboGrafx-16, GB, GBC, GBA, Nintendo DS e Neo Geo AES/MVS usam o BRUM Core integrado nas duas plataformas. PlayStation 2 usa Play! experimental somente no Android. Outros sistemas permanecem no RetroArch até terem núcleo aprovado. Jogos do computador podem ser iniciados e transmitidos com Sunshine e Moonlight. Android requer 8.0 ou superior; iOS requer 16.0 ou superior.
+O **Gaming Mode** reúne ROMs autorizadas e jogos Classics instalados no PC. NES/Famicom, SNES/Super Famicom, Master System, Game Gear, PC Engine/TurboGrafx-16, GB, GBC, GBA, Nintendo DS e Neo Geo AES/MVS usam o BRUM Core integrado nas duas plataformas. PlayStation 2 usa Play! experimental somente no Android. Outros sistemas permanecem no RetroArch até terem núcleo aprovado. Jogos do computador podem ser iniciados e transmitidos com Sunshine e Moonlight. Android requer 8.0 ou superior; iOS requer 16.0 ou superior.
 
 ## Instalar e atualizar
 
-Instale o APK 0.24.0 da release oficial sobre o aplicativo existente, sem limpar seus dados. No iPhone, assine o IPA 0.15.0 com Sideloadly ou AltStore. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente.
+Instale o APK 0.31.0 da release oficial sobre o aplicativo existente, sem limpar seus dados. No iPhone, assine o IPA 0.21.0 com Sideloadly ou AltStore. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente.
 
 Em fontes sem leitura oficial completa, abra a nova aba **Conquistas**, pesquise o jogo e toque no item oficial para marcar ou desfazer o progresso manual. Imagem, título e descrição vêm do catálogo carregado pelo launcher 1.62.0; não há formulário de data nem cadastro livre.
 

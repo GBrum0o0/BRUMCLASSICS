@@ -1,12 +1,12 @@
 {
-  "version": "0.20.0",
-  "build": 53,
+  "version": "0.21.0",
+  "build": 54,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.20.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.21.0",
   "notes": [
-    "Save Sync direto e bidirecional entre celular e PC para todos os consoles integrados no BRUM Core.",
-    "Auto Save Sync ao iniciar e ao encerrar jogos no Gaming Mode (com opção de desativar nas configurações).",
-    "Detecção automática de conflitos com preservação da versão anterior e resolução em um toque.",
-    "Botão único SINCRONIZAR SAVE COM PC nos detalhes da ROM."
+    "Direcional do iPhone com setores mais precisos, diagonais intencionais e estabilidade durante o movimento.",
+    "Gaming Mode mostra exclusivamente Classics locais ou sincronizados; jogos PC e Steam continuam disponíveis na biblioteca geral.",
+    "Vínculos antigos e favoritos não fazem jogos de outras categorias reaparecerem no Gaming Mode.",
+    "Preserva as melhorias anteriores de Save Sync e controles. Desbloqueios RetroAchievements nativos continuam em desenvolvimento."
   ]
 }

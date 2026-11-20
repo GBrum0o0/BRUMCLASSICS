@@ -1459,7 +1459,7 @@ public final class MainActivity extends Activity {
         java.util.Set<String> seenPcKeys = new java.util.HashSet<>();
         List<Game> installedGames = new ArrayList<>();
         for (Game game : games) {
-            if (!game.installed || matchedPcIds.contains(game.id)) continue;
+            if (!GamingModeRules.includes(game.category, game.installed) || matchedPcIds.contains(game.id)) continue;
             boolean duplicatedByLocal = false;
             for (LocalClassic local : localGames) {
                 if (ClassicsRules.sameClassicGame(local.title, local.systemId, game.title, game.platform)) {
@@ -1502,7 +1502,7 @@ public final class MainActivity extends Activity {
         }
 
         if (!installedGames.isEmpty()) {
-            page.addView(sectionHeading("INSTALADOS NO COMPUTADOR", installedGames.size() + " JOGOS", null), margins(-1, localGames.isEmpty() ? 24 : 28, -1, 12));
+            page.addView(sectionHeading("CLASSICS NO COMPUTADOR", installedGames.size() + " JOGOS", null), margins(-1, localGames.isEmpty() ? 24 : 28, -1, 12));
             HorizontalScrollView pcScroll = new HorizontalScrollView(this); pcScroll.setHorizontalScrollBarEnabled(false);
             LinearLayout pcShelf = row();
             for (Game game : installedGames) pcShelf.addView(gamingGameCard(game), margins(138, 0, 12, 0));
@@ -1512,7 +1512,7 @@ public final class MainActivity extends Activity {
         if (localGames.isEmpty() && installedGames.isEmpty()) {
             LinearLayout empty = column(); empty.setPadding(dp(20), dp(24), dp(20), dp(24)); empty.setBackground(background(SURFACE, 8, LINE, 1));
             empty.addView(text("NENHUM JOGO PRONTO", 13, TEXT, true));
-            empty.addView(text("Toque na engrenagem acima para selecionar uma pasta de ROMs ou instale um jogo no computador.", 10, MUTED, false), margins(-1, 8, -1, 0));
+            empty.addView(text("Toque na engrenagem acima para selecionar uma pasta de ROMs ou sincronize os Classics do computador.", 10, MUTED, false), margins(-1, 8, -1, 0));
             page.addView(empty, margins(-1, 28, -1, 0));
         }
         page.addView(space(22));
@@ -1542,6 +1542,10 @@ public final class MainActivity extends Activity {
     }
 
     private void openGamingGame(Game game) {
+        if (game == null || !GamingModeRules.includes(game.category, game.installed)) {
+            showGamingMode();
+            return;
+        }
         LocalClassic local = localClassicFor(game);
         if (local != null) { showGamingClassicGame(local); return; }
         showGamingGame(game);
@@ -1624,6 +1628,11 @@ public final class MainActivity extends Activity {
     }
 
     private void showGamingGame(Game game) {
+        if (game == null || !GamingModeRules.includes(game.category, game.installed)) {
+            gamingGameId = "";
+            showGamingMode();
+            return;
+        }
         gamingGameId = game.id;
         ScrollView scroll = scroll();
         LinearLayout page = page();
@@ -1910,23 +1919,7 @@ public final class MainActivity extends Activity {
 
     private Game launcherGameFor(LocalClassic local) {
         if (local == null) return null;
-        if (!local.launcherGameId.isEmpty()) for (Game game : games) if (game.id.equals(local.launcherGameId)) return game;
-        String wanted = ClassicsRules.normalizedTitle(local.title);
-        if (wanted.isEmpty()) return null;
-        Game platformMatch = null;
-        Game titleMatch = null;
-        int titleCount = 0;
-        for (Game game : games) {
-            if (!isClassicGame(game) && !ClassicsRules.platformMatches(local.systemId, game.platform)) continue;
-            if (!ClassicsRules.normalizedTitle(game.title).equals(wanted)) continue;
-            if (ClassicsRules.platformMatches(local.systemId, game.platform)) {
-                if (platformMatch == null || (!platformMatch.installed && game.installed)) platformMatch = game;
-            }
-            titleMatch = game;
-            titleCount++;
-        }
-        if (platformMatch != null) return platformMatch;
-        return titleCount == 1 ? titleMatch : null;
+        return GamingModeRules.launcherGameFor(local.title, local.systemId, local.launcherGameId, games);
     }
 
     private void launchLocalClassic(LocalClassic game) {

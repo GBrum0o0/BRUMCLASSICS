@@ -171,7 +171,7 @@ typedef struct {
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
     if (!self) return nil;
-    self.multipleTouchEnabled = YES;
+    self.multipleTouchEnabled = NO;
     self.exclusiveTouch = NO;
     self.backgroundColor = [UIColor colorWithWhite:0.09 alpha:0.84];
     self.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.28].CGColor;
@@ -232,7 +232,7 @@ typedef struct {
     const CGPoint point = [touch locationInView:self];
     const double radius = MAX(1, MIN(self.bounds.size.width, self.bounds.size.height) / 2);
     const uint8_t next = brum::dpadDirections(point.x - CGRectGetMidX(self.bounds),
-                                               point.y - CGRectGetMidY(self.bounds), radius);
+                                               point.y - CGRectGetMidY(self.bounds), radius, 0.16, _mask);
     if (_mask == next) return;
     _mask = next;
     const uint8_t bits[] = {brum::up, brum::down, brum::left, brum::right};

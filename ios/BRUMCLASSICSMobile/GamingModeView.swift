@@ -21,7 +21,7 @@ struct GamingModeView: View {
     private var catalogFingerprint: String {
         let romPart = pocket.romFolderGames.map { "\($0.id)" }.joined(separator: ",")
         let recPart = pocket.games.map { "\($0.filename):\($0.launcherGameID):\($0.lastPlayedAt?.timeIntervalSince1970 ?? 0)" }.joined(separator: ",")
-        let pcPart = store.snapshot.games.map { "\($0.id):\($0.installed ? 1 : 0):\($0.lastPlayedAt)" }.joined(separator: ",")
+        let pcPart = GamingModeCatalog.computerFingerprint(store.snapshot.games)
         return "\(romPart)|\(recPart)|\(pcPart)|\(favoritesJSON)"
     }
     private var libraryEntries: [GamingCatalogEntry] { catalogSnapshot.library }
@@ -106,7 +106,9 @@ struct GamingModeView: View {
     private func open(_ entry: GamingCatalogEntry) {
         switch entry {
         case .local(let rom, _): selectedROM = rom
-        case .computer(let game): selectedGame = game
+        case .computer(let game):
+            guard let current = store.snapshot.games.first(where: { $0.id == game.id && $0.isClassic && $0.installed }) else { return }
+            selectedGame = current
         }
     }
 
@@ -150,7 +152,7 @@ struct GamingModeView: View {
                     opensDetails: true
                 ) { selectedROM = rom }
             case .computer(let game):
-                Button { selectedGame = game } label: { GamingGameTile(game: game) }
+                Button { open(entry) } label: { GamingGameTile(game: game) }
                     .buttonStyle(.plain)
             }
             Button { toggleFavorite(entry.id) } label: {
@@ -204,6 +206,18 @@ struct GamingCatalogSnapshot {
 }
 
 enum GamingModeCatalog {
+    static func computerFingerprint(_ games: [Game]) -> Int {
+        var hasher = Hasher()
+        for game in games {
+            hasher.combine(game.id)
+            hasher.combine(game.category)
+            hasher.combine(game.title)
+            hasher.combine(game.platform)
+            hasher.combine(game.installed)
+            hasher.combine(game.lastPlayedAt)
+        }
+        return hasher.finalize()
+    }
     static func canOfferRetroArch(for rom: ROMFolderGame, imported: Bool) -> Bool {
         // A remembered import is not evidence that RetroArch can execute 3DS.
         if IntegratedEmulatorSupport.system(for: rom) == .nintendo3DS { return false }
@@ -267,14 +281,14 @@ enum GamingModeCatalog {
 
     static func matchedComputerGame(for rom: ROMFolderGame, records: [PocketClassic], computer: [Game]) -> Game? {
         if let linked = records.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame && !$0.launcherGameID.isEmpty }),
-           let exact = computer.first(where: { $0.id == linked.launcherGameID }) {
+           let exact = computer.first(where: { $0.isClassic && $0.id == linked.launcherGameID }) {
             return exact
         }
         let system = IntegratedEmulatorSupport.system(for: rom)
         let titleKey = normalizedKey(rom.title)
         let fileKey = normalizedKey(rom.filename)
         let candidates = computer.filter { game in
-            guard game.isClassic || platformMatches(system, pcPlatform: game.platform) else { return false }
+            guard game.isClassic else { return false }
             let gKey = normalizedKey(game.title)
             guard !gKey.isEmpty else { return false }
             return gKey == titleKey || (!fileKey.isEmpty && gKey == fileKey)
@@ -294,7 +308,7 @@ enum GamingModeCatalog {
         computerByTitleKey: [String: [Game]]
     ) -> Game? {
         if let linkedID = record?.launcherGameID, !linkedID.isEmpty,
-           let exact = computerByID[linkedID] {
+           let exact = computerByID[linkedID], exact.isClassic {
             return exact
         }
         let titleKey = normalizedKey(rom.title)
@@ -304,7 +318,7 @@ enum GamingModeCatalog {
         func appendCandidates(for key: String) {
             guard !key.isEmpty, let bucket = computerByTitleKey[key] else { return }
             for game in bucket {
-                guard game.isClassic || platformMatches(system, pcPlatform: game.platform) else { continue }
+                guard game.isClassic else { continue }
                 if seenIDs.insert(game.id).inserted {
                     candidates.append(game)
                 }
@@ -343,6 +357,7 @@ enum GamingModeCatalog {
         computerByID.reserveCapacity(computer.count)
         computerByTitleKey.reserveCapacity(computer.count)
         for game in computer {
+            guard game.isClassic else { continue }
             computerByID[game.id] = game
             let gKey = normalizedKey(game.title)
             if !gKey.isEmpty {
@@ -391,7 +406,7 @@ enum GamingModeCatalog {
         var pcEntries: [GamingCatalogEntry] = []
         pcEntries.reserveCapacity(computer.count)
         for game in computer {
-            guard game.installed, !matchedPCIDs.contains(game.id) else { continue }
+            guard game.isClassic, game.installed, !matchedPCIDs.contains(game.id) else { continue }
             let gKey = normalizedKey(game.title)
             let pKey = normalizedPlatform(game.platform)
             if !gKey.isEmpty && game.isClassic && localTitleKeys.contains("\(gKey)|\(pKey)") {
@@ -508,7 +523,7 @@ private struct GamingROMDetailView: View {
     }
     private var linkedPCGame: Game? {
         if let link = record, !link.launcherGameID.isEmpty,
-           let explicit = store.snapshot.games.first(where: { $0.id == link.launcherGameID && $0.installed }) {
+           let explicit = store.snapshot.games.first(where: { $0.isClassic && $0.id == link.launcherGameID && $0.installed }) {
             return explicit
         }
         if let matched = GamingModeCatalog.matchedComputerGame(for: rom, records: pocket.games, computer: store.snapshot.games),

@@ -255,7 +255,7 @@ enum DirectSaveSyncOutcome: Sendable {
     }
     func launcherGame(for retro: RetroArchLibraryGame, launcher: AppStore) -> Game? {
         if let link = games.first(where: { $0.filename.caseInsensitiveCompare(retro.filename) == .orderedSame }),
-           let exact = launcher.snapshot.games.first(where: { $0.id == link.launcherGameID }) { return exact }
+           let exact = launcher.snapshot.games.first(where: { $0.isClassic && $0.id == link.launcherGameID }) { return exact }
         let normalized = normalizedLibraryTitle(retro.titleName)
         let matches = launcher.snapshot.games.filter { $0.isClassic && normalizedLibraryTitle($0.title) == normalized }
         return matches.count == 1 ? matches[0] : nil
@@ -294,7 +294,7 @@ enum DirectSaveSyncOutcome: Sendable {
     }
     func launcherGame(for rom: ROMFolderGame, launcher: AppStore) -> Game? {
         if let link = games.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame && !$0.launcherGameID.isEmpty }),
-           let exact = launcher.snapshot.games.first(where: { $0.id == link.launcherGameID }) { return exact }
+           let exact = launcher.snapshot.games.first(where: { $0.isClassic && $0.id == link.launcherGameID }) { return exact }
         if let retro = retroArchGame(for: rom), let exact = launcherGame(for: retro, launcher: launcher) { return exact }
         let normalized = normalizedLibraryTitle(rom.title)
         let matches = launcher.snapshot.games.filter { $0.isClassic && normalizedLibraryTitle($0.title) == normalized }

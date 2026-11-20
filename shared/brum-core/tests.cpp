@@ -195,6 +195,30 @@ int main() {
     check(dpadDirections(100, -100, 100) == (right | up));
     check(dpadDirections(0, 100, 100) == down);
     check(dpadDirections(0, 0, 0) == 0);
+    // A finger can drift across the other axis without intending a diagonal.
+    check(dpadDirections(80, 20, 100) == right);
+    check(dpadDirections(-20, 80, 100) == down);
+    check(dpadDirections(20, -80, 100) == up);
+    check(dpadDirections(-80, -20, 100) == left);
+    check(dpadDirections(60, 60, 100) == (right | down));
+    for (double scale : {0.5, 1.0, 2.0, 3.0}) {
+        check(dpadDirections(80 * scale, 20 * scale, 100 * scale) == right);
+        check(dpadDirections(60 * scale, -60 * scale, 100 * scale) == (right | up));
+    }
+    const double radians = 3.14159265358979323846 / 180;
+    uint8_t held = right;
+    for (double degrees : {29.0, 31.0, 33.0, 30.0, 28.0}) {
+        held = dpadDirections(80 * std::cos(degrees * radians),
+                              80 * std::sin(degrees * radians), 100, 0.16, held);
+        check(held == right);
+    }
+    check(dpadDirections(60, 60, 100, 0.16, held) == (right | down));
+    check(dpadDirections(14, 0, 100, 0.16, right) == right);
+    check(dpadDirections(14, 0, 100) == 0);
+    check(dpadDirections(0, 0, 100, 0.16, right) == 0);
+    check(dpadDirections(151, 0, 100, 0.16, right) == 0);
+    check(dpadDirections(std::numeric_limits<double>::quiet_NaN(), 0, 100) == 0);
+    check(dpadDirections(0, std::numeric_limits<double>::infinity(), 100) == 0);
     const auto cRightUp = n64CButtons(cRight | cUp);
     check(near(cRightUp.x, -1) && near(cRightUp.y, -1));
     const auto opposing = n64CButtons(cLeft | cRight | cUp | cDown);
