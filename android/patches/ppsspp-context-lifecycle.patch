@@ -1,7 +1,34 @@
+diff --git a/ext/native/gfx_es2/draw_text.cpp b/ext/native/gfx_es2/draw_text.cpp
+index ce9b51b37..1b92c7c50 100644
+--- a/ext/native/gfx_es2/draw_text.cpp
++++ b/ext/native/gfx_es2/draw_text.cpp
+@@ -87,7 +87,7 @@ TextDrawer *TextDrawer::Create(Draw::DrawContext *draw) {
+ 	drawer = new TextDrawerUWP(draw);
+ #elif defined(USING_QT_UI)
+ 	drawer = new TextDrawerQt(draw);
+-#elif PPSSPP_PLATFORM(ANDROID)
++#elif PPSSPP_PLATFORM(ANDROID) && !defined(__LIBRETRO__)
+ 	drawer = new TextDrawerAndroid(draw);
+ #endif
+ 	if (drawer && !drawer->IsReady()) {
+diff --git a/ext/native/gfx_es2/draw_text_android.cpp b/ext/native/gfx_es2/draw_text_android.cpp
+index f2513b99e..fe9cd14fd 100644
+--- a/ext/native/gfx_es2/draw_text_android.cpp
++++ b/ext/native/gfx_es2/draw_text_android.cpp
+@@ -11,7 +11,7 @@
+ #include "android/jni/app-android.h"
+ #include <assert.h>
+ 
+-#if PPSSPP_PLATFORM(ANDROID)
++#if PPSSPP_PLATFORM(ANDROID) && !defined(__LIBRETRO__)
+ 
+ #include <jni.h>
+ 
 diff --git a/libretro/LibretroGraphicsContext.cpp b/libretro/LibretroGraphicsContext.cpp
+index 508353f6b..75a9d13a8 100644
 --- a/libretro/LibretroGraphicsContext.cpp
 +++ b/libretro/LibretroGraphicsContext.cpp
-@@ -78,7 +78,9 @@ void LibretroHWRenderContext::ContextDestroy() {
+@@ -67,7 +67,9 @@ void LibretroHWRenderContext::ContextDestroy() {
  
  	LostBackbuffer();
  
@@ -12,3 +39,15 @@ diff --git a/libretro/LibretroGraphicsContext.cpp b/libretro/LibretroGraphicsCon
  
  	if (!hw_render_.cache_context && !Libretro::useEmuThread) {
  		Shutdown();
+diff --git a/libretro/libretro.cpp b/libretro/libretro.cpp
+index 45185748c..42d3f2c4b 100644
+--- a/libretro/libretro.cpp
++++ b/libretro/libretro.cpp
+@@ -806,6 +806,7 @@ void NativeUpdate() {}
+ void NativeRender(GraphicsContext *graphicsContext) {}
+ void NativeResized() {}
+ bool System_InputBoxGetWString(const wchar_t *title, const std::wstring &defaultvalue, std::wstring &outvalue) { return false; }
++void System_InputBoxGetString(const std::string &title, const std::string &defaultValue, std::function<void(bool, const std::string &)> cb) { if (cb) cb(false, std::string()); }
+ 
+ #if PPSSPP_PLATFORM(ANDROID) || PPSSPP_PLATFORM(IOS)
+ std::vector<std::string> __cameraGetDeviceList() { return std::vector<std::string>(); }
