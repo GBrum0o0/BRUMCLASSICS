@@ -34,3 +34,13 @@ diff --git a/libretro/CMakeLists.txt b/libretro/CMakeLists.txt
 +if(NOT MSVC AND NOT APPLE)
     target_link_libraries(ppsspp_libretro "-Wl,-Bsymbolic")
  endif()
+diff --git a/libretro/libretro.cpp b/libretro/libretro.cpp
+--- a/libretro/libretro.cpp
++++ b/libretro/libretro.cpp
+@@ -572,0 +573,6 @@
++#if defined(IOS)
++	// BRUM iOS, 2026-11-21: sideload builds run without executable JIT memory.
++	coreParam.cpuCore = CPUCore::INTERPRETER;
++	g_Config.iCpuCore = (int)CPUCore::INTERPRETER;
++	g_Config.bVertexDecoderJit = false;
++#endif

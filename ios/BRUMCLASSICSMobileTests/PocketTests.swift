@@ -261,7 +261,9 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(CoreRegistry.candidate(for: .playStation)?.id, "beetle-psx")
         XCTAssertEqual(CoreRegistry.candidate(for: .saturn)?.id, "beetle-saturn")
         XCTAssertEqual(CoreRegistry.candidate(for: .atari2600)?.id, "stella2014")
-        XCTAssertEqual(CoreRegistry.candidate(for: .playStationPortable)?.id, "ppsspp")
+        XCTAssertEqual(CoreRegistry.core(for: .playStationPortable, includeExperimental: false)?.id, "ppsspp")
+        XCTAssertFalse(CoreRegistry.experimental.contains(CoreRegistry.ppsspp))
+        XCTAssertEqual(CoreRegistry.all.count, 9)
         XCTAssertEqual(CoreRegistry.candidate(for: .dreamcast)?.id, "flycast")
         XCTAssertEqual(CoreRegistry.candidate(for: .megaDrive)?.id, "blastem")
         XCTAssertEqual(CoreRegistry.candidate(for: .segaCD)?.id, "blastem")
@@ -450,11 +452,11 @@ final class PocketTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: directory) }
         // These bytes test installation/routing, not native library validity.
         for core in CoreRegistry.all { try Data([1]).write(to: directory.appendingPathComponent(core.libraryName)) }
-        for path in ["Pokemon.gba", "Tetris.gb", "Zelda.gbc", "Metal Slug.neo", "Sonic.sms", "Sonic.gg", "Mario.nes", "Bonk.pce", "Mario.sfc"] {
+        for path in ["Pokemon.gba", "Tetris.gb", "Zelda.gbc", "Metal Slug.neo", "Sonic.sms", "Sonic.gg", "Mario.nes", "Bonk.pce", "Mario.sfc", "PSP/Game.cso", "PSP/Game.iso", "PSP/EBOOT.PBP"] {
             let rom = ROMFolderGame(relativePath: path, filename: (path as NSString).lastPathComponent, title: "test", fileSize: 1)
             XCTAssertTrue(IntegratedEmulatorSupport.supports(rom, includeExperimental: false, frameworksDirectory: directory), path)
         }
-        for path in ["N64/Mario.z64", "MegaDrive/Sonic.md", "32X/Knuckles.32x", "PS1/Ridge Racer.cue", "Saturn/Nights.chd", "Arcade/mslug.zip", "Atari/Pitfall.a26", "PSP/Game.cso", "Dreamcast/Sonic.gdi", "3DS/Mario.3ds", "GameCube/Melee.rvz"] {
+        for path in ["N64/Mario.z64", "MegaDrive/Sonic.md", "32X/Knuckles.32x", "PS1/Ridge Racer.cue", "Saturn/Nights.chd", "Arcade/mslug.zip", "Atari/Pitfall.a26", "Dreamcast/Sonic.gdi", "3DS/Mario.3ds", "GameCube/Melee.rvz"] {
             let rom = ROMFolderGame(relativePath: path, filename: (path as NSString).lastPathComponent, title: "test", fileSize: 1)
             XCTAssertFalse(IntegratedEmulatorSupport.supports(rom, includeExperimental: false, frameworksDirectory: directory), path)
         }
@@ -510,6 +512,9 @@ final class PocketTests: XCTestCase {
         XCTAssertFalse(RetroArchAppStoreLaunchRules.supports(filename: "jogo.3ds"))
         XCTAssertFalse(GamingModeCatalog.canOfferRetroArch(for: threeDS, imported: false))
         XCTAssertFalse(GamingModeCatalog.canOfferRetroArch(for: threeDS, imported: true))
+        let psp = ROMFolderGame(relativePath: "PSP/EBOOT.PBP", filename: "EBOOT.PBP", title: "PSP", fileSize: 1)
+        XCTAssertFalse(GamingModeCatalog.canOfferRetroArch(for: psp, imported: true))
+        XCTAssertFalse(GamingModeCatalog.canOfferRetroArch(for: psp, imported: false))
         XCTAssertEqual(system("nested/PSP/game.iso"), .playStationPortable)
         XCTAssertEqual(system("PS1/PS2/game.iso"), .playStation2)
     }

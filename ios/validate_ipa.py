@@ -59,6 +59,9 @@ def validate_ipa(path, expected_version=None):
             raise ValueError("Invalid experimental build number")
         expanded_experimental = experimental and int(build_number) >= 37
         heavy_experimental = experimental and int(build_number) >= 39
+        psp_release = isinstance(build_number, str) and build_number.isdecimal() and int(build_number) >= 55
+        if psp_release:
+            integrated_cores["PPSSPP"] = root + "Frameworks/ppsspp_libretro_ios.dylib"
         sega_experimental = experimental and int(build_number) >= 40
         arcade_gc_experimental = experimental and int(build_number) >= 44
         azahar_experimental = experimental and int(build_number) >= 45
@@ -112,6 +115,8 @@ def validate_ipa(path, expected_version=None):
             root + "Frameworks/Beetle-WonderSwan-LICENSE.txt",
             root + "Frameworks/bsnes-mercury-LICENSE.txt",
         ]
+        if psp_release:
+            required_licenses += [root + "Frameworks/PPSSPP-LICENSE.txt"]
         if experimental:
             required_licenses += [root + "Frameworks/Beetle-PSX-LICENSE.txt",
                                   root + "Frameworks/Stella2014-LICENSE.txt"]
@@ -134,6 +139,14 @@ def validate_ipa(path, expected_version=None):
         if heavy_experimental and not any(name.startswith(root + "Frameworks/CoreAssets/PPSSPP/")
                                           and not name.endswith("/") for name in names):
             raise ValueError("PPSSPP core assets are absent")
+        if psp_release:
+            for asset in ("flash0/font/ltn0.pgf", "ppge_atlas.zim", "lang/en_US.ini"):
+                asset_path = root + "Frameworks/CoreAssets/PPSSPP/" + asset
+                if asset_path not in names or not archive.read(asset_path):
+                    raise ValueError(f"PPSSPP core asset is absent or empty: {asset}")
+            notice = root + "Frameworks/PPSSPP-THIRD-PARTY.txt"
+            if notice not in names or not archive.read(notice):
+                raise ValueError("PPSSPP-THIRD-PARTY.txt is absent or empty")
         if sega_experimental:
             for notice in ("BlastEm-libchdr-LICENSE.txt", "BlastEm-LZMA-LICENSE.txt", "BlastEm-zlib-LICENSE.txt"):
                 notice_path = root + "Frameworks/" + notice

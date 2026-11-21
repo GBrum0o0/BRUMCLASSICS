@@ -37,6 +37,10 @@ public final class CoreRegistry {
         "play", "Play!", "83700b2c31e593bc94e845b4b31b797be84dda59", "BSD-2-Clause",
         "play_libretro_android.so", "ps2"
     );
+    public static final Descriptor PPSSPP = new Descriptor(
+        "ppsspp", "PPSSPP", "7b4ddb426bbe9e287bb7f19b0cfaebb4ea0d41d8", "GPL-2.0-or-later",
+        "ppsspp_libretro_android.so", "psp", "cso"
+    );
     public static final Descriptor GEOLITH = new Descriptor(
         "geolith", "Geolith", "194024931935eff2092e36fc4f8e53e62ed11097", "BSD-3-Clause",
         "libgeolith_libretro.so", "neogeo"
@@ -61,15 +65,17 @@ public final class CoreRegistry {
         "bsnes-mercury-performance", "bsnes-mercury Performance", "79d7f9de218b6ffa65a80bbdc5828532bc239232", "GPL-3.0",
         "libbsnes_mercury_performance_libretro.so", "sfc", "smc"
     );
-    private static final Descriptor[] INTEGRATED = { MGBA, SKYEMU, PLAY, GEOLITH, GEARSYSTEM, NESTOPIA, BEETLE_PCE_FAST, BEETLE_WSWAN, BSNES_MERCURY };
+    private static final Descriptor[] INTEGRATED = { MGBA, SKYEMU, PLAY, PPSSPP, GEOLITH, GEARSYSTEM, NESTOPIA, BEETLE_PCE_FAST, BEETLE_WSWAN, BSNES_MERCURY };
 
     private CoreRegistry() {}
 
     public static String retroArchCore(String systemId, String filename) {
+        if ("psp".equals(systemId)) return "ppsspp";
         if ("gba".equals(systemId)) return "mgba";
         if ("gb".equals(systemId) || "gbc".equals(systemId)) return "gambatte";
 
         String extension = ClassicsRules.extension(filename);
+        if ("cso".equals(extension)) return "ppsspp";
         if ("gba".equals(extension)) return "mgba";
         if ("gb".equals(extension) || "gbc".equals(extension)) return "gambatte";
         if ("nes".equals(extension)) return "mesen";
@@ -90,7 +96,19 @@ public final class CoreRegistry {
     }
 
     public static Descriptor integratedCore(String systemId, String filename) {
-        String resolved = systemId == null || systemId.isEmpty() ? ClassicsRules.extension(filename) : systemId;
+        String resolved;
+        if (systemId != null && !systemId.isEmpty()) {
+            resolved = systemId;
+        } else {
+            String ext = ClassicsRules.extension(filename);
+            String path = "/" + (filename == null ? "" : filename.replace('\\', '/').toLowerCase(java.util.Locale.ROOT));
+            if (("iso".equals(ext) || "pbp".equals(ext)) &&
+                (path.contains("/psp/") || path.contains("/playstation portable/"))) {
+                resolved = "psp";
+            } else {
+                resolved = ext;
+            }
+        }
         for (Descriptor descriptor : INTEGRATED) if (descriptor.supports(resolved)) return descriptor;
         return null;
     }

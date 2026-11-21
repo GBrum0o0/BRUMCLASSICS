@@ -1,0 +1,14 @@
+diff --git a/libretro/LibretroGraphicsContext.cpp b/libretro/LibretroGraphicsContext.cpp
+--- a/libretro/LibretroGraphicsContext.cpp
++++ b/libretro/LibretroGraphicsContext.cpp
+@@ -78,7 +78,9 @@ void LibretroHWRenderContext::ContextDestroy() {
+ 
+ 	LostBackbuffer();
+ 
+-	gpu->DeviceLost();
++	if (gpu) {
++		gpu->DeviceLost();
++	}
+ 
+ 	if (!hw_render_.cache_context && !Libretro::useEmuThread) {
+ 		Shutdown();

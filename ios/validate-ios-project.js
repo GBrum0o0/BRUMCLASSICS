@@ -31,6 +31,7 @@ const required = [
   'BRUMCLASSICSMobile/MomentsView.swift', 'BRUMCLASSICSMobileTests/SnapshotTests.swift',
   'ios-update.json'
 ];
+required.push('prepare_ppsspp_assets.py', 'licenses/PPSSPP-FONTS.txt');
 
 for (const relative of required) {
   if (!fs.existsSync(path.join(root, relative))) throw new Error(`Arquivo obrigatório ausente: ${relative}`);
@@ -119,6 +120,10 @@ if (!source.includes('checkForPersonalUpdate')) throw new Error('Verificação d
 const updateManifest = JSON.parse(fs.readFileSync(path.join(root, 'ios-update.json'), 'utf8'));
 const publishedUpdateManifest = JSON.parse(fs.readFileSync(path.join(root, '..', 'ios-update.json'), 'utf8'));
 const workflow = fs.readFileSync(path.join(root, '..', '.github', 'workflows', 'build-ios-personal.yml'), 'utf8');
+const pspStep = workflow.match(/      - name: Compilar núcleo integrado PPSSPP sem JIT[\s\S]*?(?=\n      - name:)/)?.[0];
+if (!pspStep || !pspStep.includes('bash build-heavy-experimental.sh ppsspp "$APP"') || pspStep.includes('if:')) throw new Error('PPSSPP precisa ser compilado no pacote normal.');
+const pspBuild = fs.readFileSync(path.join(root, 'build-heavy-experimental.sh'), 'utf8');
+if (!pspBuild.includes('COMMIT=7b4ddb426bbe9e287bb7f19b0cfaebb4ea0d41d8') || !pspBuild.includes('prepare_ppsspp_assets.py')) throw new Error('Build ou assets reproduzíveis do PPSSPP ausentes.');
 if (!workflow.includes('ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa')) throw new Error('Upload do IPA não pode ficar preso a uma versão antiga.');
 for (const marker of ['CORE_COMMIT="7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6"', 'mgba_libretro_ios.dylib', '-DCMAKE_SYSTEM_NAME=iOS', '--target mgba_libretro']) {
   if (!workflow.includes(marker)) throw new Error(`Build reproduzível do core mGBA incompleto: ${marker}`);

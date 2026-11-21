@@ -9,7 +9,7 @@ O código próprio do aplicativo móvel e do BRUM Core é GPL-3.0-or-later. O la
 - licença compatível com a licença de distribuição do BRUMCLASSICS;
 - texto integral da licença presente no repositório de origem e no aplicativo;
 - origem pública, revisão fixada por commit e build reproduzível;
-- binários arm64 válidos no Android e no iOS, sem JIT ou download de código executável;
+- binários arm64 válidos na plataforma alvo, sem download de código executável; iOS comum precisa de um caminho funcional sem JIT;
 - API Libretro estável, vídeo, áudio, controles, save de bateria e serialização de estados;
 - três slots rápidos separados do save normal;
 - identidade pelo conteúdo da ROM e metadados com sistema, núcleo e versão;
@@ -93,6 +93,15 @@ O código próprio do aplicativo móvel e do BRUM Core é GPL-3.0-or-later. O la
 - Android: `libmednafen_wswan_libretro.so`.
 - iOS: `mednafen_wswan_libretro_ios.dylib`.
 
+### PPSSPP
+
+- Sistema: PlayStation Portable (PSP), imagens `.iso`, `.cso` e `.pbp` na categoria PSP.
+- Licença: GPL-2.0-or-later, combinado com o aplicativo móvel sob GPLv3 ou posterior.
+- Revisão: `7b4ddb426bbe9e287bb7f19b0cfaebb4ea0d41d8`.
+- Receitas e patches: `android/` e `ios/`, incluindo recursos de apoio e avisos de terceiros.
+- iOS utiliza interpretador e desativa os geradores de código que exigem JIT. Não exige ativação especial pelo Sideloadly; o custo de interpretação pode limitar a velocidade.
+- Integração e empacotamento são distintos de certificação de jogabilidade: partidas, áudio e saves ainda requerem validação em cada aparelho/jogo. Consulte `PSP-MOBILE.md`.
+
 ## Matriz dos 20 grupos solicitados
 
 | # | Sistema | Android | iOS | Situação atual |
@@ -106,7 +115,7 @@ O código próprio do aplicativo móvel e do BRUM Core é GPL-3.0-or-later. O la
 | 7 | Mega Drive/Genesis | RetroArch | RetroArch | Genesis Plus GX foi rejeitado pela restrição não comercial; alternativa GPL ainda precisa de build/testes móveis. |
 | 8 | PC Engine/TurboGrafx-16 | **BRUM Core · Beetle PCE Fast** | **BRUM Core · Beetle PCE Fast** | Cartuchos `.pce` integrados sob GPL-2.0-or-later/GPLv3+; PC Engine CD permanece no fallback. |
 | 9 | PlayStation 1 | RetroArch | RetroArch | Núcleo GPL compatível ainda precisa de revisão fixada, build e testes móveis. |
-| 10 | PSP | RetroArch | RetroArch | PPSSPP exige integração de recursos e renderização; iOS também depende de condições especiais para melhor desempenho. |
+| 10 | PSP | **BRUM Core · PPSSPP** | **BRUM Core · PPSSPP, interpretador** | Núcleo e recursos integrados; aguarda validação física de gameplay, áudio e saves. Sem promessa de velocidade no iPhone. |
 | 11 | Dreamcast | RetroArch | RetroArch | Flycast depende de aceleração gráfica/JIT e ainda precisa de auditoria de licença/revisão por plataforma. |
 | 12 | Sega Saturn | RetroArch | RetroArch | Núcleo compatível ainda precisa de revisão fixada, build e testes móveis. |
 | 13 | Sega CD e 32X | RetroArch | RetroArch | Genesis Plus GX e PicoDrive foram rejeitados por restrições não comerciais; alternativa GPL ainda não foi validada. |

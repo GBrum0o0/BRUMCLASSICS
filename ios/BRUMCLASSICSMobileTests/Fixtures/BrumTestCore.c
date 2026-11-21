@@ -1,6 +1,7 @@
 // A simulator-only libretro probe. No emulator/game code or copyrighted data.
 #include "../../BRUMCLASSICSMobile/Libretro/BrumLibretroAPI.h"
 #include <math.h>
+#include <string.h>
 
 static brum_retro_environment_t environment;
 static brum_retro_video_refresh_t video;
@@ -31,6 +32,11 @@ void retro_get_system_av_info(brum_retro_system_av_info *info) {
 bool retro_load_game(const brum_retro_game_info *game) {
     if (!game || !game->data || !game->size) return false;
     mode = *(const unsigned char *)game->data;
+    if (mode == 'I') {
+        brum_retro_variable option = {"ppsspp_cpu_core", NULL};
+        if (!environment(BRUM_RETRO_ENVIRONMENT_GET_VARIABLE, &option) ||
+            !option.value || strcmp(option.value, "interpreter") != 0) return false;
+    }
     if (mode == 'R') {
         brum_retro_log_callback log = {0};
         if (environment(BRUM_RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log)) log.log(3, "probe: rejected content");

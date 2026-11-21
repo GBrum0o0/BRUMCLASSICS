@@ -29,11 +29,12 @@ class PackageValidationTests(unittest.TestCase):
                 include_arcade_gc_notices=True,
                 include_ppsspp_assets=True, candidate_cpu=0x0100000C, candidate_licenses=True,
                 include_blastem_vendor_licenses=True,
-                experimental_build="37", display_name="BRUM Core Teste"):
+                experimental_build="37", display_name="BRUM Core Teste", release_build="55",
+                include_ppsspp_notices=True):
         path = Path(folder) / "test.ipa"
         root = f"Payload/{app}.app/"
         info = {"CFBundleIdentifier": "com.brumclassics.mobile.ios",
-                "CFBundleShortVersionString": "0.2.1", "CFBundleVersion": "4",
+                "CFBundleShortVersionString": "0.2.1", "CFBundleVersion": release_build,
                 "CFBundleSupportedPlatforms": ["iPhoneOS"]}
         if executable is not None:
             info["CFBundleExecutable"] = executable
@@ -44,6 +45,19 @@ class PackageValidationTests(unittest.TestCase):
                 info["CFBundleDisplayName"] = display_name
         with zipfile.ZipFile(path, "w") as archive:
             archive.writestr(root + "Info.plist", plistlib.dumps(info))
+            if experimental is False and int(release_build) >= 55:
+                if include_ppsspp:
+                    entry = zipfile.ZipInfo(root + "Frameworks/ppsspp_libretro_ios.dylib")
+                    entry.create_system = 3
+                    entry.external_attr = (stat.S_IFREG | 0o755) << 16
+                    archive.writestr(entry, struct.pack("<IIIIIIII", 0xFEEDFACF, candidate_cpu, 0, 6, 0, 0, 0, 0))
+                if candidate_licenses:
+                    archive.writestr(root + "Frameworks/PPSSPP-LICENSE.txt", "license fixture " * 100)
+                if include_ppsspp_assets:
+                    for asset in ("flash0/font/ltn0.pgf", "ppge_atlas.zim", "lang/en_US.ini"):
+                        archive.writestr(root + "Frameworks/CoreAssets/PPSSPP/" + asset, "asset fixture")
+                if include_ppsspp_notices:
+                    archive.writestr(root + "Frameworks/PPSSPP-THIRD-PARTY.txt", "third party fixture")
             if experimental is True:
                 candidates = [
                     (include_n64, "mupen64plus_next_libretro_ios.dylib", "Mupen64Plus-Next-LICENSE.txt"),
@@ -147,6 +161,26 @@ class PackageValidationTests(unittest.TestCase):
     def test_valid_package(self):
         with tempfile.TemporaryDirectory() as folder:
             self.assertTrue(validate_ipa(self.fixture(folder), "0.2.1")["ok"])
+
+    def test_normal_psp_release_requires_core_assets_license_and_notices(self):
+        with tempfile.TemporaryDirectory() as folder:
+            result = validate_ipa(self.fixture(folder))
+            self.assertFalse(result["experimentalBackends"])
+            self.assertEqual(len(result["integratedCores"]), 9)
+            self.assertIn("PPSSPP arm64", result["integratedCores"])
+            for option, message in (("include_ppsspp", "PPSSPP core is absent"),
+                                    ("include_ppsspp_assets", "PPSSPP core asset"),
+                                    ("candidate_licenses", "license is absent"),
+                                    ("include_ppsspp_notices", "PPSSPP-THIRD-PARTY")):
+                with self.subTest(option=option), self.assertRaisesRegex(ValueError, message):
+                    validate_ipa(self.fixture(folder, **{option: False}))
+            with self.assertRaisesRegex(ValueError, "arm64"):
+                validate_ipa(self.fixture(folder, candidate_cpu=0x01000007))
+
+    def test_historical_normal_package_keeps_eight_core_contract(self):
+        with tempfile.TemporaryDirectory() as folder:
+            result = validate_ipa(self.fixture(folder, release_build="54", include_ppsspp=False))
+            self.assertEqual(len(result["integratedCores"]), 8)
 
     def test_experimental_package_requires_all_candidates(self):
         with tempfile.TemporaryDirectory() as folder:

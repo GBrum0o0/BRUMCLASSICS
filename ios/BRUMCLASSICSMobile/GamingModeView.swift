@@ -221,6 +221,7 @@ enum GamingModeCatalog {
     static func canOfferRetroArch(for rom: ROMFolderGame, imported: Bool) -> Bool {
         // A remembered import is not evidence that RetroArch can execute 3DS.
         if IntegratedEmulatorSupport.system(for: rom) == .nintendo3DS { return false }
+        if IntegratedEmulatorSupport.system(for: rom) == .playStationPortable { return false }
         return RetroArchAppStoreLaunchRules.supports(filename: rom.filename) || imported
     }
 
@@ -578,6 +579,10 @@ private struct GamingROMDetailView: View {
                             BrumSectionLabel(text: "EXECUÇÃO NESTE IPHONE")
                             Text(routeDescription).font(.subheadline).foregroundStyle(BrumTheme.muted)
                             Text(executionScopeSummary).font(.caption).foregroundStyle(BrumTheme.muted)
+                            if system == .playStationPortable {
+                                Text("PPSSPP usa interpretador sem JIT neste iPhone. O desempenho depende do jogo e do aparelho. Saves de PSP ficam locais em PSP/SAVEDATA; Save Sync de bateria SRM não cobre esse formato.")
+                                    .font(.caption2).foregroundStyle(BrumTheme.muted)
+                            }
                             if system == .nintendoDS || system == .nintendo3DS {
                                 Text("Segunda tela e toque: \(system == .nintendoDS ? "SkyEmu oferece 8 layouts de tela dupla e toque direto integrado." : "Azahar 3DS suporta tela dupla e toque na build experimental.")")
                                     .font(.caption2).foregroundStyle(BrumTheme.primary)
@@ -604,7 +609,7 @@ private struct GamingROMDetailView: View {
                         Text(pocket.isImportedIntoRetroArch(rom) ? "RetroArch pronto" : "Importar ROM para o RetroArch ao jogar")
                             .font(.caption).foregroundStyle(BrumTheme.muted)
                     }
-                    if installedCore != nil {
+                    if installedCore != nil && system != .playStationPortable {
                         Button {
                             syncingNativeSave = true
                             Task {
@@ -744,7 +749,7 @@ private struct GamingROMDetailView: View {
     private var routeDescription: String {
         let reason = IntegratedEmulatorSupport.availabilityReason(for: rom)
         if installedCore != nil { return reason }
-        if system == .nintendo3DS { return "\(reason) A importação para o RetroArch não ativaria o BRUM Core." }
+        if system == .nintendo3DS || system == .playStationPortable { return "\(reason) Reinstale o pacote completo para usar este núcleo integrado." }
         if canUseRetroArch { return "\(reason) A opção abaixo usa explicitamente o RetroArch e não conta como suporte integrado." }
         return "\(reason) O arquivo original foi preservado."
     }

@@ -1,12 +1,12 @@
 {
-  "version": "0.21.0",
-  "build": 54,
+  "version": "0.22.0",
+  "build": 55,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.21.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.22.0",
   "notes": [
-    "Direcional do iPhone com setores mais precisos, diagonais intencionais e estabilidade durante o movimento.",
-    "Gaming Mode mostra exclusivamente Classics locais ou sincronizados; jogos PC e Steam continuam disponíveis na biblioteca geral.",
-    "Vínculos antigos e favoritos não fazem jogos de outras categorias reaparecerem no Gaming Mode.",
-    "Preserva as melhorias anteriores de Save Sync e controles. Desbloqueios RetroAchievements nativos continuam em desenvolvimento."
+    "PSP integrado pelo PPSSPP no pacote normal: ISO/PBP na pasta PSP e CSO reconhecido diretamente.",
+    "Execução no iPhone por interpretador, sem JIT. Compatibilidade, desempenho e gameplay dependem do aparelho e do jogo.",
+    "Controles PSP, recursos internos e licenças incluídos. Saves locais de PSP usam a pasta PSP/SAVEDATA; a sincronização de bateria SRM não cobre esse formato.",
+    "Preserva os oito núcleos anteriores, controles e Save Sync existentes."
   ]
 }

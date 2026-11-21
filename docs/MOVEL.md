@@ -1,4 +1,4 @@
-# BRUMCLASSICS MÓVEL Android 0.31.0 e iOS 0.21.0
+# BRUMCLASSICS MÓVEL Android 0.32.0 e iOS 0.22.0
 
 Jogos cadastrados no launcher como **não oficiais** são sincronizados como itens locais instalados. O aplicativo recebe somente a classificação e o SteamID de referência quando houver; o caminho do executável nunca sai do computador. B-CARD, anotações e BRUMCOMPANION continuam usando a identidade segura enviada pelo launcher.
 
@@ -6,7 +6,9 @@ O **Gaming Mode** reúne ROMs autorizadas e jogos Classics instalados no PC. NES
 
 ## Instalar e atualizar
 
-Instale o APK 0.31.0 da release oficial sobre o aplicativo existente, sem limpar seus dados. No iPhone, assine o IPA 0.21.0 com Sideloadly ou AltStore. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente.
+Instale o APK 0.32.0 da release oficial sobre o aplicativo existente, sem limpar seus dados. No iPhone, assine o IPA 0.22.0 com Sideloadly ou AltStore. Para próximas versões, use **Perfil → Atualizações**. O Android pede confirmação para instalar: o launcher não atualiza silenciosamente nem exige copiar arquivos manualmente.
+
+PSP passa a usar PPSSPP integrado nas duas plataformas, com os recursos necessários incluídos. No iPhone utiliza interpretador sem JIT. Consulte [formatos, saves e limites de validação](PSP-MOBILE.md); a integração não certifica compatibilidade ou desempenho de todos os jogos.
 
 Em fontes sem leitura oficial completa, abra a nova aba **Conquistas**, pesquise o jogo e toque no item oficial para marcar ou desfazer o progresso manual. Imagem, título e descrição vêm do catálogo carregado pelo launcher 1.62.0; não há formulário de data nem cadastro livre.
 
@@ -30,9 +32,9 @@ Anotações e Quero jogar editados offline entram em uma fila. Ao retornar à re
 O botão circular **JOGAR**, no centro da navegação inferior, abre uma tela simples em orientação horizontal. Durante o Gaming Mode, a navegação inferior fica oculta e um botão **Sair** retorna à interface normal. A lista mostra somente o que pode ser usado naquele momento:
 
 - **No celular:** todos os arquivos reconhecidos na pasta de ROMs escolhida pelo usuário; GB, GBC, GBA, Nintendo DS e cartuchos Neo Geo `.neo` abrem diretamente pelo BRUM Core, sem importação. No Android, imagens de PS2 identificadas pelo conteúdo também usam o BRUM Core experimental;
-- **Instalados no computador:** somente jogos cujo estado instalado foi confirmado pelo launcher;
+- **Instalados no computador:** somente Classics cujo estado instalado foi confirmado pelo launcher; jogos PC, Steam e outras categorias ficam na biblioteca geral;
 - sistemas ainda não integrados abrem pelo fluxo configurado do RetroArch como fallback;
-- jogos do PC usam uma solicitação autenticada, são iniciados pelo launcher e abrem o Moonlight quando o Sunshine está pronto.
+- o início remoto utiliza uma solicitação autenticada ao launcher e abre o Moonlight quando o Sunshine está pronto.
 
 Jogos apenas preservados no cache, mas que não estejam instalados, não aparecem no Gaming Mode. A transmissão usa Sunshine/Moonlight. Para acesso fora de casa, configure Tailscale nos dois aparelhos; o QR guarda o endereço remoto sob a mesma identidade TLS. Consulte [o guia de streaming](STREAMING.md). Nunca exponha a porta da ponte móvel no roteador.
 

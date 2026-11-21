@@ -78,6 +78,13 @@ public final class EmulationIdentity {
         if (length > 0xB2 && (header[0xB2] & 0xff) == 0x96) return new DetectedSystem("gba", "header");
         if (containsAscii(header, length, "BOOT2")) return new DetectedSystem("ps2", "header");
         String extension = ClassicsRules.extension(filename).toLowerCase(Locale.ROOT);
+        if ("iso".equals(extension) && containsAscii(header, length, "PSP_GAME")) return new DetectedSystem("psp", "header");
+        if ("cso".equals(extension) && length >= 4 && header[0] == 'C' && header[1] == 'I' && header[2] == 'S' && header[3] == 'O') return new DetectedSystem("psp", "header");
+        // ISO and PBP are shared with other PlayStation systems. A PSP folder
+        // disambiguates them without changing existing PS2 content detection.
+        String path = "/" + (filename == null ? "" : filename.replace('\\', '/').toLowerCase(Locale.ROOT));
+        if (("iso".equals(extension) || "pbp".equals(extension)) &&
+            (path.contains("/psp/") || path.contains("/playstation portable/"))) return new DetectedSystem("psp", "folder");
         switch (extension) {
             case "gb": case "gbc": case "gba": case "nes": case "sfc": case "smc":
             case "n64": case "z64": case "v64": case "nds": case "sms": case "gg":

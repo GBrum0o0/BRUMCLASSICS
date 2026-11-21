@@ -41,7 +41,7 @@ jobs:
         working-directory: ios
         run: |
           node validate-ios-project.js
-          python3 -m unittest -v test_validate_ipa.py
+          python3 -m unittest -v test_validate_ipa.py test_prepare_ppsspp_assets.py
 
       - name: Instalar XcodeGen
         run: brew install xcodegen
@@ -316,6 +316,14 @@ jobs:
           chmod 755 "$APP/Frameworks/mednafen_wswan_libretro_ios.dylib"
           file "$APP/Frameworks/mednafen_wswan_libretro_ios.dylib" | grep -q arm64
 
+      - name: Compilar núcleo integrado PPSSPP sem JIT
+        working-directory: ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="build/DerivedData/Build/Products/Release-iphoneos/BRUMCLASSICSMobile.app"
+          bash build-heavy-experimental.sh ppsspp "$APP"
+
       - name: Incluir backends experimentais iOS
         if: inputs.experimental
         working-directory: ios
@@ -357,14 +365,13 @@ jobs:
             chmod 755 "$APP/Frameworks/$library"
             file "$APP/Frameworks/$library" | grep -q arm64
           done
-          bash build-heavy-experimental.sh ppsspp "$APP"
           bash build-heavy-experimental.sh flycast "$APP"
           bash build-heavy-experimental.sh dolphin "$APP"
           bash build-heavy-experimental.sh azahar "$APP"
           bash build-arcade-experimental.sh "$APP"
           /usr/libexec/PlistBuddy -c 'Add :BRUMExperimentalBackends bool true' "$APP/Info.plist"
           /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName BRUM Core Teste' "$APP/Info.plist"
-          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 48' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 55' "$APP/Info.plist"
 
       - name: Empacotar IPA pessoal
         working-directory: ios
@@ -376,7 +383,7 @@ jobs:
       - name: Guardar build pessoal
         uses: actions/upload-artifact@v4
         with:
-          name: BRUMCLASSICS-MOVEL-IOS-${{ inputs.experimental && 'EXPERIMENTAL' || 'PESSOAL' }}-0.21.0
+          name: BRUMCLASSICS-MOVEL-IOS-${{ inputs.experimental && 'EXPERIMENTAL' || 'PESSOAL' }}-0.22.0
           path: |
             ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa
             ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa.sha256

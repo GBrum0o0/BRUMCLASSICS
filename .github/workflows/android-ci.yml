@@ -6,12 +6,16 @@ on:
       - "android/**"
       - "LICENSES/**"
       - "MOBILE-LICENSING.md"
+      - "ios/prepare_ppsspp_assets.py"
+      - "ios/licenses/PPSSPP-FONTS.txt"
       - ".github/workflows/android-ci.yml"
   pull_request:
     paths:
       - "android/**"
       - "LICENSES/**"
       - "MOBILE-LICENSING.md"
+      - "ios/prepare_ppsspp_assets.py"
+      - "ios/licenses/PPSSPP-FONTS.txt"
       - ".github/workflows/android-ci.yml"
   workflow_dispatch:
 
@@ -102,6 +106,29 @@ jobs:
           cp "$CORE_DIR/License.txt" android/app/src/main/assets/core-licenses/Play-LICENSE.txt
           "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" --dyn-syms \
             android/app/src/main/jniLibs/arm64-v8a/play_libretro_android.so | grep 'retro_load_game' >/dev/null
+      - name: Build pinned PPSSPP PSP core and licensed resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE="android/app/src/main/cpp/vendor/ppsspp"
+          COMMIT="7b4ddb426bbe9e287bb7f19b0cfaebb4ea0d41d8"
+          git clone --filter=blob:none https://github.com/libretro/ppsspp.git "$SOURCE"
+          git -C "$SOURCE" checkout --detach "$COMMIT"
+          test "$(git -C "$SOURCE" rev-parse HEAD)" = "$COMMIT"
+          git -C "$SOURCE" submodule update --init --recursive --depth 1
+          git -C "$SOURCE" apply "$GITHUB_WORKSPACE/android/patches/ppsspp-context-lifecycle.patch"
+          NDK="$ANDROID_HOME/ndk/27.0.12077973"
+          CMAKE_PATH="$ANDROID_HOME/cmake/3.22.1/bin"
+          "$CMAKE_PATH/cmake" -S "$SOURCE" -B "$SOURCE/build-brum-android-arm64" -G Ninja \
+            -DLIBRETRO=ON -DHEADLESS=OFF -DUNITTEST=OFF -DUSE_DISCORD=OFF \
+            -DCMAKE_BUILD_TYPE=Release -DANDROID_ABI=arm64-v8a -DANDROID_NDK="$NDK" \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_PLATFORM=android-26 -DANDROID_STL=c++_static -DCMAKE_MAKE_PROGRAM="$CMAKE_PATH/ninja"
+          "$CMAKE_PATH/cmake" --build "$SOURCE/build-brum-android-arm64" --target ppsspp_libretro --parallel 4
+          cp "$SOURCE/build-brum-android-arm64/ppsspp_libretro_android.so" android/app/src/main/jniLibs/arm64-v8a/
+          python3 ios/prepare_ppsspp_assets.py --android "$SOURCE" android/app/src/main/assets
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" --dyn-syms \
+            android/app/src/main/jniLibs/arm64-v8a/ppsspp_libretro_android.so | grep 'retro_load_game' >/dev/null
       - name: Compile Android application
         working-directory: android
         run: ./gradlew :app:assembleDebug --no-daemon
@@ -118,8 +145,12 @@ jobs:
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/libmednafen_wswan_libretro.so' >/dev/null
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/libbsnes_mercury_performance_libretro.so' >/dev/null
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/play_libretro_android.so' >/dev/null
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/ppsspp_libretro_android.so' >/dev/null
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/system/PPSSPP/ppge_atlas.zim' >/dev/null
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/system/PPSSPP/flash0/font/jpn0.pgf' >/dev/null
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/core-licenses/PPSSPP-THIRD-PARTY.txt' >/dev/null
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/GPL-3.0.txt' >/dev/null
-          for license in mGBA SkyEmu Geolith Play Gearsystem Nestopia Beetle-PCE-Fast Beetle-WonderSwan bsnes-mercury; do
+          for license in mGBA SkyEmu Geolith Play PPSSPP Gearsystem Nestopia Beetle-PCE-Fast Beetle-WonderSwan bsnes-mercury; do
             unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep "assets/core-licenses/${license}-LICENSE.txt" >/dev/null
           done
       - name: Run contract tests

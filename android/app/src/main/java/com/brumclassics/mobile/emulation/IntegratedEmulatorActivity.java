@@ -223,7 +223,7 @@ public final class IntegratedEmulatorActivity extends Activity {
         FrameLayout.LayoutParams toolsParams = frame(304, 44, Gravity.TOP | Gravity.END); toolsParams.setMargins(0, dp(12), dp(14), 0); root.addView(tools, toolsParams);
 
         String sys = launch.systemId == null ? "" : launch.systemId.toLowerCase(Locale.ROOT);
-        boolean isAnalog = "ps2".equals(sys);
+        boolean isAnalog = "ps2".equals(sys) || "psp".equals(sys);
         useAnalogStick = isAnalog;
 
         dpadView = new VirtualDPadView(this);
@@ -279,7 +279,7 @@ public final class IntegratedEmulatorActivity extends Activity {
             addPadButton(root, pce ? "II" : sms ? "1" : "B", 0, Gravity.BOTTOM | Gravity.END, 118, 56);
             addPadButton(root, pce ? "I" : sms ? "2" : "A", 8, Gravity.BOTTOM | Gravity.END, 34, 88);
         } else {
-            boolean ps = "ps2".equals(sys);
+            boolean ps = "ps2".equals(sys) || "psp".equals(sys);
             addPadButton(root, ps ? "×" : "B", 0, Gravity.BOTTOM | Gravity.END, 126, 36);
             addPadButton(root, ps ? "○" : "A", 8, Gravity.BOTTOM | Gravity.END, 34, 86);
             addPadButton(root, ps ? "□" : "Y", 1, Gravity.BOTTOM | Gravity.END, 184, 86);

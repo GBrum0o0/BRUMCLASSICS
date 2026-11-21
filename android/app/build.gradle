@@ -11,8 +11,8 @@ android {
         applicationId "com.brumclassics.mobile"
         minSdk 26
         targetSdk 36
-        versionCode 43
-        versionName "0.31.0"
+        versionCode 44
+        versionName "0.32.0"
         ndk {
             abiFilters "arm64-v8a"
         }
@@ -60,3 +60,15 @@ tasks.register("verifyPlayCoreBinary") {
     }
 }
 tasks.named("preBuild").configure { dependsOn("verifyPlayCoreBinary") }
+
+tasks.register("verifyPpssppCore") {
+    doLast {
+        def binary = file("src/main/jniLibs/arm64-v8a/ppsspp_libretro_android.so")
+        def atlas = file("src/main/assets/system/PPSSPP/ppge_atlas.zim")
+        def font = file("src/main/assets/system/PPSSPP/flash0/font/ltn0.pgf")
+        if (!binary.isFile() || binary.length() < 1_000_000L || !atlas.isFile() || !font.isFile()) {
+            throw new GradleException("PPSSPP ARM64/recursos ausentes. Execute android/fetch-ppsspp-core.ps1 antes de compilar.")
+        }
+    }
+}
+tasks.named("preBuild").configure { dependsOn("verifyPpssppCore") }

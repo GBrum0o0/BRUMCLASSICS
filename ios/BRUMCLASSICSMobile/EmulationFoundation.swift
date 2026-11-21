@@ -252,9 +252,9 @@ enum CoreRegistry {
 
     // A descriptor alone does not enable a backend. Preserve the existing release
     // while new engines pass independent builds and device acceptance tests.
-    static let all = [mgba, skyEmu, geolith, gearsystem, nestopia, beetlePCEFast, bsnesMercury, beetleWonderSwan]
-    static let candidates = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, ppsspp, flycast, blastEm, mame2016, azahar, dolphin, play]
-    static let experimental = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, ppsspp, flycast, blastEm, mame2016, azahar, dolphin]
+    static let all = [mgba, skyEmu, geolith, gearsystem, nestopia, beetlePCEFast, bsnesMercury, beetleWonderSwan, ppsspp]
+    static let candidates = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, flycast, blastEm, mame2016, azahar, dolphin, play]
+    static let experimental = [mupen64PlusNext, beetlePSX, beetleSaturn, stella2014, flycast, blastEm, mame2016, azahar, dolphin]
     static var isTestPackage: Bool {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String == "BRUM Core Teste"
     }

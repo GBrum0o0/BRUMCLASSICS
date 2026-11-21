@@ -169,11 +169,12 @@ public final class ClassicsRepository {
         }
 
         File root = new File(context.getFilesDir(), "integrated-emulator");
-        File systemDirectory = new File(root, "system");
+        File systemDirectory = new File(root, "psp".equals(stored.systemId) ? "system-ppsspp-v1" : "system");
         File saveDirectory = new File(new File(root, "saves"), stored.systemId);
         if ((!systemDirectory.isDirectory() && !systemDirectory.mkdirs()) || (!saveDirectory.isDirectory() && !saveDirectory.mkdirs())) {
             throw new IllegalStateException("Não foi possível criar a pasta segura de saves.");
         }
+        if ("psp".equals(stored.systemId)) CoreAssets.installPpsspp(context.getAssets(), systemDirectory);
         if ("neogeo".equals(stored.systemId) &&
             !new File(systemDirectory, "aes.zip").isFile() && !new File(systemDirectory, "neogeo.zip").isFile()) {
             throw new IllegalStateException("BIOS do Neo Geo ausente. Coloque aes.zip ou neogeo.zip dentro da pasta de ROMs e verifique a pasta novamente.");
@@ -188,11 +189,23 @@ public final class ClassicsRepository {
         );
     }
 
+    public synchronized String resolveSystemId(LocalClassic game) throws Exception {
+        LocalClassic stored = find(game.id);
+        if (stored == null) return game.systemId == null ? "" : game.systemId;
+        String previousSystemId = stored.systemId;
+        ensureIdentity(stored);
+        if (!stored.systemId.equals(previousSystemId)) save();
+        return stored.systemId;
+    }
+
     public synchronized IntegratedEmulatorLaunch prepareSaveSyncTarget(LocalClassic game) throws Exception {
         LocalClassic stored = find(game.id);
         if (stored == null) throw new IllegalStateException("Atualize a pasta de ROMs antes de sincronizar o save.");
         String previousIdentity = stored.canonicalGameId;
         ensureIdentity(stored);
+        if ("psp".equals(stored.systemId)) {
+            throw new IllegalStateException("Os saves de PSP estão preservados neste aparelho. A sincronização de pastas PSP ainda não está disponível.");
+        }
         if (!CoreRegistry.supportsIntegrated(stored.systemId, stored.filename)) {
             throw new IllegalStateException("Este jogo ainda não usa um núcleo integrado compatível com save direto.");
         }
@@ -227,7 +240,7 @@ public final class ClassicsRepository {
         EmulationIdentity identity;
         try (InputStream input = resolver.openInputStream(Uri.parse(stored.uri))) {
             if (input == null) throw new IllegalStateException("O Android não liberou a leitura desta ROM.");
-            identity = EmulationIdentity.inspect(input, stored.filename);
+            identity = EmulationIdentity.inspect(input, stored.relativePath);
         }
         stored.systemId = identity.systemId;
         stored.contentSha256 = identity.contentSha256;

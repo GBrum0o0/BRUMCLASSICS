@@ -61,7 +61,8 @@ enum IntegratedEmulatorSupport {
 
     static func routeLabel(_ rom: ROMFolderGame, includeExperimental: Bool = CoreRegistry.experimentalBuild, frameworksDirectory: URL? = nil) -> String {
         guard let core = core(for: rom, includeExperimental: includeExperimental, frameworksDirectory: frameworksDirectory) else {
-            return system(for: rom) == .nintendo3DS ? "INDISPONÍVEL · BRUM CORE" : "JOGAR · RETROARCH"
+            let detected = system(for: rom)
+            return detected == .nintendo3DS || detected == .playStationPortable ? "INDISPONÍVEL · BRUM CORE" : "JOGAR · RETROARCH"
         }
         return CoreRegistry.experimental.contains(core) ? "TESTAR · BRUM CORE" : "JOGAR · BRUM CORE"
     }

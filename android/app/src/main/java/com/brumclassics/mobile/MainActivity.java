@@ -326,7 +326,7 @@ public final class MainActivity extends Activity {
                             refreshCurrentScreen();
                         });
                         android.content.SharedPreferences prefs = getSharedPreferences("brum_mobile_prefs", MODE_PRIVATE);
-                        if (game != null && prefs.getBoolean("auto_save_sync", true) && bridgeClient.isConfigured() && "connected".equals(syncState)) {
+                        if (game != null && !"psp".equalsIgnoreCase(game.systemId) && prefs.getBoolean("auto_save_sync", true) && bridgeClient.isConfigured() && "connected".equals(syncState)) {
                             try {
                                 IntegratedEmulatorLaunch target = classicsRepository.prepareSaveSyncTarget(game);
                                 Game linked = launcherGameFor(game);
@@ -1563,15 +1563,18 @@ public final class MainActivity extends Activity {
         Button play = gamingAction("Jogar no celular", true, v -> launchLocalClassic(game));
         page.addView(gamingHero(game.title, classicPlatform(game), linked, game,
                 formatClassicTime(game.creditedSeconds), summary, play), margins(-1, 10, -1, 0));
+        String pathHint = classicPathHint(game);
+        CoreRegistry.Descriptor core = CoreRegistry.integratedCore(game.systemId, pathHint);
+        boolean isPsp = isPspClassic(game);
         page.addView(gamingActionTriplet(
                 "JOGAR",
                 v -> launchLocalClassic(game),
                 "GAMEPAD",
                 v -> launchGamepadOnPC(linked, game.filename, game.title, 1, "mobile1-pc2", 1, null),
                 "MULTIJOGADOR LOCAL",
-                v -> showLocalMultiplayerDialog(game.title, linked, game, game.filename, CoreRegistry.supportsIntegrated(game.systemId, game.filename))
+                v -> showLocalMultiplayerDialog(game.title, linked, game, game.filename, core != null)
         ), margins(-1, 12, -1, 4));
-        if (CoreRegistry.supportsIntegrated(game.systemId, game.filename)) {
+        if (core != null && !isPsp) {
             TextView syncSaveStatus = text("", 12, Color.rgb(173, 180, 190), false);
             syncSaveStatus.setVisibility(View.GONE);
             Button syncSave = gamingAction("SINCRONIZAR SAVE COM PC", false, null);
@@ -1581,10 +1584,14 @@ public final class MainActivity extends Activity {
             page.addView(syncSave, margins(-1, 6, -1, 4, 44));
             page.addView(syncSaveStatus, margins(-1, 0, -1, 6));
         }
-        CoreRegistry.Descriptor core = CoreRegistry.integratedCore(null, game.filename);
-        String executionText = core != null
-                ? "Executa no celular (offline) · BRUM Core " + core.displayName + " (" + core.license + ")\nDepende do PC/rede: sincronizar conquistas e Gamepad M.U.R.B no computador."
-                : "Executa no celular via RetroArch externo (quando suportado).\nDepende do PC/rede: Gamepad no computador e sincronização.";
+        String executionText;
+        if (core != null && isPsp) {
+            executionText = "Executa no celular (offline) · BRUM Core " + core.displayName + " (" + core.license + ")\nSaves de PSP ficam locais em PSP/SAVEDATA; o Save Sync de bateria SRM não cobre esse formato.\nDepende do PC/rede: sincronizar conquistas e Gamepad M.U.R.B no computador.";
+        } else if (core != null) {
+            executionText = "Executa no celular (offline) · BRUM Core " + core.displayName + " (" + core.license + ")\nDepende do PC/rede: sincronizar conquistas e Gamepad M.U.R.B no computador.";
+        } else {
+            executionText = "Executa no celular via RetroArch externo (quando suportado).\nDepende do PC/rede: Gamepad no computador e sincronização.";
+        }
         page.addView(noteCard("EXECUÇÃO E INFORMAÇÕES · " + game.filename, executionText), margins(-1, 12, -1, 0));
         String unavailable = game.raGameId <= 0 ? "Vincule o ID oficial do jogo para carregar as conquistas."
                 : classicsRepository.raUsername().isEmpty() || classicsRepository.raKey().isEmpty()
@@ -1804,7 +1811,7 @@ public final class MainActivity extends Activity {
             LinearLayout.LayoutParams coverLp = margins(210, 25, -1, 0, 294); coverLp.gravity = Gravity.CENTER_HORIZONTAL;
             page.addView(localClassicArtwork(game, 294), coverLp);
         }
-        CoreRegistry.Descriptor integratedCore = CoreRegistry.integratedCore(game.systemId, game.filename);
+        CoreRegistry.Descriptor integratedCore = CoreRegistry.integratedCore(game.systemId, classicPathHint(game));
         TextView platform = eyebrow(classicPlatform(game) + (integratedCore == null ? " · RETROARCH" : " · BRUM CORE · " + integratedCore.displayName.toUpperCase(Locale.ROOT))); platform.setGravity(Gravity.CENTER);
         page.addView(platform, margins(-1, launcherGame == null ? 28 : 20, -1, 8));
         TextView title = text(game.title, 27, TEXT, true); title.setGravity(Gravity.CENTER); page.addView(title);
@@ -1922,11 +1929,46 @@ public final class MainActivity extends Activity {
         return GamingModeRules.launcherGameFor(local.title, local.systemId, local.launcherGameId, games);
     }
 
+    private String classicPathHint(LocalClassic game) {
+        return game.relativePath != null && !game.relativePath.isEmpty() ? game.relativePath : game.filename;
+    }
+
+    private boolean isPspClassic(LocalClassic game) {
+        return "psp".equalsIgnoreCase(game.systemId) || CoreRegistry.PPSSPP == CoreRegistry.integratedCore(game.systemId, classicPathHint(game));
+    }
+
     private void launchLocalClassic(LocalClassic game) {
         Game launcherGame = launcherGameFor(game);
         try { if (game.launcherGameId.isEmpty() && launcherGame != null) classicsRepository.updateLinks(game.id, game.raGameId, launcherGame.id); }
         catch (Exception ignored) {}
-        if (CoreRegistry.supportsIntegrated(game.systemId, game.filename)) { startIntegratedClassic(game); return; }
+        String pathHint = classicPathHint(game);
+        if (CoreRegistry.supportsIntegrated(game.systemId, pathHint)) { startIntegratedClassic(game); return; }
+        if ((game.systemId == null || game.systemId.isEmpty()) && "iso".equals(ClassicsRules.extension(game.filename))) {
+            Toast.makeText(this, "Identificando imagem ISO…", Toast.LENGTH_SHORT).show();
+            modelExecutor.execute(() -> {
+                String resolved = "";
+                LocalClassic updated = game;
+                try {
+                    resolved = classicsRepository.resolveSystemId(game);
+                    LocalClassic found = classicsRepository.find(game.id);
+                    if (found != null) updated = found;
+                } catch (Exception ignored) {}
+                final String detectedSystem = resolved;
+                final LocalClassic target = updated;
+                handler.post(() -> {
+                    if (CoreRegistry.supportsIntegrated(detectedSystem, classicPathHint(target))) {
+                        startIntegratedClassic(target);
+                    } else {
+                        launchViaRetroArch(target);
+                    }
+                });
+            });
+            return;
+        }
+        launchViaRetroArch(game);
+    }
+
+    private void launchViaRetroArch(LocalClassic game) {
         List<String> packages = installedRetroArchPackages();
         if (packages.isEmpty()) { new AlertDialog.Builder(this).setTitle("RetroArch não encontrado").setMessage("Instale o RetroArch oficial e tente novamente.").setPositiveButton("ABRIR SITE", (d, w) -> startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.retroarch.com/?page=platforms")))).setNegativeButton("CANCELAR", null).show(); return; }
         String preferred = getSharedPreferences("brum_classics_android", MODE_PRIVATE).getString("retroarch_package", "");
@@ -2107,7 +2149,7 @@ public final class MainActivity extends Activity {
             try {
                 IntegratedEmulatorLaunch launch = classicsRepository.prepareIntegratedLaunch(game);
                 android.content.SharedPreferences prefs = getSharedPreferences("brum_mobile_prefs", MODE_PRIVATE);
-                if (prefs.getBoolean("auto_save_sync", true) && bridgeClient.isConfigured() && "connected".equals(syncState)) {
+                if (!"psp".equalsIgnoreCase(launch.systemId) && prefs.getBoolean("auto_save_sync", true) && bridgeClient.isConfigured() && "connected".equals(syncState)) {
                     try {
                         Game linked = launcherGameFor(game);
                         String linkedGameId = linked != null ? linked.id : game.launcherGameId;
@@ -2203,6 +2245,7 @@ public final class MainActivity extends Activity {
     }
 
     private String classicPlatform(LocalClassic game) {
+        if (isPspClassic(game)) return "PSP";
         if ("ps2".equals(game.systemId)) return "PLAYSTATION 2";
         if ("nds".equals(game.systemId)) return "NINTENDO DS";
         if ("neogeo".equals(game.systemId)) return "NEO GEO";

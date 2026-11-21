@@ -59,7 +59,10 @@ static CoreSession *activeSession = nullptr;
 class HardwareContext {
 public:
     bool configure(brum_retro_hw_render_callback *requested) {
-        if (!requested || (requested->context_type != BRUM_RETRO_HW_CONTEXT_OPENGLES3 &&
+        // PPSSPP requests GLES2 but also supports GLES3. EGL3 is backwards
+        // compatible and keeps the existing Play! rendering path intact.
+        if (!requested || (requested->context_type != BRUM_RETRO_HW_CONTEXT_OPENGLES2 &&
+                           requested->context_type != BRUM_RETRO_HW_CONTEXT_OPENGLES3 &&
                            requested->context_type != BRUM_RETRO_HW_CONTEXT_OPENGLES_VERSION)) return false;
         if (requested->context_type == BRUM_RETRO_HW_CONTEXT_OPENGLES_VERSION && requested->version_major > 3) return false;
         callback = *requested;
@@ -116,7 +119,7 @@ public:
         if (glGetError() != GL_NO_ERROR) return;
         target.resize(pixelCount);
         for (unsigned y = 0; y < height; y++) {
-            const unsigned sourceY = height - 1 - y;
+            const unsigned sourceY = callback.bottom_left_origin ? height - 1 - y : y;
             for (unsigned x = 0; x < width; x++) {
                 size_t source = (static_cast<size_t>(sourceY) * width + x) * 4;
                 target[static_cast<size_t>(y) * width + x] = 0xFF000000u |
@@ -131,13 +134,20 @@ public:
         if (!pending) return;
         initialize();
         if (callback.context_reset) callback.context_reset();
+        coreReset = true;
         releaseCurrent();
+    }
+
+    void destroyCore() {
+        if (!initialized) return;
+        makeCurrent();
+        if (coreReset && callback.context_destroy) callback.context_destroy();
+        coreReset = false;
     }
 
     void shutdown() {
         if (!initialized) return;
-        makeCurrent();
-        if (callback.context_destroy) callback.context_destroy();
+        destroyCore();
         releaseCurrent();
         eglDestroyContext(display, context);
         eglDestroySurface(display, surface);
@@ -157,6 +167,7 @@ private:
     brum_retro_hw_render_callback callback{};
     bool pending = false;
     bool initialized = false;
+    bool coreReset = false;
     std::vector<uint8_t> rgba;
 
     [[noreturn]] static void fail(const char *message) { throw std::runtime_error(message); }
@@ -178,6 +189,7 @@ public:
             variables["system_gb_bios_enable"] = "ON";
             variables["system_gba_bios_enable"] = "ON";
             variables["system_nds_bios_enable"] = "ON";
+            variables["ppsspp_internal_resolution"] = "480x272";
             if (std::ifstream(systemDirectory + "/aes.zip").good()) variables["geolith_system_type"] = "aes";
             else if (std::ifstream(systemDirectory + "/neogeo.zip").good()) variables["geolith_system_type"] = "mvs";
             coreHandle = dlopen(corePath.c_str(), RTLD_NOW | RTLD_LOCAL);
@@ -216,9 +228,10 @@ public:
                 ? av.timing.fps : 60.0;
         } catch (...) {
             if (hardware.active()) hardware.makeCurrent();
+            hardware.destroyCore();
             if (gameLoaded) core.unloadGame();
-            hardware.shutdown();
             if (initialized) core.deinitialize();
+            hardware.shutdown();
             if (activeSession == this) activeSession = nullptr;
             if (coreHandle) dlclose(coreHandle);
             coreHandle = nullptr; initialized = false; gameLoaded = false;
@@ -229,9 +242,10 @@ public:
     ~CoreSession() {
         if (hardware.active()) hardware.makeCurrent();
         persist();
+        hardware.destroyCore();
         if (gameLoaded) core.unloadGame();
-        hardware.shutdown();
         if (initialized) core.deinitialize();
+        hardware.shutdown();
         if (activeSession == this) activeSession = nullptr;
         if (coreHandle) dlclose(coreHandle);
     }

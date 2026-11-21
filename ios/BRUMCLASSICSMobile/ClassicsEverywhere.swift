@@ -316,7 +316,7 @@ enum DirectSaveSyncOutcome: Sendable {
             await update(record)
         }
         activeIntegratedROM = rom
-        if Self.autoSaveSyncEnabled && launcher.connection == .online {
+        if Self.autoSaveSyncEnabled && launcher.connection == .online && IntegratedEmulatorSupport.system(for: rom) != .playStationPortable {
             await runBoundedPreLaunchSync(rom, launcher: launcher)
         }
         let staged = try await romFolder.stageForIntegratedPlay(rom)
@@ -346,7 +346,8 @@ enum DirectSaveSyncOutcome: Sendable {
         activeIntegratedROM = nil
         integratedSessionActive = false
         await finishPlaySession(launcher: launcher)
-        if let finishedROM, Self.autoSaveSyncEnabled, launcher.connection == .online {
+        if let finishedROM, Self.autoSaveSyncEnabled, launcher.connection == .online,
+           IntegratedEmulatorSupport.system(for: finishedROM) != .playStationPortable {
             do {
                 let outcome = try await syncNativeSaveDirectly(finishedROM, launcher: launcher)
                 switch outcome {
@@ -389,6 +390,7 @@ enum DirectSaveSyncOutcome: Sendable {
                                 launcher: AppStore,
                                 conflictChoice: DirectSaveConflictChoice? = nil,
                                 pullOnly: Bool = false) async throws -> DirectSaveSyncOutcome {
+        try requireBatterySaveFormat(rom)
         guard IntegratedEmulatorSupport.supports(rom) else {
             throw PocketError.message("Este jogo não usa um núcleo integrado compatível com save nativo.")
         }
@@ -544,6 +546,7 @@ enum DirectSaveSyncOutcome: Sendable {
         }
     }
     func sendNativeSaveToPC(_ rom: ROMFolderGame, launcher: AppStore) async throws -> String {
+        try requireBatterySaveFormat(rom)
         guard IntegratedEmulatorSupport.supports(rom) else {
             throw PocketError.message("Este jogo não usa um núcleo integrado compatível com save nativo.")
         }
@@ -581,6 +584,7 @@ enum DirectSaveSyncOutcome: Sendable {
             : "Save enviado e verificado. No PC, abra Cofre de Saves e escolha APLICAR AO BRUM CORE PC."
     }
     func receiveNativeSaveFromPC(_ rom: ROMFolderGame, launcher: AppStore) async throws -> String {
+        try requireBatterySaveFormat(rom)
         guard IntegratedEmulatorSupport.supports(rom) else {
             throw PocketError.message("Este jogo não usa um núcleo integrado compatível com save nativo.")
         }
@@ -623,7 +627,17 @@ enum DirectSaveSyncOutcome: Sendable {
         return applied ? "Save do PC aplicado ao BRUM Core. A versão anterior do iPhone foi preservada." :
                          "O save do iPhone já corresponde ao backup do PC."
     }
+    private func requireBatterySaveFormat(_ rom: ROMFolderGame) throws {
+        if IntegratedEmulatorSupport.system(for: rom) == .playStationPortable {
+            throw PocketError.message("Os saves de PSP ficam locais em PSP/SAVEDATA. O Save Sync de bateria SRM ainda não suporta esse formato; nenhum save foi alterado.")
+        }
+    }
     func launchROM(_ rom: ROMFolderGame, launcher: AppStore) async {
+        if IntegratedEmulatorSupport.system(for: rom) == .playStationPortable,
+           !IntegratedEmulatorSupport.supports(rom) {
+            message = IntegratedEmulatorSupport.availabilityReason(for: rom)
+            return
+        }
         if IntegratedEmulatorSupport.system(for: rom) == .nintendo3DS,
            !IntegratedEmulatorSupport.supports(rom) {
             message = "Arquivo 3DS reconhecido, mas o Azahar não está instalado nesta versão. Nenhuma importação para o RetroArch foi iniciada. Confira a build experimental do BRUM Core."

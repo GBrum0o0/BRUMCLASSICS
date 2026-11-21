@@ -81,6 +81,7 @@ public final class ClassicsRules {
             case "gg": return "Sega_-_Game_Gear";
             case "pce": return "NEC_-_PC_Engine_-_TurboGrafx_16";
             case "elf": case "isz": return "Sony_-_PlayStation_2";
+            case "cso": return "Sony_-_PlayStation_Portable";
             case "neo": return "SNK_-_Neo_Geo";
             case "ws": case "wsc": return "Bandai_-_WonderSwan_Color";
             default: return null;

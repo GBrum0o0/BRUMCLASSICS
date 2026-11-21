@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build pinned heavy candidates in the same job as the IPA.
-# A candidate is still experimental until gameplay, audio and saves pass on an
-# actual iPhone. Never fetch an expiring artifact from another workflow run.
+# Build pinned heavy cores in the same job as the IPA. PPSSPP is included in
+# the normal package; the other cores remain experimental. Package inclusion
+# is not gameplay/device acceptance. Never reuse an expiring CI artifact.
 if [ "$#" -ne 2 ]; then
   echo "usage: $0 <ppsspp|flycast|dolphin|azahar> <app-directory>" >&2
   exit 2
@@ -112,9 +112,11 @@ chmod 755 "$APP/Frameworks/$LIBRARY"
 file "$APP/Frameworks/$LIBRARY" | grep -q arm64
 
 if [ "$CORE" = ppsspp ]; then
-  mkdir -p "$APP/Frameworks/CoreAssets/PPSSPP"
-  ditto "$SOURCE/assets" "$APP/Frameworks/CoreAssets/PPSSPP"
-  test -n "$(find "$APP/Frameworks/CoreAssets/PPSSPP" -type f -print -quit)"
+  python3 "$SCRIPT_DIR/prepare_ppsspp_assets.py" "$SOURCE" "$APP/Frameworks"
+  for asset in flash0/font/ltn0.pgf flash0/font/jpn0.pgf ppge_atlas.zim lang/en_US.ini; do
+    test -s "$APP/Frameworks/CoreAssets/PPSSPP/$asset"
+  done
+  test -s "$APP/Frameworks/PPSSPP-THIRD-PARTY.txt"
 elif [ "$CORE" = dolphin ]; then
   mkdir -p "$APP/Frameworks/CoreAssets/dolphin-emu/Sys"
   ditto "$SOURCE/Data/Sys" "$APP/Frameworks/CoreAssets/dolphin-emu/Sys"

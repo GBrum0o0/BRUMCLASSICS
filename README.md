@@ -10,8 +10,8 @@
 
 <p align="center">
   <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.29"><strong>Windows 2.1.29</strong></a> ·
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.26.0"><strong>Android 0.26.0</strong></a> ·
-  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.17.0"><strong>iOS 0.17.0</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.32.0"><strong>Android 0.32.0</strong></a> ·
+  <a href="https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.22.0"><strong>iOS 0.22.0</strong></a> ·
   <a href="SUPPORT.md">Ajuda</a> ·
   <a href="PRIVACY.md">Privacidade</a> ·
   <a href="SECURITY.md">Segurança</a>
@@ -69,6 +69,7 @@ Esta página distribui o **BRUMCLASSICS OFICIAL**, preparado para uma instalaç�
 - Gaming Mode móvel horizontal com botão central JOGAR e listas separadas de ROMs presentes no celular e jogos instalados no computador.
 - BRUM Core executa NES/Famicom, SNES/Super Famicom, Master System, Game Gear, PC Engine/TurboGrafx-16, GB, GBC, GBA, Nintendo DS e Neo Geo AES/MVS diretamente no Android e iOS; no Android, PlayStation 2 também está disponível em caráter experimental. RetroArch permanece como fallback externo e não é anunciado como suporte nativo.
 - BRUM Core oferece três slots de estado rápido por jogo no Android e iOS, separados do save normal e identificados pelo conteúdo da ROM e pela versão do núcleo.
+- PSP integrado por PPSSPP no Gaming Mode Android/iOS, com arquivos de apoio incluídos. No iPhone usa interpretador sem JIT; gameplay e desempenho por aparelho ainda precisam de validação. Veja [PSP Mobile](docs/PSP-MOBILE.md).
 - Registro multicore escolhe dinamicamente nome, versão, licença e biblioteca nativa; sistemas sem núcleo aprovado continuam identificados no RetroArch sem simular suporte interno.
 - Central BRUM sincronizada com iPhone e Android, limitada ao perfil ativo e sem enviar credenciais ou caminhos locais.
 - B-CARD lista jogos instalados no celular e permite iniciar no computador com um gesto autenticado para cima.
@@ -86,8 +87,8 @@ Cada plataforma possui uma release identificada, evitando que o botão “mais r
 | Plataforma | Versão | Download e instruções |
 | --- | ---: | --- |
 | Windows | 2.1.29 | [Release do launcher](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/v2.1.29) |
-| Android | 0.26.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.26.0) · [Guia](docs/MOVEL.md) (código em 0.27.0 no CI) |
-| iOS pessoal | 0.17.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.17.0) · [Guia](ios/README-IOS.md) |
+| Android | 0.32.0 | [APK assinado](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/android-v0.32.0) · [Guia](docs/MOVEL.md) |
+| iOS pessoal | 0.22.0 | [IPA sem assinatura](https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.22.0) · [Guia](ios/README-IOS.md) |
 
 Os hashes SHA-256 acompanham os arquivos publicados. O GitHub hospeda executáveis, APKs e IPAs somente em Releases; esses binários não entram no histórico do repositório.
 

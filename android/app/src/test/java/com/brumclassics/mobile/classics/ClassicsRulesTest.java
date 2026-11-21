@@ -35,6 +35,17 @@ public final class ClassicsRulesTest {
         if (!CoreRegistry.supportsIntegrated("ps2", "game.iso")) throw new AssertionError("PS2 deveria usar Play! no Android");
         if (!"play_libretro_android.so".equals(CoreRegistry.integratedCore("ps2", "game.iso").androidLibraryName)) throw new AssertionError("Biblioteca Play! incorreta");
         if (CoreRegistry.integratedCore("", "ambiguous.iso") != null) throw new AssertionError("ISO ambígua não pode ser classificada apenas pela extensão");
+        byte[] pspIso = new byte[4096];
+        System.arraycopy("PSP_GAME".getBytes(java.nio.charset.StandardCharsets.US_ASCII), 0, pspIso, 100, 8);
+        if (!"psp".equals(EmulationIdentity.inspect(new ByteArrayInputStream(pspIso), "game.iso").systemId)) throw new AssertionError("ISO PSP não detectada");
+        if (!"psp".equals(EmulationIdentity.inspect(new ByteArrayInputStream(new byte[] {67, 73, 83, 79}), "game.cso").systemId)) throw new AssertionError("CSO PSP não detectado");
+        if (!"psp".equals(EmulationIdentity.inspect(new ByteArrayInputStream(new byte[] {0, 80, 66, 80}), "PSP/game.pbp").systemId)) throw new AssertionError("PBP na pasta PSP não detectado");
+        try { EmulationIdentity.inspect(new ByteArrayInputStream(new byte[] {0, 80, 66, 80}), "ambiguous.pbp"); throw new AssertionError("PBP ambíguo aceito"); }
+        catch (IllegalArgumentException expected) { }
+        if (!"ppsspp_libretro_android.so".equals(CoreRegistry.integratedCore("psp", "game.iso").androidLibraryName)) throw new AssertionError("PSP não usa PPSSPP integrado");
+        if (!"ppsspp_libretro_android.so".equals(CoreRegistry.integratedCore("", "PSP/game.iso").androidLibraryName)) throw new AssertionError("ISO na pasta PSP não usa PPSSPP integrado");
+        if (!"ppsspp_libretro_android.so".equals(CoreRegistry.integratedCore("", "PSP/EBOOT.PBP").androidLibraryName)) throw new AssertionError("PBP na pasta PSP não usa PPSSPP integrado");
+        if (CoreRegistry.integratedCore("", "ambiguous.pbp") != null) throw new AssertionError("PBP ambíguo não pode ser classificado apenas pela extensão");
         EmulationIdentity neoGeo = EmulationIdentity.inspect(new ByteArrayInputStream(new byte[] {1, 2, 3}), "game.neo");
         if (!"neogeo".equals(neoGeo.systemId) || !CoreRegistry.supportsIntegrated("neogeo", "game.neo")) throw new AssertionError("Neo Geo deveria usar Geolith");
         if (!"libgeolith_libretro.so".equals(CoreRegistry.integratedCore("neogeo", "game.neo").androidLibraryName)) throw new AssertionError("Biblioteca Geolith incorreta");

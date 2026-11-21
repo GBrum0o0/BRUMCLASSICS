@@ -895,6 +895,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         @"physicalMemoryBytes": @(NSProcessInfo.processInfo.physicalMemory)
     } reportURL:report redactedPaths:@[_romURL.path, NSBundle.mainBundle.bundlePath, NSHomeDirectory()]];
     _variables = [NSMutableDictionary dictionary];
+    // Exact option/value from pinned libretro PPSSPP. Sideloadly provides no JIT.
+    _variables[@"ppsspp_cpu_core"] = @"interpreter";
+    _variables[@"ppsspp_internal_resolution"] = @"480x272";
     _variables[@"system_core_override"] = @"Automatic";
     _variables[@"system_gb_bios_enable"] = @"ON";
     _variables[@"system_gba_bios_enable"] = @"ON";
@@ -940,6 +943,11 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     if (!support) return NO;
     NSURL *root = [support URLByAppendingPathComponent:@"IntegratedEmulator" isDirectory:YES];
     NSURL *system = [root URLByAppendingPathComponent:@"System" isDirectory:YES];
+    if ([_emulatedSystemID isEqualToString:@"psp"]) {
+        // A prior experimental IPA may have installed the old Japanese font.
+        // Keep that tree intact and use this release's separate asset directory.
+        system = [system URLByAppendingPathComponent:@"psp-7b4ddb-ume77c1e965-v1" isDirectory:YES];
+    }
     NSURL *savesRoot = [root URLByAppendingPathComponent:@"Saves" isDirectory:YES];
     NSURL *saves = [savesRoot URLByAppendingPathComponent:_emulatedSystemID isDirectory:YES];
     if (![[NSFileManager defaultManager] createDirectoryAtURL:system withIntermediateDirectories:YES attributes:nil error:error]) return NO;
@@ -949,6 +957,17 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     NSString *frameworks = NSBundle.mainBundle.privateFrameworksPath ?: NSBundle.mainBundle.bundlePath;
     NSURL *bundledAssets = [[NSURL fileURLWithPath:frameworks isDirectory:YES] URLByAppendingPathComponent:@"CoreAssets" isDirectory:YES];
     _coreAssetsDirectory = bundledAssets.path;
+
+    if ([_emulatedSystemID isEqualToString:@"psp"]) {
+        for (NSString *asset in @[@"PPSSPP/flash0/font/ltn0.pgf", @"PPSSPP/ppge_atlas.zim"]) {
+            NSNumber *size = nil;
+            NSURL *file = [bundledAssets URLByAppendingPathComponent:asset];
+            if (![file getResourceValue:&size forKey:NSURLFileSizeKey error:nil] || size.unsignedLongLongValue == 0) {
+                if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:19 userInfo:@{NSLocalizedDescriptionKey: @"Os recursos do PPSSPP estão ausentes ou incompletos nesta instalação. Reinstale o IPA completo. A ROM e os saves foram preservados."}];
+                return NO;
+            }
+        }
+    }
 
     // These two cores require their data below the libretro system directory.
     // Copy only once, keeping the signed application bundle read-only.

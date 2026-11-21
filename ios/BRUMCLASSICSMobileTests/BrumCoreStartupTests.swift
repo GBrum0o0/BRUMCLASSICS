@@ -85,6 +85,13 @@ final class BrumCoreStartupTests: XCTestCase {
         try body(controller, { ready }, { exited })
     }
 
+    @MainActor func testPSPCoreReceivesExactInterpreterOptionBeforeContentLoad() throws {
+        try withProbe(mode: 73) { controller, ready, _ in
+            controller.runFrame()
+            XCTAssertEqual(ready(), 1, controller.diagnosticsReport)
+        }
+    }
+
     @MainActor func testRejectedContentCanStillExitAndNeverSignalsReady() throws {
         try withProbe(mode: 82) { controller, ready, exited in
             let report = controller.diagnosticsReport
