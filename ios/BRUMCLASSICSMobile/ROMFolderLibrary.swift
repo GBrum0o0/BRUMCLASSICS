@@ -5,6 +5,7 @@ struct ROMFolderGame: Codable, Equatable, Identifiable, Sendable {
     let filename: String
     let title: String
     let fileSize: Int64
+    var detectedSystem: EmulatedSystemID? = nil
 
     var id: String { relativePath.lowercased() }
 }
@@ -104,9 +105,27 @@ enum ROMFolderScanner {
         }
     }
 
+    static func folderSystemHint(folderName: String, extension ext: String) -> EmulatedSystemID? {
+        let lower = folderName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let format = ext.lowercased()
+        switch lower {
+        case "ps1", "psx" where ["cue", "chd", "pbp", "m3u", "bin", "iso"].contains(format): return .playStation
+        case "ps2" where ["iso", "bin", "chd", "m3u"].contains(format): return .playStation2
+        case "saturn" where ["cue", "chd", "m3u"].contains(format): return .saturn
+        case "sega cd", "segacd", "mega cd", "megacd" where ["cue", "chd", "iso"].contains(format): return .segaCD
+        case "arcade", "fbneo", "mame" where ["zip", "7z"].contains(format): return .arcade
+        case "psp", "playstation portable", "sony psp" where ["iso", "pbp", "prx"].contains(format): return .playStationPortable
+        case "dreamcast" where ["chd", "cdi", "m3u"].contains(format): return .dreamcast
+        case "3ds" where ["app", "elf", "axf"].contains(format): return .nintendo3DS
+        case "gamecube" where ["iso", "ciso", "gcm"].contains(format): return .gameCube
+        default: return nil
+        }
+    }
+
     private static func scanContents(_ root: URL, allowedExtensions: Set<String>) throws -> ROMFolderScan {
         let root = root.standardizedFileURL
-        let keys: [URLResourceKey] = [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]
+        let rootFolderName = root.lastPathComponent
+        let keys: [URLResourceKey] = [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .ubiquitousItemDownloadingStatusKey]
         guard let enumerator = FileManager.default.enumerator(
             at: root,
             includingPropertiesForKeys: keys,
@@ -117,20 +136,31 @@ enum ROMFolderScanner {
         for case let file as URL in enumerator {
             if candidates.count >= maximumFiles { break }
             let values = try file.resourceValues(forKeys: Set(keys))
+            let ext = file.pathExtension.lowercased()
             guard values.isRegularFile == true, values.isSymbolicLink != true,
-                  allowedExtensions.contains(file.pathExtension.lowercased()),
+                  values.ubiquitousItemDownloadingStatus != .notDownloaded,
+                  allowedExtensions.contains(ext),
                   !firmwareFilenames.contains(file.lastPathComponent.lowercased()),
                   let size = values.fileSize, size > 0 else { continue }
             let standardized = file.standardizedFileURL
+            guard FileManager.default.isReadableFile(atPath: standardized.path) else { continue }
             let rootPrefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
             guard standardized.path.hasPrefix(rootPrefix) else { continue }
             let relative = String(standardized.path.dropFirst(rootPrefix.count))
             guard !relative.isEmpty, relative.count <= 1_000, PocketRules.safeFilename(standardized.lastPathComponent) else { continue }
+            var detected: EmulatedSystemID? = nil
+            if ["iso", "pbp", "cso"].contains(ext) {
+                detected = ROMContentInspector.detectDiscSystem(at: standardized, filename: standardized.lastPathComponent)
+            }
+            if detected == nil && !relative.contains("/") {
+                detected = folderSystemHint(folderName: rootFolderName, extension: ext)
+            }
             candidates.append(ROMFolderGame(
                 relativePath: relative,
                 filename: standardized.lastPathComponent,
                 title: ROMTitleRules.clean(standardized.lastPathComponent),
-                fileSize: Int64(size)
+                fileSize: Int64(size),
+                detectedSystem: detected
             ))
         }
 

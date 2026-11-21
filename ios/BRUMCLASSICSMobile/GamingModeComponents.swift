@@ -84,27 +84,27 @@ struct TopControlAndSettingsActions: View {
                         }
                     }
                 }
-                Text("Controles físicos conectados ao iPhone são encaminhados automaticamente aos jogos do BRUM Core e ao Gamepad M.U.R.B.")
+                Text("Controles físicos conectados ao iPhone são encaminhados automaticamente aos jogos e ao controle para PC.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 
-            Section("Gamepad Virtual integrado") {
+            Section("Controle virtual na tela") {
                 HStack {
-                    Label("BRUM Core (Multitoque + Analógico)", systemImage: "iphone.landscape")
+                    Label("Multitoque + Analógico", systemImage: "iphone.landscape")
                     Spacer()
-                    ExecutionBadge(kind: .onPhone)
+                    GamingAvailabilityBadge(kind: .available)
                 }
                 Text("Inclui D-Pad em cruz, analógicos virtuais por console, botões táteis e segundas telas de DS/3DS com toque direto.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 
-            Section("Gamepad para PC (M.U.R.B Engine)") {
+            Section("Gamepad para PC") {
                 HStack {
-                    Label("Controle + 2ª Tela DS/3DS na LAN", systemImage: "desktopcomputer")
+                    Label("Controle + 2ª Tela na rede local", systemImage: "desktopcomputer")
                     Spacer()
-                    ExecutionBadge(kind: .dependsOnPC)
+                    GamingAvailabilityBadge(kind: .onComputer)
                 }
-                Button("Abrir Gamepad M.U.R.B para PC") {
+                Button("Abrir Gamepad para PC") {
                     activePanel = nil
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                         showMurbRemote = true
@@ -198,7 +198,7 @@ private struct GamingSettingsPanel: View {
                     .font(.caption).foregroundStyle(.secondary)
                 if !feedback.isEmpty { Text(feedback).font(.caption) }
             }
-            Section("Controles e BRUM Core") {
+            Section("Controles e tela") {
                 Toggle("Vibração tátil nos botões virtuais", isOn: $virtualHaptics)
                 Toggle("Ocultar controles na tela com joystick conectado", isOn: $autoHidePadWithController)
                 Toggle("Preencher tela por padrão ao iniciar jogo", isOn: $defaultFillDisplay)
@@ -363,6 +363,50 @@ struct GamingAchievements: View {
                 }
             }.frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+}
+
+struct GamingAvailabilityBadge: View {
+    enum Kind: Equatable {
+        case available
+        case onComputer
+        case unavailable
+
+        var title: String {
+            switch self {
+            case .available: return GamingModePresentation.localAvailabilityLabel
+            case .onComputer: return GamingModePresentation.computerAvailabilityLabel
+            case .unavailable: return GamingModePresentation.unavailableOnPhoneLabel
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .available: return "checkmark.circle.fill"
+            case .onComputer: return "desktopcomputer"
+            case .unavailable: return "exclamationmark.circle"
+            }
+        }
+
+        var tint: Color {
+            switch self {
+            case .available: return BrumTheme.primary
+            case .onComputer: return BrumTheme.muted
+            case .unavailable: return .orange
+            }
+        }
+    }
+
+    let kind: Kind
+
+    var body: some View {
+        Label(kind.title, systemImage: kind.icon)
+            .font(.caption2.bold())
+            .foregroundStyle(kind.tint)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(kind.tint.opacity(0.14), in: Capsule())
+            .overlay(Capsule().stroke(kind.tint.opacity(0.35), lineWidth: 1))
     }
 }
 

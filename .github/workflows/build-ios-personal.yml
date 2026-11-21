@@ -371,7 +371,7 @@ jobs:
           bash build-arcade-experimental.sh "$APP"
           /usr/libexec/PlistBuddy -c 'Add :BRUMExperimentalBackends bool true' "$APP/Info.plist"
           /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName BRUM Core Teste' "$APP/Info.plist"
-          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 55' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 56' "$APP/Info.plist"
 
       - name: Empacotar IPA pessoal
         working-directory: ios
@@ -383,7 +383,7 @@ jobs:
       - name: Guardar build pessoal
         uses: actions/upload-artifact@v4
         with:
-          name: BRUMCLASSICS-MOVEL-IOS-${{ inputs.experimental && 'EXPERIMENTAL' || 'PESSOAL' }}-0.22.0
+          name: BRUMCLASSICS-MOVEL-IOS-${{ inputs.experimental && 'EXPERIMENTAL' || 'PESSOAL' }}-0.23.0
           path: |
             ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa
             ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa.sha256

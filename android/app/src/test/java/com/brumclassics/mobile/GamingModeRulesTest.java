@@ -44,6 +44,19 @@ public final class GamingModeRulesTest {
             throw new AssertionError("Ambiguous Classic titles linked");
         if (GamingModeRules.launcherGameFor("", "gba", "", cached) != null)
             throw new AssertionError("Empty title linked");
+
+        for (String desktopPlatform : Arrays.asList("PC", "Windows", "Steam", "Epic Games", "PlayStation 5", "Switch")) {
+            Game mislabeled = game("pc:" + desktopPlatform, "Jogo PC", desktopPlatform, "classic", true);
+            if (GamingModeRules.includes(mislabeled)) {
+                throw new AssertionError("Desktop/modern platform shown in Gaming Mode: " + desktopPlatform);
+            }
+        }
+        Game exeClassic = game("pc:exe", "Setup.exe", "GBA", "classic", true);
+        if (GamingModeRules.includes(exeClassic)) throw new AssertionError("Windows executable shown in Gaming Mode");
+        Game pspClassic = game("pc:psp", "God of War", "PSP", "classic", true);
+        if (!GamingModeRules.includes(pspClassic)) throw new AssertionError("PC Classic PSP missing");
+        if (!"Disponível".equals(GamingModeRules.availabilityLabel(true))) throw new AssertionError("Wrong local label");
+        if (!"No computador".equals(GamingModeRules.availabilityLabel(false))) throw new AssertionError("Wrong PC label");
         System.out.println("GamingModeRulesTest: OK (Classics-only cache, stale links, platform matching and existing fallbacks)");
     }
 }

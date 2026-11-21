@@ -125,6 +125,8 @@ public final class MainActivity extends Activity {
     private String classicDetailsReturnScreen = "classics";
     private boolean launchingClassic;
     private boolean reopenGamingAfterFolderPick;
+    private List<LocalClassic> verifiedGamingClassics = null;
+    private boolean verifyingGamingClassics = false;
     private String syncState = "offline";
     private String syncDetail = "Dados locais";
     private BridgeClient bridgeClient;
@@ -321,7 +323,7 @@ public final class MainActivity extends Activity {
                         ClassicsRepository.SessionResult result = classicsRepository.finishIntegratedSession(gameId, elapsed);
                         LocalClassic game = result != null ? classicsRepository.find(result.gameId) : classicsRepository.find(gameId);
                         if (result != null) handler.post(() -> {
-                            Toast.makeText(this, "Sessão BRUM Core · " + Math.max(0, result.addedSeconds / 60) + " min", Toast.LENGTH_LONG).show();
+                            Toast.makeText(this, "Sessão concluída · " + Math.max(0, result.addedSeconds / 60) + " min", Toast.LENGTH_LONG).show();
                             if (game != null) syncClassic(game, false);
                             refreshCurrentScreen();
                         });
@@ -346,7 +348,10 @@ public final class MainActivity extends Activity {
         Uri tree = data.getData();
         modelExecutor.execute(() -> {
             try {
-                if (requestCode == REQUEST_ROM_TREE) classicsRepository.configureRomTree(tree);
+                if (requestCode == REQUEST_ROM_TREE) {
+                    classicsRepository.configureRomTree(tree);
+                    verifiedGamingClassics = null;
+                }
                 else classicsRepository.configureRuntimeTree(tree);
                 handler.post(() -> {
                     Toast.makeText(this, requestCode == REQUEST_ROM_TREE ? "Pasta de ROMs autorizada." : "Pasta de logs autorizada.", Toast.LENGTH_LONG).show();
@@ -382,6 +387,10 @@ public final class MainActivity extends Activity {
         updateGamingControllers();
         handler.removeCallbacks(performanceExpiry);
         handler.post(performanceExpiry);
+        if ("gaming".equals(currentScreen) && classicsRepository != null && classicsRepository.romFolderConfigured()) {
+            verifiedGamingClassics = null;
+            verifyGamingLocalAvailability();
+        }
         if (updateManager != null) updateManager.resumeInstallIfReady();
         handler.postDelayed(this::syncAllClassicsIfDue, 700);
         if (classicsRepository != null) modelExecutor.execute(() -> {
@@ -1116,6 +1125,7 @@ public final class MainActivity extends Activity {
     private void openGamingMode() {
         gamingOrientationLocked = true;
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+        verifiedGamingClassics = null;
         showGamingMode();
     }
 
@@ -1179,11 +1189,11 @@ public final class MainActivity extends Activity {
         TextView list = text("", 15, TEXT, false);
         gamingControllerList = list;
         panel.addView(list);
-        panel.addView(text("Gamepad Virtual BRUM Core · Executa no celular\nD-Pad contínuo em cruz, analógico por sistema e toque DS/3DS.",
+        panel.addView(text("Controles na tela · Disponível no celular\nD-Pad contínuo em cruz, analógico por sistema e toque na tela.",
                 12, Color.rgb(173, 180, 190), false), margins(-1, 14, -1, 0));
         AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Controles").setView(panel)
                 .setPositiveButton("Fechar", null).create();
-        panel.addView(gamingAction("Gamepad M.U.R.B para PC (LAN)", true, v -> {
+        panel.addView(gamingAction("Gamepad para PC (LAN)", true, v -> {
             dialog.dismiss();
             showMurbRemoteDialog();
         }), margins(-1, 14, -1, 0, 44));
@@ -1216,6 +1226,7 @@ public final class MainActivity extends Activity {
                 modelExecutor.execute(() -> {
                     try {
                         classicsRepository.scan();
+                        verifiedGamingClassics = null;
                         handler.post(() -> {
                             Toast.makeText(this, "Pasta de ROMs atualizada.", Toast.LENGTH_SHORT).show();
                             openGamingMode();
@@ -1445,10 +1456,30 @@ public final class MainActivity extends Activity {
         return card;
     }
 
+    private void verifyGamingLocalAvailability() {
+        if (verifyingGamingClassics) return;
+        verifyingGamingClassics = true;
+        modelExecutor.execute(() -> {
+            List<LocalClassic> accessible = classicsRepository.accessibleForGaming();
+            handler.post(() -> {
+                verifyingGamingClassics = false;
+                verifiedGamingClassics = accessible;
+                if ("gaming".equals(currentScreen)) showGamingMode();
+            });
+        });
+    }
+
     private void showGamingMode() {
         ScrollView scroll = scroll(); LinearLayout page = page(); scroll.addView(page);
         page.addView(gamingHeader(false));
-        List<LocalClassic> localGames = new ArrayList<>(classicsRepository.all());
+        if (verifiedGamingClassics == null && !classicsRepository.all().isEmpty()) {
+            verifyGamingLocalAvailability();
+        } else if (verifiedGamingClassics == null) {
+            verifiedGamingClassics = new ArrayList<>();
+        }
+        List<LocalClassic> localGames = verifiedGamingClassics != null
+                ? new ArrayList<>(verifiedGamingClassics)
+                : new ArrayList<>();
         localGames.sort((left, right) -> left.title.compareToIgnoreCase(right.title));
         java.util.Set<String> matchedPcIds = new java.util.HashSet<>();
         for (LocalClassic local : localGames) {
@@ -1459,7 +1490,7 @@ public final class MainActivity extends Activity {
         java.util.Set<String> seenPcKeys = new java.util.HashSet<>();
         List<Game> installedGames = new ArrayList<>();
         for (Game game : games) {
-            if (!GamingModeRules.includes(game.category, game.installed) || matchedPcIds.contains(game.id)) continue;
+            if (!GamingModeRules.includes(game) || matchedPcIds.contains(game.id)) continue;
             boolean duplicatedByLocal = false;
             for (LocalClassic local : localGames) {
                 if (ClassicsRules.sameClassicGame(local.title, local.systemId, game.title, game.platform)) {
@@ -1511,8 +1542,10 @@ public final class MainActivity extends Activity {
 
         if (localGames.isEmpty() && installedGames.isEmpty()) {
             LinearLayout empty = column(); empty.setPadding(dp(20), dp(24), dp(20), dp(24)); empty.setBackground(background(SURFACE, 8, LINE, 1));
-            empty.addView(text("NENHUM JOGO PRONTO", 13, TEXT, true));
-            empty.addView(text("Toque na engrenagem acima para selecionar uma pasta de ROMs ou sincronize os Classics do computador.", 10, MUTED, false), margins(-1, 8, -1, 0));
+            empty.addView(text(verifyingGamingClassics ? "VERIFICANDO JOGOS..." : "NENHUM JOGO PRONTO", 13, TEXT, true));
+            empty.addView(text(verifyingGamingClassics
+                    ? "Conferindo os arquivos disponíveis neste celular."
+                    : "Toque na engrenagem acima para selecionar uma pasta de ROMs ou sincronize os Classics do computador.", 10, MUTED, false), margins(-1, 8, -1, 0));
             page.addView(empty, margins(-1, 28, -1, 0));
         }
         page.addView(space(22));
@@ -1521,16 +1554,16 @@ public final class MainActivity extends Activity {
 
     private View gamingGameCard(Game game) {
         LinearLayout card = column(); card.addView(cover(game, 138, 193));
-        card.addView(text(game.platform.toUpperCase(Locale.ROOT), 7, ACCENT, true), margins(-1, 9, -1, 3));
+        card.addView(text(game.platform.toUpperCase(Locale.ROOT), 7, Color.rgb(173, 180, 190), true), margins(-1, 9, -1, 3));
         TextView title = text(game.title, 11, TEXT, true); title.setMaxLines(2); card.addView(title);
-        card.addView(text("NO COMPUTADOR", 7, MUTED, true), margins(-1, 5, -1, 0));
+        card.addView(text(GamingModeRules.LABEL_ON_COMPUTER, 9, MUTED, true), margins(-1, 5, -1, 0));
         card.setOnClickListener(v -> showGamingGame(game)); card.setFocusable(true); return card;
     }
 
     private View gamingClassicCard(LocalClassic game) {
         LinearLayout card = column(); card.addView(localClassicArtwork(game, 193), new LinearLayout.LayoutParams(dp(138), dp(193)));
-        card.addView(text("CLASSICS", 7, ACCENT, true), margins(-1, 9, -1, 3)); TextView title = text(game.title, 11, TEXT, true); title.setMaxLines(2); card.addView(title);
-        card.addView(text("NO APARELHO", 7, MUTED, true), margins(-1, 5, -1, 0));
+        card.addView(text(classicPlatform(game), 7, Color.rgb(173, 180, 190), true), margins(-1, 9, -1, 3)); TextView title = text(game.title, 11, TEXT, true); title.setMaxLines(2); card.addView(title);
+        card.addView(text(GamingModeRules.LABEL_AVAILABLE, 9, ACCENT, true), margins(-1, 5, -1, 0));
         card.setOnClickListener(v -> showGamingClassicGame(game)); card.setFocusable(true); return card;
     }
 
@@ -1542,7 +1575,7 @@ public final class MainActivity extends Activity {
     }
 
     private void openGamingGame(Game game) {
-        if (game == null || !GamingModeRules.includes(game.category, game.installed)) {
+        if (!GamingModeRules.includes(game)) {
             showGamingMode();
             return;
         }
@@ -1560,12 +1593,15 @@ public final class MainActivity extends Activity {
         Game linked = launcherGameFor(game);
         List<LocalClassic.Achievement> earned = gamingRetroProgress(game);
         String summary = earned.isEmpty() ? null : game.unlockedCount() + " de " + earned.size() + " conquistas";
-        Button play = gamingAction("Jogar no celular", true, v -> launchLocalClassic(game));
+        Button play = gamingAction("Jogar", true, v -> launchLocalClassic(game));
         page.addView(gamingHero(game.title, classicPlatform(game), linked, game,
                 formatClassicTime(game.creditedSeconds), summary, play), margins(-1, 10, -1, 0));
         String pathHint = classicPathHint(game);
         CoreRegistry.Descriptor core = CoreRegistry.integratedCore(game.systemId, pathHint);
         boolean isPsp = isPspClassic(game);
+        TextView availability = text(GamingModeRules.LABEL_AVAILABLE, 10, ACCENT, true);
+        availability.setGravity(Gravity.CENTER);
+        page.addView(availability, margins(-1, 12, -1, 6));
         page.addView(gamingActionTriplet(
                 "JOGAR",
                 v -> launchLocalClassic(game),
@@ -1573,7 +1609,7 @@ public final class MainActivity extends Activity {
                 v -> launchGamepadOnPC(linked, game.filename, game.title, 1, "mobile1-pc2", 1, null),
                 "MULTIJOGADOR LOCAL",
                 v -> showLocalMultiplayerDialog(game.title, linked, game, game.filename, core != null)
-        ), margins(-1, 12, -1, 4));
+        ), margins(-1, 4, -1, 4));
         if (core != null && !isPsp) {
             TextView syncSaveStatus = text("", 12, Color.rgb(173, 180, 190), false);
             syncSaveStatus.setVisibility(View.GONE);
@@ -1584,15 +1620,10 @@ public final class MainActivity extends Activity {
             page.addView(syncSave, margins(-1, 6, -1, 4, 44));
             page.addView(syncSaveStatus, margins(-1, 0, -1, 6));
         }
-        String executionText;
-        if (core != null && isPsp) {
-            executionText = "Executa no celular (offline) · BRUM Core " + core.displayName + " (" + core.license + ")\nSaves de PSP ficam locais em PSP/SAVEDATA; o Save Sync de bateria SRM não cobre esse formato.\nDepende do PC/rede: sincronizar conquistas e Gamepad M.U.R.B no computador.";
-        } else if (core != null) {
-            executionText = "Executa no celular (offline) · BRUM Core " + core.displayName + " (" + core.license + ")\nDepende do PC/rede: sincronizar conquistas e Gamepad M.U.R.B no computador.";
-        } else {
-            executionText = "Executa no celular via RetroArch externo (quando suportado).\nDepende do PC/rede: Gamepad no computador e sincronização.";
-        }
-        page.addView(noteCard("EXECUÇÃO E INFORMAÇÕES · " + game.filename, executionText), margins(-1, 12, -1, 0));
+        String infoText = isPsp
+                ? "Disponível neste celular.\nSaves de PSP ficam armazenados localmente neste aparelho.\nArquivo: " + game.filename
+                : "Disponível neste celular.\nArquivo: " + game.filename;
+        page.addView(noteCard("INFORMAÇÕES DO JOGO", infoText), margins(-1, 12, -1, 0));
         String unavailable = game.raGameId <= 0 ? "Vincule o ID oficial do jogo para carregar as conquistas."
                 : classicsRepository.raUsername().isEmpty() || classicsRepository.raKey().isEmpty()
                 ? "Configure a conta RetroAchievements na engrenagem." : "Nenhuma conquista carregada. Use Atualizar para consultar o progresso.";
@@ -1635,7 +1666,7 @@ public final class MainActivity extends Activity {
     }
 
     private void showGamingGame(Game game) {
-        if (game == null || !GamingModeRules.includes(game.category, game.installed)) {
+        if (!GamingModeRules.includes(game)) {
             gamingGameId = "";
             showGamingMode();
             return;
@@ -1653,15 +1684,15 @@ public final class MainActivity extends Activity {
                 margins(-1, 10, -1, 0));
         org.json.JSONObject streamingStatus = experience.optJSONObject("streaming");
         boolean streamingReady = streamingStatus != null && streamingStatus.optBoolean("available", false);
-        TextView launchState = text(game.installed ? ("connected".equals(syncState) ? (streamingReady ? "PRONTO PARA JOGAR NO CELULAR" : "PRONTO NO COMPUTADOR") : "COMPUTADOR FORA DE ALCANCE") : "INSTALAÇÃO NÃO CONFIRMADA", 8, game.installed && "connected".equals(syncState) ? ACCENT : MUTED, true);
+        TextView launchState = text(GamingModeRules.LABEL_ON_COMPUTER, 10, MUTED, true);
         launchState.setGravity(Gravity.CENTER); page.addView(launchState, margins(-1, 12, -1, 6));
         page.addView(gamingActionTriplet(
                 "JOGAR",
                 v -> {
                     if (streamingReady) {
-                        launchState.setText("VALIDANDO SUNSHINE, JOGO E CONEXÃO SEGURA");
+                        launchState.setText("INICIANDO TRANSMISSÃO...");
                         bridgeClient.launchStream(game, "new", new BridgeClient.BCardCallback() {
-                            @Override public void onResult(org.json.JSONObject result) { launchState.setText("JOGO INICIADO · ABRINDO MOONLIGHT"); launchState.setTextColor(ACCENT); openMoonlightClient(result.optJSONObject("session")); bridgeClient.fetchSnapshot(); }
+                            @Override public void onResult(org.json.JSONObject result) { launchState.setText("JOGO INICIADO · ABRINDO STREAMING"); launchState.setTextColor(ACCENT); openMoonlightClient(result.optJSONObject("session")); bridgeClient.fetchSnapshot(); }
                             @Override public void onError(String safeMessage) { launchState.setText(safeMessage.toUpperCase(Locale.ROOT)); launchState.setTextColor(Color.rgb(255, 118, 118)); }
                         });
                     } else {
@@ -1689,8 +1720,8 @@ public final class MainActivity extends Activity {
                 });
             }); page.addView(pcOnly, margins(-1, 6, -1, 0, 46));
         }
-        page.addView(noteCard("DEPENDE DO PC · " + game.platform.toUpperCase(Locale.ROOT),
-                "Gênero: " + (game.genre.isEmpty() ? (game.category.isEmpty() ? "Clássico" : game.category) : game.genre) + " · Executa no computador via Streaming / B-CARD."),
+        page.addView(noteCard("INFORMAÇÕES DO JOGO · " + game.platform.toUpperCase(Locale.ROOT),
+                "Disponível somente no computador." + (game.genre.isEmpty() ? "" : "\nGênero: " + game.genre)),
                 margins(-1, 12, -1, 0));
         if (!game.description.trim().isEmpty()) page.addView(text(game.description, 12, TEXT, false), margins(-1, 14, -1, 0));
 
@@ -1723,7 +1754,8 @@ public final class MainActivity extends Activity {
     private LocalClassic localClassicFor(Game game) {
         if (game == null || !isClassicGame(game)) return null;
         String wanted = ClassicsRules.normalizedTitle(game.title); LocalClassic match = null; int matches = 0;
-        for (LocalClassic local : classicsRepository.all()) {
+        List<LocalClassic> source = verifiedGamingClassics != null ? verifiedGamingClassics : classicsRepository.all();
+        for (LocalClassic local : source) {
             if (!local.launcherGameId.isEmpty() && local.launcherGameId.equals(game.id)) return local;
             if (ClassicsRules.normalizedTitle(local.title).equals(wanted)) { match = local; matches++; }
         }
@@ -1812,15 +1844,14 @@ public final class MainActivity extends Activity {
             page.addView(localClassicArtwork(game, 294), coverLp);
         }
         CoreRegistry.Descriptor integratedCore = CoreRegistry.integratedCore(game.systemId, classicPathHint(game));
-        TextView platform = eyebrow(classicPlatform(game) + (integratedCore == null ? " · RETROARCH" : " · BRUM CORE · " + integratedCore.displayName.toUpperCase(Locale.ROOT))); platform.setGravity(Gravity.CENTER);
+        TextView platform = eyebrow(classicPlatform(game)); platform.setGravity(Gravity.CENTER);
         page.addView(platform, margins(-1, launcherGame == null ? 28 : 20, -1, 8));
         TextView title = text(game.title, 27, TEXT, true); title.setGravity(Gravity.CENTER); page.addView(title);
         page.addView(text(game.filename, 8, MUTED, false), margins(-1, 7, -1, 20));
 
-        boolean integrated = integratedCore != null;
-        Button play = primaryButton(integrated ? "JOGAR · BRUM CORE" : "JOGAR NO RETROARCH"); play.setOnClickListener(v -> launchLocalClassic(game));
+        Button play = primaryButton("JOGAR"); play.setOnClickListener(v -> launchLocalClassic(game));
         page.addView(play, new LinearLayout.LayoutParams(-1, dp(50)));
-        page.addView(text(integrated ? "Este jogo roda dentro do BRUMCLASSICS com " + integratedCore.displayName + ", save local, tela cheia e avanço rápido." : "Este sistema ainda usa o RetroArch porque não possui um núcleo interno aprovado e compatível.", 8, MUTED, false), margins(-1, 8, -1, 0));
+        page.addView(text("Disponível neste celular.", 8, ACCENT, true), margins(-1, 8, -1, 0));
 
         page.addView(sectionHeading("HORAS NO ANDROID", "ATUALIZAR", v -> syncClassic(game, true)), margins(-1, 28, -1, 10));
         long pending = Math.max(0L, game.creditedSeconds - Math.max(0L, game.acknowledgedSeconds));
@@ -2025,7 +2056,7 @@ public final class MainActivity extends Activity {
             launchGamepadOnPC(pcGame, filename, gameTitle, 2, "dual-mobile", 1, null);
         }), margins(-1, 0, -1, 12, 44));
         if (phoneCoopAvailable && localClassic != null) {
-            panel.addView(text("Multijogador neste celular (Offline · BRUM Core)", 15, TEXT, true), margins(-1, 4, -1, 4));
+            panel.addView(text("Multijogador neste celular (Offline)", 15, TEXT, true), margins(-1, 4, -1, 4));
             panel.addView(gamingAction("Controles conectados (Virtual = P1)", false, v -> {
                 dialog.dismiss();
                 startIntegratedClassic(localClassic, 0);
@@ -2144,7 +2175,7 @@ public final class MainActivity extends Activity {
     }
 
     private void startIntegratedClassic(LocalClassic game, int virtualPadPort) {
-        Toast.makeText(this, "Preparando BRUM Core…", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Iniciando jogo…", Toast.LENGTH_SHORT).show();
         modelExecutor.execute(() -> {
             try {
                 IntegratedEmulatorLaunch launch = classicsRepository.prepareIntegratedLaunch(game);

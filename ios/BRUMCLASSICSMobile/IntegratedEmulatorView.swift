@@ -39,6 +39,7 @@ enum IntegratedEmulatorSupport {
         case "rvz", "gcz": return .gameCube
         default: break
         }
+        if let detected = rom.detectedSystem { return detected }
         let folders = rom.relativePath.lowercased().replacingOccurrences(of: "\\", with: "/")
             .split(separator: "/").dropLast()
         // Nearest recognized directory wins, but only for a supported format.
@@ -49,7 +50,7 @@ enum IntegratedEmulatorSupport {
             case "saturn" where ["cue", "chd", "m3u"].contains(ext): return .saturn
             case "sega cd", "segacd", "mega cd", "megacd": return ["cue", "chd", "iso"].contains(ext) ? .segaCD : nil
             case "arcade", "fbneo", "mame": return ["zip", "7z"].contains(ext) ? .arcade : nil
-            case "psp" where ["iso", "pbp"].contains(ext): return .playStationPortable
+            case "psp", "playstation portable", "sony psp" where ["iso", "pbp", "prx"].contains(ext): return .playStationPortable
             case "dreamcast" where ["chd", "cdi", "m3u"].contains(ext): return .dreamcast
             case "3ds" where ["app", "elf", "axf"].contains(ext): return .nintendo3DS
             case "gamecube" where ["iso", "ciso", "gcm"].contains(ext): return .gameCube
@@ -105,8 +106,8 @@ struct IntegratedEmulatorView: View {
             } else {
                 VStack(spacing: 14) {
                     ProgressView().tint(BrumTheme.primary).scaleEffect(1.25)
-                    Text("PREPARANDO BRUM CORE").font(.caption.bold()).tracking(2).foregroundStyle(BrumTheme.primary)
-                    Text("A ROM continua na pasta escolhida. Nenhuma importação para o RetroArch é necessária.")
+                    Text("INICIANDO JOGO").font(.caption.bold()).tracking(2).foregroundStyle(BrumTheme.primary)
+                    Text("Carregando os arquivos do jogo neste aparelho…")
                         .font(.caption).multilineTextAlignment(.center).foregroundStyle(.white.opacity(0.62)).frame(maxWidth: 440)
                 }
             }

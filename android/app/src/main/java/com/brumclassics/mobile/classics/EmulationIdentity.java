@@ -58,6 +58,27 @@ public final class EmulationIdentity {
         return new EmulationIdentity(detected.systemId, hex(digest.digest()), detected.source);
     }
 
+    public static String detectSystemFromStream(InputStream input, String pathHint) throws Exception {
+        byte[] buffer = new byte[64 * 1024];
+        byte[] header = new byte[4 * 1024 * 1024];
+        int headerSize = 0;
+        int read;
+        boolean checkedInitialWindow = false;
+        while (headerSize < header.length && (read = input.read(buffer, 0, Math.min(buffer.length, header.length - headerSize))) != -1) {
+            if (read == 0) continue;
+            System.arraycopy(buffer, 0, header, headerSize, read);
+            headerSize += read;
+            if (!checkedInitialWindow && headerSize >= 64 * 1024) {
+                checkedInitialWindow = true;
+                DetectedSystem fast = detectSystem(header, headerSize, pathHint);
+                if (fast != null) return fast.systemId;
+            }
+        }
+        if (headerSize == 0) return "";
+        DetectedSystem detected = detectSystem(header, headerSize, pathHint);
+        return detected != null ? detected.systemId : "";
+    }
+
     static DetectedSystem detectSystem(byte[] header, int length, String filename) {
         byte[] logo = {
             (byte)0xCE, (byte)0xED, 0x66, 0x66, (byte)0xCC, 0x0D, 0x00, 0x0B,
@@ -76,15 +97,29 @@ public final class EmulationIdentity {
             }
         }
         if (length > 0xB2 && (header[0xB2] & 0xff) == 0x96) return new DetectedSystem("gba", "header");
-        if (containsAscii(header, length, "BOOT2")) return new DetectedSystem("ps2", "header");
         String extension = ClassicsRules.extension(filename).toLowerCase(Locale.ROOT);
+        if ("iso".equals(extension) && containsAscii(header, length, "PSP GAME")) return new DetectedSystem("psp", "header");
+        if (containsAscii(header, length, "BOOT2")) return new DetectedSystem("ps2", "header");
         if ("iso".equals(extension) && containsAscii(header, length, "PSP_GAME")) return new DetectedSystem("psp", "header");
         if ("cso".equals(extension) && length >= 4 && header[0] == 'C' && header[1] == 'I' && header[2] == 'S' && header[3] == 'O') return new DetectedSystem("psp", "header");
+        if ("pbp".equals(extension) && length >= 40 && header[0] == 0x00 && header[1] == 'P' && header[2] == 'B' && header[3] == 'P') {
+            long dataPspOffset = readUInt32LE(header, 0x20);
+            long dataPsarOffset = readUInt32LE(header, 0x24);
+            boolean isPs1Classic = dataPsarOffset >= 40 && dataPsarOffset + 10 <= length
+                && (matchesAsciiAt(header, (int) dataPsarOffset, "PSISOIMG")
+                    || matchesAsciiAt(header, (int) dataPsarOffset, "PSTITLEIMG"));
+            if (!isPs1Classic && dataPspOffset >= 40 && dataPspOffset + 4 <= length) {
+                int o = (int) dataPspOffset;
+                boolean isPspElf = header[o] == 0x7E && header[o + 1] == 'P' && header[o + 2] == 'S' && header[o + 3] == 'P';
+                boolean isElf = header[o] == 0x7F && header[o + 1] == 'E' && header[o + 2] == 'L' && header[o + 3] == 'F';
+                if (isPspElf || isElf) return new DetectedSystem("psp", "header");
+            }
+        }
         // ISO and PBP are shared with other PlayStation systems. A PSP folder
         // disambiguates them without changing existing PS2 content detection.
         String path = "/" + (filename == null ? "" : filename.replace('\\', '/').toLowerCase(Locale.ROOT));
-        if (("iso".equals(extension) || "pbp".equals(extension)) &&
-            (path.contains("/psp/") || path.contains("/playstation portable/"))) return new DetectedSystem("psp", "folder");
+        if (("iso".equals(extension) || "pbp".equals(extension) || "prx".equals(extension)) &&
+            (path.contains("/psp/") || path.contains("/playstation portable/") || path.contains("/sony psp/"))) return new DetectedSystem("psp", "folder");
         switch (extension) {
             case "gb": case "gbc": case "gba": case "nes": case "sfc": case "smc":
             case "n64": case "z64": case "v64": case "nds": case "sms": case "gg":
@@ -98,6 +133,22 @@ public final class EmulationIdentity {
                 break;
         }
         return null;
+    }
+
+    private static boolean matchesAsciiAt(byte[] bytes, int offset, String value) {
+        byte[] wanted = value.getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        if (offset < 0 || offset + wanted.length > bytes.length) return false;
+        for (int i = 0; i < wanted.length; i++) {
+            if (bytes[offset + i] != wanted[i]) return false;
+        }
+        return true;
+    }
+
+    private static long readUInt32LE(byte[] bytes, int offset) {
+        return (bytes[offset] & 0xffL)
+            | ((bytes[offset + 1] & 0xffL) << 8)
+            | ((bytes[offset + 2] & 0xffL) << 16)
+            | ((bytes[offset + 3] & 0xffL) << 24);
     }
 
     private static boolean containsAscii(byte[] bytes, int length, String value) {

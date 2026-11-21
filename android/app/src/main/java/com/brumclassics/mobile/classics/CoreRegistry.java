@@ -102,8 +102,8 @@ public final class CoreRegistry {
         } else {
             String ext = ClassicsRules.extension(filename);
             String path = "/" + (filename == null ? "" : filename.replace('\\', '/').toLowerCase(java.util.Locale.ROOT));
-            if (("iso".equals(ext) || "pbp".equals(ext)) &&
-                (path.contains("/psp/") || path.contains("/playstation portable/"))) {
+            if (("iso".equals(ext) || "pbp".equals(ext) || "prx".equals(ext)) &&
+                (path.contains("/psp/") || path.contains("/playstation portable/") || path.contains("/sony psp/"))) {
                 resolved = "psp";
             } else {
                 resolved = ext;

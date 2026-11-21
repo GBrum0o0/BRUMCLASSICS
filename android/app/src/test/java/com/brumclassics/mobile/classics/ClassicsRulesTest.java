@@ -38,12 +38,31 @@ public final class ClassicsRulesTest {
         byte[] pspIso = new byte[4096];
         System.arraycopy("PSP_GAME".getBytes(java.nio.charset.StandardCharsets.US_ASCII), 0, pspIso, 100, 8);
         if (!"psp".equals(EmulationIdentity.inspect(new ByteArrayInputStream(pspIso), "game.iso").systemId)) throw new AssertionError("ISO PSP não detectada");
+        byte[] pspPvdIso = new byte[0x8020];
+        System.arraycopy("PSP GAME".getBytes(java.nio.charset.StandardCharsets.US_ASCII), 0, pspPvdIso, 0x8008, 8);
+        if (!"psp".equals(EmulationIdentity.inspect(new ByteArrayInputStream(pspPvdIso), "loose.iso").systemId)) throw new AssertionError("ISO PVD PSP não detectada");
+        if (!"psp".equals(EmulationIdentity.detectSystemFromStream(new ByteArrayInputStream(pspPvdIso), "loose.iso"))) throw new AssertionError("Stream ISO PVD PSP não detectado");
         if (!"psp".equals(EmulationIdentity.inspect(new ByteArrayInputStream(new byte[] {67, 73, 83, 79}), "game.cso").systemId)) throw new AssertionError("CSO PSP não detectado");
+        byte[] pspPbp = new byte[64];
+        pspPbp[0] = 0; pspPbp[1] = 'P'; pspPbp[2] = 'B'; pspPbp[3] = 'P';
+        pspPbp[0x20] = 40; pspPbp[0x24] = 56;
+        pspPbp[40] = 0x7E; pspPbp[41] = 'P'; pspPbp[42] = 'S'; pspPbp[43] = 'P';
+        if (!"psp".equals(EmulationIdentity.inspect(new ByteArrayInputStream(pspPbp), "homebrew.pbp").systemId)) throw new AssertionError("PBP ~PSP não detectado");
+        pspPbp[40] = 0x7F; pspPbp[41] = 'E'; pspPbp[42] = 'L'; pspPbp[43] = 'F';
+        if (!"psp".equals(EmulationIdentity.detectSystemFromStream(new ByteArrayInputStream(pspPbp), "homebrew.pbp"))) throw new AssertionError("PBP ELF não detectado");
+        byte[] ps1Pbp = new byte[80];
+        ps1Pbp[0] = 0; ps1Pbp[1] = 'P'; ps1Pbp[2] = 'B'; ps1Pbp[3] = 'P';
+        ps1Pbp[0x20] = 40; ps1Pbp[0x24] = 48;
+        ps1Pbp[40] = 0x7E; ps1Pbp[41] = 'P'; ps1Pbp[42] = 'S'; ps1Pbp[43] = 'P';
+        System.arraycopy("PSISOIMG".getBytes(java.nio.charset.StandardCharsets.US_ASCII), 0, ps1Pbp, 48, 8);
+        if ("psp".equals(EmulationIdentity.detectSystemFromStream(new ByteArrayInputStream(ps1Pbp), "ps1.pbp"))) throw new AssertionError("PBP PS1 não deve ser classificado como PSP");
         if (!"psp".equals(EmulationIdentity.inspect(new ByteArrayInputStream(new byte[] {0, 80, 66, 80}), "PSP/game.pbp").systemId)) throw new AssertionError("PBP na pasta PSP não detectado");
         try { EmulationIdentity.inspect(new ByteArrayInputStream(new byte[] {0, 80, 66, 80}), "ambiguous.pbp"); throw new AssertionError("PBP ambíguo aceito"); }
         catch (IllegalArgumentException expected) { }
         if (!"ppsspp_libretro_android.so".equals(CoreRegistry.integratedCore("psp", "game.iso").androidLibraryName)) throw new AssertionError("PSP não usa PPSSPP integrado");
         if (!"ppsspp_libretro_android.so".equals(CoreRegistry.integratedCore("", "PSP/game.iso").androidLibraryName)) throw new AssertionError("ISO na pasta PSP não usa PPSSPP integrado");
+        if (!"ppsspp_libretro_android.so".equals(CoreRegistry.integratedCore("", "PlayStation Portable/game.iso").androidLibraryName)) throw new AssertionError("ISO em PlayStation Portable não usa PPSSPP");
+        if (!"ppsspp_libretro_android.so".equals(CoreRegistry.integratedCore("", "Sony PSP/EBOOT.PBP").androidLibraryName)) throw new AssertionError("PBP em Sony PSP não usa PPSSPP");
         if (!"ppsspp_libretro_android.so".equals(CoreRegistry.integratedCore("", "PSP/EBOOT.PBP").androidLibraryName)) throw new AssertionError("PBP na pasta PSP não usa PPSSPP integrado");
         if (CoreRegistry.integratedCore("", "ambiguous.pbp") != null) throw new AssertionError("PBP ambíguo não pode ser classificado apenas pela extensão");
         EmulationIdentity neoGeo = EmulationIdentity.inspect(new ByteArrayInputStream(new byte[] {1, 2, 3}), "game.neo");

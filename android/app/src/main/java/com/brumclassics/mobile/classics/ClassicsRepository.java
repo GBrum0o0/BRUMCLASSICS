@@ -53,6 +53,49 @@ public final class ClassicsRepository {
 
     public synchronized List<LocalClassic> all() { return new ArrayList<>(games); }
     public synchronized LocalClassic find(String id) { for (LocalClassic game : games) if (game.id.equals(id)) return game; return null; }
+
+    public boolean isAccessible(LocalClassic game) {
+        if (!romFolderConfigured() || game == null || game.uri == null || game.uri.isEmpty()) return false;
+        try (Cursor cursor = resolver.query(
+                Uri.parse(game.uri),
+                new String[]{DocumentsContract.Document.COLUMN_SIZE},
+                null, null, null)) {
+            if (cursor == null || !cursor.moveToFirst()) return false;
+            return cursor.isNull(0) || cursor.getLong(0) > 0;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    public synchronized List<LocalClassic> accessibleForGaming() {
+        List<LocalClassic> accessible = new ArrayList<>();
+        if (!romFolderConfigured()) return accessible;
+        boolean changed = false;
+        String rootName = romFolderName();
+        for (LocalClassic game : games) {
+            if (!isAccessible(game)) continue;
+            String ext = ClassicsRules.extension(game.filename);
+            if ((game.systemId == null || game.systemId.isEmpty())
+                    && ("iso".equals(ext) || "pbp".equals(ext) || "prx".equals(ext))) {
+                String pathHint = (rootName == null || rootName.isEmpty())
+                        ? game.relativePath : rootName + "/" + game.relativePath;
+                try (InputStream input = resolver.openInputStream(Uri.parse(game.uri))) {
+                    if (input != null) {
+                        String detected = EmulationIdentity.detectSystemFromStream(input, pathHint);
+                        if (!detected.isEmpty()) {
+                            game.systemId = detected;
+                            changed = true;
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+            accessible.add(game);
+        }
+        if (changed) {
+            try { save(); } catch (Exception ignored) {}
+        }
+        return accessible;
+    }
     public boolean romFolderConfigured() { return !preferences.getString("rom_tree", "").isEmpty(); }
     public boolean runtimeFolderConfigured() { return !preferences.getString("runtime_tree", "").isEmpty(); }
     public String romFolderName() { return preferences.getString("rom_tree_name", "ROMs"); }
@@ -299,6 +342,7 @@ public final class ClassicsRepository {
 
     private List<LocalClassic> scanTree(Uri tree, Map<String, LocalClassic> previous) throws Exception {
         List<LocalClassic> result = new ArrayList<>(); Set<String> visited = new HashSet<>();
+        String rootName = treeName(tree, "");
         String rootId = DocumentsContract.getTreeDocumentId(tree);
         ArrayDeque<Node> queue = new ArrayDeque<>(); queue.add(new Node(rootId, ""));
         String[] projection = {DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME,
@@ -320,6 +364,17 @@ public final class ClassicsRepository {
                     LocalClassic game = previous.get(id);
                     if (game == null) game = new LocalClassic(id, document.toString(), relative, name, ClassicsRules.cleanTitle(name), size);
                     else { game.uri = document.toString(); game.relativePath = relative; game.filename = name; game.title = ClassicsRules.cleanTitle(name); game.fileSize = size; }
+                    String ext = ClassicsRules.extension(name);
+                    if ((game.systemId == null || game.systemId.isEmpty())
+                            && ("iso".equals(ext) || "pbp".equals(ext) || "prx".equals(ext))) {
+                        String pathHint = (rootName == null || rootName.isEmpty()) ? relative : rootName + "/" + relative;
+                        try (InputStream input = resolver.openInputStream(document)) {
+                            if (input != null) {
+                                String detected = EmulationIdentity.detectSystemFromStream(input, pathHint);
+                                if (!detected.isEmpty()) game.systemId = detected;
+                            }
+                        } catch (Exception ignored) {}
+                    }
                     result.add(game);
                 }
             }

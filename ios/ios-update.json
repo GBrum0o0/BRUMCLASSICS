@@ -1,12 +1,12 @@
 {
-  "version": "0.22.0",
-  "build": 55,
+  "version": "0.23.0",
+  "build": 56,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.22.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.23.0",
   "notes": [
-    "PSP integrado pelo PPSSPP no pacote normal: ISO/PBP na pasta PSP e CSO reconhecido diretamente.",
-    "Execução no iPhone por interpretador, sem JIT. Compatibilidade, desempenho e gameplay dependem do aparelho e do jogo.",
-    "Controles PSP, recursos internos e licenças incluídos. Saves locais de PSP usam a pasta PSP/SAVEDATA; a sincronização de bateria SRM não cobre esse formato.",
-    "Preserva os oito núcleos anteriores, controles e Save Sync existentes."
+    "Corrige a detecção de jogos de PSP em .iso e .pbp fora de subpasta PSP e melhora a identificação de arquivos acessíveis.",
+    "Simplifica os cartões e detalhes do Gaming Mode exibindo apenas Disponível (verde) e No computador (cinza), sem nomes técnicos de cores ou emuladores.",
+    "Filtra o Gaming Mode para exibir somente jogos Classics, ocultando títulos comuns de PC/Steam/Windows sem alterar a biblioteca original.",
+    "Preserva execução no iPhone por interpretador sem JIT, controles e Save Sync existentes."
   ]
 }

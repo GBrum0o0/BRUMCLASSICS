@@ -107,7 +107,7 @@ struct GamingModeView: View {
         switch entry {
         case .local(let rom, _): selectedROM = rom
         case .computer(let game):
-            guard let current = store.snapshot.games.first(where: { $0.id == game.id && $0.isClassic && $0.installed }) else { return }
+            guard let current = store.snapshot.games.first(where: { $0.id == game.id && GamingModeCatalog.isEligibleComputerClassic($0) }) else { return }
             selectedGame = current
         }
     }
@@ -144,11 +144,15 @@ struct GamingModeView: View {
             switch entry {
             case .local(let rom, _):
                 let matched = matchedComputerGame(for: rom)
+                let playable = IntegratedEmulatorSupport.supports(rom)
+                    || GamingModeCatalog.canOfferRetroArch(for: rom, imported: pocket.isImportedIntoRetroArch(rom))
                 ROMFolderGameTile(
                     rom: rom,
                     launcherGame: matched,
                     retroArchReady: pocket.isImportedIntoRetroArch(rom),
                     integratedCoreName: IntegratedEmulatorSupport.core(for: rom)?.displayName,
+                    platformLabel: platform(for: entry),
+                    isPlayableOnPhone: playable,
                     opensDetails: true
                 ) { selectedROM = rom }
             case .computer(let game):
@@ -205,7 +209,38 @@ struct GamingCatalogSnapshot {
     static let empty = GamingCatalogSnapshot(library: [], recent: [], matchedByROMID: [:])
 }
 
+enum GamingModePresentation {
+    static let localAvailabilityLabel = "Disponível"
+    static let computerAvailabilityLabel = "No computador"
+    static let unavailableOnPhoneLabel = "Indisponível neste aparelho"
+}
+
 enum GamingModeCatalog {
+    private static let nonClassicPlatforms: Set<String> = [
+        "pc", "windows", "win", "win32", "win64", "steam", "epic", "epic games",
+        "gog", "ea", "ea app", "origin", "ubisoft", "ubisoft connect",
+        "battlenet", "battle.net", "amazon", "amazon games", "microsoft store",
+        "xbox app", "xbox", "xbox one", "xbox series", "xbox series x",
+        "xbox series s", "ps4", "ps5", "playstation 4", "playstation 5",
+        "switch", "nintendo switch"
+    ]
+
+    static func isNonClassicPlatform(_ platform: String) -> Bool {
+        let lower = platform.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let normalized = normalizedPlatform(lower)
+        return nonClassicPlatforms.contains(lower) || nonClassicPlatforms.contains(normalized)
+    }
+
+    static func isEligibleClassicCategory(_ game: Game) -> Bool {
+        game.isClassic
+            && !isNonClassicPlatform(game.platform)
+            && !game.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased().hasSuffix(".exe")
+    }
+
+    static func isEligibleComputerClassic(_ game: Game) -> Bool {
+        game.installed && isEligibleClassicCategory(game)
+    }
+
     static func computerFingerprint(_ games: [Game]) -> Int {
         var hasher = Hasher()
         for game in games {
@@ -282,14 +317,14 @@ enum GamingModeCatalog {
 
     static func matchedComputerGame(for rom: ROMFolderGame, records: [PocketClassic], computer: [Game]) -> Game? {
         if let linked = records.first(where: { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame && !$0.launcherGameID.isEmpty }),
-           let exact = computer.first(where: { $0.isClassic && $0.id == linked.launcherGameID }) {
+           let exact = computer.first(where: { isEligibleClassicCategory($0) && $0.id == linked.launcherGameID }) {
             return exact
         }
         let system = IntegratedEmulatorSupport.system(for: rom)
         let titleKey = normalizedKey(rom.title)
         let fileKey = normalizedKey(rom.filename)
         let candidates = computer.filter { game in
-            guard game.isClassic else { return false }
+            guard isEligibleClassicCategory(game) else { return false }
             let gKey = normalizedKey(game.title)
             guard !gKey.isEmpty else { return false }
             return gKey == titleKey || (!fileKey.isEmpty && gKey == fileKey)
@@ -309,7 +344,7 @@ enum GamingModeCatalog {
         computerByTitleKey: [String: [Game]]
     ) -> Game? {
         if let linkedID = record?.launcherGameID, !linkedID.isEmpty,
-           let exact = computerByID[linkedID], exact.isClassic {
+           let exact = computerByID[linkedID], isEligibleClassicCategory(exact) {
             return exact
         }
         let titleKey = normalizedKey(rom.title)
@@ -319,7 +354,7 @@ enum GamingModeCatalog {
         func appendCandidates(for key: String) {
             guard !key.isEmpty, let bucket = computerByTitleKey[key] else { return }
             for game in bucket {
-                guard game.isClassic else { continue }
+                guard isEligibleClassicCategory(game) else { continue }
                 if seenIDs.insert(game.id).inserted {
                     candidates.append(game)
                 }
@@ -358,7 +393,7 @@ enum GamingModeCatalog {
         computerByID.reserveCapacity(computer.count)
         computerByTitleKey.reserveCapacity(computer.count)
         for game in computer {
-            guard game.isClassic else { continue }
+            guard isEligibleClassicCategory(game) else { continue }
             computerByID[game.id] = game
             let gKey = normalizedKey(game.title)
             if !gKey.isEmpty {
@@ -407,10 +442,10 @@ enum GamingModeCatalog {
         var pcEntries: [GamingCatalogEntry] = []
         pcEntries.reserveCapacity(computer.count)
         for game in computer {
-            guard game.isClassic, game.installed, !matchedPCIDs.contains(game.id) else { continue }
+            guard isEligibleComputerClassic(game), !matchedPCIDs.contains(game.id) else { continue }
             let gKey = normalizedKey(game.title)
             let pKey = normalizedPlatform(game.platform)
-            if !gKey.isEmpty && game.isClassic && localTitleKeys.contains("\(gKey)|\(pKey)") {
+            if !gKey.isEmpty && isEligibleClassicCategory(game) && localTitleKeys.contains("\(gKey)|\(pKey)") {
                 continue
             }
             let dedupKey = gKey.isEmpty ? "id:\(game.id)" : "\(gKey)|\(pKey)"
@@ -518,13 +553,14 @@ private struct GamingROMDetailView: View {
 
     private var installedCore: CoreDescriptor? { IntegratedEmulatorSupport.core(for: rom) }
     private var system: EmulatedSystemID? { IntegratedEmulatorSupport.system(for: rom) }
+    private var isAvailableOnPhone: Bool { installedCore != nil || canUseRetroArch }
     private var pcNativeSaveCompatible: Bool { installedCore != nil }
     private var canUseRetroArch: Bool {
         GamingModeCatalog.canOfferRetroArch(for: rom, imported: pocket.isImportedIntoRetroArch(rom))
     }
     private var linkedPCGame: Game? {
         if let link = record, !link.launcherGameID.isEmpty,
-           let explicit = store.snapshot.games.first(where: { $0.isClassic && $0.id == link.launcherGameID && $0.installed }) {
+           let explicit = store.snapshot.games.first(where: { GamingModeCatalog.isEligibleComputerClassic($0) && $0.id == link.launcherGameID }) {
             return explicit
         }
         if let matched = GamingModeCatalog.matchedComputerGame(for: rom, records: pocket.games, computer: store.snapshot.games),
@@ -545,15 +581,15 @@ private struct GamingROMDetailView: View {
                     GamingHero(title: rom.title, platform: system?.rawValue.uppercased() ?? "CLASSICS",
                                artwork: GamingArtwork(game: pocket.launcherGame(for: rom, launcher: store), rom: rom)) {
                         VStack(alignment: .leading, spacing: 10) {
-                            ExecutionBadge(kind: installedCore != nil ? .onPhone : canUseRetroArch ? .externalApp : .unavailable)
+                            GamingAvailabilityBadge(kind: isAvailableOnPhone ? .available : (linkedPCGame != nil ? .onComputer : .unavailable))
                             GamingMetrics(time: localTime, timeLabel: "Tempo neste iPhone", earned: progress?.unlocked,
                                           total: progress?.achievements.count)
                         }
                     }
                     GamingActionBar(
-                        canPlay: installedCore != nil || canUseRetroArch || linkedPCGame != nil,
+                        canPlay: isAvailableOnPhone || linkedPCGame != nil,
                         playTitle: "JOGAR",
-                        playSubtitle: installedCore != nil ? "No celular · \(installedCore!.displayName)" : (canUseRetroArch ? "No celular · RetroArch" : "No PC"),
+                        playSubtitle: isAvailableOnPhone ? GamingModePresentation.localAvailabilityLabel : GamingModePresentation.computerAvailabilityLabel,
                         gamepadBusy: launchingGamepad,
                         pcOnline: store.connection == .online,
                         onPlay: {
@@ -574,39 +610,16 @@ private struct GamingROMDetailView: View {
                         onLocalMultiplayer: { showLocalMultiplayer = true }
                     )
                     if !actionMessage.isEmpty { Text(actionMessage).font(.caption).foregroundStyle(BrumTheme.primary) }
-                    BrumCard {
-                        VStack(alignment: .leading, spacing: 8) {
-                            BrumSectionLabel(text: "EXECUÇÃO NESTE IPHONE")
-                            Text(routeDescription).font(.subheadline).foregroundStyle(BrumTheme.muted)
-                            Text(executionScopeSummary).font(.caption).foregroundStyle(BrumTheme.muted)
-                            if system == .playStationPortable {
-                                Text("PPSSPP usa interpretador sem JIT neste iPhone. O desempenho depende do jogo e do aparelho. Saves de PSP ficam locais em PSP/SAVEDATA; Save Sync de bateria SRM não cobre esse formato.")
-                                    .font(.caption2).foregroundStyle(BrumTheme.muted)
-                            }
-                            if system == .nintendoDS || system == .nintendo3DS {
-                                Text("Segunda tela e toque: \(system == .nintendoDS ? "SkyEmu oferece 8 layouts de tela dupla e toque direto integrado." : "Azahar 3DS suporta tela dupla e toque na build experimental.")")
-                                    .font(.caption2).foregroundStyle(BrumTheme.primary)
-                            }
-                            if system == .nintendo3DS {
-                                Text("Build \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?") · Azahar: \(installedCore == nil ? "arquivo ausente" : "arquivo presente")")
-                                    .font(.caption2).foregroundStyle(BrumTheme.muted)
-                                    .accessibilityIdentifier("brum-core-build-status")
-                            }
-                        }
-                    }
-                    GamingInfoCard(title: "Informações da ROM", items: [
+                    GamingInfoCard(title: "Informações do jogo", items: [
                         GamingInfoItem(label: "Sistema", value: system.map { MurbProtocol.displaySystemName($0.rawValue) } ?? "Não identificado"),
-                        GamingInfoItem(label: "Núcleo", value: installedCore.map { "\($0.displayName) (\($0.license))" } ?? (canUseRetroArch ? "RetroArch externo" : "Sem núcleo instalado")),
+                        GamingInfoItem(label: "Disponibilidade", value: isAvailableOnPhone ? GamingModePresentation.localAvailabilityLabel : (linkedPCGame != nil ? GamingModePresentation.computerAvailabilityLabel : GamingModePresentation.unavailableOnPhoneLabel)),
                         GamingInfoItem(label: "Arquivo", value: rom.filename),
                         GamingInfoItem(label: "Tamanho", value: ByteCountFormatter.string(fromByteCount: rom.fileSize, countStyle: .file)),
                         GamingInfoItem(label: "RetroAchievements", value: Int(record?.retroAchievementID ?? "").map { "ID \($0)" } ?? "Não vinculado"),
-                        GamingInfoItem(label: "Launcher PC", value: linkedPCGame?.title ?? "Não vinculado")
+                        GamingInfoItem(label: "Biblioteca PC", value: linkedPCGame?.title ?? "Não vinculado")
                     ])
-                    if let core = installedCore {
-                        Text("\(CoreRegistry.experimental.contains(core) ? "TESTAR" : "JOGAR · BRUM CORE") · \(core.displayName)")
-                            .font(.caption.bold()).foregroundStyle(BrumTheme.primary)
-                    } else if canUseRetroArch {
-                        Text(pocket.isImportedIntoRetroArch(rom) ? "RetroArch pronto" : "Importar ROM para o RetroArch ao jogar")
+                    if system == .playStationPortable {
+                        Text("Saves de PSP ficam armazenados localmente neste aparelho.")
                             .font(.caption).foregroundStyle(BrumTheme.muted)
                     }
                     if installedCore != nil && system != .playStationPortable {
@@ -739,28 +752,13 @@ private struct GamingROMDetailView: View {
         return "O progresso aparece após sincronizar o jogo vinculado."
     }
 
-    private var executionScopeSummary: String {
-        if installedCore != nil {
-            return "No celular (offline): emulação, gamepad virtual/físico e saves locais. Depende do PC/rede: sincronizar save nativo, iniciar no computador e consultar RetroAchievements."
-        }
-        return "No celular: execução externa via RetroArch quando suportado. Depende do PC/rede: B-CARD no computador e sincronização."
-    }
-
-    private var routeDescription: String {
-        let reason = IntegratedEmulatorSupport.availabilityReason(for: rom)
-        if installedCore != nil { return reason }
-        if system == .nintendo3DS || system == .playStationPortable { return "\(reason) Reinstale o pacote completo para usar este núcleo integrado." }
-        if canUseRetroArch { return "\(reason) A opção abaixo usa explicitamente o RetroArch e não conta como suporte integrado." }
-        return "\(reason) O arquivo original foi preservado."
-    }
-
     private func launchGamepadFromROM() {
         startPCGamepadOrMultiplayer(players: 1, hybridMode: "mobile1-pc2", myPlayerNumber: 1)
     }
 
     private func startPCGamepadOrMultiplayer(players: Int, hybridMode: String, myPlayerNumber: Int) {
         guard store.connection == .online else {
-            actionMessage = "Computador offline. Conecte o Launcher na mesma rede ou abra o Gamepad M.U.R.B manualmente."
+            actionMessage = "Computador offline. Conecte o Launcher na mesma rede ou pareie o controle manualmente."
             showMurbManual = true
             return
         }
@@ -799,9 +797,9 @@ private struct GamingGameTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             GameCoverView(game: game, cornerRadius: 11).aspectRatio(0.72, contentMode: .fit)
-            Text(game.platform.uppercased()).font(.caption2.bold()).tracking(1).foregroundStyle(BrumTheme.primary)
+            Text(game.platform.uppercased()).font(.caption2.bold()).tracking(1).foregroundStyle(BrumTheme.muted)
             Text(game.title).font(.subheadline.bold()).foregroundStyle(BrumTheme.text).lineLimit(2).multilineTextAlignment(.leading)
-            Text("NO COMPUTADOR").font(.caption2.bold()).foregroundStyle(BrumTheme.muted)
+            Text(GamingModePresentation.computerAvailabilityLabel).font(.caption2.bold()).foregroundStyle(BrumTheme.muted)
         }
     }
 }
@@ -839,7 +837,7 @@ private struct GamingGameView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     GamingHero(title: game.title, platform: game.platform, artwork: GamingArtwork(game: game)) {
                         VStack(alignment: .leading, spacing: 10) {
-                            ExecutionBadge(kind: game.installed ? .dependsOnPC : .unavailable)
+                            GamingAvailabilityBadge(kind: game.installed ? .onComputer : .unavailable)
                             GamingMetrics(time: game.playtimeLabel, timeLabel: "Tempo jogado",
                                           earned: hasAchievementTotals ? game.achievementsCollected : nil,
                                           total: hasAchievementTotals ? game.achievementsTotal : nil)
@@ -848,7 +846,7 @@ private struct GamingGameView: View {
                     GamingActionBar(
                         canPlay: canStartOnPC,
                         playTitle: "JOGAR",
-                        playSubtitle: streaming?.available == true ? "Streaming no celular" : "Iniciar no PC",
+                        playSubtitle: streaming?.available == true ? "Streaming no celular" : GamingModePresentation.computerAvailabilityLabel,
                         gamepadBusy: launchingGamepad,
                         pcOnline: canStartOnPC,
                         onPlay: {
@@ -868,7 +866,7 @@ private struct GamingGameView: View {
                         GamingInfoItem(label: "Origem", value: game.store),
                         GamingInfoItem(label: "Status", value: game.statusLabel),
                         GamingInfoItem(label: "Tamanho", value: game.sizeBytes > 0 ? ByteCountFormatter.string(fromByteCount: game.sizeBytes, countStyle: .file) : ""),
-                        GamingInfoItem(label: "Execução", value: "Depende do PC (B-CARD / Streaming / M.U.R.B)")
+                        GamingInfoItem(label: "Disponibilidade", value: GamingModePresentation.computerAvailabilityLabel)
                     ])
                     GamingAchievements(title: achievementSource, items: game.achievements,
                                        earned: hasAchievementTotals ? game.achievementsCollected : nil,
@@ -1120,7 +1118,7 @@ struct LocalMultiplayerSheet: View {
                     .disabled(!pcAvailable)
 
                     if !pcAvailable {
-                        Button("Abrir Gamepad M.U.R.B manualmente") { onOpenManualMurb() }
+                        Button("Abrir Gamepad para PC manualmente") { onOpenManualMurb() }
                     }
                     Text("Ao iniciar no PC em rede local, este celular abre automaticamente o joystick virtual conectado no jogador escolhido.")
                         .font(.caption).foregroundStyle(.secondary)

@@ -363,11 +363,107 @@ enum ROMContentInspector {
         let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
         // A folder hint must not override a ROM header or an unambiguous format.
         let detected = detectSystem(header: header, filename: filename)
+            ?? detectDiscSystem(at: url, filename: filename).map { (system: $0, source: ROMDetectionSource.header) }
             ?? expectedSystem.map { (system: $0, source: ROMDetectionSource.extensionFallback) }
         guard let detected else {
             throw PocketError.message("O formato desta ROM ainda não é reconhecido pelo BRUM Core.")
         }
         return CanonicalGameIdentity(systemID: detected.system, contentSHA256: digest, detectionSource: detected.source)
+    }
+
+    /// Reads disc/container magic signatures beyond the initial 512 bytes (ISO-9660 PVD at 0x8000, PBP sections, CSO magic).
+    static func detectDiscSystem(at url: URL, filename: String) -> EmulatedSystemID? {
+        let ext = (filename as NSString).pathExtension.lowercased()
+        guard ["iso", "pbp", "cso"].contains(ext),
+              let handle = try? FileHandle(forReadingFrom: url) else {
+            return nil
+        }
+        defer { try? handle.close() }
+
+        if ext == "cso" {
+            guard let magic = try? handle.read(upToCount: 4),
+                  magic == Data([0x43, 0x49, 0x53, 0x4F]) else {
+                return nil
+            }
+            return .playStationPortable
+        }
+
+        if ext == "pbp" {
+            guard let header = try? handle.read(upToCount: 40),
+                  header.count >= 40,
+                  header.starts(with: Data([0x00, 0x50, 0x42, 0x50])) else {
+                return nil
+            }
+            let dataPspOffset = readUInt32LE(header, at: 0x20)
+            let dataPsarOffset = readUInt32LE(header, at: 0x24)
+            if dataPsarOffset >= 40 {
+                do {
+                    try handle.seek(toOffset: UInt64(dataPsarOffset))
+                    if let psarMagic = try handle.read(upToCount: 10),
+                       psarMagic.starts(with: Data("PSISOIMG".utf8)) || psarMagic.starts(with: Data("PSTITLEIMG".utf8)) {
+                        return .playStation
+                    }
+                } catch {}
+            }
+            if dataPspOffset >= 40 {
+                do {
+                    try handle.seek(toOffset: UInt64(dataPspOffset))
+                    if let pspMagic = try handle.read(upToCount: 4),
+                       pspMagic == Data([0x7E, 0x50, 0x53, 0x50]) || pspMagic == Data([0x7F, 0x45, 0x4C, 0x46]) {
+                        return .playStationPortable
+                    }
+                } catch {}
+            }
+            return nil
+        }
+
+        if let head = try? handle.read(upToCount: 64), head.count >= 0x20 {
+            let bytes = [UInt8](head)
+            if bytes[0x1C] == 0xC2 && bytes[0x1D] == 0x33 && bytes[0x1E] == 0x9F && bytes[0x1F] == 0x3D {
+                return .gameCube
+            }
+        }
+
+        // Fast path: ISO-9660 Primary Volume Descriptor sits at sector 16 (0x8000).
+        do {
+            try handle.seek(toOffset: 0x8000)
+            if let pvd = try handle.read(upToCount: 2048),
+               pvd.range(of: Data("PSP GAME".utf8)) != nil || pvd.range(of: Data("PSP_GAME".utf8)) != nil {
+                return .playStationPortable
+            }
+        } catch {}
+
+        // Fallback scan across the first 4 MB with overlap so markers straddling chunks are never split.
+        do {
+            try handle.seek(toOffset: 0)
+            let chunkLimit = 65_536
+            let maxBytes = 4 * 1024 * 1024
+            let boot2 = Data("BOOT2".utf8)
+            let pspUnderscore = Data("PSP_GAME".utf8)
+            let pspSpace = Data("PSP GAME".utf8)
+            var totalRead = 0
+            var overlap = Data()
+            while totalRead < maxBytes {
+                let toRead = min(chunkLimit, maxBytes - totalRead)
+                guard let chunk = try handle.read(upToCount: toRead), !chunk.isEmpty else { break }
+                totalRead += chunk.count
+                var window = overlap
+                window.append(chunk)
+                if window.range(of: boot2) != nil { return .playStation2 }
+                if window.range(of: pspUnderscore) != nil || window.range(of: pspSpace) != nil {
+                    return .playStationPortable
+                }
+                overlap = window.count > 16 ? Data(window.suffix(16)) : window
+            }
+        } catch {}
+        return nil
+    }
+
+    private static func readUInt32LE(_ data: Data, at offset: Int) -> UInt32 {
+        UInt32(data[offset])
+            | (UInt32(data[offset + 1]) << 8)
+            | (UInt32(data[offset + 2]) << 16)
+            | (UInt32(data[offset + 3]) << 24)
     }
 
     static func detectSystem(header: Data, filename: String) -> (system: EmulatedSystemID, source: ROMDetectionSource)? {

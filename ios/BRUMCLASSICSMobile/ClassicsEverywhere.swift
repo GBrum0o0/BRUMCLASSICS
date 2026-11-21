@@ -192,6 +192,7 @@ enum DirectSaveSyncOutcome: Sendable {
         let hasBookmark = await romFolder.configured
         guard romFolderConfigured || hasBookmark else {
             romFolderConfigured = false
+            romFolderGames = []
             romFolderStatus = "Selecione uma pasta de ROMs em Perfil → Configurações do app → CLASSICS."
             return
         }
@@ -199,7 +200,10 @@ enum DirectSaveSyncOutcome: Sendable {
             romFolderConfigured = true
             romFolderName = await romFolder.displayName
             try await applyROMFolderScan(try await romFolder.scan())
-        } catch { romFolderStatus = "A pasta precisa ser autorizada novamente em Perfil → Configurações do app → CLASSICS. Seus dados foram preservados." }
+        } catch {
+            romFolderGames = []
+            romFolderStatus = "A pasta precisa ser autorizada novamente em Perfil → Configurações do app → CLASSICS. Seus dados foram preservados."
+        }
     }
     private func applyROMFolderScan(_ scan: ROMFolderScan) async throws {
         var reconciled = games
@@ -890,38 +894,46 @@ struct ROMFolderGameTile: View {
     let launcherGame: Game?
     let retroArchReady: Bool
     let integratedCoreName: String?
+    var platformLabel: String? = nil
+    var isPlayableOnPhone: Bool = true
     var opensDetails = false
     let play: () -> Void
     @State private var artwork: ROMArtwork?
     @State private var artworkImage: UIImage?
     private var displayedTitle: String { launcherGame?.title ?? artwork?.title ?? rom.title }
-    private var routeLabel: String {
-        if let integratedCoreName { return "JOGAR · BRUM CORE · \(integratedCoreName.uppercased())" }
-        if let system = IntegratedEmulatorSupport.system(for: rom),
-           CoreRegistry.candidate(for: system) != nil,
-           !RetroArchAppStoreLaunchRules.supports(filename: rom.filename) {
-            return "BRUM CORE · NÃO DISPONÍVEL NESTA INSTALAÇÃO"
-        }
-        return retroArchReady ? "JOGAR · RETROARCH" : "PRIMEIRO USO · IMPORTAR"
+    private var resolvedPlatformLabel: String {
+        if let platformLabel, !platformLabel.isEmpty { return platformLabel.uppercased() }
+        if let system = IntegratedEmulatorSupport.system(for: rom) { return system.rawValue.uppercased() }
+        return "CLASSICS"
+    }
+    private var availabilityText: String {
+        if isPlayableOnPhone { return GamingModePresentation.localAvailabilityLabel }
+        if launcherGame?.installed == true { return GamingModePresentation.computerAvailabilityLabel }
+        return GamingModePresentation.unavailableOnPhoneLabel
+    }
+    private var availabilityColor: Color {
+        if isPlayableOnPhone { return BrumTheme.primary }
+        return launcherGame?.installed == true ? BrumTheme.muted : .orange
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button(action: play) {
                 VStack(alignment: .leading, spacing: 8) {
                     if let launcherGame, !launcherGame.artworkPath.isEmpty {
-                        GameCoverView(game: launcherGame).aspectRatio(0.72, contentMode: .fit)
+                        GameCoverView(game: launcherGame, cornerRadius: 11).aspectRatio(0.72, contentMode: .fit)
                     } else {
-                        RoundedRectangle(cornerRadius: 12).fill(BrumTheme.surface).aspectRatio(0.72, contentMode: .fit)
+                        RoundedRectangle(cornerRadius: 11).fill(BrumTheme.surface).aspectRatio(0.72, contentMode: .fit)
                             .overlay {
                                 if let artworkImage { Image(uiImage: artworkImage).resizable().scaledToFit() }
                                 else { Image(systemName: "gamecontroller.fill").font(.largeTitle).foregroundStyle(BrumTheme.primary) }
-                            }.clipShape(RoundedRectangle(cornerRadius: 12))
+                            }.clipShape(RoundedRectangle(cornerRadius: 11))
                     }
-                    Text(displayedTitle).font(.system(size: 15, weight: .bold)).foregroundStyle(BrumTheme.text).lineLimit(2).multilineTextAlignment(.leading)
+                    Text(resolvedPlatformLabel).font(.caption2.bold()).tracking(1).foregroundStyle(BrumTheme.muted)
+                    Text(displayedTitle).font(.subheadline.bold()).foregroundStyle(BrumTheme.text).lineLimit(2).multilineTextAlignment(.leading)
                 }
             }.buttonStyle(.plain).accessibilityLabel("\(opensDetails ? "Ver detalhes de" : "Jogar") \(displayedTitle)")
-            Text(routeLabel)
-                .font(.system(size: 10, weight: .bold)).foregroundStyle(BrumTheme.primary)
+            Text(availabilityText)
+                .font(.caption2.bold()).foregroundStyle(availabilityColor)
         }.task(id: rom.id + (launcherGame?.artworkPath ?? "")) {
             guard launcherGame?.artworkPath.isEmpty != false else { return }
             let result = await ROMArtworkCache.shared.artwork(for: rom)

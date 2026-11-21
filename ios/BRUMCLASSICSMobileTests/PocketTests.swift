@@ -619,7 +619,84 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(ROMArtworkRules.match(filename: "1636 - Pokemon Fire Red (U)(Squirrels).gba", paths: paths), paths[0])
         XCTAssertNil(ROMArtworkRules.match(filename: "Pokemon Emerald.gba", paths: paths))
         XCTAssertNil(ROMArtworkRules.repository(filename: "game.iso"))
+        XCTAssertEqual(ROMArtworkRules.repository(for: ROMFolderGame(relativePath: "PSP/game.iso", filename: "game.iso", title: "Game", fileSize: 1)), "Sony_-_PlayStation_Portable")
         XCTAssertEqual(ROMArtworkRules.repository(filename: "Metal Slug.neo"), "SNK_-_Neo_Geo")
         XCTAssertNotEqual(ROMArtworkRules.repository(filename: "game.gba"), ROMArtworkRules.repository(filename: "game.gb"))
+    }
+    func testLoosePSPISOAndPBPHeadersAndRootPSPFolderDetection() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let downloads = root.appendingPathComponent("Downloads", isDirectory: true)
+        let pspRoot = root.appendingPathComponent("PSP", isDirectory: true)
+        try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: pspRoot, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        var isoPvd = Data(count: 0x8020)
+        isoPvd.replaceSubrange(0x8008..<(0x8008 + 8), with: Data("PSP GAME".utf8))
+        let loosePvdIso = downloads.appendingPathComponent("loose_pvd.iso")
+        try isoPvd.write(to: loosePvdIso)
+        XCTAssertEqual(ROMContentInspector.detectDiscSystem(at: loosePvdIso, filename: "loose_pvd.iso"), .playStationPortable)
+
+        var isoMarker = Data(count: 512)
+        isoMarker.replaceSubrange(128..<(128 + 8), with: Data("PSP_GAME".utf8))
+        let looseMarkerIso = downloads.appendingPathComponent("loose_marker.iso")
+        try isoMarker.write(to: looseMarkerIso)
+        XCTAssertEqual(ROMContentInspector.detectDiscSystem(at: looseMarkerIso, filename: "loose_marker.iso"), .playStationPortable)
+
+        var pspPbp = Data(count: 64)
+        pspPbp.replaceSubrange(0..<4, with: Data([0x00, 0x50, 0x42, 0x50]))
+        pspPbp[0x20] = 40 // data.psp offset = 40
+        pspPbp[0x24] = 56 // data.psar offset = 56
+        pspPbp.replaceSubrange(40..<44, with: Data([0x7E, 0x50, 0x53, 0x50])) // ~PSP
+        let loosePspPbp = downloads.appendingPathComponent("homebrew.pbp")
+        try pspPbp.write(to: loosePspPbp)
+        XCTAssertEqual(ROMContentInspector.detectDiscSystem(at: loosePspPbp, filename: "homebrew.pbp"), .playStationPortable)
+
+        var ps1Pbp = Data(count: 80)
+        ps1Pbp.replaceSubrange(0..<4, with: Data([0x00, 0x50, 0x42, 0x50]))
+        ps1Pbp[0x20] = 40
+        ps1Pbp[0x24] = 48
+        ps1Pbp.replaceSubrange(48..<56, with: Data("PSISOIMG".utf8))
+        let loosePs1Pbp = downloads.appendingPathComponent("ps1_classic.pbp")
+        try ps1Pbp.write(to: loosePs1Pbp)
+        XCTAssertEqual(ROMContentInspector.detectDiscSystem(at: loosePs1Pbp, filename: "ps1_classic.pbp"), .playStation)
+
+        let scannedDownloads = try ROMFolderScanner.scan(downloads)
+        for name in ["loose_pvd.iso", "loose_marker.iso", "homebrew.pbp"] {
+            let rom = try XCTUnwrap(scannedDownloads.games.first { $0.filename == name })
+            XCTAssertEqual(IntegratedEmulatorSupport.system(for: rom), .playStationPortable, name)
+        }
+        let ps1Rom = try XCTUnwrap(scannedDownloads.games.first { $0.filename == "ps1_classic.pbp" })
+        XCTAssertEqual(IntegratedEmulatorSupport.system(for: ps1Rom), .playStation)
+
+        // Direct PSP root folder (no inner PSP subfolder in relativePath)
+        try Data([1, 2, 3, 4]).write(to: pspRoot.appendingPathComponent("direct.iso"))
+        let scannedPspRoot = try ROMFolderScanner.scan(pspRoot)
+        let directRom = try XCTUnwrap(scannedPspRoot.games.first { $0.filename == "direct.iso" })
+        XCTAssertEqual(IntegratedEmulatorSupport.system(for: directRom), .playStationPortable)
+    }
+
+    func testGamingModePresentationLabelsAndDesktopPlatformFiltering() throws {
+        XCTAssertEqual(GamingModePresentation.localAvailabilityLabel, "Disponível")
+        XCTAssertEqual(GamingModePresentation.computerAvailabilityLabel, "No computador")
+        for label in [GamingModePresentation.localAvailabilityLabel, GamingModePresentation.computerAvailabilityLabel] {
+            for forbidden in ["Brum Core", "BRUM Core", "mGBA", "PPSSPP", "SkyEmu", "RetroArch", "M.U.R.B"] {
+                XCTAssertFalse(label.contains(forbidden))
+            }
+        }
+
+        let json = """
+        [
+          {"id":"pc-mislabeled","title":"Cyberpunk","description":"","category":"classic","platform":"PC","store":"steam","genre":"","collectionId":"","sizeBytes":0,"playtimeMinutes":10,"playtimeAvailable":true,"achievementsCollected":0,"achievementsTotal":0,"achievementsAvailable":false,"achievements":[],"storyCompleted":false,"favorite":false,"wantToPlay":false,"libraryStateRevision":0,"notes":{"whereStopped":"","objectives":"","tips":"","commands":"","revision":0,"updatedAt":""},"installed":true,"integrityStatus":"verified","lastPlayedAt":"","artworkPath":""},
+          {"id":"win-exe","title":"Installer.exe","description":"","category":"classic","platform":"gba","store":"local","genre":"","collectionId":"","sizeBytes":0,"playtimeMinutes":0,"playtimeAvailable":true,"achievementsCollected":0,"achievementsTotal":0,"achievementsAvailable":false,"achievements":[],"storyCompleted":false,"favorite":false,"wantToPlay":false,"libraryStateRevision":0,"notes":{"whereStopped":"","objectives":"","tips":"","commands":"","revision":0,"updatedAt":""},"installed":true,"integrityStatus":"verified","lastPlayedAt":"","artworkPath":""},
+          {"id":"steam-game","title":"Half-Life 2","description":"","category":"modern","platform":"Steam","store":"steam","genre":"","collectionId":"","sizeBytes":0,"playtimeMinutes":0,"playtimeAvailable":true,"achievementsCollected":0,"achievementsTotal":0,"achievementsAvailable":false,"achievements":[],"storyCompleted":false,"favorite":false,"wantToPlay":false,"libraryStateRevision":0,"notes":{"whereStopped":"","objectives":"","tips":"","commands":"","revision":0,"updatedAt":""},"installed":true,"integrityStatus":"verified","lastPlayedAt":"","artworkPath":""},
+          {"id":"pc-psp","title":"Crisis Core","description":"","category":"classic","platform":"PSP","store":"local","genre":"","collectionId":"","sizeBytes":0,"playtimeMinutes":0,"playtimeAvailable":true,"achievementsCollected":0,"achievementsTotal":0,"achievementsAvailable":false,"achievements":[],"storyCompleted":false,"favorite":false,"wantToPlay":false,"libraryStateRevision":0,"notes":{"whereStopped":"","objectives":"","tips":"","commands":"","revision":0,"updatedAt":""},"installed":true,"integrityStatus":"verified","lastPlayedAt":"","artworkPath":""}
+        ]
+        """.data(using: .utf8)!
+        let original = try JSONDecoder().decode([Game].self, from: json)
+        let localGba = ROMFolderGame(relativePath: "gba/minish.gba", filename: "minish.gba", title: "Minish Cap", fileSize: 1024)
+        let snapshot = GamingModeCatalog.buildSnapshot(local: [localGba], records: [], computer: original)
+        XCTAssertEqual(snapshot.library.map(\.id), ["pc:pc-psp", "local:gba/minish.gba"])
+        XCTAssertEqual(original.count, 4)
     }
 }

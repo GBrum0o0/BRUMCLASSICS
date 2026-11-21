@@ -17,8 +17,16 @@ enum ROMArtworkRules {
         case "gg": return "Sega_-_Game_Gear"
         case "pce": return "NEC_-_PC_Engine_-_TurboGrafx_16"
         case "neo": return "SNK_-_Neo_Geo"
+        case "cso": return "Sony_-_PlayStation_Portable"
         default: return nil
         }
+    }
+
+    static func repository(for rom: ROMFolderGame) -> String? {
+        if IntegratedEmulatorSupport.system(for: rom) == .playStationPortable {
+            return "Sony_-_PlayStation_Portable"
+        }
+        return repository(filename: rom.filename)
     }
 
     static func match(filename: String, paths: [String]) -> String? {
@@ -106,7 +114,7 @@ actor ROMArtworkCache {
     }
 
     func artwork(for rom: ROMFolderGame) async -> ROMArtwork? {
-        guard let repository = ROMArtworkRules.repository(filename: rom.filename) else { return nil }
+        guard let repository = ROMArtworkRules.repository(for: rom) else { return nil }
         let key = SHA256.hash(data: Data((repository + ":" + rom.filename).utf8)).map { String(format: "%02x", $0) }.joined()
         let metadataFile = root.appendingPathComponent(key + ".json")
         let imageFile = root.appendingPathComponent(key + ".png")
