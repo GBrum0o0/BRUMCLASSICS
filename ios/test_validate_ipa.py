@@ -30,7 +30,7 @@ class PackageValidationTests(unittest.TestCase):
                 include_ppsspp_assets=True, candidate_cpu=0x0100000C, candidate_licenses=True,
                 include_blastem_vendor_licenses=True,
                 experimental_build="37", display_name="BRUM Core Teste", release_build="55",
-                include_ppsspp_notices=True):
+                include_ppsspp_notices=True, include_rcheevos_license=True):
         path = Path(folder) / "test.ipa"
         root = f"Payload/{app}.app/"
         info = {"CFBundleIdentifier": "com.brumclassics.mobile.ios",
@@ -58,6 +58,9 @@ class PackageValidationTests(unittest.TestCase):
                         archive.writestr(root + "Frameworks/CoreAssets/PPSSPP/" + asset, "asset fixture")
                 if include_ppsspp_notices:
                     archive.writestr(root + "Frameworks/PPSSPP-THIRD-PARTY.txt", "third party fixture")
+            if (experimental is False and int(release_build) >= 57) or (experimental is True and int(experimental_build) >= 57):
+                if include_rcheevos_license:
+                    archive.writestr(root + "Frameworks/rcheevos-LICENSE.txt", "MIT rcheevos license " * 80)
             if experimental is True:
                 candidates = [
                     (include_n64, "mupen64plus_next_libretro_ios.dylib", "Mupen64Plus-Next-LICENSE.txt"),
@@ -181,6 +184,13 @@ class PackageValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             result = validate_ipa(self.fixture(folder, release_build="54", include_ppsspp=False))
             self.assertEqual(len(result["integratedCores"]), 8)
+
+    def test_build_57_requires_rcheevos_license(self):
+        with tempfile.TemporaryDirectory() as folder:
+            result = validate_ipa(self.fixture(folder, release_build="57"))
+            self.assertEqual(result["build"], "57")
+            with self.assertRaisesRegex(ValueError, "license is absent"):
+                validate_ipa(self.fixture(folder, release_build="57", include_rcheevos_license=False))
 
     def test_experimental_package_requires_all_candidates(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -1,46 +1,398 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 5f8082b59..b48720b14 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -28 +28 @@
+@@ -25,7 +25,7 @@ endif()
+ 
+ # Detect CPU from CMAKE configuration. Toolchains should set this up
+ if(CMAKE_SYSTEM_PROCESSOR)
 -	if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm")
 +	if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm" AND NOT ${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm64")
-@@ -46 +46 @@
+ 		set(ARM_DEVICE ON)
+ 		if(UNIX AND NOT APPLE)
+ 			execute_process(COMMAND cat /proc/cpuinfo OUTPUT_VARIABLE OUTSTR)
+@@ -43,7 +43,7 @@ if(CMAKE_SYSTEM_PROCESSOR)
+ 				set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -target armv7a-none-linux-android")
+ 			endif()
+ 		endif()
 -	elseif(${CMAKE_SYSTEM_PROCESSOR} MATCHES "^aarch64")
 +	elseif(${CMAKE_SYSTEM_PROCESSOR} MATCHES "^aarch64" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "^arm64")
-@@ -148,0 +149,3 @@
+ 		set(ARM64 ON)
+ 		add_definitions(-DARM64)
+ 	elseif(${CMAKE_SYSTEM_PROCESSOR} MATCHES "^amd64" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "^x86_64" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "^AMD64")
+@@ -146,6 +146,9 @@ endif()
+ if(LIBRETRO)
+ 	add_definitions(-D__LIBRETRO__)
+ 	add_definitions(-DGLEW_NO_GLU)
 +	if(IOS)
 +		add_definitions(-DPNG_ARM_NEON_OPT=0)
 +	endif()
-@@ -736 +736 @@
+ 	if(NOT MSVC)
+ 		add_compile_options(-fPIC)
+ 	endif()
+@@ -733,7 +736,7 @@ if(ANDROID)
+ 		android/jni/native-audio-so.h
+ 	)
+ 	# No target
 -elseif(IOS)
 +elseif(IOS AND NOT LIBRETRO)
-@@ -2039 +2039 @@
+ 	set(nativeExtra ${nativeExtra}
+ 		ios/main.mm
+ 		ios/AppDelegate.mm
+@@ -2036,7 +2039,7 @@ if(NOT ANDROID)
+ 	file(INSTALL assets/flash0 DESTINATION assets)
+ endif()
+ # packaging and code signing
 -if(IOS)
 +if(IOS AND NOT LIBRETRO)
+ 	set(DEPLOYMENT_TARGET 8.0)
+ 	file(GLOB IOSAssets ios/assets/*.png)
+ 	list(REMOVE_ITEM IOSAssets ${CMAKE_CURRENT_SOURCE_DIR}/ios/assets/Default-568h@2x.png)
+diff --git a/Common/MemoryUtil.cpp b/Common/MemoryUtil.cpp
+index 519bfc6bd..23ca1b9c2 100644
+--- a/Common/MemoryUtil.cpp
++++ b/Common/MemoryUtil.cpp
+@@ -118,6 +118,11 @@ static void *SearchForFreeMem(size_t size) {
+ // This is purposely not a full wrapper for virtualalloc/mmap, but it
+ // provides exactly the primitive operations that PPSSPP needs.
+ void *AllocateExecutableMemory(size_t size) {
++#if defined(IOS)
++	(void)size;
++	ERROR_LOG(MEMMAP, "AllocateExecutableMemory disabled on iOS without JIT.");
++	return nullptr;
++#endif
+ #if defined(_WIN32)
+ 	void *ptr = nullptr;
+ 	DWORD prot = PAGE_EXECUTE_READWRITE;
+@@ -287,6 +292,12 @@ bool PlatformIsWXExclusive() {
+ }
+ 
+ bool ProtectMemoryPages(const void* ptr, size_t size, uint32_t memProtFlags) {
++#if defined(IOS)
++	if (memProtFlags & MEM_PROT_EXEC) {
++		ERROR_LOG(MEMMAP, "PROT_EXEC rejected on iOS without JIT.");
++		return false;
++	}
++#endif
+ 	VERBOSE_LOG(JIT, "ProtectMemoryPages: %p (%d) : r%d w%d x%d", ptr, (int)size,
+ 			(memProtFlags & MEM_PROT_READ) != 0, (memProtFlags & MEM_PROT_WRITE) != 0, (memProtFlags & MEM_PROT_EXEC) != 0);
+ 
+diff --git a/Core/MemMap.cpp b/Core/MemMap.cpp
+index 9c7a2cce1..57bf0f9f5 100644
+--- a/Core/MemMap.cpp
++++ b/Core/MemMap.cpp
+@@ -226,12 +226,6 @@ bool MemoryMap_Setup(u32 flags) {
+ 		uintptr_t max_base_addr = 0x7FFF0000 - 0x10000000;
+ 		uintptr_t min_base_addr = 0x01000000;
+ 		uintptr_t stride = 0x400000;
+-#else
+-		// iOS
+-		uintptr_t max_base_addr = 0x1FFFF0000ULL - 0x80000000ULL;
+-		uintptr_t min_base_addr = 0x100000000ULL;
+-		uintptr_t stride = 0x800000;
+-#endif
+ 		for (uintptr_t base_addr = min_base_addr; base_addr < max_base_addr; base_addr += stride) {
+ 			base_attempts++;
+ 			base = (u8 *)base_addr;
+@@ -240,8 +234,25 @@ bool MemoryMap_Setup(u32 flags) {
+ 				return true;
+ 			}
+ 		}
++#else
++		// iOS 64-bit: ASLR on modern iOS may occupy 0x100000000..0x180000000; probe higher VA ranges too.
++		static const struct { uintptr_t min_addr; uintptr_t max_addr; uintptr_t stride; } ranges[] = {
++			{ 0x100000000ULL, 0x1FFFF0000ULL - 0x80000000ULL, 0x800000 },
++			{ 0x180000000ULL, 0x800000000ULL - 0x80000000ULL, 0x4000000 },
++		};
++		for (const auto &range : ranges) {
++			for (uintptr_t base_addr = range.min_addr; base_addr < range.max_addr; base_addr += range.stride) {
++				base_attempts++;
++				base = (u8 *)base_addr;
++				if (Memory_TryBase(flags)) {
++					INFO_LOG(MEMMAP, "Found valid memory base at %p after %i tries.", base, base_attempts);
++					return true;
++				}
++			}
++		}
++#endif
++		base = nullptr;
+ 		ERROR_LOG(MEMMAP, "MemoryMap_Setup: Failed finding a memory base.");
+-		PanicAlert("MemoryMap_Setup: Failed finding a memory base.");
+ 		return false;
+ 	}
+ 	else
+@@ -286,7 +297,10 @@ void Init() {
+ 			views[i].size = std::min(std::max((int)g_MemorySize - MAX_MMAP_SIZE * 2, 0), MAX_MMAP_SIZE);
+ 	}
+ 	int flags = 0;
+-	MemoryMap_Setup(flags);
++	if (!MemoryMap_Setup(flags)) {
++		base = nullptr;
++		return;
++	}
+ 
+ 	INFO_LOG(MEMMAP, "Memory system initialized. Base at %p (RAM at @ %p, uncached @ %p)",
+ 		base, m_pPhysicalRAM, m_pUncachedRAM);
+diff --git a/Core/System.cpp b/Core/System.cpp
+index eff04fbea..b09cb92cf 100644
+--- a/Core/System.cpp
++++ b/Core/System.cpp
+@@ -237,6 +237,11 @@ void CPU_Init() {
+ 	coreParameter.compat.Load(discID);
+ 
+ 	Memory::Init();
++	if (!Memory::base) {
++		coreParameter.errorString = "Failed to map PSP virtual memory.";
++		coreParameter.fileToStart = "";
++		return;
++	}
+ 	mipsr4k.Reset();
+ 
+ 	host->AttemptLoadSymbolMap();
+diff --git a/GPU/Common/DrawEngineCommon.cpp b/GPU/Common/DrawEngineCommon.cpp
+index 8b6638ed7..176790cab 100644
+--- a/GPU/Common/DrawEngineCommon.cpp
++++ b/GPU/Common/DrawEngineCommon.cpp
+@@ -34,7 +34,11 @@ enum {
+ };
+ 
+ DrawEngineCommon::DrawEngineCommon() : decoderMap_(16) {
+-	decJitCache_ = new VertexDecoderJitCache();
++#if defined(IOS)
++	decJitCache_ = nullptr;
++#else
++	decJitCache_ = g_Config.bVertexDecoderJit ? new VertexDecoderJitCache() : nullptr;
++#endif
+ 	transformed = (TransformedVertex *)AllocateMemoryPages(TRANSFORMED_VERTEX_BUFFER_SIZE, MEM_PROT_READ | MEM_PROT_WRITE);
+ 	transformedExpanded = (TransformedVertex *)AllocateMemoryPages(3 * TRANSFORMED_VERTEX_BUFFER_SIZE, MEM_PROT_READ | MEM_PROT_WRITE);
+ }
+@@ -163,7 +167,8 @@ static Vec3f ScreenToDrawing(const Vec3f& coords) {
+ }
+ 
+ void DrawEngineCommon::Resized() {
+-	decJitCache_->Clear();
++	if (decJitCache_)
++		decJitCache_->Clear();
+ 	lastVType_ = -1;
+ 	dec_ = nullptr;
+ 	decoderMap_.Iterate([&](const uint32_t vtype, VertexDecoder *decoder) {
+diff --git a/GPU/Common/DrawEngineCommon.h b/GPU/Common/DrawEngineCommon.h
+index ac735f90c..0bd67cd0a 100644
+--- a/GPU/Common/DrawEngineCommon.h
++++ b/GPU/Common/DrawEngineCommon.h
+@@ -92,7 +92,7 @@ class DrawEngineCommon {
+ 	virtual void Resized();
+ 
+ 	bool IsCodePtrVertexDecoder(const u8 *ptr) const {
+-		return decJitCache_->IsInSpace(ptr);
++		return decJitCache_ ? decJitCache_->IsInSpace(ptr) : false;
+ 	}
+ 	int GetNumDrawCalls() const {
+ 		return numDrawCalls;
+diff --git a/GPU/GLES/DrawEngineGLES.cpp b/GPU/GLES/DrawEngineGLES.cpp
+index 2f272def8..536665286 100644
+--- a/GPU/GLES/DrawEngineGLES.cpp
++++ b/GPU/GLES/DrawEngineGLES.cpp
+@@ -651,7 +651,7 @@ void DrawEngineGLES::DoFlush() {
+ }
+ 
+ bool DrawEngineGLES::IsCodePtrVertexDecoder(const u8 *ptr) const {
+-	return decJitCache_->IsInSpace(ptr);
++	return decJitCache_ ? decJitCache_->IsInSpace(ptr) : false;
+ }
+ 
+ void TessellationDataTransferGLES::SendDataToShader(const SimpleVertex *const *points, int size_u, int size_v, u32 vertType, const Spline::Weight2D &weights) {
 diff --git a/ext/native/thin3d/GLQueueRunner.cpp b/ext/native/thin3d/GLQueueRunner.cpp
+index 2ea228fcd..8912a4964 100644
 --- a/ext/native/thin3d/GLQueueRunner.cpp
 +++ b/ext/native/thin3d/GLQueueRunner.cpp
-@@ -18 +18 @@
+@@ -15,7 +15,7 @@
+ 
+ #define TEXCACHE_NAME_CACHE_SIZE 16
+ 
 -#ifdef IOS
 +#if defined(IOS) && !defined(__LIBRETRO__)
-@@ -1546 +1546 @@
+ extern void bindDefaultFBO();
+ #endif
+ 
+@@ -1543,7 +1543,7 @@ void GLQueueRunner::fbo_unbind() {
+ 	glBindFramebuffer(GL_FRAMEBUFFER, g_defaultFBO);
+ #endif
+ 
 -#ifdef IOS
 +#if defined(IOS) && !defined(__LIBRETRO__)
+ 	bindDefaultFBO();
+ #endif
+ 
 diff --git a/libretro/CMakeLists.txt b/libretro/CMakeLists.txt
+index b590cc25d..e1b15f187 100644
 --- a/libretro/CMakeLists.txt
 +++ b/libretro/CMakeLists.txt
-@@ -23,3 +23,3 @@
+@@ -20,7 +20,7 @@ if(ANDROID)
+ 	set_target_properties(ppsspp_libretro PROPERTIES SUFFIX "_android.so")
+ endif()
+ 
 -if(NOT MSVC)
 +if(NOT MSVC AND NOT APPLE)
     target_link_libraries(ppsspp_libretro "-Wl,-Bsymbolic")
  endif()
+ target_link_libraries(ppsspp_libretro ${LinkCommon})
+diff --git a/libretro/LibretroGraphicsContext.cpp b/libretro/LibretroGraphicsContext.cpp
+index 508353f6b..418d8d967 100644
+--- a/libretro/LibretroGraphicsContext.cpp
++++ b/libretro/LibretroGraphicsContext.cpp
+@@ -65,9 +65,11 @@ void LibretroHWRenderContext::ContextDestroy() {
+ #endif
+ 	}
+ 
+-	LostBackbuffer();
++	if (draw_)
++		LostBackbuffer();
+ 
+-	gpu->DeviceLost();
++	if (gpu)
++		gpu->DeviceLost();
+ 
+ 	if (!hw_render_.cache_context && !Libretro::useEmuThread) {
+ 		Shutdown();
 diff --git a/libretro/libretro.cpp b/libretro/libretro.cpp
+index 45185748c..f3e338ec4 100644
 --- a/libretro/libretro.cpp
 +++ b/libretro/libretro.cpp
-@@ -572,0 +573,6 @@
+@@ -4,6 +4,9 @@
+ #include <thread>
+ #include <atomic>
+ #include <vector>
 +#if defined(IOS)
-+	// BRUM iOS, 2026-11-21: sideload builds run without executable JIT memory.
++#include <pthread.h>
++#endif
+ 
+ #include "base/timeutil.h"
+ #include "Common/ChunkFile.h"
+@@ -284,15 +287,19 @@ static void check_variables(CoreParameter &coreParam) {
+ 		g_Config.iLanguage = get_language_auto();
+ 	}
+ 
+-	if (!PSP_IsInited() && ppsspp_internal_resolution.Update(&g_Config.iInternalResolution)) {
++	const bool resChanged = ppsspp_internal_resolution.Update(&g_Config.iInternalResolution);
++	if (!PSP_IsInited()) {
++		if (g_Config.iInternalResolution < 1)
++			g_Config.iInternalResolution = 1;
+ 		coreParam.pixelWidth = coreParam.renderWidth = g_Config.iInternalResolution * 480;
+ 		coreParam.pixelHeight = coreParam.renderHeight = g_Config.iInternalResolution * 272;
+-		if (gpu) {
+-			retro_system_av_info av_info;
+-			retro_get_system_av_info(&av_info);
+-			environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av_info);
+-			gpu->Resized();
+-		}
++	} else if (resChanged && gpu) {
++		coreParam.pixelWidth = coreParam.renderWidth = g_Config.iInternalResolution * 480;
++		coreParam.pixelHeight = coreParam.renderHeight = g_Config.iInternalResolution * 272;
++		retro_system_av_info av_info;
++		retro_get_system_av_info(&av_info);
++		environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av_info);
++		gpu->Resized();
+ 	}
+ 
+ 	if (ppsspp_texture_scaling_type.Update(&g_Config.iTexScalingType) && gpu) {
+@@ -385,7 +392,17 @@ namespace Libretro {
+ bool useEmuThread = false;
+ std::atomic<EmuThreadState> emuThreadState(EmuThreadState::DISABLED);
+ 
++#if defined(IOS)
++static pthread_t emuPthread;
++static bool emuPthreadValid = false;
++static void EmuThreadFunc();
++static void *EmuThreadEntry(void *) {
++	EmuThreadFunc();
++	return nullptr;
++}
++#else
+ static std::thread emuThread;
++#endif
+ static void EmuFrame() {
+ 	ctx->SetRenderTarget();
+ 	if (ctx->GetDrawContext()) {
+@@ -436,12 +453,20 @@ void EmuThreadStart() {
+ 
+ 	if (!wasPaused) {
+ 		ctx->ThreadStart();
++#if defined(IOS)
++		pthread_attr_t attr;
++		pthread_attr_init(&attr);
++		pthread_attr_setstacksize(&attr, 2 * 1024 * 1024);
++		emuPthreadValid = (pthread_create(&emuPthread, &attr, EmuThreadEntry, nullptr) == 0);
++		pthread_attr_destroy(&attr);
++#else
+ 		emuThread = std::thread(&EmuThreadFunc);
++#endif
+ 	}
+ }
+ 
+ void EmuThreadStop() {
+-	if (emuThreadState != EmuThreadState::RUNNING) {
++	if (emuThreadState != EmuThreadState::RUNNING && emuThreadState != EmuThreadState::START_REQUESTED && emuThreadState != EmuThreadState::PAUSED) {
+ 		return;
+ 	}
+ 
+@@ -452,8 +477,15 @@ void EmuThreadStop() {
+ 		continue;
+ 	}
+ 
++#if defined(IOS)
++	if (emuPthreadValid) {
++		pthread_join(emuPthread, nullptr);
++		emuPthreadValid = false;
++	}
++#else
+ 	emuThread.join();
+ 	emuThread = std::thread();
++#endif
+ 	ctx->ThreadEnd();
+ }
+ 
+@@ -570,6 +602,13 @@ bool retro_load_game(const struct retro_game_info *game) {
+ 	coreParam.cpuCore = CPUCore::JIT;
+ 	check_variables(coreParam);
+ 
++#if defined(IOS)
++	// BRUM iOS: sideloaded IPA builds run without executable JIT memory.
 +	coreParam.cpuCore = CPUCore::INTERPRETER;
 +	g_Config.iCpuCore = (int)CPUCore::INTERPRETER;
 +	g_Config.bVertexDecoderJit = false;
 +#endif
++
+ #if 0
+ 	g_Config.bVertexDecoderJit = (coreParam.cpuCore == CPU_JIT) ? true : false;
+ #endif
+@@ -716,6 +755,9 @@ struct SaveStart {
+ } // namespace SaveState
+ 
+ size_t retro_serialize_size(void) {
++	if (!PSP_IsInited() || !gpu)
++		return 0;
++
+ 	// TODO: Libretro API extension to use the savestate queue
+ 	if (useEmuThread) {
+ 		EmuThreadPause();
+@@ -726,6 +768,9 @@ size_t retro_serialize_size(void) {
+ }
+ 
+ bool retro_serialize(void *data, size_t size) {
++	if (!PSP_IsInited() || !gpu)
++		return false;
++
+ 	// TODO: Libretro API extension to use the savestate queue
+ 	if (useEmuThread) {
+ 		EmuThreadPause(); // Does nothing if already paused
+@@ -744,6 +789,9 @@ bool retro_serialize(void *data, size_t size) {
+ }
+ 
+ bool retro_unserialize(const void *data, size_t size) {
++	if (!PSP_IsInited() || !gpu)
++		return false;
++
+ 	// TODO: Libretro API extension to use the savestate queue
+ 	if (useEmuThread) {
+ 		EmuThreadPause(); // Does nothing if already paused

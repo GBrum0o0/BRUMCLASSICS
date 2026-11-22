@@ -159,4 +159,13 @@ final class BrumCoreStartupTests: XCTestCase {
             XCTAssertEqual(ready(), 1, controller.diagnosticsReport)
         }
     }
+
+    @MainActor func testPreFirstFrameSerializeSizeIsNotCalledAndJitIsDisabled() throws {
+        // Mode 'P' (80) traps inside retro_serialize_size if invoked before frame 1
+        // and verifies GET_JIT_CAPABLE == false and citra_use_cpu_jit == "disabled".
+        try withProbe(mode: 80) { controller, ready, _ in
+            controller.runFrame()
+            XCTAssertEqual(ready(), 1, controller.diagnosticsReport)
+        }
+    }
 }

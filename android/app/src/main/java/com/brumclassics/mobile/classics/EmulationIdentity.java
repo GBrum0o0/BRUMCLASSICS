@@ -97,6 +97,10 @@ public final class EmulationIdentity {
             }
         }
         if (length > 0xB2 && (header[0xB2] & 0xff) == 0x96) return new DetectedSystem("gba", "header");
+        if (length >= 4 && header[0] == '3' && header[1] == 'D' && header[2] == 'S' && header[3] == 'X') return new DetectedSystem("3ds", "header");
+        if (length >= 0x104 && header[0x100] == 'N' && header[0x101] == 'C' && (header[0x102] == 'S' || header[0x102] == 'C') && (header[0x103] == 'D' || header[0x103] == 'H')) {
+            return new DetectedSystem("3ds", "header");
+        }
         String extension = ClassicsRules.extension(filename).toLowerCase(Locale.ROOT);
         if ("iso".equals(extension) && containsAscii(header, length, "PSP GAME")) return new DetectedSystem("psp", "header");
         if (containsAscii(header, length, "BOOT2")) return new DetectedSystem("ps2", "header");
@@ -129,6 +133,8 @@ public final class EmulationIdentity {
                 return new DetectedSystem("ps2", "extension");
             case "neo":
                 return new DetectedSystem("neogeo", "extension");
+            case "3ds": case "cci": case "cxi": case "app": case "3dsx":
+                return new DetectedSystem("3ds", "extension");
             default:
                 break;
         }

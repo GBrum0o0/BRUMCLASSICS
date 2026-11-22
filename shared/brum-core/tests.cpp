@@ -5,6 +5,7 @@
 #include "VirtualControlInput.hpp"
 #include "FrameCadence.hpp"
 #include "ContentValidation.hpp"
+#include "AchievementDeduplicator.hpp"
 #include "../../ios/BRUMCLASSICSMobile/Libretro/BrumScreenProfiles.hpp"
 #include <cstdlib>
 #include <iostream>
@@ -256,5 +257,14 @@ int main() {
     check(!validAVTiming(60, 0));
     check(!validAVTiming(std::numeric_limits<double>::infinity(), 48000));
     check(!validAVTiming(60, std::numeric_limits<double>::quiet_NaN()));
+    brum::AchievementDeduplicator dedup(3);
+    check(dedup.markIfNew("ra:777:102", 777, "102", "First"));
+    check(!dedup.markIfNew("ra:777:102", 777, "102", "First"));
+    check(dedup.markIfNew("", 777, "103", "Second"));
+    check(!dedup.markIfNew("", 777, "103", "Second"));
+    check(dedup.markIfNew("", 777, "104", "Third"));
+    check(dedup.markIfNew("", 777, "105", "Fourth"));
+    // Capacity=3 evicted ra:777:102 cleanly.
+    check(dedup.markIfNew("ra:777:102", 777, "102", "First"));
     std::cout << "BRUM screen/input: " << checks << " checks passed\n";
 }

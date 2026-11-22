@@ -2,8 +2,10 @@ package com.brumclassics.mobile.murb;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -43,8 +45,23 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
     private int playerNumber = 1;
     private String p2Uri = "";
 
+    public static final String ACTION_ACHIEVEMENT_UNLOCKED = "com.brumclassics.mobile.ACHIEVEMENT_UNLOCKED";
+    public static volatile boolean activeOnForeground = false;
+
     private MurbRemoteClient client;
     private RemoteCanvasView canvasView;
+    private com.brumclassics.mobile.emulation.BrumAchievementOverlay achievementOverlay;
+    private final BroadcastReceiver achievementReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            String raw = intent == null ? null : intent.getStringExtra("payload");
+            if (raw == null || raw.isEmpty() || achievementOverlay == null) return;
+            try {
+                com.brumclassics.mobile.emulation.BrumAchievementOverlay.Payload popup =
+                    com.brumclassics.mobile.emulation.BrumAchievementOverlay.Payload.fromBridgeEvent(new org.json.JSONObject(raw));
+                if (popup != null) achievementOverlay.enqueue(popup);
+            } catch (Exception ignored) {}
+        }
+    };
     private TextView statusPill;
     private TextView modeToggle;
     private TextView scaleToggle;
@@ -152,6 +169,7 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
         root.addView(bar, new FrameLayout.LayoutParams(-1, -2));
 
         setContentView(root);
+        achievementOverlay = new com.brumclassics.mobile.emulation.BrumAchievementOverlay(this, root);
         updateDualScreenControls();
         updateStatusPill();
         startClient();
@@ -335,7 +353,20 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
         }
     }
 
+    @Override protected void onResume() {
+        super.onResume();
+        activeOnForeground = true;
+        IntentFilter filter = new IntentFilter(ACTION_ACHIEVEMENT_UNLOCKED);
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(achievementReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(achievementReceiver, filter);
+        }
+    }
+
     @Override protected void onPause() {
+        activeOnForeground = false;
+        try { unregisterReceiver(achievementReceiver); } catch (Exception ignored) {}
         physicalButtons = 0;
         physicalStickX = 0;
         physicalStickY = 0;
@@ -348,6 +379,10 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
     }
 
     @Override protected void onDestroy() {
+        if (achievementOverlay != null) {
+            achievementOverlay.destroy();
+            achievementOverlay = null;
+        }
         if (client != null) {
             client.disconnect();
             client = null;

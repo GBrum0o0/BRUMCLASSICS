@@ -467,7 +467,14 @@ final class AppStore: ObservableObject {
             }
             return
         }
-        guard ["ready", "library_changed", "companion_changed", "achievement_unlocked", "install_changed", "notes_changed", "library_state_changed", "collections_changed", "activity_changed", "profile_changed", "notifications_changed"].contains(event["type"] as? String ?? "") else { return }
+        if event["type"] as? String == "achievement_unlocked" {
+            if let payload = BrumAchievementOverlayPayload.fromBridgeEvent(event) {
+                BrumAchievementOverlayCoordinator.shared.enqueue(payload)
+            }
+            await refresh()
+            return
+        }
+        guard ["ready", "library_changed", "companion_changed", "install_changed", "notes_changed", "library_state_changed", "collections_changed", "activity_changed", "profile_changed", "notifications_changed"].contains(event["type"] as? String ?? "") else { return }
         await refresh()
     }
 }

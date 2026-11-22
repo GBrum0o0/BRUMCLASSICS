@@ -13,7 +13,8 @@ public final class ClassicsRules {
     private static final Set<String> EXTENSIONS = new HashSet<>(Arrays.asList(
         "gba", "gb", "gbc", "nes", "sfc", "smc", "n64", "z64", "v64", "nds",
         "sms", "gg", "md", "gen", "pce", "chd", "pbp", "iso", "cso", "rvz",
-        "cue", "m3u", "gdi", "wad", "zip", "elf", "isz", "neo", "ws", "wsc"
+        "cue", "m3u", "gdi", "wad", "zip", "elf", "isz", "neo", "ws", "wsc",
+        "3ds", "cci", "cxi", "app", "3dsx"
     ));
 
     private ClassicsRules() {}

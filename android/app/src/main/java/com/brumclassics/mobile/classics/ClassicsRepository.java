@@ -102,11 +102,51 @@ public final class ClassicsRepository {
     public String runtimeFolderName() { return preferences.getString("runtime_tree_name", "Runtime Logs"); }
     public String raUsername() { return secrets.get("ra_username"); }
     public String raKey() { return secrets.get("ra_key"); }
+    public String raRuntimeToken() { return secrets.get("ra_runtime_token"); }
 
     public void configureRetroAchievements(String username, String key) throws Exception {
         String cleanUser = username == null ? "" : username.trim(); String cleanKey = key == null ? "" : key.trim();
-        if (cleanUser.isEmpty() || cleanKey.isEmpty()) throw new IllegalArgumentException("Preencha usuário e Web API Key.");
-        secrets.put("ra_username", cleanUser); secrets.put("ra_key", cleanKey);
+        if (cleanUser.isEmpty() || (cleanKey.isEmpty() && raRuntimeToken().isEmpty())) throw new IllegalArgumentException("Preencha usuário e Web API Key.");
+        secrets.put("ra_username", cleanUser);
+        if (!cleanKey.isEmpty()) secrets.put("ra_key", cleanKey);
+    }
+
+    public String loginRetroAchievementsRuntime(String username, String password) throws Exception {
+        String cleanUser = username == null ? "" : username.trim();
+        String pass = password == null ? "" : password;
+        if (cleanUser.isEmpty() || pass.isEmpty()) throw new IllegalArgumentException("Informe usuário e senha RetroAchievements.");
+        String body = "r=login2&u=" + java.net.URLEncoder.encode(cleanUser, "UTF-8")
+            + "&p=" + java.net.URLEncoder.encode(pass, "UTF-8");
+        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) new java.net.URL("https://retroachievements.org/dorequest.php").openConnection();
+        conn.setRequestMethod("POST");
+        conn.setDoOutput(true);
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(15000);
+        conn.setRequestProperty("User-Agent", "BRUMCLASSICSAndroid/0.34.0");
+        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+        try {
+            byte[] payload = body.getBytes(StandardCharsets.UTF_8);
+            try (java.io.OutputStream out = conn.getOutputStream()) { out.write(payload); }
+            int code = conn.getResponseCode();
+            InputStream stream = code >= 200 && code < 400 ? conn.getInputStream() : conn.getErrorStream();
+            String resp = stream == null ? "" : new String(readAll(stream, 1024 * 1024), StandardCharsets.UTF_8);
+            JSONObject json = new JSONObject(resp);
+            if (code < 200 || code >= 300 || !json.optBoolean("Success", false)) {
+                throw new IllegalStateException(json.optString("Error", "Falha no login RetroAchievements."));
+            }
+            String token = json.optString("Token", "").trim();
+            if (token.isEmpty()) throw new IllegalStateException("Servidor não retornou token de sessão.");
+            String canonUser = json.optString("User", cleanUser).trim();
+            secrets.put("ra_username", canonUser.isEmpty() ? cleanUser : canonUser);
+            secrets.put("ra_runtime_token", token);
+            return secrets.get("ra_username");
+        } finally {
+            conn.disconnect();
+        }
+    }
+
+    public void clearRetroAchievementsRuntimeToken() throws Exception {
+        secrets.put("ra_runtime_token", "");
     }
 
     public synchronized List<LocalClassic> configureRomTree(Uri tree) throws Exception {
@@ -218,6 +258,20 @@ public final class ClassicsRepository {
             throw new IllegalStateException("Não foi possível criar a pasta segura de saves.");
         }
         if ("psp".equals(stored.systemId)) CoreAssets.installPpsspp(context.getAssets(), systemDirectory);
+        if ("3ds".equals(stored.systemId)) {
+            File sysdata = new File(new File(systemDirectory, "Azahar"), "sysdata");
+            if (!sysdata.isDirectory()) sysdata.mkdirs();
+            for (String keyFile : new String[]{"aes_keys.txt", "seeddb.bin"}) {
+                File src = new File(systemDirectory, keyFile);
+                File dst = new File(sysdata, keyFile);
+                if (src.isFile() && (!dst.isFile() || dst.length() != src.length())) {
+                    try (FileInputStream in = new FileInputStream(src); FileOutputStream out = new FileOutputStream(dst)) {
+                        byte[] buf = new byte[65536]; int n;
+                        while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                    } catch (Exception ignored) {}
+                }
+            }
+        }
         if ("neogeo".equals(stored.systemId) &&
             !new File(systemDirectory, "aes.zip").isFile() && !new File(systemDirectory, "neogeo.zip").isFile()) {
             throw new IllegalStateException("BIOS do Neo Geo ausente. Coloque aes.zip ou neogeo.zip dentro da pasta de ROMs e verifique a pasta novamente.");
@@ -359,6 +413,10 @@ public final class ClassicsRepository {
                     if (name == null || size <= 0 || size > MAX_ROM_BYTES) continue;
                     Uri document = DocumentsContract.buildDocumentUriUsingTree(tree, documentId);
                     if (isNeoGeoFirmware(name)) { installFirmware(document, name, size); continue; }
+                    if ("aes_keys.txt".equalsIgnoreCase(name) || "seeddb.bin".equalsIgnoreCase(name)) {
+                        installFirmware(document, name, size);
+                        continue;
+                    }
                     if (!ClassicsRules.accepts(name)) continue;
                     String id = sha256(document.toString());
                     LocalClassic game = previous.get(id);

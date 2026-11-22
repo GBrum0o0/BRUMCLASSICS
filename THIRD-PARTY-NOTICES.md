@@ -34,6 +34,8 @@ O aplicativo móvel, licenciado sob GPL-3.0-or-later, também empacota os seguin
 - Beetle PCE Fast (PC Engine/TurboGrafx-16 em cartucho), GPL-2.0-or-later, revisão `3f946f277aef3aa99a95551618bbcd1dd2bda0d9`: https://github.com/libretro/beetle-pce-fast-libretro
 - bsnes-mercury Performance (SNES/Super Famicom), GPL-3.0, revisão `79d7f9de218b6ffa65a80bbdc5828532bc239232`: https://github.com/libretro/bsnes-mercury
 - PPSSPP (PSP), GPL-2.0-or-later, revisão `7b4ddb426bbe9e287bb7f19b0cfaebb4ea0d41d8`: https://github.com/libretro/ppsspp. Incluído nas builds normais Android/iOS a partir de 0.32.0/0.22.0; iOS executa sem JIT. O núcleo mantém autoria de Henrik Rydgård e demais colaboradores. Scripts e patches públicos registram as adaptações e empacotam os avisos dos componentes utilizados; consulte `docs/PSP-MOBILE.md`.
+- Azahar (Nintendo 3DS), GPL-2.0-or-later, revisão `9e6f523a57fac9564ac0bf8286db3c3702d301ec`: https://github.com/azahar-emu/azahar. Incluído no build ARM64 Android (GLES3 + Dynarmic, sem keyblob proprietário embutido; aceita chaves fornecidas pelo usuário em `Azahar/sysdata/`). No iOS permanece experimental por software sem JIT.
+- rcheevos (runtime e cálculo de hashes RetroAchievements), MIT, versão `v12.5.0` (revisão `1433173220a7eaede6a9ed7a18e94117be1821e0`): https://github.com/RetroAchievements/rcheevos. Licença integral em `LICENSES/rcheevos-LICENSE.txt` e empacotada nos builds PC e móveis.
 
 ## Candidatos no IPA experimental iOS
 

@@ -17,6 +17,11 @@ public final class IntegratedEmulatorLaunchTest {
         if (launch.retroAchievementsGameId != 1234) throw new AssertionError("ID RetroAchievements não foi preservado.");
         if (RetroAchievementsConsole.idForSystem("gba") != 5) throw new AssertionError("Console GBA incorreto.");
         if (RetroAchievementsConsole.idForSystem("neogeo") != 27) throw new AssertionError("Console Arcade/Neo Geo incorreto.");
+        if (RetroAchievementsConsole.idForSystem("psp") != 41) throw new AssertionError("Console PSP incorreto.");
+        if (RetroAchievementsConsole.idForSystem("3ds") != 0) throw new AssertionError("Nintendo 3DS não tem suporte RetroAchievements oficial.");
+        if (!"libazahar_libretro.so".equals(com.brumclassics.mobile.classics.CoreRegistry.integratedCore("3ds", "game.cci").androidLibraryName)) {
+            throw new AssertionError("Biblioteca Azahar 3DS incorreta.");
+        }
         System.out.println("IntegratedEmulatorLaunchTest: OK");
     }
 

@@ -1,7 +1,53 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(brumcore LANGUAGES C CXX)
 
-add_library(brumcore SHARED brum_core.cpp)
+set(RCHEEVOS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../third_party/rcheevos")
+set(BRUM_SHARED_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../shared/brum-core")
+set(RCHEEVOS_SOURCES
+    "${RCHEEVOS_ROOT}/src/rc_client.c"
+    "${RCHEEVOS_ROOT}/src/rc_compat.c"
+    "${RCHEEVOS_ROOT}/src/rc_libretro.c"
+    "${RCHEEVOS_ROOT}/src/rc_util.c"
+    "${RCHEEVOS_ROOT}/src/rc_version.c"
+    "${RCHEEVOS_ROOT}/src/rapi/rc_api_common.c"
+    "${RCHEEVOS_ROOT}/src/rapi/rc_api_info.c"
+    "${RCHEEVOS_ROOT}/src/rapi/rc_api_runtime.c"
+    "${RCHEEVOS_ROOT}/src/rapi/rc_api_user.c"
+    "${RCHEEVOS_ROOT}/src/rcheevos/alloc.c"
+    "${RCHEEVOS_ROOT}/src/rcheevos/condition.c"
+    "${RCHEEVOS_ROOT}/src/rcheevos/condset.c"
+    "${RCHEEVOS_ROOT}/src/rcheevos/consoleinfo.c"
+    "${RCHEEVOS_ROOT}/src/rcheevos/format.c"
+    "${RCHEEVOS_ROOT}/src/rcheevos/lboard.c"
+    "${RCHEEVOS_ROOT}/src/rcheevos/memref.c"
+    "${RCHEEVOS_ROOT}/src/rcheevos/operand.c"
+    "${RCHEEVOS_ROOT}/src/rcheevos/rc_validate.c"
+    "${RCHEEVOS_ROOT}/src/rcheevos/richpresence.c"
+    "${RCHEEVOS_ROOT}/src/rcheevos/runtime.c"
+    "${RCHEEVOS_ROOT}/src/rcheevos/runtime_progress.c"
+    "${RCHEEVOS_ROOT}/src/rcheevos/trigger.c"
+    "${RCHEEVOS_ROOT}/src/rcheevos/value.c"
+    "${RCHEEVOS_ROOT}/src/rhash/aes.c"
+    "${RCHEEVOS_ROOT}/src/rhash/cdreader.c"
+    "${RCHEEVOS_ROOT}/src/rhash/hash.c"
+    "${RCHEEVOS_ROOT}/src/rhash/hash_disc.c"
+    "${RCHEEVOS_ROOT}/src/rhash/hash_encrypted.c"
+    "${RCHEEVOS_ROOT}/src/rhash/hash_rom.c"
+    "${RCHEEVOS_ROOT}/src/rhash/hash_zip.c"
+    "${RCHEEVOS_ROOT}/src/rhash/md5.c"
+)
+set_source_files_properties(${RCHEEVOS_SOURCES} PROPERTIES COMPILE_OPTIONS "-w")
+
+add_library(brumcore SHARED
+    brum_core.cpp
+    "${BRUM_SHARED_ROOT}/RetroAchievementsRuntime.cpp"
+    ${RCHEEVOS_SOURCES})
+target_include_directories(brumcore PRIVATE
+    "${RCHEEVOS_ROOT}/include"
+    "${RCHEEVOS_ROOT}/src"
+    "${BRUM_SHARED_ROOT}"
+    "${BRUM_SHARED_ROOT}/libretro_shim")
+target_compile_definitions(brumcore PRIVATE RC_DISABLE_LUA=1 RC_CLIENT_SUPPORTS_HASH=1)
 target_compile_features(brumcore PRIVATE cxx_std_17)
 target_compile_options(brumcore PRIVATE -Wall -Wextra -Werror=return-type)
 target_link_libraries(brumcore PRIVATE android log dl EGL GLESv3)

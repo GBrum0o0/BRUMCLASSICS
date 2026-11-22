@@ -8,14 +8,40 @@ settings:
     SWIFT_VERSION: "5.9"
     SWIFT_OBJC_BRIDGING_HEADER: BRUMCLASSICSMobile/BRUMCLASSICSMobile-Bridging-Header.h
     CLANG_CXX_LANGUAGE_STANDARD: c++17
-    CURRENT_PROJECT_VERSION: 56
-    MARKETING_VERSION: 0.23.0
+    CURRENT_PROJECT_VERSION: 57
+    MARKETING_VERSION: 0.24.0
+    HEADER_SEARCH_PATHS:
+      - $(inherited)
+      - ../third_party/rcheevos/include
+      - ../third_party/rcheevos/src
+      - ../shared/brum-core
+      - ../shared/brum-core/libretro_shim
+    GCC_PREPROCESSOR_DEFINITIONS:
+      - $(inherited)
+      - RC_DISABLE_LUA=1
+      - RC_CLIENT_SUPPORTS_HASH=1
 targets:
   BRUMCLASSICSMobile:
     type: application
     platform: iOS
     sources:
       - path: BRUMCLASSICSMobile
+      - path: ../shared/brum-core/RetroAchievementsRuntime.cpp
+        compilerFlags:
+          - -DRC_DISABLE_LUA=1
+          - -DRC_CLIENT_SUPPORTS_HASH=1
+      - path: ../third_party/rcheevos/src
+        excludes:
+          - "rc_client_external.c"
+          - "rc_client_external.h"
+          - "rc_client_external_versions.h"
+          - "rc_client_raintegration.c"
+          - "rc_client_raintegration_internal.h"
+          - "rapi/rc_api_editor.c"
+        compilerFlags:
+          - -DRC_DISABLE_LUA=1
+          - -DRC_CLIENT_SUPPORTS_HASH=1
+          - -w
     dependencies:
       - sdk: AudioToolbox.framework
       - sdk: AVFoundation.framework
@@ -38,16 +64,60 @@ targets:
     type: bundle.unit-test
     platform: iOS
     sources:
+      - path: BRUMCLASSICSMobile
+      - path: ../shared/brum-core/RetroAchievementsRuntime.cpp
+        compilerFlags:
+          - -DRC_DISABLE_LUA=1
+          - -DRC_CLIENT_SUPPORTS_HASH=1
+      - path: ../third_party/rcheevos/src
+        excludes:
+          - "rc_client_external.c"
+          - "rc_client_external.h"
+          - "rc_client_external_versions.h"
+          - "rc_client_raintegration.c"
+          - "rc_client_raintegration_internal.h"
+          - "rapi/rc_api_editor.c"
+        compilerFlags:
+          - -DRC_DISABLE_LUA=1
+          - -DRC_CLIENT_SUPPORTS_HASH=1
+          - -w
       - path: BRUMCLASSICSMobileTests
         excludes: [Fixtures]
       - path: build/test-fixtures/BrumTestCore.dylib
         buildPhase: resources
     dependencies:
       - target: BRUMCLASSICSMobile
+      - sdk: AudioToolbox.framework
+      - sdk: AVFoundation.framework
+      - sdk: GameController.framework
+      - sdk: OpenGLES.framework
+      - sdk: QuartzCore.framework
   BRUMCLASSICSMobileUITests:
     type: bundle.ui-testing
     platform: iOS
     sources:
+      - path: BRUMCLASSICSMobile
+      - path: ../shared/brum-core/RetroAchievementsRuntime.cpp
+        compilerFlags:
+          - -DRC_DISABLE_LUA=1
+          - -DRC_CLIENT_SUPPORTS_HASH=1
+      - path: ../third_party/rcheevos/src
+        excludes:
+          - "rc_client_external.c"
+          - "rc_client_external.h"
+          - "rc_client_external_versions.h"
+          - "rc_client_raintegration.c"
+          - "rc_client_raintegration_internal.h"
+          - "rapi/rc_api_editor.c"
+        compilerFlags:
+          - -DRC_DISABLE_LUA=1
+          - -DRC_CLIENT_SUPPORTS_HASH=1
+          - -w
       - path: BRUMCLASSICSMobileUITests
     dependencies:
       - target: BRUMCLASSICSMobile
+      - sdk: AudioToolbox.framework
+      - sdk: AVFoundation.framework
+      - sdk: GameController.framework
+      - sdk: OpenGLES.framework
+      - sdk: QuartzCore.framework

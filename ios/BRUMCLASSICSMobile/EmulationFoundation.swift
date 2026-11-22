@@ -1,4 +1,5 @@
 import CryptoKit
+import Darwin
 import Foundation
 
 enum EmulatedSystemID: String, Codable, CaseIterable, Sendable {
@@ -328,19 +329,40 @@ enum ROMContentInspector {
         0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E
     ]
 
-    static func inspect(url: URL, filename: String, expectedSystem: EmulatedSystemID? = nil) throws -> CanonicalGameIdentity {
-        let handle = try FileHandle(forReadingFrom: url)
-        defer { try? handle.close() }
+    private static func streamFile(_ url: URL, chunkHandler: (UnsafeRawBufferPointer) -> Void) throws {
+        let fd = Darwin.open(url.path, O_RDONLY)
+        if fd < 0 {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+        defer { Darwin.close(fd) }
 
+        let capacity = 1_048_576
+        let buffer = UnsafeMutableRawPointer.allocate(byteCount: capacity, alignment: 64)
+        defer { buffer.deallocate() }
+
+        while true {
+            let bytesRead = Darwin.read(fd, buffer, capacity)
+            if bytesRead > 0 {
+                chunkHandler(UnsafeRawBufferPointer(start: buffer, count: bytesRead))
+            } else if bytesRead == 0 {
+                break
+            } else if errno == EINTR {
+                continue
+            } else {
+                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            }
+        }
+    }
+
+    static func inspect(url: URL, filename: String, expectedSystem: EmulatedSystemID? = nil) throws -> CanonicalGameIdentity {
         var hasher = SHA256()
         var header = Data()
-        while true {
-            let chunk = try handle.read(upToCount: 1_048_576) ?? Data()
-            if chunk.isEmpty { break }
-            if header.count < 512 {
-                header.append(chunk.prefix(512 - header.count))
+        try streamFile(url) { chunk in
+            if header.count < 512, let base = chunk.baseAddress {
+                let take = min(chunk.count, 512 - header.count)
+                header.append(UnsafeRawBufferPointer(start: base, count: take).bindMemory(to: UInt8.self))
             }
-            hasher.update(data: chunk)
+            hasher.update(bufferPointer: chunk)
         }
         guard !header.isEmpty else {
             throw PocketError.message("A ROM está vazia e não pode ser identificada.")
@@ -351,10 +373,10 @@ enum ROMContentInspector {
             var discHasher = SHA256()
             discHasher.update(data: Data("BRUM-DISC-SET-v1\0".utf8))
             for file in try ROMExportStager.contentFiles(for: url) {
-                let input = try FileHandle(forReadingFrom: file)
-                defer { try? input.close() }
                 var fileHasher = SHA256()
-                while let chunk = try input.read(upToCount: 1_048_576), !chunk.isEmpty { fileHasher.update(data: chunk) }
+                try streamFile(file) { chunk in
+                    fileHasher.update(bufferPointer: chunk)
+                }
                 discHasher.update(data: Data(fileHasher.finalize()))
             }
             hasher = discHasher

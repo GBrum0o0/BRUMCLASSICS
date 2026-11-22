@@ -9,6 +9,7 @@
 #define BRUM_RETRO_DEVICE_ANALOG 5
 #define BRUM_RETRO_DEVICE_POINTER 6
 #define BRUM_RETRO_MEMORY_SAVE_RAM 0
+#define BRUM_RETRO_MEMORY_SYSTEM_RAM 2
 
 #define BRUM_RETRO_DEVICE_ID_POINTER_X 0
 #define BRUM_RETRO_DEVICE_ID_POINTER_Y 1
@@ -30,10 +31,14 @@
 #define BRUM_RETRO_ENVIRONMENT_GET_LOG_INTERFACE 27
 #define BRUM_RETRO_ENVIRONMENT_GET_CORE_ASSETS_DIRECTORY 30
 #define BRUM_RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY 31
+#define BRUM_RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO 32
+#define BRUM_RETRO_ENVIRONMENT_SET_MEMORY_MAPS (36 | 0x10000)
+#define BRUM_RETRO_ENVIRONMENT_SET_GEOMETRY 37
 #define BRUM_RETRO_ENVIRONMENT_GET_LANGUAGE 39
 #define BRUM_RETRO_ENVIRONMENT_SET_HW_SHARED_CONTEXT (44 | 0x10000)
 #define BRUM_RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE (47 | 0x10000)
 #define BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2_INTL 68
+#define BRUM_RETRO_ENVIRONMENT_GET_JIT_CAPABLE 74
 
 #define BRUM_RETRO_PIXEL_FORMAT_0RGB1555 0
 #define BRUM_RETRO_PIXEL_FORMAT_XRGB8888 1
@@ -77,3 +82,19 @@ typedef struct {
     brum_retro_hw_context_reset_t context_destroy;
     bool debug_context;
 } brum_retro_hw_render_callback;
+
+typedef struct {
+    uint64_t flags;
+    void *ptr;
+    size_t offset;
+    size_t start;
+    size_t select;
+    size_t disconnect;
+    size_t len;
+    const char *addrspace;
+} brum_retro_memory_descriptor;
+
+typedef struct {
+    const brum_retro_memory_descriptor *descriptors;
+    unsigned num_descriptors;
+} brum_retro_memory_map;

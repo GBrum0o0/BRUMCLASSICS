@@ -8,11 +8,14 @@ struct BRUMCLASSICSMobileApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environmentObject(store)
-                .environmentObject(pocket)
-                .task { await pocket.restore(); await pocket.sync(launcher: store) }
-                .preferredColorScheme(.dark)
+            ZStack {
+                RootView()
+                    .environmentObject(store)
+                    .environmentObject(pocket)
+                    .task { await pocket.restore(); await pocket.sync(launcher: store) }
+                BrumAchievementOverlayContainer()
+            }
+            .preferredColorScheme(.dark)
                 .tint(BrumTheme.primary)
                 .onOpenURL { url in
                     Task {

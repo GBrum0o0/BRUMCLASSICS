@@ -65,7 +65,11 @@ public final class CoreRegistry {
         "bsnes-mercury-performance", "bsnes-mercury Performance", "79d7f9de218b6ffa65a80bbdc5828532bc239232", "GPL-3.0",
         "libbsnes_mercury_performance_libretro.so", "sfc", "smc"
     );
-    private static final Descriptor[] INTEGRATED = { MGBA, SKYEMU, PLAY, PPSSPP, GEOLITH, GEARSYSTEM, NESTOPIA, BEETLE_PCE_FAST, BEETLE_WSWAN, BSNES_MERCURY };
+    public static final Descriptor AZAHAR = new Descriptor(
+        "azahar", "Azahar", "9e6f523a57fac9564ac0bf8286db3c3702d301ec", "GPL-2.0-or-later",
+        "libazahar_libretro.so", "3ds", "cci", "cxi", "app", "3dsx"
+    );
+    private static final Descriptor[] INTEGRATED = { MGBA, SKYEMU, PLAY, PPSSPP, AZAHAR, GEOLITH, GEARSYSTEM, NESTOPIA, BEETLE_PCE_FAST, BEETLE_WSWAN, BSNES_MERCURY };
 
     private CoreRegistry() {}
 
@@ -88,6 +92,7 @@ public final class CoreRegistry {
         if ("ws".equals(extension) || "wsc".equals(extension)) return "mednafen_wswan";
         if ("elf".equals(extension) || "isz".equals(extension) || "ps2".equals(systemId)) return "play";
         if ("neo".equals(extension) || "neogeo".equals(systemId)) return "geolith";
+        if ("3ds".equals(systemId) || "3ds".equals(extension) || "cci".equals(extension) || "cxi".equals(extension) || "3dsx".equals(extension)) return "azahar";
         return null;
     }
 

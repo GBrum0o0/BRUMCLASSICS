@@ -419,10 +419,55 @@ actor ROMFolderAccess {
                 let refreshed = try root.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
                 UserDefaults.standard.set(refreshed, forKey: bookmarkKey)
             }
-            return try ROMExportStager.stageDiscSet(source: source, filename: game.filename, root: integratedRoot, id: UUID())
+            return try Self.reuseOrStageIntegratedFile(source: source, game: game, root: integratedRoot)
         } catch {
             throw PocketError.message("Não foi possível preparar a ROM: \(error.localizedDescription). Se estiver no iCloud, baixe todos os arquivos do jogo; se necessário, reautorize a pasta em Configurações → CLASSICS.")
         }
+    }
+
+    private struct IntegratedStageManifest: Codable {
+        let sourcePath: String
+        let fileSize: Int64
+        let modifiedTime: TimeInterval
+    }
+
+    private static func reuseOrStageIntegratedFile(source: URL, game: ROMFolderGame, root: URL) throws -> URL {
+        let ext = source.pathExtension.lowercased()
+        let isDiscDescriptor = ["cue", "m3u", "gdi"].contains(ext)
+        if !isDiscDescriptor {
+            let sourceValues = try CoordinatedFileAccess.read(source) { coordinated -> (Int64, TimeInterval) in
+                let v = try coordinated.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+                return (Int64(v.fileSize ?? 0), v.contentModificationDate?.timeIntervalSince1970 ?? 0)
+            }
+            let keyData = SHA256.hash(data: Data("\(game.relativePath)|\(sourceValues.0)".utf8))
+            let cacheFolderName = "cache-" + keyData.prefix(12).map { String(format: "%02x", $0) }.joined()
+            let cacheDir = root.appendingPathComponent(cacheFolderName, isDirectory: true)
+            let cachedFile = cacheDir.appendingPathComponent(game.filename, isDirectory: false)
+            let manifestFile = cacheDir.appendingPathComponent(".brum-stage.json", isDirectory: false)
+            if FileManager.default.fileExists(atPath: cachedFile.path),
+               let cachedSize = try? cachedFile.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+               Int64(cachedSize) == sourceValues.0,
+               let manifestData = try? Data(contentsOf: manifestFile),
+               let manifest = try? JSONDecoder().decode(IntegratedStageManifest.self, from: manifestData),
+               manifest.sourcePath == game.relativePath,
+               manifest.fileSize == sourceValues.0,
+               abs(manifest.modifiedTime - sourceValues.1) < 1.0 {
+                try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: cacheDir.path)
+                return cachedFile
+            }
+            try? FileManager.default.removeItem(at: cacheDir)
+            let staged = try ROMExportStager.stage(source: source, filename: game.filename, root: root, id: UUID())
+            let stagedDir = staged.deletingLastPathComponent()
+            if (try? FileManager.default.moveItem(at: stagedDir, to: cacheDir)) != nil {
+                let manifest = IntegratedStageManifest(sourcePath: game.relativePath, fileSize: sourceValues.0, modifiedTime: sourceValues.1)
+                if let encoded = try? JSONEncoder().encode(manifest) {
+                    try? encoded.write(to: manifestFile, options: [.atomic])
+                }
+                return cacheDir.appendingPathComponent(game.filename, isDirectory: false)
+            }
+            return staged
+        }
+        return try ROMExportStager.stageDiscSet(source: source, filename: game.filename, root: root, id: UUID())
     }
 
     func finishShare(_ id: UUID) {

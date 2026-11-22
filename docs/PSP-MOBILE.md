@@ -11,11 +11,17 @@ O Gaming Mode executa PSP dentro do aplicativo, por meio do núcleo PPSSPP Libre
 
 ## iPhone
 
-A IPA destinada ao Sideloadly usa o interpretador do PPSSPP, sem depender de ativação de JIT ou permissões especiais. Isso pode reduzir bastante o desempenho dependendo do jogo e do aparelho. A inclusão do núcleo não garante 60 FPS nem compatibilidade com toda a biblioteca de PSP.
+A IPA destinada ao Sideloadly usa o interpretador do PPSSPP, sem depender de ativação de JIT ou permissões especiais. Na revisão `0.24.0` (build `57`), foram corrigidas causas reais de fechamento na abertura de `.iso` no iPhone:
+
+- inspeção e hash por streaming POSIX (`open`/`read` com buffer fixo de 1 MB) em `EmulationFoundation.swift`, eliminando o acúmulo de objetos autorelease/OOM (Jetsam) em imagens grandes;
+- guardas pré-1º frame para `retro_serialize_size`/`retro_serialize` antes de `!PSP_IsInited() || !gpu`, inicialização incondicional de resolução ao relançar o jogo no mesmo processo e proteção de `decJitCache_` nulo e contexto GL em `ContextDestroy` (`ios/patches/ppsspp-ios-libretro.patch`);
+- remoção estrita de `PROT_EXEC`/`mprotect` executável em `Common/MemoryUtil.cpp` no iOS sem JIT, pilha `pthread` de 2 MB na `EmuThread` e sondagem ASLR ampliada em `Core/System.cpp`.
+
+Isso pode reduzir bastante o desempenho dependendo do jogo e do aparelho. A inclusão do núcleo não garante 60 FPS nem compatibilidade com toda a biblioteca de PSP.
 
 ## Validação
 
-O build e os testes de contratos verificam integração, arquivos de apoio e empacotamento. São distintos da validação física de imagem, áudio, comandos e persistência.
+O build e os testes de contratos (incluindo patches `--unidiff-zero`, `BrumTestCore` com simulação pré-1º frame e inspector streaming em `.iso` multi-chunk) verificam integração, arquivos de apoio e empacotamento. São distintos da validação física de imagem, áudio, comandos e persistência em aparelho real, que continua marcada como **aguarda validação no aparelho** até confirmação em gameplay no iPhone e no Android.
 
 Para confirmar um jogo, registre título/hash, versão do aplicativo, aparelho, passos e pelo menos cinco minutos de gameplay ativo. Verifique movimento, menus, áudio, encerramento e recuperação por **Continue** quando o jogo oferecer save. Sem essa execução, o resultado permanece **aguarda validação no aparelho**.
 

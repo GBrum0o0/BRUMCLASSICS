@@ -60,6 +60,7 @@ def validate_ipa(path, expected_version=None):
         expanded_experimental = experimental and int(build_number) >= 37
         heavy_experimental = experimental and int(build_number) >= 39
         psp_release = isinstance(build_number, str) and build_number.isdecimal() and int(build_number) >= 55
+        rcheevos_release = isinstance(build_number, str) and build_number.isdecimal() and int(build_number) >= 57
         if psp_release:
             integrated_cores["PPSSPP"] = root + "Frameworks/ppsspp_libretro_ios.dylib"
         sega_experimental = experimental and int(build_number) >= 40
@@ -117,6 +118,8 @@ def validate_ipa(path, expected_version=None):
         ]
         if psp_release:
             required_licenses += [root + "Frameworks/PPSSPP-LICENSE.txt"]
+        if rcheevos_release:
+            required_licenses += [root + "Frameworks/rcheevos-LICENSE.txt"]
         if experimental:
             required_licenses += [root + "Frameworks/Beetle-PSX-LICENSE.txt",
                                   root + "Frameworks/Stella2014-LICENSE.txt"]

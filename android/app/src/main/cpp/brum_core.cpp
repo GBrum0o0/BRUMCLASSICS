@@ -1,4 +1,5 @@
 #include "brum_libretro_api.h"
+#include "../../../../shared/brum-core/RetroAchievementsRuntime.hpp"
 
 #include <jni.h>
 #include <dlfcn.h>
@@ -13,11 +14,34 @@
 #include <cstring>
 #include <deque>
 #include <fstream>
+#include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+static JavaVM *g_jvm = nullptr;
+static std::mutex g_httpMutex;
+static std::atomic<jlong> g_nextHttpId{1};
+static std::unordered_map<jlong, brum::RetroAchievementsCallbacks::HttpDoneFn> g_httpCallbacks;
+
+static JNIEnv *attachCurrentThread(bool &didAttach) {
+    didAttach = false;
+    if (!g_jvm) return nullptr;
+    JNIEnv *env = nullptr;
+    if (g_jvm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) == JNI_OK) return env;
+    if (g_jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+        didAttach = true;
+        return env;
+    }
+    return nullptr;
+}
+
+extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *) {
+    g_jvm = vm;
+    return JNI_VERSION_1_6;
+}
 
 using retro_api_version_fn = unsigned (*)(void);
 using retro_init_fn = void (*)(void);
@@ -114,6 +138,7 @@ public:
         const size_t pixelCount = static_cast<size_t>(width) * height;
         if (pixelCount > 16u * 1024u * 1024u) return;
         rgba.resize(pixelCount * 4);
+        while (glGetError() != GL_NO_ERROR) {}
         glPixelStorei(GL_PACK_ALIGNMENT, 1);
         glReadPixels(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height), GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
         if (glGetError() != GL_NO_ERROR) return;
@@ -190,6 +215,11 @@ public:
             variables["system_gba_bios_enable"] = "ON";
             variables["system_nds_bios_enable"] = "ON";
             variables["ppsspp_internal_resolution"] = "480x272";
+            variables["citra_graphics_api"] = "OpenGLES";
+            variables["citra_use_cpu_jit"] = "enabled";
+            variables["citra_layout_option"] = "Top/Bottom";
+            variables["citra_resolution_factor"] = "1";
+            variables["citra_enable_touch_touchscreen"] = "enabled";
             if (std::ifstream(systemDirectory + "/aes.zip").good()) variables["geolith_system_type"] = "aes";
             else if (std::ifstream(systemDirectory + "/neogeo.zip").good()) variables["geolith_system_type"] = "mvs";
             coreHandle = dlopen(corePath.c_str(), RTLD_NOW | RTLD_LOCAL);
@@ -204,7 +234,8 @@ public:
             core.setInputPoll(inputPoll);
             core.setInputState(inputState);
             core.initialize(); initialized = true;
-            for (unsigned p = 0; p < 4; p++) core.setController(p, BRUM_RETRO_DEVICE_JOYPAD);
+            const bool is3ds = corePath.find("azahar") != std::string::npos || corePath.find("citra") != std::string::npos;
+            for (unsigned p = 0; p < 4; p++) core.setController(p, (is3ds && p == 0) ? 257u : BRUM_RETRO_DEVICE_JOYPAD);
 
             brum_retro_system_info info{}; core.getSystemInfo(&info);
             std::ifstream file(romPath, std::ios::binary);
@@ -240,6 +271,15 @@ public:
     }
 
     ~CoreSession() {
+        raRuntime.reset();
+        if (raCallbackGlobalRef) {
+            bool didAttach = false;
+            if (JNIEnv *env = attachCurrentThread(didAttach)) {
+                env->DeleteGlobalRef(raCallbackGlobalRef);
+                if (didAttach && g_jvm) g_jvm->DetachCurrentThread();
+            }
+            raCallbackGlobalRef = nullptr;
+        }
         if (hardware.active()) hardware.makeCurrent();
         persist();
         hardware.destroyCore();
@@ -254,7 +294,12 @@ public:
         if (shutdownRequested) throw std::runtime_error("O núcleo encerrou a emulação. Verifique se a ROM e as BIOS exigidas são válidas.");
         inputMask = mask;
         if (hardware.active()) hardware.makeCurrent();
-        for (int index = 0; index < count; index++) { suppressVideo = index + 1 < count; core.run(); }
+        for (int index = 0; index < count; index++) {
+            suppressVideo = index + 1 < count;
+            core.run();
+            ++framesRun;
+            if (raRuntime) raRuntime->doFrame();
+        }
         suppressVideo = false;
         if (hardware.active()) hardware.releaseCurrent();
         if (shutdownRequested) throw std::runtime_error("O núcleo encerrou a emulação. Verifique se a ROM e as BIOS exigidas são válidas.");
@@ -289,7 +334,7 @@ public:
     }
 
     bool saveState(const std::string &path) {
-        if (!gameLoaded) return false;
+        if (!gameLoaded || framesRun == 0) return false;
         size_t size = core.serializeSize();
         if (!size || size > 64 * 1024 * 1024) return false;
         std::vector<uint8_t> state(size);
@@ -305,7 +350,7 @@ public:
     }
 
     bool loadState(const std::string &path) {
-        if (!gameLoaded) return false;
+        if (!gameLoaded || framesRun == 0) return false;
         size_t expected = core.serializeSize();
         if (!expected || expected > 64 * 1024 * 1024) return false;
         std::ifstream file(path, std::ios::binary | std::ios::ate);
@@ -314,8 +359,113 @@ public:
         file.read(reinterpret_cast<char *>(state.data()), static_cast<std::streamsize>(expected));
         if (!file) return false;
         bool restored = core.unserialize(state.data(), expected);
-        if (restored) clearAudio();
+        if (restored) {
+            clearAudio();
+            if (raRuntime) raRuntime->reset();
+        }
         return restored;
+    }
+
+    void configureRetroAchievements(JNIEnv *env, uint32_t consoleId, const std::string &username, const std::string &token, jobject callbackObj) {
+        raRuntime.reset();
+        if (raCallbackGlobalRef) {
+            env->DeleteGlobalRef(raCallbackGlobalRef);
+            raCallbackGlobalRef = nullptr;
+        }
+        if (consoleId == 0 || username.empty() || token.empty() || !callbackObj) return;
+        raCallbackGlobalRef = env->NewGlobalRef(callbackObj);
+        jclass cls = env->GetObjectClass(callbackObj);
+        jmethodID httpMid = env->GetMethodID(cls, "onNativeHttpRequest", "(JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
+        jmethodID unlockMid = env->GetMethodID(cls, "onNativeAchievementConfirmed", "(Ljava/lang/String;IILjava/lang/String;Ljava/lang/String;ILjava/lang/String;)V");
+        jmethodID statusMid = env->GetMethodID(cls, "onNativeRetroAchievementsStatus", "(Ljava/lang/String;Ljava/lang/String;)V");
+        env->DeleteLocalRef(cls);
+        if (!httpMid || !unlockMid || !statusMid) return;
+
+        jobject targetRef = raCallbackGlobalRef;
+        brum::RetroAchievementsCallbacks cb;
+        cb.userAgent = "BRUMCLASSICSAndroid/0.34.0";
+        cb.httpPost = [targetRef, httpMid](const std::string &url, const std::string &postData, const std::string &contentType, brum::RetroAchievementsCallbacks::HttpDoneFn done) {
+            const jlong reqId = g_nextHttpId.fetch_add(1);
+            {
+                std::lock_guard<std::mutex> lock(g_httpMutex);
+                g_httpCallbacks[reqId] = std::move(done);
+            }
+            bool didAttach = false;
+            JNIEnv *jenv = attachCurrentThread(didAttach);
+            if (!jenv) {
+                brum::RetroAchievementsCallbacks::HttpDoneFn cbDone;
+                {
+                    std::lock_guard<std::mutex> lock(g_httpMutex);
+                    auto it = g_httpCallbacks.find(reqId);
+                    if (it != g_httpCallbacks.end()) { cbDone = std::move(it->second); g_httpCallbacks.erase(it); }
+                }
+                if (cbDone) cbDone(-2, "");
+                return;
+            }
+            jstring jUrl = jenv->NewStringUTF(url.c_str());
+            jstring jPost = jenv->NewStringUTF(postData.c_str());
+            jstring jType = jenv->NewStringUTF(contentType.c_str());
+            jenv->CallVoidMethod(targetRef, httpMid, reqId, jUrl, jPost, jType);
+            jenv->DeleteLocalRef(jUrl);
+            jenv->DeleteLocalRef(jPost);
+            jenv->DeleteLocalRef(jType);
+            if (jenv->ExceptionCheck()) jenv->ExceptionClear();
+            if (didAttach && g_jvm) g_jvm->DetachCurrentThread();
+        };
+        cb.getCoreMemory = [this](uint32_t id, void **data, size_t *size) {
+            if (!gameLoaded || !core.getMemoryData || !core.getMemorySize) {
+                *data = nullptr; *size = 0; return;
+            }
+            *data = core.getMemoryData(id);
+            *size = core.getMemorySize(id);
+        };
+        cb.onConfirmedUnlock = [targetRef, unlockMid](const brum::ConfirmedAchievementUnlock &u) {
+            bool didAttach = false;
+            JNIEnv *jenv = attachCurrentThread(didAttach);
+            if (!jenv) return;
+            jstring jEvt = jenv->NewStringUTF(u.eventId.c_str());
+            jstring jTitle = jenv->NewStringUTF(u.title.c_str());
+            jstring jDesc = jenv->NewStringUTF(u.description.c_str());
+            jstring jBadge = jenv->NewStringUTF(u.badgeUrl.c_str());
+            jenv->CallVoidMethod(targetRef, unlockMid, jEvt, static_cast<jint>(u.gameId), static_cast<jint>(u.achievementId), jTitle, jDesc, static_cast<jint>(u.points), jBadge);
+            jenv->DeleteLocalRef(jEvt);
+            jenv->DeleteLocalRef(jTitle);
+            jenv->DeleteLocalRef(jDesc);
+            jenv->DeleteLocalRef(jBadge);
+            if (jenv->ExceptionCheck()) jenv->ExceptionClear();
+            if (didAttach && g_jvm) g_jvm->DetachCurrentThread();
+        };
+        cb.onStatusChanged = [targetRef, statusMid](const brum::RetroAchievementsStatus &st) {
+            bool didAttach = false;
+            JNIEnv *jenv = attachCurrentThread(didAttach);
+            if (!jenv) return;
+            jstring jState = jenv->NewStringUTF(st.state.c_str());
+            jstring jMsg = jenv->NewStringUTF(st.message.c_str());
+            jenv->CallVoidMethod(targetRef, statusMid, jState, jMsg);
+            jenv->DeleteLocalRef(jState);
+            jenv->DeleteLocalRef(jMsg);
+            if (jenv->ExceptionCheck()) jenv->ExceptionClear();
+            if (didAttach && g_jvm) g_jvm->DetachCurrentThread();
+        };
+
+        raRuntime = std::make_unique<brum::RetroAchievementsRuntime>(std::move(cb));
+        raRuntime->loginWithToken(username, token);
+        std::vector<retro_memory_descriptor> mapped;
+        mapped.reserve(memoryDescriptors.size());
+        for (const auto &d : memoryDescriptors) {
+            retro_memory_descriptor item{};
+            item.flags = d.flags;
+            item.ptr = d.ptr;
+            item.offset = d.offset;
+            item.start = d.start;
+            item.select = d.select;
+            item.disconnect = d.disconnect;
+            item.len = d.len;
+            item.addrspace = d.addrspace;
+            mapped.push_back(item);
+        }
+        retro_memory_map map{mapped.empty() ? nullptr : mapped.data(), static_cast<unsigned>(mapped.size())};
+        raRuntime->startGame(consoleId, romPath, rom.empty() ? nullptr : rom.data(), rom.size(), mapped.empty() ? nullptr : &map);
     }
 
     void clearAudio() {
@@ -351,6 +501,10 @@ public:
     std::atomic<uint32_t> portMasks[4]{{0}, {0}, {0}, {0}};
     std::atomic<int16_t> portAnalogAxes[4][4]{};
     bool shutdownRequested = false;
+    uint64_t framesRun = 0;
+    std::vector<brum_retro_memory_descriptor> memoryDescriptors;
+    std::unique_ptr<brum::RetroAchievementsRuntime> raRuntime;
+    jobject raCallbackGlobalRef = nullptr;
     HardwareContext hardware;
 
 private:
@@ -426,6 +580,17 @@ private:
                 return session->hardware.configure(static_cast<brum_retro_hw_render_callback *>(data));
             case BRUM_RETRO_ENVIRONMENT_SET_HW_SHARED_CONTEXT:
                 return true;
+            case BRUM_RETRO_ENVIRONMENT_GET_JIT_CAPABLE:
+                if (data) *static_cast<bool *>(data) = true;
+                return true;
+            case BRUM_RETRO_ENVIRONMENT_SET_MEMORY_MAPS: {
+                const auto *map = static_cast<const brum_retro_memory_map *>(data);
+                session->memoryDescriptors.clear();
+                if (map && map->descriptors && map->num_descriptors > 0 && map->num_descriptors <= 4096) {
+                    session->memoryDescriptors.assign(map->descriptors, map->descriptors + map->num_descriptors);
+                }
+                return true;
+            }
             case BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2_INTL: return true;
             case BRUM_RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL:
             case BRUM_RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS:
@@ -592,6 +757,28 @@ extern "C" JNIEXPORT jboolean JNICALL
 Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeLoadState(JNIEnv *env, jclass, jlong handle, jstring path) {
     auto *session = reinterpret_cast<CoreSession *>(handle);
     return session && session->loadState(jstringValue(env, path)) ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeConfigureRetroAchievements(JNIEnv *env, jclass, jlong handle, jint consoleId,
+                                                                                       jstring username, jstring token, jobject callbackObj) {
+    auto *session = reinterpret_cast<CoreSession *>(handle);
+    if (session && consoleId > 0) {
+        session->configureRetroAchievements(env, static_cast<uint32_t>(consoleId), jstringValue(env, username), jstringValue(env, token), callbackObj);
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeCompleteHttp(JNIEnv *env, jclass, jlong requestId, jint httpStatus, jstring responseBody) {
+    brum::RetroAchievementsCallbacks::HttpDoneFn done;
+    {
+        std::lock_guard<std::mutex> lock(g_httpMutex);
+        auto it = g_httpCallbacks.find(requestId);
+        if (it == g_httpCallbacks.end()) return;
+        done = std::move(it->second);
+        g_httpCallbacks.erase(it);
+    }
+    if (done) done(static_cast<int>(httpStatus), jstringValue(env, responseBody));
 }
 
 extern "C" JNIEXPORT void JNICALL

@@ -52,6 +52,8 @@ public final class IntegratedEmulatorActivity extends Activity {
 
     private IntegratedEmulatorLaunch launch;
     private BrumCoreView emulatorView;
+    private BrumAchievementOverlay achievementOverlay;
+    private TextView statusBanner;
     private ParcelFileDescriptor romDescriptor;
     private boolean closing;
     private final List<View> padOverlayViews = new ArrayList<>();
@@ -120,9 +122,56 @@ public final class IntegratedEmulatorActivity extends Activity {
             if (prefs.getBoolean("default_fill_display", false)) emulatorView.toggleFillDisplay();
             setContentView(buildInterface());
             syncControllerOverlay(false);
+            configureRetroAchievementsRuntime(bridge);
         } catch (Throwable error) {
             showFailure(error.getMessage() == null ? "O BRUM Core não conseguiu abrir este jogo." : error.getMessage());
         }
+    }
+
+    private boolean isMissing3dsKeys() {
+        if (launch == null || !"3ds".equalsIgnoreCase(launch.systemId)) return false;
+        String lowerName = (launch.romFile != null ? launch.romFile.getName() : "").toLowerCase(Locale.ROOT);
+        if (lowerName.endsWith(".3dsx")) return false;
+        File sysRoot = launch.systemDirectory;
+        File azaharSysdata = new File(new File(sysRoot, "Azahar"), "sysdata");
+        return !new File(azaharSysdata, "aes_keys.txt").isFile() && !new File(sysRoot, "aes_keys.txt").isFile();
+    }
+
+    private void configureRetroAchievementsRuntime(BrumCoreBridge bridge) {
+        if (bridge == null || launch == null) return;
+        final boolean missing3dsKeys = isMissing3dsKeys();
+        int consoleId = RetroAchievementsConsole.idForSystem(launch.systemId);
+        if (consoleId <= 0) {
+            if (statusBanner != null) {
+                statusBanner.setText(BrumAchievementModel.formatStatusBanner(launch.coreDisplayName, launch.systemId, launch.retroAchievementsGameId, "unsupported", missing3dsKeys));
+            }
+            return;
+        }
+        com.brumclassics.mobile.classics.SecureSecretStore secrets = new com.brumclassics.mobile.classics.SecureSecretStore(this);
+        String raUser = secrets.get("ra_username");
+        String raToken = secrets.get("ra_runtime_token");
+        if (raUser == null || raUser.trim().isEmpty() || raToken == null || raToken.trim().isEmpty()) {
+            return;
+        }
+        bridge.configureRetroAchievements(consoleId, raUser.trim(), raToken.trim(), new BrumCoreBridge.RetroAchievementsListener() {
+            @Override public void onAchievementConfirmed(String eventId, int gameId, int achievementId, String title, String description, int points, String badgeUrl) {
+                runOnUiThread(() -> {
+                    if (closing || achievementOverlay == null) return;
+                    achievementOverlay.enqueue(new BrumAchievementOverlay.Payload(
+                        eventId, String.valueOf(achievementId), title, description, points, badgeUrl
+                    ));
+                });
+            }
+
+            @Override public void onStatusChanged(String state, String message) {
+                runOnUiThread(() -> {
+                    if (closing || statusBanner == null) return;
+                    statusBanner.setText(BrumAchievementModel.formatStatusBanner(
+                        launch.coreDisplayName, launch.systemId, launch.retroAchievementsGameId, state, missing3dsKeys
+                    ));
+                });
+            }
+        });
     }
 
     @Override protected void onResume() {
@@ -142,6 +191,7 @@ public final class IntegratedEmulatorActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        if (achievementOverlay != null) achievementOverlay.destroy();
         if (emulatorView != null) emulatorView.destroy();
         if (romDescriptor != null) { try { romDescriptor.close(); } catch (Exception ignored) {} romDescriptor = null; }
         super.onDestroy();
@@ -223,7 +273,7 @@ public final class IntegratedEmulatorActivity extends Activity {
         FrameLayout.LayoutParams toolsParams = frame(304, 44, Gravity.TOP | Gravity.END); toolsParams.setMargins(0, dp(12), dp(14), 0); root.addView(tools, toolsParams);
 
         String sys = launch.systemId == null ? "" : launch.systemId.toLowerCase(Locale.ROOT);
-        boolean isAnalog = "ps2".equals(sys) || "psp".equals(sys);
+        boolean isAnalog = "ps2".equals(sys) || "psp".equals(sys) || "3ds".equals(sys);
         useAnalogStick = isAnalog;
 
         dpadView = new VirtualDPadView(this);
@@ -250,9 +300,12 @@ public final class IntegratedEmulatorActivity extends Activity {
 
         buildActionButtonsForSystem(root, sys);
 
-        String raStatus = launch.retroAchievementsGameId > 0 ? " · RA ID " + launch.retroAchievementsGameId + " (PREPARAÇÃO)" : "";
-        TextView status = label("BRUM CORE · " + launch.coreDisplayName + " · " + launch.systemId.toUpperCase(Locale.ROOT) + raStatus, 9, ACCENT, true);
-        FrameLayout.LayoutParams statusParams = frame(260, 28, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL); statusParams.bottomMargin = dp(65); root.addView(status, statusParams);
+        String bannerText = BrumAchievementModel.formatStatusBanner(
+            launch.coreDisplayName, launch.systemId, launch.retroAchievementsGameId, "", isMissing3dsKeys()
+        );
+        statusBanner = label(bannerText, 9, ACCENT, true);
+        FrameLayout.LayoutParams statusParams = frame(280, 28, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL); statusParams.bottomMargin = dp(65); root.addView(statusBanner, statusParams);
+        achievementOverlay = new BrumAchievementOverlay(this, root);
         return root;
     }
 
@@ -288,11 +341,12 @@ public final class IntegratedEmulatorActivity extends Activity {
 
         if (hasShoulders) {
             boolean ps = "ps2".equals(sys);
+            boolean n3ds = "3ds".equals(sys);
             addShoulderButton(root, ps ? "L1" : "L", 10, Gravity.TOP | Gravity.START, 16);
             addShoulderButton(root, ps ? "R1" : "R", 11, Gravity.TOP | Gravity.END, 16);
-            if (ps) {
-                addShoulderButton(root, "L2", 12, Gravity.TOP | Gravity.START, 92);
-                addShoulderButton(root, "R2", 13, Gravity.TOP | Gravity.END, 92);
+            if (ps || n3ds) {
+                addShoulderButton(root, n3ds ? "ZL" : "L2", 12, Gravity.TOP | Gravity.START, 92);
+                addShoulderButton(root, n3ds ? "ZR" : "R2", 13, Gravity.TOP | Gravity.END, 92);
             }
         }
 

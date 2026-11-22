@@ -699,4 +699,61 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(snapshot.library.map(\.id), ["pc:pc-psp", "local:gba/minish.gba"])
         XCTAssertEqual(original.count, 4)
     }
+
+    func testStreamingInspectorHandlesMultiChunkISOAndReleasesResources() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("brum-iso-stream-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let totalBytes = 2_500_000
+        var pspData = Data(count: totalBytes)
+        pspData.replaceSubrange(0x8000..<(0x8000 + 6), with: Data([0x01, 0x43, 0x44, 0x30, 0x30, 0x31]))
+        pspData.replaceSubrange(0x8008..<(0x8008 + 8), with: Data("PSP GAME".utf8))
+        let isoURL = root.appendingPathComponent("TestPSP.iso")
+        try pspData.write(to: isoURL)
+
+        let expectedHash = SHA256.hash(data: pspData).map { String(format: "%02x", $0) }.joined()
+        let identity = try ROMContentInspector.inspect(url: isoURL, filename: "TestPSP.iso")
+        XCTAssertEqual(identity.systemID, .playStationPortable)
+        XCTAssertEqual(identity.contentSHA256, expectedHash)
+    }
+
+    func testAchievementOverlayPayloadSanitizationAndDeduplication() {
+        let valid = BrumAchievementOverlayPayload.fromBridgeEvent([
+            "type": "achievement_unlocked",
+            "gameId": "777",
+            "achievement": [
+                "id": "102",
+                "title": "Primeira vitória",
+                "description": "Vença sua primeira batalha.",
+                "points": 10,
+                "badgeUrl": "https://media.retroachievements.org/Badge/00102.png"
+            ]
+        ])
+        XCTAssertNotNil(valid)
+        XCTAssertEqual(valid?.eventID, "ra:777:102")
+        XCTAssertEqual(valid?.points, 10)
+        XCTAssertNotNil(valid?.badgeURL)
+
+        let unsafe = BrumAchievementOverlayPayload(
+            eventID: "evt-unsafe",
+            achievementID: "5",
+            title: "  Teste  ",
+            description: "Desc",
+            points: -99,
+            badgeURL: "http://evil.example/Badge/5.png"
+        )
+        XCTAssertEqual(unsafe.title, "Teste")
+        XCTAssertEqual(unsafe.points, 0)
+        XCTAssertNil(unsafe.badgeURL)
+        XCTAssertNil(BrumAchievementOverlayPayload.validatedBadgeURL("https://evil.example/Badge/5.png"))
+        XCTAssertNil(BrumAchievementOverlayPayload.validatedBadgeURL("https://media.retroachievements.org/Other/5.png"))
+
+        let coord = BrumAchievementOverlayCoordinator.shared
+        coord.resetForTesting()
+        XCTAssertTrue(coord.markSeen("ra:777:102"))
+        XCTAssertFalse(coord.markSeen("ra:777:102"))
+        XCTAssertTrue(coord.markSeen("ra:777:103"))
+        coord.resetForTesting()
+    }
 }

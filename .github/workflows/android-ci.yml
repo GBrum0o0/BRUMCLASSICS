@@ -4,6 +4,8 @@ on:
   push:
     paths:
       - "android/**"
+      - "shared/brum-core/**"
+      - "third_party/rcheevos/**"
       - "LICENSES/**"
       - "MOBILE-LICENSING.md"
       - "ios/prepare_ppsspp_assets.py"
@@ -12,6 +14,8 @@ on:
   pull_request:
     paths:
       - "android/**"
+      - "shared/brum-core/**"
+      - "third_party/rcheevos/**"
       - "LICENSES/**"
       - "MOBILE-LICENSING.md"
       - "ios/prepare_ppsspp_assets.py"
@@ -130,6 +134,35 @@ jobs:
           python3 ios/prepare_ppsspp_assets.py --android "$SOURCE" android/app/src/main/assets
           "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" --dyn-syms \
             android/app/src/main/jniLibs/arm64-v8a/ppsspp_libretro_android.so | grep 'retro_load_game' >/dev/null
+      - name: Build pinned Azahar 3DS core (ARM64 GLES3 + Dynarmic)
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE="android/app/src/main/cpp/vendor/azahar"
+          COMMIT="9e6f523a57fac9564ac0bf8286db3c3702d301ec"
+          git clone --filter=blob:none https://github.com/azahar-emu/azahar.git "$SOURCE"
+          git -C "$SOURCE" checkout --detach "$COMMIT"
+          test "$(git -C "$SOURCE" rev-parse HEAD)" = "$COMMIT"
+          git -C "$SOURCE" submodule update --init --recursive --depth 1
+          NDK="$ANDROID_HOME/ndk/27.0.12077973"
+          CMAKE_PATH="$ANDROID_HOME/cmake/3.22.1/bin"
+          cmake -S "$SOURCE" -B "$SOURCE/build-brum-android-arm64" -G Ninja \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DENABLE_LIBRETRO=ON -DENABLE_OPENGL=ON -DENABLE_VULKAN=OFF \
+            -DENABLE_BUILTIN_KEYBLOB=OFF -DENABLE_LTO=OFF \
+            -DENABLE_WEB_SERVICE=OFF -DENABLE_SCRIPTING=OFF -DENABLE_TESTS=OFF \
+            -DCITRA_USE_PRECOMPILED_HEADERS=OFF -DCITRA_WARNINGS_AS_ERRORS=OFF \
+            -DCMAKE_BUILD_TYPE=Release -DANDROID_ABI=arm64-v8a -DANDROID_NDK="$NDK" \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_PLATFORM=android-26 -DANDROID_STL=c++_static -DCMAKE_MAKE_PROGRAM="$CMAKE_PATH/ninja"
+          cmake --build "$SOURCE/build-brum-android-arm64" --target citra_libretro --parallel 4
+          CORE_SO=$(find "$SOURCE/build-brum-android-arm64" -type f -name 'azahar_libretro*.so' -print -quit)
+          test -n "$CORE_SO"
+          mkdir -p android/app/src/main/jniLibs/arm64-v8a android/app/src/main/assets/core-licenses
+          cp "$CORE_SO" android/app/src/main/jniLibs/arm64-v8a/libazahar_libretro.so
+          cp "$SOURCE/license.txt" android/app/src/main/assets/core-licenses/Azahar-LICENSE.txt
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" --dyn-syms \
+            android/app/src/main/jniLibs/arm64-v8a/libazahar_libretro.so | grep 'retro_load_game' >/dev/null
       - name: Compile Android application
         working-directory: android
         run: ./gradlew :app:assembleDebug --no-daemon
@@ -147,11 +180,13 @@ jobs:
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/libbsnes_mercury_performance_libretro.so' >/dev/null
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/play_libretro_android.so' >/dev/null
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/ppsspp_libretro_android.so' >/dev/null
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'lib/arm64-v8a/libazahar_libretro.so' >/dev/null
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/system/PPSSPP/ppge_atlas.zim' >/dev/null
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/system/PPSSPP/flash0/font/jpn0.pgf' >/dev/null
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/core-licenses/PPSSPP-THIRD-PARTY.txt' >/dev/null
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/GPL-3.0.txt' >/dev/null
-          for license in mGBA SkyEmu Geolith Play PPSSPP Gearsystem Nestopia Beetle-PCE-Fast Beetle-WonderSwan bsnes-mercury; do
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/rcheevos-LICENSE.txt' >/dev/null
+          for license in mGBA SkyEmu Geolith Play PPSSPP Azahar Gearsystem Nestopia Beetle-PCE-Fast Beetle-WonderSwan bsnes-mercury; do
             unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep "assets/core-licenses/${license}-LICENSE.txt" >/dev/null
           done
       - name: Run contract tests
@@ -168,6 +203,7 @@ jobs:
             android/app/src/main/java/com/brumclassics/mobile/classics/CoreRegistry.java \
             android/app/src/main/java/com/brumclassics/mobile/classics/EmulationIdentity.java \
             android/app/src/main/java/com/brumclassics/mobile/classics/SaveManifest.java \
+            android/app/src/main/java/com/brumclassics/mobile/emulation/BrumAchievementModel.java \
             android/app/src/main/java/com/brumclassics/mobile/emulation/IntegratedEmulatorLaunch.java \
             android/app/src/main/java/com/brumclassics/mobile/emulation/NativeSaveSync.java \
             android/app/src/main/java/com/brumclassics/mobile/emulation/CoreTiming.java \
@@ -179,6 +215,7 @@ jobs:
             android/app/src/test/java/com/brumclassics/mobile/data/BCardLibraryTest.java \
             android/app/src/test/java/com/brumclassics/mobile/model/PerformanceLiveStateTest.java \
             android/app/src/test/java/com/brumclassics/mobile/classics/ClassicsRulesTest.java \
+            android/app/src/test/java/com/brumclassics/mobile/emulation/BrumAchievementOverlayTest.java \
             android/app/src/test/java/com/brumclassics/mobile/emulation/IntegratedEmulatorLaunchTest.java \
             android/app/src/test/java/com/brumclassics/mobile/emulation/NativeSaveSyncTest.java \
             android/app/src/test/java/com/brumclassics/mobile/emulation/CoreTimingTest.java \
@@ -190,6 +227,7 @@ jobs:
             com.brumclassics.mobile.data.BCardLibraryTest \
             com.brumclassics.mobile.model.PerformanceLiveStateTest \
             com.brumclassics.mobile.classics.ClassicsRulesTest \
+            com.brumclassics.mobile.emulation.BrumAchievementOverlayTest \
             com.brumclassics.mobile.emulation.IntegratedEmulatorLaunchTest \
             com.brumclassics.mobile.emulation.NativeSaveSyncTest \
             com.brumclassics.mobile.emulation.CoreTimingTest \

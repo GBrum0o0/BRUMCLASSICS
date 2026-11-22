@@ -8,6 +8,9 @@
 #include "../../../shared/brum-core/VirtualControlInput.hpp"
 #include "../../../shared/brum-core/FrameCadence.hpp"
 #include "../../../shared/brum-core/ContentValidation.hpp"
+#include "../../../shared/brum-core/RetroAchievementsRuntime.hpp"
+#import "BRUMCLASSICSMobile-Swift.h"
+#include <memory>
 
 #import <AudioToolbox/AudioToolbox.h>
 #import <AVFoundation/AVFoundation.h>
@@ -342,6 +345,9 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     uint8_t _n64CButtonMask;
     NSURL *_romURL;
     NSData *_romData;
+    std::vector<brum_retro_memory_descriptor> _memoryDescriptors;
+    std::unique_ptr<brum::RetroAchievementsRuntime> _raRuntime;
+    BrumAchievementOverlayPresenter *_achievementOverlay;
     NSString *_gameTitle;
     NSString *_systemDirectory;
     NSString *_coreAssetsDirectory;
@@ -430,6 +436,35 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
 static void *BrumLoadSymbol(void *handle, const char *name) {
     dlerror();
     return dlsym(handle, name);
+}
+
+static uint32_t BrumRAConsoleIDForSystem(NSString *systemID) {
+    if (!systemID.length) return 0;
+    NSString *lower = systemID.lowercaseString;
+    if ([lower isEqualToString:@"md"]) return 1;
+    if ([lower isEqualToString:@"n64"]) return 2;
+    if ([lower isEqualToString:@"sfc"]) return 3;
+    if ([lower isEqualToString:@"gb"]) return 4;
+    if ([lower isEqualToString:@"gba"]) return 5;
+    if ([lower isEqualToString:@"gbc"]) return 6;
+    if ([lower isEqualToString:@"nes"]) return 7;
+    if ([lower isEqualToString:@"pce"]) return 8;
+    if ([lower isEqualToString:@"segacd"]) return 9;
+    if ([lower isEqualToString:@"32x"]) return 10;
+    if ([lower isEqualToString:@"sms"]) return 11;
+    if ([lower isEqualToString:@"psx"]) return 12;
+    if ([lower isEqualToString:@"lynx"]) return 13;
+    if ([lower isEqualToString:@"gg"]) return 15;
+    if ([lower isEqualToString:@"nds"]) return 18;
+    if ([lower isEqualToString:@"neogeo"] || [lower isEqualToString:@"arcade"]) return 27;
+    if ([lower isEqualToString:@"saturn"]) return 39;
+    if ([lower isEqualToString:@"dreamcast"]) return 40;
+    if ([lower isEqualToString:@"psp"]) return 41;
+    if ([lower isEqualToString:@"a2600"]) return 25;
+    if ([lower isEqualToString:@"ws"] || [lower isEqualToString:@"wsc"]) return 53;
+    // Nintendo 3DS has no official RetroAchievements runtime memory support.
+    if ([lower isEqualToString:@"3ds"]) return 0;
+    return 0;
 }
 
 static void BrumCoreLog(int level, const char *format, ...) {
@@ -579,6 +614,17 @@ static bool BrumEnvironment(unsigned command, void *data) {
             // The EAGL adapter owns one context per session, not a shared
             // context. Never tell a backend that cross-context resources work.
             return false;
+        case BRUM_RETRO_ENVIRONMENT_GET_JIT_CAPABLE:
+            if (data) *(bool *)data = false;
+            return true;
+        case BRUM_RETRO_ENVIRONMENT_SET_MEMORY_MAPS: {
+            const brum_retro_memory_map *map = (const brum_retro_memory_map *)data;
+            host->_memoryDescriptors.clear();
+            if (map && map->descriptors && map->num_descriptors > 0 && map->num_descriptors <= 4096) {
+                host->_memoryDescriptors.assign(map->descriptors, map->descriptors + map->num_descriptors);
+            }
+            return true;
+        }
         case BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS:
             BrumRegisterCoreOptions(host, (const brum_retro_core_option_definition *)data);
             return true;
@@ -638,6 +684,7 @@ static void BrumVideo(const void *data, unsigned width, unsigned height, size_t 
     NSData *pixels = [NSData dataWithBytesNoCopy:target length:byteCount freeWhenDone:YES];
     if (data == BrumHardwareFrameBuffer) {
         if (!host->_hardwareInitialized || width > (unsigned)host->_hardwareSurfaceSize || height > (unsigned)host->_hardwareSurfaceSize) return;
+        while (glGetError() != GL_NO_ERROR) {}
         glBindFramebuffer(GL_FRAMEBUFFER, host->_hardwareFramebuffer);
         host->_hwReadbackRGBA.resize(byteCount);
         glPixelStorei(GL_PACK_ALIGNMENT, 1);
@@ -903,6 +950,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _variables[@"system_gba_bios_enable"] = @"ON";
     _variables[@"system_nds_bios_enable"] = @"ON";
     _variables[@"citra_graphics_api"] = @"Software";
+    _variables[@"citra_use_cpu_jit"] = @"disabled";
     _variables[@"citra_layout_option"] = @"default";
     _variables[@"citra_resolution_factor"] = @"1";
     _variables[@"citra_enable_touch_touchscreen"] = @"enabled";
@@ -1147,6 +1195,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [super viewDidLoad];
     self.view.backgroundColor = UIColor.blackColor;
     [self buildInterface];
+    _achievementOverlay = [[BrumAchievementOverlayPresenter alloc] initWithHostView:self.view];
     if (_startupError) {
         _statusLabel.text = _startupError.localizedDescription;
         _statusLabel.textColor = UIColor.systemRedColor;
@@ -1272,7 +1321,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     if (_screenManager.screens.size() > 1) result |= BrumBackendMultipleScreens;
     for (const auto& screen : _screenManager.screens) if (screen.touch) result |= BrumBackendTouch;
     if (_core.getMemoryData(BRUM_RETRO_MEMORY_SAVE_RAM) && _core.getMemorySize(BRUM_RETRO_MEMORY_SAVE_RAM)) result |= BrumBackendSave;
-    const size_t size = _core.serializeSize ? _core.serializeSize() : 0;
+    // Do not probe serializeSize() before the first emulated frame: PPSSPP allocates
+    // GPU state lazily on frame 1 and dereferences gpu inside DoState().
+    const size_t size = (_sessionFrames > 0 && _core.serializeSize) ? _core.serializeSize() : 0;
     if (size && size <= 64 * 1024 * 1024 && _core.serialize && _core.unserialize) result |= BrumBackendSaveState;
     return result;
 }
@@ -2159,6 +2210,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     if (!state || !expected || state.length != expected || [metadata[@"sizeBytes"] unsignedLongLongValue] != state.length || !_core.unserialize(state.bytes, state.length)) {
         [self showStateStatus:@"ESTADO INCOMPATÍVEL OU CORROMPIDO" error:YES]; return;
     }
+    if (_raRuntime) _raRuntime->reset();
     os_unfair_lock_lock(&_audioLock); _audioRead = 0; _audioWrite = 0; _audioCount = 0; os_unfair_lock_unlock(&_audioLock);
     [self showStateStatus:[NSString stringWithFormat:@"SLOT %ld CARREGADO", (long)slot] error:NO];
 }
@@ -2240,6 +2292,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [_diagnostics enterStage:@"initialize_graphics"];
     if (![self initializeHardware:error]) return NO;
     [self restoreSaveRAM];
+    [self startRetroAchievementsSession];
     brum_retro_system_av_info avInfo = {};
     _core.getAVInfo(&avInfo);
     if (_hasPendingAVInfo) { avInfo = _pendingAVInfo; _hasPendingAVInfo = NO; }
@@ -2249,7 +2302,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     }
     _contentAspectRatio = avInfo.geometry.aspect_ratio;
     _screenManager.screens = brum::libretroScreens(_coreID.UTF8String, avInfo.geometry.base_width, avInfo.geometry.base_height);
-    _stateButton.enabled = (self.capabilities & BrumBackendSaveState) != 0;
+    _stateButton.enabled = NO;
     [_diagnostics enterStage:@"initialize_audio"];
     if (![self startAudio:avInfo.timing.sample_rate error:error]) return NO;
     [_diagnostics enterStage:@"first_frame"];
@@ -2350,6 +2403,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     for (NSUInteger frame = 0; frame < frameCount; frame++) {
         _suppressVideo = frame + 1 < frameCount;
         _core.run();
+        if (_raRuntime) _raRuntime->doFrame();
         ++_sessionFrames;
         if (_performanceHUDEnabled) ++_measuredFrames;
         if (_shutdownRequested) break;
@@ -2357,6 +2411,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _suppressVideo = NO;
     if (_shutdownRequested) { [self handleCoreShutdown]; return; }
     [self applyPendingAVInfo];
+    if (_sessionFrames == 1 && _stateButton && !_stateButton.enabled) {
+        _stateButton.enabled = (self.capabilities & BrumBackendSaveState) != 0;
+    }
     if (!_readyDelivered && _presentedFrames > 0) {
         _readyDelivered = YES;
         [self captureDiagnosticsMetrics];
@@ -2379,6 +2436,106 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
             _measuredFrames = 0;
         }
     }
+}
+
+- (void)startRetroAchievementsSession {
+    const uint32_t consoleId = BrumRAConsoleIDForSystem(_emulatedSystemID);
+    NSString *username = [BrumRASessionCredentials storedUsername];
+    NSString *token = [BrumRASessionCredentials storedRuntimeToken];
+    if (consoleId == 0 || !username.length || !token.length) return;
+
+    __weak BrumLibretroViewController *weakSelf = self;
+    brum::RetroAchievementsCallbacks cb;
+    cb.userAgent = "BRUMCLASSICSMobile/0.24.0";
+    cb.httpPost = [](const std::string &urlStr,
+                     const std::string &postData,
+                     const std::string &contentType,
+                     brum::RetroAchievementsCallbacks::HttpDoneFn done) {
+        NSString *nsUrl = [NSString stringWithUTF8String:urlStr.c_str()];
+        NSURL *url = nsUrl ? [NSURL URLWithString:nsUrl] : nil;
+        if (!url) {
+            done(-1, "");
+            return;
+        }
+        NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url
+                                                           cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
+                                                       timeoutInterval:15.0];
+        [req setValue:@"BRUMCLASSICSMobile/0.24.0" forHTTPHeaderField:@"User-Agent"];
+        if (!postData.empty()) {
+            req.HTTPMethod = @"POST";
+            req.HTTPBody = [NSData dataWithBytes:postData.data() length:postData.size()];
+            NSString *ct = contentType.empty() ? @"application/x-www-form-urlencoded" : [NSString stringWithUTF8String:contentType.c_str()];
+            [req setValue:ct forHTTPHeaderField:@"Content-Type"];
+        }
+        NSURLSessionDataTask *task = [NSURLSession.sharedSession dataTaskWithRequest:req completionHandler:^(NSData *data, NSURLResponse *response, NSError *err) {
+            if (err || ![response isKindOfClass:NSHTTPURLResponse.class]) {
+                done(-2, "");
+                return;
+            }
+            const NSInteger statusCode = ((NSHTTPURLResponse *)response).statusCode;
+            std::string bodyStr;
+            if (data.length > 0 && data.length <= 16 * 1024 * 1024) {
+                bodyStr.assign((const char *)data.bytes, data.length);
+            }
+            done((int)statusCode, bodyStr);
+        }];
+        [task resume];
+    };
+    cb.getCoreMemory = [weakSelf](uint32_t memId, void **outData, size_t *outSize) {
+        BrumLibretroViewController *strongSelf = weakSelf;
+        if (!strongSelf || !strongSelf->_gameLoaded || strongSelf->_stopped || !strongSelf->_core.getMemoryData || !strongSelf->_core.getMemorySize) {
+            *outData = nullptr;
+            *outSize = 0;
+            return;
+        }
+        *outData = strongSelf->_core.getMemoryData(memId);
+        *outSize = strongSelf->_core.getMemorySize(memId);
+    };
+    cb.onConfirmedUnlock = [weakSelf](const brum::ConfirmedAchievementUnlock &unlock) {
+        BrumLibretroViewController *strongSelf = weakSelf;
+        if (!strongSelf || !strongSelf->_achievementOverlay) return;
+        NSString *evt = [NSString stringWithUTF8String:unlock.eventId.c_str()] ?: @"";
+        NSString *ach = [NSString stringWithFormat:@"%u", unlock.achievementId];
+        NSString *title = [NSString stringWithUTF8String:unlock.title.c_str()] ?: @"Conquista desbloqueada";
+        NSString *desc = [NSString stringWithUTF8String:unlock.description.c_str()] ?: @"";
+        NSString *badge = unlock.badgeUrl.empty() ? nil : [NSString stringWithUTF8String:unlock.badgeUrl.c_str()];
+        [strongSelf->_achievementOverlay enqueueUnlockWithEventID:evt
+                                                   achievementID:ach
+                                                           title:title
+                                                          detail:desc
+                                                          points:(NSInteger)unlock.points
+                                                        badgeURL:badge];
+    };
+    cb.onStatusChanged = [weakSelf](const brum::RetroAchievementsStatus &status) {
+        NSString *msg = status.message.empty() ? nil : [NSString stringWithUTF8String:status.message.c_str()];
+        if (!msg.length) return;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            BrumLibretroViewController *strongSelf = weakSelf;
+            if (!strongSelf || strongSelf->_stopped) return;
+            [strongSelf->_diagnostics recordMessage:[NSString stringWithFormat:@"RA: %@", msg] level:1];
+        });
+    };
+
+    _raRuntime = std::make_unique<brum::RetroAchievementsRuntime>(std::move(cb));
+    _raRuntime->loginWithToken(username.UTF8String, token.UTF8String);
+
+    std::vector<retro_memory_descriptor> mapped;
+    mapped.reserve(_memoryDescriptors.size());
+    for (const auto &d : _memoryDescriptors) {
+        retro_memory_descriptor item{};
+        item.flags = d.flags;
+        item.ptr = d.ptr;
+        item.offset = d.offset;
+        item.start = d.start;
+        item.select = d.select;
+        item.disconnect = d.disconnect;
+        item.len = d.len;
+        item.addrspace = d.addrspace;
+        mapped.push_back(item);
+    }
+    retro_memory_map map{mapped.empty() ? nullptr : mapped.data(), (unsigned)mapped.size()};
+    const char *romPath = _romURL.path.fileSystemRepresentation ?: "";
+    _raRuntime->startGame(consoleId, romPath, (const uint8_t *)_romData.bytes, (size_t)_romData.length, mapped.empty() ? nullptr : &map);
 }
 
 - (void)restoreSaveRAM {
@@ -2450,6 +2607,11 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 - (void)handleCoreShutdown {
     if (_stopped) return;
     [_displayLink invalidate]; _displayLink = nil;
+    if (_raRuntime) {
+        _raRuntime->unloadGame();
+        _raRuntime.reset();
+    }
+    [_achievementOverlay invalidate];
     _startupError = [NSError errorWithDomain:BrumLibretroErrorDomain code:18 userInfo:@{NSLocalizedDescriptionKey: @"O núcleo interrompeu o jogo. Consulte o aviso registrado no relatório para identificar a causa."}];
     [self captureDiagnosticsMetrics];
     [_diagnostics recordFailure:_startupError.localizedDescription];
@@ -2473,6 +2635,11 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [self captureDiagnosticsMetrics];
     [_diagnostics markStopped];
     [_displayLink invalidate]; _displayLink = nil;
+    if (_raRuntime) {
+        _raRuntime->unloadGame();
+        _raRuntime.reset();
+    }
+    [_achievementOverlay invalidate];
     if (_audioQueue) { AudioQueueStop(_audioQueue, true); AudioQueueDispose(_audioQueue, true); _audioQueue = NULL; }
     _audioSampleRate = 0;
     [AVAudioSession.sharedInstance setActive:NO withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:nil];

@@ -7,6 +7,7 @@ static brum_retro_environment_t environment;
 static brum_retro_video_refresh_t video;
 static brum_retro_audio_sample_batch_t audio;
 static unsigned char mode;
+static unsigned frames_run = 0;
 
 unsigned retro_api_version(void) { return BRUM_RETRO_API_VERSION; }
 void retro_set_environment(brum_retro_environment_t callback) { environment = callback; }
@@ -32,11 +33,17 @@ void retro_get_system_av_info(brum_retro_system_av_info *info) {
 bool retro_load_game(const brum_retro_game_info *game) {
     if (!game || !game->data || !game->size) return false;
     mode = *(const unsigned char *)game->data;
-    if (mode == 'I') {
+    if (mode == 'I' || mode == 'P') {
         brum_retro_variable option = {"ppsspp_cpu_core", NULL};
         if (!environment(BRUM_RETRO_ENVIRONMENT_GET_VARIABLE, &option) ||
             !option.value || strcmp(option.value, "interpreter") != 0) return false;
+        brum_retro_variable citraJit = {"citra_use_cpu_jit", NULL};
+        if (!environment(BRUM_RETRO_ENVIRONMENT_GET_VARIABLE, &citraJit) ||
+            !citraJit.value || strcmp(citraJit.value, "disabled") != 0) return false;
+        bool jitCapable = true;
+        if (!environment(BRUM_RETRO_ENVIRONMENT_GET_JIT_CAPABLE, &jitCapable) || jitCapable) return false;
     }
+    frames_run = 0;
     if (mode == 'R') {
         brum_retro_log_callback log = {0};
         if (environment(BRUM_RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log)) log.log(3, "probe: rejected content");
@@ -54,11 +61,18 @@ void retro_run(void) {
     }
     const uint32_t pixels[4] = {0x123456, 0x654321, 0xabcdef, 0xfedcba};
     const int16_t samples[8] = {100, -100, 200, -200, 300, -300, 400, -400};
+    frames_run++;
     video(pixels, 2, 2, 8);
     audio(samples, 4);
 }
 void *retro_get_memory_data(unsigned id) { (void)id; return NULL; }
 size_t retro_get_memory_size(unsigned id) { (void)id; return 0; }
-size_t retro_serialize_size(void) { return 0; }
+size_t retro_serialize_size(void) {
+    if (mode == 'P') {
+        if (frames_run == 0) __builtin_trap();
+        return 1024;
+    }
+    return 0;
+}
 bool retro_serialize(void *data, size_t size) { (void)data; (void)size; return false; }
 bool retro_unserialize(const void *data, size_t size) { (void)data; (void)size; return false; }

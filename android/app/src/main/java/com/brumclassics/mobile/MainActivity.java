@@ -64,6 +64,7 @@ import com.brumclassics.mobile.classics.CoreRegistry;
 import com.brumclassics.mobile.classics.LocalClassic;
 import com.brumclassics.mobile.classics.LocalArtworkClient;
 import com.brumclassics.mobile.classics.RetroAchievementsClient;
+import com.brumclassics.mobile.emulation.BrumAchievementOverlay;
 import com.brumclassics.mobile.emulation.IntegratedEmulatorActivity;
 import com.brumclassics.mobile.murb.MurbRemoteClient;
 import com.brumclassics.mobile.murb.MurbRemoteGamepadActivity;
@@ -113,6 +114,7 @@ public final class MainActivity extends Activity {
     private ClassicsRepository classicsRepository;
     private RetroAchievementsClient retroAchievements;
     private LocalArtworkClient localArtwork;
+    private BrumAchievementOverlay achievementOverlay;
     private List<Game> games = new ArrayList<>();
     private String currentScreen = "home";
     private String detailsReturnScreen = "library";
@@ -216,8 +218,15 @@ public final class MainActivity extends Activity {
             }
             @Override public void onEvent(String type, org.json.JSONObject payload) {
                 if ("achievement_unlocked".equals(type)) {
-                    org.json.JSONObject achievement = payload.optJSONObject("achievement");
-                    Toast.makeText(MainActivity.this, achievement == null ? "Nova conquista sincronizada" : "Conquista: " + achievement.optString("title", "Desbloqueada"), Toast.LENGTH_LONG).show();
+                    BrumAchievementOverlay.Payload popup = BrumAchievementOverlay.Payload.fromBridgeEvent(payload);
+                    if (com.brumclassics.mobile.murb.MurbRemoteGamepadActivity.activeOnForeground) {
+                        Intent relay = new Intent(com.brumclassics.mobile.murb.MurbRemoteGamepadActivity.ACTION_ACHIEVEMENT_UNLOCKED);
+                        relay.setPackage(getPackageName());
+                        relay.putExtra("payload", payload == null ? "" : payload.toString());
+                        sendBroadcast(relay);
+                    } else if (popup != null && achievementOverlay != null) {
+                        achievementOverlay.enqueue(popup);
+                    }
                 } else if ("install_changed".equals(type)) {
                     org.json.JSONObject update = payload.optJSONObject("update");
                     syncDetail = update == null ? "Download atualizado" : "Download · " + Math.round(update.optDouble("percent", 0)) + "% · " + update.optString("state", "em andamento");
@@ -284,6 +293,7 @@ public final class MainActivity extends Activity {
             );
         }
         setContentView(buildShell());
+        achievementOverlay = new BrumAchievementOverlay(this, findViewById(android.R.id.content));
         showLoading();
         modelExecutor.execute(() -> {
             try {
@@ -371,6 +381,7 @@ public final class MainActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        if (achievementOverlay != null) achievementOverlay.destroy();
         handler.removeCallbacks(performanceExpiry);
         bridgeClient.close();
         updateManager.close();
@@ -1323,17 +1334,46 @@ public final class MainActivity extends Activity {
 
     private void showGamingRetroAccount() {
         LinearLayout panel = gamingDialogPanel();
+        boolean hasToken = !classicsRepository.raRuntimeToken().isEmpty();
+        TextView runtimeNote = text("A Web API Key consulta catálogo. Para desbloqueio em tempo real no BRUM Core, entre abaixo com a senha (apenas o token fica salvo no Android Keystore). Status: " + (hasToken ? "token ativo (Softcore)" : "não autenticado"), 9, MUTED, false);
         EditText username = pairingField("Usuário RetroAchievements", classicsRepository.raUsername());
         EditText key = pairingField("Web API Key", "");
         key.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        EditText runtimePass = pairingField("Senha RetroAchievements (não salva)", "");
+        runtimePass.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         String storedKey = classicsRepository.raKey();
         if (!storedKey.isEmpty()) key.setHint("Nova Web API Key (opcional para a mesma conta)");
+        Button runtimeLogin = gamingAction(hasToken ? "Renovar token do runtime" : "Entrar para conquistas no jogo", false, v -> {});
+        panel.addView(runtimeNote, margins(-1, 0, -1, 10));
         panel.addView(username, margins(-1, 0, -1, 8, 48));
-        panel.addView(key, new LinearLayout.LayoutParams(-1, dp(48)));
+        panel.addView(key, margins(-1, 0, -1, 8, 48));
+        panel.addView(runtimePass, margins(-1, 0, -1, 10, 48));
+        panel.addView(runtimeLogin, new LinearLayout.LayoutParams(-1, dp(46)));
         ScrollView fields = new ScrollView(this);
         fields.addView(panel);
         AlertDialog dialog = new AlertDialog.Builder(this).setTitle("RetroAchievements").setView(fields)
                 .setNegativeButton("Cancelar", null).setPositiveButton("Salvar", null).create();
+        runtimeLogin.setOnClickListener(v -> {
+            String account = username.getText().toString().trim();
+            String password = runtimePass.getText().toString();
+            runtimePass.setText("");
+            runtimeLogin.setEnabled(false);
+            modelExecutor.execute(() -> {
+                try {
+                    String canon = classicsRepository.loginRetroAchievementsRuntime(account, password);
+                    handler.post(() -> {
+                        dialog.dismiss();
+                        Toast.makeText(this, "Token RetroAchievements salvo para " + canon + " (Softcore).", Toast.LENGTH_LONG).show();
+                        refreshCurrentScreen();
+                    });
+                } catch (Exception err) {
+                    handler.post(() -> {
+                        runtimeLogin.setEnabled(true);
+                        runtimePass.setError(err.getMessage());
+                    });
+                }
+            });
+        });
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             String account = username.getText().toString().trim();
             String apiKey = key.getText().toString().trim();
@@ -1900,14 +1940,36 @@ public final class MainActivity extends Activity {
         page.addView(openRetro, margins(-1, 10, -1, 0, 46));
 
         page.addView(sectionHeading("3 · RETROACHIEVEMENTS", "", null), margins(-1, 28, -1, 10));
-        page.addView(text("No RetroArch, ative Settings → Achievements e entre com usuário e senha. A Web API Key abaixo serve somente para consultar o progresso.", 9, MUTED, false));
+        boolean hasToken = !classicsRepository.raRuntimeToken().isEmpty();
+        page.addView(text("A Web API Key consulta catálogo. Para desbloqueio em tempo real no BRUM Core, autentique abaixo (somente o token é protegido pelo Android Keystore, nunca a senha). Status: " + (hasToken ? "token ativo (Softcore)" : "não autenticado"), 9, MUTED, false));
         EditText username = pairingField("USUÁRIO RETROACHIEVEMENTS", classicsRepository.raUsername());
         EditText apiKey = pairingField("WEB API KEY", classicsRepository.raKey()); apiKey.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        EditText runtimePass = pairingField("SENHA RETROACHIEVEMENTS (NÃO SALVA)", ""); runtimePass.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         page.addView(username, margins(-1, 12, -1, 8, 48)); page.addView(apiKey, new LinearLayout.LayoutParams(-1, dp(48)));
-        Button saveAccount = primaryButton("SALVAR CONTA"); saveAccount.setOnClickListener(v -> {
+        page.addView(runtimePass, margins(-1, 8, -1, 0, 48));
+        Button saveAccount = primaryButton("SALVAR WEB API KEY"); saveAccount.setOnClickListener(v -> {
             try { classicsRepository.configureRetroAchievements(username.getText().toString(), apiKey.getText().toString()); Toast.makeText(this, "Conta salva com proteção do Android Keystore.", Toast.LENGTH_LONG).show(); }
             catch (Exception error) { Toast.makeText(this, error.getMessage(), Toast.LENGTH_LONG).show(); }
         }); page.addView(saveAccount, margins(-1, 10, -1, 0, 47));
+        Button loginRuntime = button(hasToken ? "RENOVAR TOKEN DO RUNTIME" : "ENTRAR PARA CONQUISTAS NO JOGO");
+        loginRuntime.setTextColor(ACCENT); loginRuntime.setBackground(background(SURFACE, 3, ACCENT, 1));
+        loginRuntime.setOnClickListener(v -> {
+            String u = username.getText().toString().trim();
+            String p = runtimePass.getText().toString();
+            runtimePass.setText("");
+            modelExecutor.execute(() -> {
+                try {
+                    String canon = classicsRepository.loginRetroAchievementsRuntime(u, p);
+                    handler.post(() -> {
+                        Toast.makeText(this, "Token RetroAchievements salvo para " + canon + " (Softcore).", Toast.LENGTH_LONG).show();
+                        showClassicSettings();
+                    });
+                } catch (Exception err) {
+                    handler.post(() -> Toast.makeText(this, err.getMessage(), Toast.LENGTH_LONG).show());
+                }
+            });
+        });
+        page.addView(loginRuntime, margins(-1, 8, -1, 0, 46));
 
         page.addView(sectionHeading("4 · HORAS OFFLINE", "", null), margins(-1, 28, -1, 10));
         page.addView(text("Recomendado: no RetroArch ative Save runtime log (aggregate) e selecione abaixo a pasta Runtime Logs. Sem ela, usamos o intervalo entre sair para o emulador e voltar ao BRUMCLASSICS.", 9, MUTED, false));

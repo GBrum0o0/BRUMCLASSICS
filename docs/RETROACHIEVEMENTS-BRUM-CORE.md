@@ -2,12 +2,16 @@
 
 ## Estado atual
 
-O BRUMCLASSICS já consulta progresso pela Web API, mas essa consulta **não desbloqueia conquistas**. A ligação do runtime nativo começou com estes contratos:
+O BRUMCLASSICS integra oficialmente o avaliador nativo `rcheevos` v12.5.0 (revisão `1433173220a7eaede6a9ed7a18e94117be1821e0`, licença MIT) em `shared/brum-core/RetroAchievementsRuntime.{hpp,cpp}` para **PC (`brum-core-pc`)**, **iOS** e **Android** (além da consulta de catálogo pela Web API):
 
-- o ID oficial do jogo agora acompanha a sessão integrada até o host Libretro no Android e no iOS;
-- cada sistema integrado possui o `console_id` oficial definido por `rcheevos`;
-- a interface identifica esse estado como **PREPARAÇÃO**, nunca como conquistas ativas;
-- a implementação usará `rcheevos` v12.5.0, revisão `1433173220a7eaede6a9ed7a18e94117be1821e0`, sob licença MIT.
+- `login2`/`login` converte usuário e senha em token de runtime armazenado no Keychain (iOS), Android Keystore (`SecureSecretStore`) ou `safeStorage` (PC), sem salvar a senha;
+- o hash oficial é calculado via `rc_client`/`rhash` e o mapa de memória Libretro (`SET_MEMORY_MAPS` + fallback `RETRO_MEMORY_SYSTEM_RAM`) é conectado diretamente ao `rc_libretro`;
+- `rc_client_do_frame()` é executado quadro a quadro durante emulação normal e avanço rápido, e `rc_client_reset()` acompanha resets e carregamento de save state;
+- **Softcore por padrão**: nenhum popup é exibido nem gravado antes de resposta oficial HTTP `200` com `"Success": true` em `r=awardachievement`;
+- o popup visual segue o molde horizontal **BRUM CLASSICS** (`#090d0e`, borda `#35413f`, barra lateral `#9dff3b`, ícone vetorial em cartucho, `+N PTS`) no computador, iOS e Android (incluindo sessões Gamepad remoto, com deduplicação por `eventId`);
+- **Nintendo 3DS (`Azahar`) não possui suporte oficial a RetroAchievements** nesta versão (`console_id = 0` no runtime nativo móvel/PC), exibindo estado honesto de indisponibilidade sem falsos positivos.
+
+O desbloqueio real em conta de usuário e o registro de jogo/hash/conquista específicos dependem de execução com ROM reconhecida e credenciais reais em conta válida.
 
 ## O que falta para ativar desbloqueios
 

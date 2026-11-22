@@ -103,10 +103,61 @@ actor PocketRAClient {
         var url = URLComponents(string: "https://retroachievements.org/API/API_GetGameInfoAndUserProgress.php")!
         url.queryItems = [URLQueryItem(name: "y", value: key), URLQueryItem(name: "u", value: username), URLQueryItem(name: "g", value: String(gameID))]
         var request = URLRequest(url: url.url!, timeoutInterval: 20)
-        request.setValue("BRUMCLASSICS-iOS/0.15.1", forHTTPHeaderField: "User-Agent")
+        request.setValue("BRUMCLASSICSMobile/0.24.0", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200, data.count <= 12 * 1024 * 1024 else { throw PocketError.message("RetroAchievements indisponível ou credencial inválida. Tente mais tarde; o progresso salvo foi mantido.") }
         return try PocketProgress.decode(data, username: username, expectedID: gameID)
+    }
+
+    func loginRuntime(username: String, password: String) async throws -> (username: String, token: String) {
+        let cleanUser = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanUser.isEmpty, !password.isEmpty else {
+            throw PocketError.message("Informe usuário e senha RetroAchievements para entrar no runtime.")
+        }
+        var body = URLComponents()
+        body.queryItems = [
+            URLQueryItem(name: "r", value: "login2"),
+            URLQueryItem(name: "u", value: cleanUser),
+            URLQueryItem(name: "p", value: password)
+        ]
+        var request = URLRequest(url: URL(string: "https://retroachievements.org/dorequest.php")!, timeoutInterval: 20)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.setValue("BRUMCLASSICSMobile/0.24.0", forHTTPHeaderField: "User-Agent")
+        request.httpBody = Data((body.percentEncodedQuery ?? "").utf8)
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              (json["Success"] as? Bool) == true,
+              let token = json["Token"] as? String, !token.isEmpty else {
+            let reason = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["Error"] as? String
+            throw PocketError.message(reason ?? "Não foi possível autenticar no RetroAchievements. Confira usuário e senha.")
+        }
+        let canonUser = (json["User"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (username: (canonUser?.isEmpty == false ? canonUser! : cleanUser), token: token)
+    }
+}
+
+@objc public final class BrumRASessionCredentials: NSObject {
+    @objc public static func storedUsername() -> String? {
+        guard let text = SecureStore.read(PocketClassicsStore.accountKey),
+              let data = text.data(using: .utf8),
+              let creds = try? JSONDecoder().decode(PocketClassicsStore.Credentials.self, from: data) else {
+            return nil
+        }
+        let user = creds.username.trimmingCharacters(in: .whitespacesAndNewlines)
+        return user.isEmpty ? nil : user
+    }
+
+    @objc public static func storedRuntimeToken() -> String? {
+        guard let text = SecureStore.read(PocketClassicsStore.accountKey),
+              let data = text.data(using: .utf8),
+              let creds = try? JSONDecoder().decode(PocketClassicsStore.Credentials.self, from: data),
+              let token = creds.runtimeToken?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !token.isEmpty else {
+            return nil
+        }
+        return token
     }
 }
 
@@ -155,17 +206,42 @@ enum DirectSaveSyncOutcome: Sendable {
     private var loaded = false
     private var lastSync = Date.distantPast
     static let accountKey = "pocket-ra-credentials"
-    struct Credentials: Codable { let username: String; let key: String }
+    struct Credentials: Codable {
+        let username: String
+        let key: String
+        var runtimeToken: String? = nil
+    }
     var credentials: Credentials? {
         guard let text = SecureStore.read(Self.accountKey), let data = text.data(using: .utf8) else { return nil }
         return try? JSONDecoder().decode(Credentials.self, from: data)
     }
     func configure(username: String, key: String) throws {
-        let account = Credentials(username: username.trimmingCharacters(in: .whitespacesAndNewlines), key: key.trimmingCharacters(in: .whitespacesAndNewlines))
-        guard !account.username.isEmpty, !account.key.isEmpty else { throw PocketError.message("Preencha usuário e Web API Key.") }
+        let existingToken = credentials?.runtimeToken
+        let account = Credentials(
+            username: username.trimmingCharacters(in: .whitespacesAndNewlines),
+            key: key.trimmingCharacters(in: .whitespacesAndNewlines),
+            runtimeToken: existingToken
+        )
+        guard !account.username.isEmpty, (!account.key.isEmpty || !(existingToken ?? "").isEmpty) else {
+            throw PocketError.message("Preencha usuário e Web API Key.")
+        }
         let json = try JSONEncoder().encode(account)
         try SecureStore.write(String(decoding: json, as: UTF8.self), account: Self.accountKey)
         lastSync = .distantPast
+    }
+    func authenticateRuntime(username: String, password: String) async throws {
+        let result = try await api.loginRuntime(username: username, password: password)
+        let existingKey = credentials?.key ?? ""
+        let account = Credentials(username: result.username, key: existingKey, runtimeToken: result.token)
+        let json = try JSONEncoder().encode(account)
+        try SecureStore.write(String(decoding: json, as: UTF8.self), account: Self.accountKey)
+        lastSync = .distantPast
+    }
+    func clearRuntimeToken() throws {
+        guard let existing = credentials else { return }
+        let updated = Credentials(username: existing.username, key: existing.key, runtimeToken: nil)
+        let json = try JSONEncoder().encode(updated)
+        try SecureStore.write(String(decoding: json, as: UTF8.self), account: Self.accountKey)
     }
     func restore() async {
         guard !loaded else { return }
@@ -1071,6 +1147,9 @@ struct PocketSetupView: View {
     @EnvironmentObject private var pocket: PocketClassicsStore
     @State private var username = ""
     @State private var key = ""
+    @State private var runtimePassword = ""
+    @State private var authenticating = false
+    @State private var runtimeTokenActive = false
     @State private var feedback = ""
     @State private var choosingRuntime = false
     var body: some View {
@@ -1088,12 +1167,38 @@ struct PocketSetupView: View {
                 Text("Antes de alterar um retroarch.cfg existente, copie-o no app Arquivos. O BRUMCLASSICS não sobrescreve suas preferências ou saves.")
             }
             Section("3 · RetroAchievements") {
-                Text("No RetroArch: Settings → Achievements → Enabled. Entre com seu usuário e senha RetroAchievements. Use a MESMA conta no launcher e aqui. A Web API Key abaixo serve para consultar o progresso, não para desbloquear conquistas.")
+                Text("A Web API Key consulta catálogo e progresso. Para desbloquear conquistas em tempo real dentro do BRUM Core, autentique abaixo — apenas o token de sessão é salvo no Keychain, nunca a senha.")
                 TextField("Usuário RetroAchievements", text: $username).textInputAutocapitalization(.never).autocorrectionDisabled()
                 SecureField("Web API Key", text: $key).textInputAutocapitalization(.never).autocorrectionDisabled()
                 Link("Obter minha Web API Key", destination: URL(string: "https://retroachievements.org/settings")!)
-                Button("Salvar conta neste iPhone") { do { try pocket.configure(username: username, key: key); feedback = "Credenciais salvas no Keychain. Vincule o ID de cada jogo para consultar conquistas." } catch { feedback = error.localizedDescription } }
-                Text("É necessário estar online no RetroArch para registrar conquistas. O modo Hardcore restringe save states. ROMs incompatíveis ou núcleos sem suporte não geram conquistas.")
+                Button("Salvar Web API Key") { do { try pocket.configure(username: username, key: key); feedback = "Web API Key salva no Keychain." } catch { feedback = error.localizedDescription } }
+                SecureField("Senha RetroAchievements (não armazenada)", text: $runtimePassword).textInputAutocapitalization(.never).autocorrectionDisabled()
+                HStack {
+                    Button(authenticating ? "Autenticando..." : (runtimeTokenActive ? "Renovar token do runtime" : "Entrar para conquistas no jogo")) {
+                        let pass = runtimePassword
+                        runtimePassword = ""
+                        authenticating = true
+                        Task { @MainActor in
+                            defer { authenticating = false }
+                            do {
+                                try await pocket.authenticateRuntime(username: username, password: pass)
+                                runtimeTokenActive = true
+                                feedback = "Token de sessão RetroAchievements salvo com segurança no Keychain. Softcore ativo."
+                            } catch {
+                                feedback = error.localizedDescription
+                            }
+                        }
+                    }
+                    .disabled(authenticating)
+                    if runtimeTokenActive {
+                        Button("Desconectar token") {
+                            try? pocket.clearRuntimeToken()
+                            runtimeTokenActive = false
+                            feedback = "Token do runtime removido do Keychain."
+                        }.foregroundStyle(.red)
+                    }
+                }
+                Text("Status runtime: \(runtimeTokenActive ? "token ativo (Softcore)" : "não autenticado"). É necessário estar online para enviar e confirmar conquistas oficiais. Nintendo 3DS não possui suporte oficial RetroAchievements.")
             }
             Section("4 · Sincronização") {
                 Text("Em CLASSICS Everywhere, as ROMs de plataformas identificáveis abrem diretamente com o núcleo compatível. Atualizar vínculo continua disponível para formatos ambíguos e jogos já organizados em playlists. Para atualizar o PC, vincule o mesmo jogo e use a mesma conta; o launcher deve estar atualizado, aberto e na rede local. Não copiamos ROMs nem saves para o PC.")
@@ -1111,6 +1216,10 @@ struct PocketSetupView: View {
         .fileImporter(isPresented: $choosingRuntime, allowedContentTypes: [.folder]) { result in
             switch result { case .success(let folder): Task { await pocket.configureRuntime(folder) }; case .failure(let error): feedback = error.localizedDescription }
         }
-        .onAppear { username = pocket.credentials?.username ?? ""; key = pocket.credentials?.key ?? "" }
+        .onAppear {
+            username = pocket.credentials?.username ?? ""
+            key = pocket.credentials?.key ?? ""
+            runtimeTokenActive = !(pocket.credentials?.runtimeToken ?? "").isEmpty
+        }
     }
 }

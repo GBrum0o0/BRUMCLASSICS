@@ -15,9 +15,11 @@ on:
   push:
     branches:
       - main
+      - "antigravity/**"
     paths:
       - "ios/**"
       - "shared/brum-core/**"
+      - "third_party/rcheevos/**"
       - "LICENSES/**"
       - "MOBILE-LICENSING.md"
       - ".github/workflows/build-ios-personal.yml"
@@ -36,6 +38,35 @@ jobs:
         run: |
           clang++ -std=c++17 -Wall -Wextra -Werror shared/brum-core/tests.cpp -o "$RUNNER_TEMP/brum-core-tests"
           "$RUNNER_TEMP/brum-core-tests"
+          mkdir -p "$RUNNER_TEMP/ra_obj"
+          RC_SRCS=(
+            third_party/rcheevos/src/rc_client.c third_party/rcheevos/src/rc_compat.c
+            third_party/rcheevos/src/rc_libretro.c third_party/rcheevos/src/rc_util.c
+            third_party/rcheevos/src/rc_version.c third_party/rcheevos/src/rapi/rc_api_common.c
+            third_party/rcheevos/src/rapi/rc_api_info.c third_party/rcheevos/src/rapi/rc_api_runtime.c
+            third_party/rcheevos/src/rapi/rc_api_user.c third_party/rcheevos/src/rcheevos/alloc.c
+            third_party/rcheevos/src/rcheevos/condition.c third_party/rcheevos/src/rcheevos/condset.c
+            third_party/rcheevos/src/rcheevos/consoleinfo.c third_party/rcheevos/src/rcheevos/format.c
+            third_party/rcheevos/src/rcheevos/lboard.c third_party/rcheevos/src/rcheevos/memref.c
+            third_party/rcheevos/src/rcheevos/operand.c third_party/rcheevos/src/rcheevos/rc_validate.c
+            third_party/rcheevos/src/rcheevos/richpresence.c third_party/rcheevos/src/rcheevos/runtime.c
+            third_party/rcheevos/src/rcheevos/runtime_progress.c third_party/rcheevos/src/rcheevos/trigger.c
+            third_party/rcheevos/src/rcheevos/value.c third_party/rcheevos/src/rhash/aes.c
+            third_party/rcheevos/src/rhash/cdreader.c third_party/rcheevos/src/rhash/hash.c
+            third_party/rcheevos/src/rhash/hash_disc.c third_party/rcheevos/src/rhash/hash_encrypted.c
+            third_party/rcheevos/src/rhash/hash_rom.c third_party/rcheevos/src/rhash/hash_zip.c
+            third_party/rcheevos/src/rhash/md5.c
+          )
+          for f in "${RC_SRCS[@]}"; do
+            clang -c -O2 -DRC_DISABLE_LUA=1 -DRC_CLIENT_SUPPORTS_HASH=1 \
+              -Ithird_party/rcheevos/include -Ithird_party/rcheevos/src -Ishared/brum-core/libretro_shim \
+              -w "$f" -o "$RUNNER_TEMP/ra_obj/$(basename "${f%.c}.o")"
+          done
+          clang++ -std=c++17 -Wall -Wextra -Werror -pthread -DRC_DISABLE_LUA=1 -DRC_CLIENT_SUPPORTS_HASH=1 \
+            -Ithird_party/rcheevos/include -Ithird_party/rcheevos/src -Ishared/brum-core -Ishared/brum-core/libretro_shim \
+            shared/brum-core/RetroAchievementsRuntime.cpp shared/brum-core/ra_tests.cpp "$RUNNER_TEMP/ra_obj/"*.o \
+            -o "$RUNNER_TEMP/brum-ra-tests"
+          "$RUNNER_TEMP/brum-ra-tests"
 
       - name: Validar projeto e testes do pacote
         working-directory: ios
@@ -85,7 +116,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: BRUMCLASSICS-IOS-TESTES-0.17.0
+          name: BRUMCLASSICS-IOS-TESTES-0.24.0
           path: ios/build/iOS-Tests.xcresult
           retention-days: 7
           if-no-files-found: warn
@@ -223,6 +254,8 @@ jobs:
           cp "$CORE_PATH" "$APP/Frameworks/gearsystem_libretro_ios.dylib"
           cp build/gearsystem-core/LICENSE "$APP/Frameworks/Gearsystem-LICENSE.txt"
           cp ../LICENSES/GPL-3.0.txt "$APP/Frameworks/BRUMCLASSICS-Mobile-GPL-3.0.txt"
+          cp ../LICENSES/rcheevos-LICENSE.txt "$APP/Frameworks/rcheevos-LICENSE.txt"
+          test -s "$APP/Frameworks/rcheevos-LICENSE.txt"
           chmod 755 "$APP/Frameworks/gearsystem_libretro_ios.dylib"
           file "$APP/Frameworks/gearsystem_libretro_ios.dylib" | grep -q arm64
 
@@ -371,7 +404,7 @@ jobs:
           bash build-arcade-experimental.sh "$APP"
           /usr/libexec/PlistBuddy -c 'Add :BRUMExperimentalBackends bool true' "$APP/Info.plist"
           /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName BRUM Core Teste' "$APP/Info.plist"
-          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 56' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 57' "$APP/Info.plist"
 
       - name: Empacotar IPA pessoal
         working-directory: ios
@@ -383,7 +416,7 @@ jobs:
       - name: Guardar build pessoal
         uses: actions/upload-artifact@v4
         with:
-          name: BRUMCLASSICS-MOVEL-IOS-${{ inputs.experimental && 'EXPERIMENTAL' || 'PESSOAL' }}-0.23.0
+          name: BRUMCLASSICS-MOVEL-IOS-${{ inputs.experimental && 'EXPERIMENTAL' || 'PESSOAL' }}-0.24.0
           path: |
             ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa
             ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa.sha256

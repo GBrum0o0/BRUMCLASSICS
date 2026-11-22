@@ -844,6 +844,7 @@ struct MurbRemoteGamepadView: View {
                 .padding(.horizontal, 14).padding(.top, 8)
                 Spacer()
             }
+            BrumAchievementOverlayContainer()
         }
         .onAppear {
             GamingOrientation.request(.landscape)
