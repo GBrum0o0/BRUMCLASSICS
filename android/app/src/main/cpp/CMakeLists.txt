@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(brumcore LANGUAGES C CXX)
 
-set(RCHEEVOS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../third_party/rcheevos")
-set(BRUM_SHARED_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../shared/brum-core")
+set(RCHEEVOS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../third_party/rcheevos")
+set(BRUM_SHARED_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../shared/brum-core")
 set(RCHEEVOS_SOURCES
     "${RCHEEVOS_ROOT}/src/rc_client.c"
     "${RCHEEVOS_ROOT}/src/rc_compat.c"

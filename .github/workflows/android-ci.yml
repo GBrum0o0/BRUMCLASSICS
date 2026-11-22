@@ -160,7 +160,7 @@ jobs:
               -DCITRA_USE_PRECOMPILED_HEADERS=OFF -DCITRA_WARNINGS_AS_ERRORS=OFF \
               -DCMAKE_BUILD_TYPE=Release -DANDROID_ABI=arm64-v8a -DANDROID_NDK="$NDK" \
               -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
-              -DANDROID_PLATFORM=android-26 -DANDROID_STL=c++_static \
+              -DANDROID_PLATFORM=android-21 -DANDROID_STL=c++_static \
               -DCMAKE_MAKE_PROGRAM="$CMAKE_PATH/ninja"
             "$CMAKE_PATH/cmake" --build "$SOURCE/build-brum-android-arm64" \
               --target azahar_libretro --config Release --parallel 4
@@ -189,7 +189,27 @@ jobs:
           fi
       - name: Compile Android application
         working-directory: android
-        run: ./gradlew :app:assembleDebug --no-daemon
+        shell: bash
+        run: |
+          set -euo pipefail
+          GRADLE_LOG="$RUNNER_TEMP/gradle-build.log"
+          GRADLE_ERRORS="$RUNNER_TEMP/gradle-errors.log"
+          set +e
+          ./gradlew :app:assembleDebug --no-daemon 2>&1 | tee "$GRADLE_LOG"
+          GRADLE_STATUS=${PIPESTATUS[0]}
+          set -e
+          if [ "$GRADLE_STATUS" -ne 0 ]; then
+            grep -E 'error:|fatal error:|CMake Error|undefined reference|FAILED:|ld\.lld:|FAILURE:' "$GRADLE_LOG" \
+              | tail -n 25 > "$GRADLE_ERRORS" || true
+            if [ ! -s "$GRADLE_ERRORS" ]; then tail -n 25 "$GRADLE_LOG" > "$GRADLE_ERRORS"; fi
+            while IFS= read -r LINE; do
+              LINE=$(printf '%s' "$LINE" | sed -E $'s/\x1B\\[[0-9;]*[mK]//g' | cut -c1-1800)
+              LINE=${LINE//'%'/'%25'}
+              LINE=${LINE//$'\r'/'%0D'}
+              echo "::error title=Gradle::$LINE"
+            done < "$GRADLE_ERRORS"
+            exit "$GRADLE_STATUS"
+          fi
       - name: Verify integrated native core
         shell: bash
         run: |

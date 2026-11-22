@@ -1,5 +1,5 @@
 #include "brum_libretro_api.h"
-#include "../../../../shared/brum-core/RetroAchievementsRuntime.hpp"
+#include "RetroAchievementsRuntime.hpp"
 
 #include <jni.h>
 #include <dlfcn.h>
