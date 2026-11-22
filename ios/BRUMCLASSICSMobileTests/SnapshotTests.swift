@@ -119,4 +119,106 @@ final class SnapshotTests: XCTestCase {
         XCTAssertTrue(PersonalUpdateService.isNewer(newerBuild, thanVersion: "0.1.1", build: 2))
         XCTAssertFalse(PersonalUpdateService.isNewer(sameBuild, thanVersion: "0.1.1", build: 2))
     }
+
+    func testSideStoreSourceDecodingAndDeepLinks() throws {
+        let json = """
+        {
+          "name": "BRUMCLASSICS Oficial (iOS)",
+          "identifier": "com.brumclassics.sidestore.source",
+          "sourceURL": "https://raw.githubusercontent.com/GBrum0o0/BRUMCLASSICS/sidestore-source/sidestore-source.json",
+          "apps": [
+            {
+              "name": "BRUMCLASSICS",
+              "bundleIdentifier": "com.brumclassics.mobile.ios",
+              "versions": [
+                {
+                  "version": "0.24.0",
+                  "buildVersion": "57",
+                  "date": "2026-11-22T09:23:00Z",
+                  "localizedDescription": "Versão anterior PSP",
+                  "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.24.0/BRUMCLASSICS-MOVEL-IOS-0.24.0.ipa",
+                  "size": 15024172,
+                  "minOSVersion": "16.0"
+                },
+                {
+                  "version": "0.25.0",
+                  "buildVersion": "58",
+                  "date": "2026-11-22T12:00:00Z",
+                  "localizedDescription": "- SideStore oficial\\n- Backup verificado de saves",
+                  "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.25.0/BRUMCLASSICS-MOVEL-IOS-0.25.0.ipa",
+                  "size": 15100000,
+                  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "minOSVersion": "16.0"
+                },
+                {
+                  "version": "9.9.9",
+                  "buildVersion": "999",
+                  "date": "2026-12-01T00:00:00Z",
+                  "localizedDescription": "Invalido latest",
+                  "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/latest/download/BRUMCLASSICS-OFICIAL.exe",
+                  "size": 100
+                }
+              ]
+            }
+          ]
+        }
+        """
+        let manifest = try SideStoreSourceParser.latestManifest(from: Data(json.utf8))
+        XCTAssertEqual(manifest.version, "0.25.0")
+        XCTAssertEqual(manifest.build, 58)
+        XCTAssertEqual(manifest.minimumIOS, "16.0")
+        XCTAssertEqual(manifest.notes, ["SideStore oficial", "Backup verificado de saves"])
+        XCTAssertEqual(manifest.buildURL.absoluteString, "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.25.0")
+
+        let sourceLink = try XCTUnwrap(SideStoreLinks.addSourceURL())
+        XCTAssertEqual(sourceLink.scheme, "sidestore")
+        XCTAssertEqual(sourceLink.host, "source")
+        XCTAssertTrue(sourceLink.absoluteString.contains("sidestore-source.json"))
+
+        let installLink = try XCTUnwrap(manifest.downloadURL.flatMap(SideStoreLinks.installIPAURL))
+        XCTAssertEqual(installLink.scheme, "sidestore")
+        XCTAssertEqual(installLink.host, "install")
+
+        let latestURL = try XCTUnwrap(URL(string: "https://github.com/GBrum0o0/BRUMCLASSICS/releases/latest/download/BRUMCLASSICS-OFICIAL.exe"))
+        XCTAssertNil(SideStoreLinks.installIPAURL(latestURL))
+    }
+
+    func testSaveMigrationBackupExportVerifyAndRestorePreservesData() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("brum-backup-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let support = root.appendingPathComponent("AppSupport", isDirectory: true)
+        let exports = root.appendingPathComponent("Exports", isDirectory: true)
+        try FileManager.default.createDirectory(at: support.appendingPathComponent("IntegratedEmulator/Saves/gba", isDirectory: true), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: support.appendingPathComponent("ClassicsEverywhere", isDirectory: true), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: exports, withIntermediateDirectories: true)
+
+        let saveURL = support.appendingPathComponent("IntegratedEmulator/Saves/gba/firered.srm")
+        let originalSave = Data("SRAM-FIRERED-PIKACHU".utf8)
+        try originalSave.write(to: saveURL)
+        try Data("[]".utf8).write(to: support.appendingPathComponent("ClassicsEverywhere/games.json"))
+
+        let exported = try SaveMigrationBackupService.exportBackup(
+            from: support,
+            to: exports,
+            appVersion: "0.25.0",
+            appBuild: 58
+        )
+        XCTAssertEqual(exported.manifest.files.count, 2)
+
+        // Sobrescreve save local, restaura do backup e garante preservação anterior em PreRestoreBackups.
+        try Data("CORRUPTED".utf8).write(to: saveURL)
+        let restored = try SaveMigrationBackupService.restoreBackup(from: exported.folder, into: support)
+        XCTAssertEqual(restored.restoredCount, 2)
+        XCTAssertEqual(try Data(contentsOf: saveURL), originalSave)
+        XCTAssertNotNil(restored.snapshotFolder)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: restored.snapshotFolder!.appendingPathComponent("IntegratedEmulator/Saves/gba/firered.srm").path))
+
+        // Adulterar arquivo dentro do backup deve impedir restauração.
+        let backedSave = exported.folder.appendingPathComponent("files/IntegratedEmulator/Saves/gba/firered.srm")
+        try Data("TAMPERED".utf8).write(to: backedSave)
+        XCTAssertThrowsError(try SaveMigrationBackupService.restoreBackup(from: exported.folder, into: support))
+        XCTAssertEqual(try Data(contentsOf: saveURL), originalSave)
+    }
 }

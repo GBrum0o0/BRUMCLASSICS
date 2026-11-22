@@ -155,19 +155,37 @@ struct ConflictCenterView: View {
 private struct PersonalUpdateCard: View {
     @EnvironmentObject private var store: AppStore
     @Environment(\.openURL) private var openURL
+    @State private var showMigrationBackup = false
+    @State private var copiedSourceURL = false
+
+    private var sideStoreAvailable: Bool {
+        guard let schemeURL = URL(string: "sidestore://") else { return false }
+        return UIApplication.shared.canOpenURL(schemeURL)
+    }
 
     var body: some View {
         BrumCard {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    BrumSectionLabel(text: "ATUALIZAÇÃO PESSOAL")
+                    BrumSectionLabel(text: "ATUALIZAÇÃO NO IPHONE")
                     Spacer()
                     status
                 }
 
+                Text("Versão instalada: v\(store.installedVersion) (build \(store.installedBuild))")
+                    .font(.caption)
+                    .foregroundStyle(BrumTheme.muted)
+
                 switch store.personalUpdate {
                 case .available(let manifest):
-                    Text("Versão \(manifest.version) disponível").font(.headline).foregroundStyle(BrumTheme.text)
+                    Text("Versão \(manifest.version) disponível (build \(manifest.build) · iOS \(manifest.minimumIOS)+)")
+                        .font(.headline)
+                        .foregroundStyle(BrumTheme.text)
+                    if let sizeBytes = manifest.sizeBytes, sizeBytes > 0 {
+                        Text("Tamanho do pacote: \(ByteCountFormatter.string(fromByteCount: sizeBytes, countStyle: .file))")
+                            .font(.caption)
+                            .foregroundStyle(BrumTheme.muted)
+                    }
                     if !manifest.notes.isEmpty {
                         VStack(alignment: .leading, spacing: 5) {
                             ForEach(manifest.notes, id: \.self) { note in
@@ -175,18 +193,67 @@ private struct PersonalUpdateCard: View {
                             }
                         }
                     }
-                    Button("ABRIR BUILD PESSOAL") { openURL(manifest.buildURL) }.buttonStyle(PrimaryButtonStyle())
-                    Text("Baixe no computador e instale sobre a versão anterior usando o mesmo método de sideload. O identificador do app permanece fixo para preservar seus dados.").font(.caption).foregroundStyle(BrumTheme.muted)
+
+                    if sideStoreAvailable {
+                        if let ipaURL = manifest.downloadURL, let installURL = SideStoreLinks.installIPAURL(ipaURL) {
+                            Button("Enviar IPA ao SideStore") { openURL(installURL) }
+                                .buttonStyle(PrimaryButtonStyle())
+                        }
+                        if let addSource = SideStoreLinks.addSourceURL() {
+                            Button("Abrir fonte oficial no SideStore") { openURL(addSource) }
+                                .font(.caption.bold())
+                                .foregroundStyle(BrumTheme.primary)
+                        }
+                        Text("O SideStore realiza o download e a assinatura no iPhone com o StosVPN ativo. Abrir o link apenas encaminha para o SideStore e não conclui a instalação automaticamente.")
+                            .font(.caption)
+                            .foregroundStyle(BrumTheme.muted)
+                    } else {
+                        Text("SideStore não detectado neste aparelho. Para atualizar sem computador depois da configuração inicial, instale o SideStore + StosVPN e adicione a fonte oficial do BRUMCLASSICS.")
+                            .font(.caption)
+                            .foregroundStyle(BrumTheme.muted)
+                    }
+
+                    Button("Baixar IPA no GitHub (Sideloadly)") { openURL(manifest.buildURL) }
+                        .font(.caption.bold())
+                        .foregroundStyle(BrumTheme.text)
                 case .failed:
-                    Text("A consulta falhou, mas sua biblioteca offline e o restante do app continuam disponíveis.").font(.caption).foregroundStyle(BrumTheme.muted)
+                    Text("A consulta falhou, mas sua biblioteca offline e o restante do app continuam disponíveis.")
+                        .font(.caption)
+                        .foregroundStyle(BrumTheme.muted)
                 default:
-                    Text("O iPhone verifica silenciosamente se existe um novo build pessoal. Nenhuma versão é publicada na App Store.").font(.caption).foregroundStyle(BrumTheme.muted)
+                    Text("Consulta a fonte oficial do SideStore para iOS. Contas Apple gratuitas renovam a assinatura a cada 7 dias pelo SideStore com StosVPN ativo.")
+                        .font(.caption)
+                        .foregroundStyle(BrumTheme.muted)
                 }
 
-                Button("VERIFICAR AGORA") { Task { await store.checkForPersonalUpdate(showCurrentMessage: true) } }
-                    .font(.caption.bold()).foregroundStyle(BrumTheme.primary)
+                HStack(spacing: 14) {
+                    Button("Verificar atualização") {
+                        Task { await store.checkForPersonalUpdate(showCurrentMessage: true) }
+                    }
+                    .font(.caption.bold())
+                    .foregroundStyle(BrumTheme.primary)
                     .disabled(store.personalUpdate == .checking)
+                    .accessibilityIdentifier("check-update-button")
+
+                    Spacer()
+
+                    Button(copiedSourceURL ? "Fonte copiada" : "Copiar fonte SideStore") {
+                        UIPasteboard.general.string = PersonalUpdateService.sideStoreSourceURL.absoluteString
+                        copiedSourceURL = true
+                    }
+                    .font(.caption.bold())
+                    .foregroundStyle(BrumTheme.muted)
+                }
+
+                Button("Backup de saves para migração (Sideloadly → SideStore)") {
+                    showMigrationBackup = true
+                }
+                .font(.caption.bold())
+                .foregroundStyle(BrumTheme.primary)
             }
+        }
+        .sheet(isPresented: $showMigrationBackup) {
+            SaveMigrationBackupSheet()
         }
     }
 

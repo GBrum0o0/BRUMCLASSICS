@@ -18,6 +18,7 @@ const required = [
   'BRUMCLASSICSMobile/MurbRemoteGamepad.swift',
   'BRUMCLASSICSMobile/PersonalUpdateService.swift',
   'BRUMCLASSICSMobile/ProfileView.swift', 'BRUMCLASSICSMobile/BCardView.swift',
+  'BRUMCLASSICSMobile/SaveMigrationBackup.swift',
   'BRUMCLASSICSMobile/ROMFolderLibrary.swift',
   'BRUMCLASSICSMobile/IntegratedEmulatorView.swift',
   'BRUMCLASSICSMobile/Libretro/BrumLibretroAPI.h',
@@ -31,7 +32,7 @@ const required = [
   'BRUMCLASSICSMobile/MomentsView.swift', 'BRUMCLASSICSMobileTests/SnapshotTests.swift',
   'ios-update.json'
 ];
-required.push('prepare_ppsspp_assets.py', 'licenses/PPSSPP-FONTS.txt');
+required.push('prepare_ppsspp_assets.py', 'licenses/PPSSPP-FONTS.txt', 'generate_sidestore_source.py', 'test_sidestore_source.py');
 
 for (const relative of required) {
   if (!fs.existsSync(path.join(root, relative))) throw new Error(`Arquivo obrigatório ausente: ${relative}`);
@@ -116,6 +117,9 @@ if (!source.includes('completeFileProtectionUnlessOpen')) throw new Error('Prote
 if (source.includes('NSAllowsArbitraryLoads')) throw new Error('Exceção ATS ampla não é permitida.');
 if (!source.includes('com.brumclassics.mobile.ios') && !fs.readFileSync(path.join(root, 'project.yml'), 'utf8').includes('com.brumclassics.mobile.ios')) throw new Error('Bundle ID pessoal fixo ausente.');
 if (!source.includes('checkForPersonalUpdate')) throw new Error('Verificação de atualização pessoal ausente.');
+if (!info.includes('<string>sidestore</string>')) throw new Error('Esquema URL sidestore precisa estar declarado em Info.plist.');
+if (!fs.readFileSync(path.join(app, 'ProfileView.swift'), 'utf8').includes('Verificar atualização')) throw new Error('Botão Verificar atualização ausente em ProfileView.');
+if (!fs.readFileSync(path.join(root, '..', '.github', 'workflows', 'build-ios-personal.yml'), 'utf8').includes('generate_sidestore_source.py')) throw new Error('Automação da fonte SideStore ausente no workflow iOS.');
 
 const updateManifest = JSON.parse(fs.readFileSync(path.join(root, 'ios-update.json'), 'utf8'));
 const publishedUpdateManifest = JSON.parse(fs.readFileSync(path.join(root, '..', 'ios-update.json'), 'utf8'));

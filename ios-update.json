@@ -1,11 +1,11 @@
 {
-  "version": "0.24.0",
-  "build": 57,
+  "version": "0.25.0",
+  "build": 58,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.24.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.25.0",
   "notes": [
-    "Corrige falhas de abertura do PSP (.iso) no iPhone (streaming POSIX sem JIT/PROT_EXEC, guardas antes do 1º frame, stack de 2 MB e sondagem ASLR).",
-    "Integra runtime oficial rcheevos v12.5.0 (Softcore, token no Keychain) com popup no molde horizontal BRUM CLASSICS e deduplicação entre tela nativa e Gamepad.",
-    "Preserva 3DS em modo experimental por software/interpretador sem JIT e sem declaração falsa de RetroAchievements."
+    "Adiciona fonte oficial compatível com SideStore (sidestore-source.json) para consultar e instalar atualizações pelo iPhone sem voltar ao computador após o pareamento inicial.",
+    "Atualiza a tela de atualizações em Perfil com botão 'Verificar atualização' e encaminhamento seguro via sidestore:// mantendo compatibilidade com Sideloadly.",
+    "Inclui backup e restauração verificados (SHA-256) para migrar saves locais com segurança antes de trocar do Sideloadly para o SideStore."
   ]
 }
