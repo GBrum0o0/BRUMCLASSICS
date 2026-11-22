@@ -239,21 +239,23 @@ public final class MainActivity extends Activity {
                     }
                 } else if ("pokedex_discovery".equals(type)) {
                     if (payload != null && pokedexStore != null) {
-                        org.json.JSONObject disc = payload.optJSONObject("discovery");
-                        if (disc == null) disc = payload;
-                        int dex = disc.optInt("nationalDexNumber", 0);
-                        if (dex >= 1 && dex <= 802) {
-                            boolean isShiny = disc.optBoolean("isShiny", "shiny".equalsIgnoreCase(disc.optString("category", "")));
-                            pokedexStore.recordCapture(
-                                dex,
-                                isShiny,
-                                disc.optString("gameTitle", "Pokémon FireRed Version"),
-                                disc.optString("gameId", ""),
-                                disc.optString("systemId", "gba"),
-                                disc.optString("capturedAt", null),
-                                disc.optString("captureLocation", "Localização desconhecida")
-                            );
-                        }
+                        try {
+                            org.json.JSONObject disc = payload.optJSONObject("discovery");
+                            if (disc == null) disc = payload;
+                            int dex = disc.optInt("nationalDexNumber", 0);
+                            if (dex >= 1 && dex <= 802) {
+                                boolean isShiny = disc.optBoolean("isShiny", "shiny".equalsIgnoreCase(disc.optString("category", "")));
+                                pokedexStore.recordCapture(
+                                    dex,
+                                    isShiny,
+                                    disc.optString("gameTitle", "Pokémon FireRed Version"),
+                                    disc.optString("gameId", ""),
+                                    disc.optString("systemId", "gba"),
+                                    disc.optString("capturedAt", null),
+                                    disc.optString("captureLocation", "Localização desconhecida")
+                                );
+                            }
+                        } catch (Exception ignored) {}
                     }
                     BrumAchievementOverlay.Payload popup = BrumAchievementOverlay.Payload.fromPokedexBridgeEvent(payload);
                     if (com.brumclassics.mobile.murb.MurbRemoteGamepadActivity.activeOnForeground) {

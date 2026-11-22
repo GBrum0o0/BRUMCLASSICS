@@ -38,7 +38,51 @@ public final class PokedexUniversalStore {
         return new File(storageDir, "collection-v1.json");
     }
 
-    private synchronized void loadFromDisk() {
+    private File enabledFile() {
+        return new File(storageDir, "enabled.json");
+    }
+
+    public synchronized boolean isExtensionEnabled() {
+        File file = enabledFile();
+        if (!file.isFile()) return true;
+        try {
+            AtomicFile atomic = new AtomicFile(file);
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            try (FileInputStream in = atomic.openRead()) {
+                byte[] chunk = new byte[1024];
+                int read;
+                while ((read = in.read(chunk)) >= 0) {
+                    buffer.write(chunk, 0, read);
+                }
+            }
+            JSONObject root = new JSONObject(new String(buffer.toByteArray(), StandardCharsets.UTF_8));
+            return root.optBoolean("enabled", true);
+        } catch (Exception ignored) {
+            return true;
+        }
+    }
+
+    public synchronized void setExtensionEnabled(boolean enabled) {
+        try {
+            JSONObject root = new JSONObject();
+            root.put("extensionId", BrumExtensionContract.POKEDEX_EXTENSION_ID);
+            root.put("profileId", ownerProfileId);
+            root.put("enabled", enabled);
+            AtomicFile atomic = new AtomicFile(enabledFile());
+            FileOutputStream out = null;
+            try {
+                out = atomic.startWrite();
+                out.write(root.toString(2).getBytes(StandardCharsets.UTF_8));
+                out.getFD().sync();
+                atomic.finishWrite(out);
+            } catch (Exception e) {
+                if (out != null) atomic.failWrite(out);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    public synchronized void loadFromDisk() {
         File file = collectionFile();
         File bakFile = new File(file.getPath() + ".bak");
         if (!file.isFile() && !bakFile.isFile()) return;
