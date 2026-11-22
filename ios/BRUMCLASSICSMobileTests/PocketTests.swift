@@ -1,3 +1,4 @@
+import CryptoKit
 import XCTest
 @testable import BRUMCLASSICSMobile
 
@@ -718,7 +719,7 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(identity.contentSHA256, expectedHash)
     }
 
-    func testAchievementOverlayPayloadSanitizationAndDeduplication() {
+    @MainActor func testAchievementOverlayPayloadSanitizationAndDeduplication() {
         let valid = BrumAchievementOverlayPayload.fromBridgeEvent([
             "type": "achievement_unlocked",
             "gameId": "777",
