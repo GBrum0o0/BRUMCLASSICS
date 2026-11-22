@@ -1,0 +1,74 @@
+{
+  "name": "BRUMCLASSICS Oficial (iOS)",
+  "identifier": "com.brumclassics.sidestore.source",
+  "sourceURL": "https://raw.githubusercontent.com/GBrum0o0/BRUMCLASSICS/sidestore-source/sidestore-source.json",
+  "subtitle": "Atualizações oficiais do BRUMCLASSICS Móvel para iPhone via SideStore.",
+  "description": "Fonte oficial do BRUMCLASSICS Móvel para iOS apontando exclusivamente para IPAs verificados nas releases ios-v* no GitHub.",
+  "iconURL": "https://raw.githubusercontent.com/GBrum0o0/BRUMCLASSICS/main/ios/BRUMCLASSICSMobile/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png",
+  "website": "https://github.com/GBrum0o0/BRUMCLASSICS",
+  "tintColor": "#10B981",
+  "featuredApps": [
+    "com.brumclassics.mobile.ios"
+  ],
+  "apps": [
+    {
+      "name": "BRUMCLASSICS",
+      "bundleIdentifier": "com.brumclassics.mobile.ios",
+      "developerName": "BRUMCLASSICS",
+      "subtitle": "Emulação CLASSICS, Gaming Mode e segunda tela no iPhone.",
+      "localizedDescription": "Cliente iOS oficial do ecossistema BRUMCLASSICS com biblioteca offline sincronizada, Gaming Mode, Gamepad remoto de baixa latência, núcleos integrados Libretro (incluindo PPSSPP sem JIT para iPhone) e RetroAchievements oficial (rcheevos).",
+      "iconURL": "https://raw.githubusercontent.com/GBrum0o0/BRUMCLASSICS/main/ios/BRUMCLASSICSMobile/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png",
+      "tintColor": "#10B981",
+      "category": "games",
+      "screenshotURLs": [],
+      "version": "0.24.0",
+      "versionDate": "2026-11-22T09:23:06Z",
+      "versionDescription": "# BRUMCLASSICS MÓVEL iOS 0.24.0 — Correção de Crash no PSP e RetroAchievements Real (`rcheevos`)\n\n- **PSP (`.iso`):** corrige falhas reais de abertura no iPhone com inspeção e hashing em streaming POSIX (`open`/`read` de 1 MB) sem OOM/Jetsam, guardas pré-1º frame para `serialize*`, inicialização de resolução ao relançar no mesmo processo, proteção estrita contra `PROT_EXEC` sem JIT, pilha de 2 MB na `EmuThread` e sondagem ASLR ampliada.\n- **RetroAchievements Real (`rcheevos` v12.5.0, MIT):** integra o avaliador oficial em modo **Softcore**, autenticação por token protegida no Keychain (sem salvar senha), leitura de memória quadro a quadro e exibição exclusiva após confirmação oficial HTTP `200` `\"Success\": true` em `r=awardachievement`.\n- **Popup BRUM CLASSICS:** aplica o molde horizontal oficial (`#090d0e`, borda `#35413f`, barra lateral `#9dff3b`, ícone vetorial de cartucho e pílula `+N PTS`) na sessão integrada e no Gamepad remoto, com deduplicação por `eventId`.\n- **Nintendo 3DS (`Azahar`):** preservado no build experimental por software sem JIT e explicitamente marcado como sem suporte RetroAchievements (`console_id = 0`) até suporte oficial certificado.\n\n**Validação:** contratos compartilhados C++ (`tests.cpp` e `ra_tests.cpp`), validação de pacote/licenças (`validate_ipa.py` + `rcheevos-LICENSE.txt`) e estrutura do projeto iOS passam localmente e no workflow; gameplay físico de 5+ min em iPhone real e desbloqueio oficial em conta de usuário aguardam validação em aparelho.",
+      "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.24.0/BRUMCLASSICS-MOVEL-IOS-0.24.0.ipa",
+      "size": 15024172,
+      "versions": [
+        {
+          "version": "0.24.0",
+          "buildVersion": "57",
+          "date": "2026-11-22T09:23:06Z",
+          "localizedDescription": "# BRUMCLASSICS MÓVEL iOS 0.24.0 — Correção de Crash no PSP e RetroAchievements Real (`rcheevos`)\n\n- **PSP (`.iso`):** corrige falhas reais de abertura no iPhone com inspeção e hashing em streaming POSIX (`open`/`read` de 1 MB) sem OOM/Jetsam, guardas pré-1º frame para `serialize*`, inicialização de resolução ao relançar no mesmo processo, proteção estrita contra `PROT_EXEC` sem JIT, pilha de 2 MB na `EmuThread` e sondagem ASLR ampliada.\n- **RetroAchievements Real (`rcheevos` v12.5.0, MIT):** integra o avaliador oficial em modo **Softcore**, autenticação por token protegida no Keychain (sem salvar senha), leitura de memória quadro a quadro e exibição exclusiva após confirmação oficial HTTP `200` `\"Success\": true` em `r=awardachievement`.\n- **Popup BRUM CLASSICS:** aplica o molde horizontal oficial (`#090d0e`, borda `#35413f`, barra lateral `#9dff3b`, ícone vetorial de cartucho e pílula `+N PTS`) na sessão integrada e no Gamepad remoto, com deduplicação por `eventId`.\n- **Nintendo 3DS (`Azahar`):** preservado no build experimental por software sem JIT e explicitamente marcado como sem suporte RetroAchievements (`console_id = 0`) até suporte oficial certificado.\n\n**Validação:** contratos compartilhados C++ (`tests.cpp` e `ra_tests.cpp`), validação de pacote/licenças (`validate_ipa.py` + `rcheevos-LICENSE.txt`) e estrutura do projeto iOS passam localmente e no workflow; gameplay físico de 5+ min em iPhone real e desbloqueio oficial em conta de usuário aguardam validação em aparelho.",
+          "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.24.0/BRUMCLASSICS-MOVEL-IOS-0.24.0.ipa",
+          "size": 15024172,
+          "sha256": "487b84b8de05d599fc3e68e2754e123837d0bf063b0870613d4f6f50b7852015",
+          "minOSVersion": "16.0"
+        },
+        {
+          "version": "0.23.0",
+          "buildVersion": "56",
+          "date": "2026-11-21T20:12:35Z",
+          "localizedDescription": "# BRUMCLASSICS MÓVEL iOS 0.23.0 — Correções do Gaming Mode e PSP\n\n- Corrige a detecção de jogos PSP em `.iso` e `.pbp` (inclusive fora de subpasta `PSP` ou em pasta raiz `PSP`/`PlayStation Portable`) para não aparecerem como indisponíveis quando presentes e acessíveis no iPhone.\n- Remove nomes técnicos de núcleos e emuladores da interface do Gaming Mode.\n- Exibe indicadores diretos abaixo dos jogos: `Disponível` (verde) para arquivos acessíveis no aparelho e `No computador` (cinza) para jogos Classics sincronizados do PC.\n- Filtra o Gaming Mode para exibir exclusivamente jogos Classics, ocultando títulos de PC, Steam, Windows e executáveis sem alterar a biblioteca original.\n\n**Validação:** compilação, testes automatizados no simulador e verificação do IPA são executados no build. Teste físico em iPhone com jogos PSP, áudio, controles e saves locais em `PSP/SAVEDATA` ainda exige validação no aparelho; desempenho de PSP permanece limitado pelo modo interpretador sem JIT.",
+          "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.23.0/BRUMCLASSICS-MOVEL-IOS-0.23.0.ipa",
+          "size": 14838205,
+          "sha256": "1ce0b71cd85094f91e8f9abb2917acdb93fecc2d71e6dfac0e80f32f4a429d21",
+          "minOSVersion": "16.0"
+        },
+        {
+          "version": "0.22.0",
+          "buildVersion": "55",
+          "date": "2026-11-21T12:17:12Z",
+          "localizedDescription": "# BRUMCLASSICS MÓVEL iOS 0.22.0 — PSP\n\n- Inclui o núcleo PPSSPP e seus arquivos de apoio na IPA normal, para abrir jogos de PSP pelo Gaming Mode.\n- Reconhece jogos ISO, CSO e PBP na categoria PSP e utiliza os controles da sessão integrada.\n- Configura o interpretador para instalação pelo Sideloadly sem exigir JIT.\n- Preserva as correções de direcional, filtro Classics e Save Sync das versões anteriores.\n\n**Validação:** compilação, contratos e conteúdo da IPA são verificados pelo fluxo de build. Gameplay físico de PSP, áudio, controle e recuperação de save ainda exigem teste no iPhone. Desempenho varia por jogo/aparelho; não há promessa de 60 FPS. Desbloqueios RetroAchievements nativos continuam em desenvolvimento.\n\nInstale a IPA com o Sideloadly. Jogos, BIOS e contas não acompanham o arquivo.\n\nCódigo-fonte correspondente e receitas: o commit deste build no repositório público. O núcleo PPSSPP mantém sua licença GPL-2.0-or-later; o aplicativo móvel é GPL-3.0-or-later. Consulte as licenças incluídas e [orientações de PSP](../../docs/PSP-MOBILE.md).",
+          "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.22.0/BRUMCLASSICS-MOVEL-IOS-0.22.0.ipa",
+          "size": 14832402,
+          "sha256": "8b27be53e169349e4392e3b5935416d55e855e5544dd002d37497a45e55c4850",
+          "minOSVersion": "16.0"
+        },
+        {
+          "version": "0.21.0",
+          "buildVersion": "54",
+          "date": "2026-11-20T21:12:50Z",
+          "localizedDescription": "# BRUMCLASSICS MÓVEL iOS 0.21.0\n\nO direcional virtual tolera pequenos desvios do dedo sem ativar diagonais involuntárias. Diagonais intencionais continuam disponíveis, com estabilidade durante movimentos contínuos e liberação ao terminar ou cancelar o toque.\n\nGaming Mode mostra somente ROMs locais e jogos Classics. O filtro cobre favoritos, vínculos antigos e mudanças de categoria após sincronização. A biblioteca geral do computador permanece intacta.\n\nMantém o Save Sync e as integrações da versão 0.20.0. Instale sobre o aplicativo existente, com a mesma identidade de assinatura, para preservar seus dados. O IPA é distribuído sem assinatura para instalação pessoal.\n\nNovos desbloqueios RetroAchievements durante a emulação nativa continuam em desenvolvimento. A consulta do progresso da conta não substitui o avaliador do runtime. Os testes automatizados não certificam toque e jogabilidade no aparelho físico.",
+          "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.21.0/BRUMCLASSICS-MOVEL-IOS-0.21.0.ipa",
+          "size": 4969272,
+          "sha256": "ef06c628a3c3c689a4c0b060d711f345a79352d64fd081f93f2443d584c2cac0",
+          "minOSVersion": "16.0"
+        }
+      ]
+    }
+  ],
+  "news": []
+}
