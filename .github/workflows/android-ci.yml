@@ -144,20 +144,42 @@ jobs:
           git -C "$SOURCE" checkout --detach "$COMMIT"
           test "$(git -C "$SOURCE" rev-parse HEAD)" = "$COMMIT"
           git -C "$SOURCE" submodule update --init --recursive --depth 1
-          NDK="$ANDROID_HOME/ndk/27.0.12077973"
-          CMAKE_PATH="$ANDROID_HOME/cmake/3.22.1/bin"
-          cmake -S "$SOURCE" -B "$SOURCE/build-brum-android-arm64" -G Ninja \
-            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-            -DENABLE_LIBRETRO=ON -DENABLE_OPENGL=ON -DENABLE_VULKAN=OFF \
-            -DENABLE_BUILTIN_KEYBLOB=OFF -DENABLE_LTO=OFF \
-            -DENABLE_WEB_SERVICE=OFF -DENABLE_SCRIPTING=OFF -DENABLE_TESTS=OFF \
-            -DCITRA_USE_PRECOMPILED_HEADERS=OFF -DCITRA_WARNINGS_AS_ERRORS=OFF \
-            -DCMAKE_BUILD_TYPE=Release -DANDROID_ABI=arm64-v8a -DANDROID_NDK="$NDK" \
-            -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
-            -DANDROID_PLATFORM=android-26 -DANDROID_STL=c++_static -DCMAKE_MAKE_PROGRAM="$CMAKE_PATH/ninja"
-          cmake --build "$SOURCE/build-brum-android-arm64" --target citra_libretro --parallel 4
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -path '*/bin/sdkmanager' | sort -V | tail -1)
+          yes | "$SDKMANAGER" "ndk;29.0.14206865" "cmake;3.30.3" >/dev/null
+          NDK="$ANDROID_HOME/ndk/29.0.14206865"
+          CMAKE_PATH="$ANDROID_HOME/cmake/3.30.3/bin"
+          AZAHAR_LOG="$RUNNER_TEMP/azahar-build.log"
+          AZAHAR_ERRORS="$RUNNER_TEMP/azahar-errors.log"
+          set +e
+          (
+            "$CMAKE_PATH/cmake" -S "$SOURCE" -B "$SOURCE/build-brum-android-arm64" -G Ninja \
+              -DENABLE_LIBRETRO=ON -DENABLE_OPENGL=ON -DENABLE_VULKAN=OFF \
+              -DENABLE_BUILTIN_KEYBLOB=OFF -DENABLE_LTO=OFF -DENABLE_TESTS=OFF \
+              -DCITRA_USE_PRECOMPILED_HEADERS=OFF -DCITRA_WARNINGS_AS_ERRORS=OFF \
+              -DCMAKE_BUILD_TYPE=Release -DANDROID_ABI=arm64-v8a -DANDROID_NDK="$NDK" \
+              -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
+              -DANDROID_PLATFORM=android-26 -DANDROID_STL=c++_static \
+              -DCMAKE_MAKE_PROGRAM="$CMAKE_PATH/ninja" && \
+            "$CMAKE_PATH/cmake" --build "$SOURCE/build-brum-android-arm64" \
+              --target azahar_libretro --config Release --parallel 4
+          ) 2>&1 | tee "$AZAHAR_LOG"
+          AZAHAR_STATUS=${PIPESTATUS[0]}
+          set -e
+          if [ "$AZAHAR_STATUS" -ne 0 ]; then
+            grep -E 'error:|fatal error:|CMake Error|undefined reference|FAILED:|ld\.lld:' "$AZAHAR_LOG" \
+              | tail -n 25 > "$AZAHAR_ERRORS" || true
+            if [ ! -s "$AZAHAR_ERRORS" ]; then tail -n 25 "$AZAHAR_LOG" > "$AZAHAR_ERRORS"; fi
+            while IFS= read -r LINE; do
+              LINE=$(printf '%s' "$LINE" | sed -E $'s/\x1B\\[[0-9;]*[mK]//g' | cut -c1-1800)
+              LINE=${LINE//'%'/'%25'}
+              LINE=${LINE//$'\r'/'%0D'}
+              echo "::error title=Azahar::$LINE"
+            done < "$AZAHAR_ERRORS"
+            exit "$AZAHAR_STATUS"
+          fi
           CORE_SO=$(find "$SOURCE/build-brum-android-arm64" -type f -name 'azahar_libretro*.so' -print -quit)
           test -n "$CORE_SO"
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" -s "$CORE_SO"
           mkdir -p android/app/src/main/jniLibs/arm64-v8a android/app/src/main/assets/core-licenses
           cp "$CORE_SO" android/app/src/main/jniLibs/arm64-v8a/libazahar_libretro.so
           cp "$SOURCE/license.txt" android/app/src/main/assets/core-licenses/Azahar-LICENSE.txt

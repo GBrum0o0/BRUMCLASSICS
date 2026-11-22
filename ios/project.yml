@@ -21,11 +21,10 @@ settings:
       - RC_DISABLE_LUA=1
       - RC_CLIENT_SUPPORTS_HASH=1
 targets:
-  BRUMCLASSICSMobile:
-    type: application
+  Rcheevos:
+    type: library.static
     platform: iOS
     sources:
-      - path: BRUMCLASSICSMobile
       - path: ../shared/brum-core/RetroAchievementsRuntime.cpp
         compilerFlags:
           - -DRC_DISABLE_LUA=1
@@ -42,7 +41,18 @@ targets:
           - -DRC_DISABLE_LUA=1
           - -DRC_CLIENT_SUPPORTS_HASH=1
           - -w
+    settings:
+      base:
+        CLANG_ENABLE_MODULES: NO
+        SKIP_INSTALL: YES
+        SWIFT_OBJC_BRIDGING_HEADER: ""
+  BRUMCLASSICSMobile:
+    type: application
+    platform: iOS
+    sources:
+      - path: BRUMCLASSICSMobile
     dependencies:
+      - target: Rcheevos
       - sdk: AudioToolbox.framework
       - sdk: AVFoundation.framework
       - sdk: GameController.framework
@@ -65,28 +75,13 @@ targets:
     platform: iOS
     sources:
       - path: BRUMCLASSICSMobile
-      - path: ../shared/brum-core/RetroAchievementsRuntime.cpp
-        compilerFlags:
-          - -DRC_DISABLE_LUA=1
-          - -DRC_CLIENT_SUPPORTS_HASH=1
-      - path: ../third_party/rcheevos/src
-        excludes:
-          - "rc_client_external.c"
-          - "rc_client_external.h"
-          - "rc_client_external_versions.h"
-          - "rc_client_raintegration.c"
-          - "rc_client_raintegration_internal.h"
-          - "rapi/rc_api_editor.c"
-        compilerFlags:
-          - -DRC_DISABLE_LUA=1
-          - -DRC_CLIENT_SUPPORTS_HASH=1
-          - -w
       - path: BRUMCLASSICSMobileTests
         excludes: [Fixtures]
       - path: build/test-fixtures/BrumTestCore.dylib
         buildPhase: resources
     dependencies:
       - target: BRUMCLASSICSMobile
+      - target: Rcheevos
       - sdk: AudioToolbox.framework
       - sdk: AVFoundation.framework
       - sdk: GameController.framework
@@ -97,25 +92,10 @@ targets:
     platform: iOS
     sources:
       - path: BRUMCLASSICSMobile
-      - path: ../shared/brum-core/RetroAchievementsRuntime.cpp
-        compilerFlags:
-          - -DRC_DISABLE_LUA=1
-          - -DRC_CLIENT_SUPPORTS_HASH=1
-      - path: ../third_party/rcheevos/src
-        excludes:
-          - "rc_client_external.c"
-          - "rc_client_external.h"
-          - "rc_client_external_versions.h"
-          - "rc_client_raintegration.c"
-          - "rc_client_raintegration_internal.h"
-          - "rapi/rc_api_editor.c"
-        compilerFlags:
-          - -DRC_DISABLE_LUA=1
-          - -DRC_CLIENT_SUPPORTS_HASH=1
-          - -w
       - path: BRUMCLASSICSMobileUITests
     dependencies:
       - target: BRUMCLASSICSMobile
+      - target: Rcheevos
       - sdk: AudioToolbox.framework
       - sdk: AVFoundation.framework
       - sdk: GameController.framework
