@@ -927,19 +927,12 @@ struct PokedexGamingExtensionView: View {
 
     // MARK: - Section 9: Horizontal Split View (Left Detail Panel + Right Species List & Tabs)
     private var openPokedexSplitView: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: 16) {
-                leftDetailPanel
-                    .frame(minWidth: 310, idealWidth: 380, maxWidth: 440)
-                rightListPanel
-                    .frame(maxWidth: .infinity)
-            }
-            VStack(alignment: .leading, spacing: 16) {
-                leftDetailPanel
-                rightListPanel
-            }
+        HStack(alignment: .top, spacing: 16) {
+            leftDetailPanel
+                .frame(minWidth: 280, idealWidth: 340, maxWidth: 390)
+            rightListPanel
+                .frame(maxWidth: .infinity)
         }
-        .accessibilityIdentifier("pokedex-open-split")
     }
 
     private var leftDetailPanel: some View {
