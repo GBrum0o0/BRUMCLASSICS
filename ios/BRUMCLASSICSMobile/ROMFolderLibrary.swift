@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 struct ROMFolderGame: Codable, Equatable, Identifiable, Sendable {
     let relativePath: String
@@ -436,7 +437,7 @@ actor ROMFolderAccess {
         let isDiscDescriptor = ["cue", "m3u", "gdi"].contains(ext)
         if !isDiscDescriptor {
             let sourceValues = try CoordinatedFileAccess.read(source) { coordinated -> (Int64, TimeInterval) in
-                let v = try coordinated.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+                let v = try coordinated.resourceValues(forKeys: Set<URLResourceKey>([.fileSizeKey, .contentModificationDateKey]))
                 return (Int64(v.fileSize ?? 0), v.contentModificationDate?.timeIntervalSince1970 ?? 0)
             }
             let keyData = SHA256.hash(data: Data("\(game.relativePath)|\(sourceValues.0)".utf8))
@@ -445,7 +446,8 @@ actor ROMFolderAccess {
             let cachedFile = cacheDir.appendingPathComponent(game.filename, isDirectory: false)
             let manifestFile = cacheDir.appendingPathComponent(".brum-stage.json", isDirectory: false)
             if FileManager.default.fileExists(atPath: cachedFile.path),
-               let cachedSize = try? cachedFile.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+               let cachedValues = try? cachedFile.resourceValues(forKeys: Set<URLResourceKey>([.fileSizeKey])),
+               let cachedSize = cachedValues.fileSize,
                Int64(cachedSize) == sourceValues.0,
                let manifestData = try? Data(contentsOf: manifestFile),
                let manifest = try? JSONDecoder().decode(IntegratedStageManifest.self, from: manifestData),
