@@ -100,18 +100,16 @@ enum BrumCartridgeBrandMark {
     }
 }
 
-@MainActor
-final class BrumAchievementOverlayCoordinator: ObservableObject {
-    static let shared = BrumAchievementOverlayCoordinator()
-
-    @Published private(set) var current: BrumAchievementOverlayPayload?
-    private var queue: [BrumAchievementOverlayPayload] = []
+final class BrumAchievementEventDeduper: @unchecked Sendable {
+    static let shared = BrumAchievementEventDeduper()
+    private let lock = NSLock()
     private var seenEventKeys: Set<String> = []
     private var seenOrder: [String] = []
-    private var activeTask: Task<Void, Never>?
 
     func markSeen(_ eventID: String) -> Bool {
         let key = eventID.lowercased()
+        lock.lock()
+        defer { lock.unlock() }
         guard !seenEventKeys.contains(key) else { return false }
         if seenOrder.count >= 512, let oldest = seenOrder.first {
             seenOrder.removeFirst()
@@ -120,6 +118,26 @@ final class BrumAchievementOverlayCoordinator: ObservableObject {
         seenOrder.append(key)
         seenEventKeys.insert(key)
         return true
+    }
+
+    func resetForTesting() {
+        lock.lock()
+        defer { lock.unlock() }
+        seenEventKeys.removeAll()
+        seenOrder.removeAll()
+    }
+}
+
+@MainActor
+final class BrumAchievementOverlayCoordinator: ObservableObject {
+    static let shared = BrumAchievementOverlayCoordinator()
+
+    @Published private(set) var current: BrumAchievementOverlayPayload?
+    private var queue: [BrumAchievementOverlayPayload] = []
+    private var activeTask: Task<Void, Never>?
+
+    func markSeen(_ eventID: String) -> Bool {
+        BrumAchievementEventDeduper.shared.markSeen(eventID)
     }
 
     func enqueue(_ payload: BrumAchievementOverlayPayload) {
@@ -132,8 +150,7 @@ final class BrumAchievementOverlayCoordinator: ObservableObject {
         activeTask?.cancel()
         activeTask = nil
         queue.removeAll()
-        seenEventKeys.removeAll()
-        seenOrder.removeAll()
+        BrumAchievementEventDeduper.shared.resetForTesting()
         current = nil
     }
 
@@ -389,7 +406,7 @@ final class BrumAchievementCardView: UIView {
     }
 
     private func enqueueOnMain(_ payload: BrumAchievementOverlayPayload) {
-        guard BrumAchievementOverlayCoordinator.shared.markSeen(payload.eventID) else { return }
+        guard BrumAchievementEventDeduper.shared.markSeen(payload.eventID) else { return }
         queue.append(payload)
         if !showing {
             showNext()
