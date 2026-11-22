@@ -21,12 +21,22 @@
       "tintColor": "#10B981",
       "category": "games",
       "screenshotURLs": [],
-      "version": "0.24.0",
-      "versionDate": "2026-11-22T09:23:06Z",
-      "versionDescription": "# BRUMCLASSICS MÓVEL iOS 0.24.0 — Correção de Crash no PSP e RetroAchievements Real (`rcheevos`)\n\n- **PSP (`.iso`):** corrige falhas reais de abertura no iPhone com inspeção e hashing em streaming POSIX (`open`/`read` de 1 MB) sem OOM/Jetsam, guardas pré-1º frame para `serialize*`, inicialização de resolução ao relançar no mesmo processo, proteção estrita contra `PROT_EXEC` sem JIT, pilha de 2 MB na `EmuThread` e sondagem ASLR ampliada.\n- **RetroAchievements Real (`rcheevos` v12.5.0, MIT):** integra o avaliador oficial em modo **Softcore**, autenticação por token protegida no Keychain (sem salvar senha), leitura de memória quadro a quadro e exibição exclusiva após confirmação oficial HTTP `200` `\"Success\": true` em `r=awardachievement`.\n- **Popup BRUM CLASSICS:** aplica o molde horizontal oficial (`#090d0e`, borda `#35413f`, barra lateral `#9dff3b`, ícone vetorial de cartucho e pílula `+N PTS`) na sessão integrada e no Gamepad remoto, com deduplicação por `eventId`.\n- **Nintendo 3DS (`Azahar`):** preservado no build experimental por software sem JIT e explicitamente marcado como sem suporte RetroAchievements (`console_id = 0`) até suporte oficial certificado.\n\n**Validação:** contratos compartilhados C++ (`tests.cpp` e `ra_tests.cpp`), validação de pacote/licenças (`validate_ipa.py` + `rcheevos-LICENSE.txt`) e estrutura do projeto iOS passam localmente e no workflow; gameplay físico de 5+ min em iPhone real e desbloqueio oficial em conta de usuário aguardam validação em aparelho.",
-      "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.24.0/BRUMCLASSICS-MOVEL-IOS-0.24.0.ipa",
-      "size": 15024172,
+      "version": "0.25.0",
+      "versionDate": "2026-11-22T12:02:47Z",
+      "versionDescription": "# BRUMCLASSICS MÓVEL iOS 0.25.0 — Atualizações pelo iPhone com SideStore\n\n- **Fonte oficial SideStore:** disponibiliza `sidestore-source.json` na branch `sidestore-source` apontando exclusivamente para as releases oficiais `ios-v*` verificadas no GitHub (nunca `/releases/latest` de PC/Android), com versão, build (`58`), `minimumOsVersion` (`16.0`), tamanho em bytes e `SHA-256` validados após publicação do `.ipa`.\n- **Integração no Perfil do iPhone:** adiciona o botão **Verificar atualização**, consulta prioritária à fonte SideStore (com fallback seguro para `ios-update.json`), detecção do esquema `sidestore://` e encaminhamento para adicionar a fonte ou enviar o `.ipa` ao SideStore mantendo o download para Sideloadly.\n- **Backup de migração com integridade verificada:** permite exportar e restaurar saves integrados (`IntegratedEmulator/Saves`) e vínculos JSON (`ClassicsEverywhere`) com conferência `SHA-256` e cópia preventiva antes de trocar do Sideloadly para o SideStore.\n\n**Validação:** geração e validação da fonte SideStore (`test_sidestore_source.py`), parser Swift + deep links e backup/restauração verificados (`SnapshotTests`), validação do pacote (`validate_ipa.py`) e simulador/compilação no workflow passam em CI; instalação no SideStore real, renovação com StosVPN e atualização sem PC aguardam validação em iPhone físico.",
+      "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.25.0/BRUMCLASSICS-MOVEL-IOS-0.25.0.ipa",
+      "size": 15095169,
       "versions": [
+        {
+          "version": "0.25.0",
+          "buildVersion": "58",
+          "date": "2026-11-22T12:02:47Z",
+          "localizedDescription": "# BRUMCLASSICS MÓVEL iOS 0.25.0 — Atualizações pelo iPhone com SideStore\n\n- **Fonte oficial SideStore:** disponibiliza `sidestore-source.json` na branch `sidestore-source` apontando exclusivamente para as releases oficiais `ios-v*` verificadas no GitHub (nunca `/releases/latest` de PC/Android), com versão, build (`58`), `minimumOsVersion` (`16.0`), tamanho em bytes e `SHA-256` validados após publicação do `.ipa`.\n- **Integração no Perfil do iPhone:** adiciona o botão **Verificar atualização**, consulta prioritária à fonte SideStore (com fallback seguro para `ios-update.json`), detecção do esquema `sidestore://` e encaminhamento para adicionar a fonte ou enviar o `.ipa` ao SideStore mantendo o download para Sideloadly.\n- **Backup de migração com integridade verificada:** permite exportar e restaurar saves integrados (`IntegratedEmulator/Saves`) e vínculos JSON (`ClassicsEverywhere`) com conferência `SHA-256` e cópia preventiva antes de trocar do Sideloadly para o SideStore.\n\n**Validação:** geração e validação da fonte SideStore (`test_sidestore_source.py`), parser Swift + deep links e backup/restauração verificados (`SnapshotTests`), validação do pacote (`validate_ipa.py`) e simulador/compilação no workflow passam em CI; instalação no SideStore real, renovação com StosVPN e atualização sem PC aguardam validação em iPhone físico.",
+          "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.25.0/BRUMCLASSICS-MOVEL-IOS-0.25.0.ipa",
+          "size": 15095169,
+          "sha256": "cc8aed1af1a70c262e428d6797e8c37c75acb28ee05e053f8c68b506bcb184af",
+          "minOSVersion": "16.0"
+        },
         {
           "version": "0.24.0",
           "buildVersion": "57",
