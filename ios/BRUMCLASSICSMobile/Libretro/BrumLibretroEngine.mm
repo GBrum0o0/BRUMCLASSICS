@@ -9,7 +9,6 @@
 #include "../../../shared/brum-core/FrameCadence.hpp"
 #include "../../../shared/brum-core/ContentValidation.hpp"
 #include "../../../shared/brum-core/RetroAchievementsRuntime.hpp"
-#import "BRUMCLASSICSMobile-Swift.h"
 #include <memory>
 
 #import <AudioToolbox/AudioToolbox.h>
@@ -20,6 +19,13 @@
 #import <OpenGLES/ES3/glext.h>
 #import <OpenGLES/EAGL.h>
 #import <QuartzCore/QuartzCore.h>
+#if __has_include("BRUMCLASSICSMobile-Swift.h")
+#import "BRUMCLASSICSMobile-Swift.h"
+#elif __has_include("BRUMCLASSICSMobileTests-Swift.h")
+#import "BRUMCLASSICSMobileTests-Swift.h"
+#elif __has_include("BRUMCLASSICSMobileUITests-Swift.h")
+#import "BRUMCLASSICSMobileUITests-Swift.h"
+#endif
 #import <dlfcn.h>
 #import <math.h>
 #import <os/lock.h>
