@@ -112,6 +112,12 @@ struct BrumExtensionManifest: Codable, Equatable, Identifiable {
 }
 
 final class BrumExtensionRegistry {
+    static let shared: BrumExtensionRegistry = {
+        let reg = BrumExtensionRegistry()
+        _ = try? reg.register(.pokedexUniversal)
+        return reg
+    }()
+
     private let storageRoot: URL
     private var registered: [String: BrumExtensionManifest] = [:]
 

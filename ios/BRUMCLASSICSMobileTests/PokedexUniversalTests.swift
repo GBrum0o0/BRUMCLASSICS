@@ -165,4 +165,79 @@ final class PokedexUniversalTests: XCTestCase {
         XCTAssertEqual(mergeOutcome.replacedWithEarlierCount, 0)
         XCTAssertEqual(mergeOutcome.preservedCount, 1)
     }
+
+    @MainActor
+    func testPokedexFrontendCoordinatorSpriteAndDiscoveryPopupContract() throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PokedexFrontendTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+
+        let registry = BrumExtensionRegistry(storageRoot: tempRoot)
+        _ = try registry.register(.pokedexUniversal)
+        let store = PokedexUniversalStore(registry: registry, deviceID: "iphone-ui-test")
+        let coordinator = PokedexUniversalCoordinator(store: store, profileID: "gusta")
+
+        // 1. Initial state must be closed Pokédex device
+        XCTAssertFalse(coordinator.isDeviceOpen)
+        XCTAssertEqual(coordinator.selectedTab, .pokemon)
+        XCTAssertEqual(coordinator.displayedEntries.count, 151)
+
+        // 2. Undiscovered species (#001 Bulbasaur) must NOT match search by hidden name "bulbasaur"
+        coordinator.searchQuery = "bulbasaur"
+        XCTAssertEqual(coordinator.displayedEntries.count, 0)
+
+        // Searching by visible National Dex number (#001) MUST match
+        coordinator.searchQuery = "001"
+        XCTAssertEqual(coordinator.displayedEntries.count, 1)
+        XCTAssertEqual(coordinator.displayedEntries.first?.name, "???")
+        coordinator.searchQuery = ""
+
+        // 3. Record capture of Pikachu (#25) and verify discovery popup payload
+        coordinator.handleDetectedCapture(
+            nationalDexNumber: 25,
+            isShiny: false,
+            gameTitle: "Pokémon FireRed Version",
+            gameID: "firered-1",
+            systemID: "gba",
+            captureLocation: "Viridian Forest"
+        )
+        XCTAssertEqual(coordinator.projectedView.summary.normalDiscovered, 1)
+        XCTAssertEqual(coordinator.selectedDexNumber, 25)
+
+        // Discovered species (#025 Pikachu) CAN now be found by name
+        coordinator.searchQuery = "pikachu"
+        XCTAssertEqual(coordinator.displayedEntries.count, 1)
+        XCTAssertEqual(coordinator.displayedEntries.first?.name, "Pikachu")
+        coordinator.searchQuery = ""
+
+        // 4. Pixel-art sprite renderer produces non-empty images for silhouette, normal, and shiny
+        let silhouetteImg = PokedexPixelSprite.image(for: 1, mode: .silhouette, pixelScale: 4)
+        let normalImg = PokedexPixelSprite.image(for: 25, mode: .normal, pixelScale: 4)
+        let shinyImg = PokedexPixelSprite.image(for: 25, mode: .shiny, pixelScale: 4)
+        XCTAssertEqual(silhouetteImg.size.width, 64)
+        XCTAssertEqual(normalImg.size.width, 64)
+        XCTAssertEqual(shinyImg.size.width, 64)
+
+        // 5. Verify Bridge Event -> Discovery Overlay Payload
+        let bridgeEvent: [String: Any] = [
+            "type": "pokedex_discovery",
+            "eventId": "pokedex-discovery:gusta:25:shiny",
+            "discovery": [
+                "nationalDexNumber": 25,
+                "formattedNumber": "025",
+                "speciesName": "Pikachu",
+                "category": "shiny",
+                "isShiny": true,
+                "headline": "025 — Pikachu",
+                "gameTitle": "Pokémon FireRed Version",
+                "subtitle": "Registrado na Pokédex Universal"
+            ]
+        ]
+        let overlayPayload = try XCTUnwrap(BrumAchievementOverlayPayload.fromPokedexBridgeEvent(bridgeEvent))
+        XCTAssertEqual(overlayPayload.eyebrow, "✦ NOVO POKÉMON SHINY DESCOBERTO!")
+        XCTAssertEqual(overlayPayload.title, "025 — Pikachu")
+        XCTAssertEqual(overlayPayload.pillText, "✦ SHINY")
+        XCTAssertEqual(overlayPayload.pokedexNationalDexNumber, 25)
+        XCTAssertTrue(overlayPayload.isShinyDiscovery)
+    }
 }

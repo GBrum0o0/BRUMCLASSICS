@@ -33,6 +33,7 @@ const required = [
   'BRUMCLASSICSMobile/Extensions/BrumExtensionContract.swift',
   'BRUMCLASSICSMobile/Extensions/PokedexSpeciesCatalogData.swift',
   'BRUMCLASSICSMobile/Extensions/PokedexUniversalStore.swift',
+  'BRUMCLASSICSMobile/Extensions/PokedexUniversalView.swift',
   'BRUMCLASSICSMobile/Resources/pokedex-species-catalog-v1.json',
   'BRUMCLASSICSMobileTests/PokedexUniversalTests.swift',
   '../shared/brum-core/PokemonFireRedAdapter.hpp',
@@ -88,8 +89,8 @@ if (bcardView.split('private func send')[1].includes('offset = 0')) throw new Er
 for (const marker of ['ClassicsEverywhereView', 'PocketSetupView', 'PocketRules.launchURL', '/v1/classics/achievements/sync', 'API_GetGameInfoAndUserProgress.php']) if (!source.includes(marker)) throw new Error(`CLASSICS iPhone incompleto: ${marker}`);
 if (!source.includes('companion-capture') || !source.includes('MobileSettingsView')) throw new Error('Captura ou configurações móveis ausentes.');
 for (const marker of ['MobileNotificationSnapshot', 'NotificationsView', 'notifications_changed', 'markAllNotificationsRead']) if (!source.includes(marker)) throw new Error(`Central BRUM incompleta: ${marker}`);
-for (const marker of ['struct GamingModeView', 'GamingTabBar(selection:', 'JOGADOS RECENTEMENTE', 'BIBLIOTECA', 'GamingModeCatalog.library', 'pocket.romFolderGames', 'GamingOrientation.request(.landscape)', 'selection != 2']) {
-  if (!source.includes(marker)) throw new Error(`Gaming Mode incompleto: ${marker}`);
+for (const marker of ['struct GamingModeView', 'GamingTabBar(selection:', 'JOGADOS RECENTEMENTE', 'BIBLIOTECA', 'EXTENSÕES', 'gaming-mode-extensions', 'PokedexGamingExtensionView', 'GamingModeCatalog.library', 'pocket.romFolderGames', 'GamingOrientation.request(.landscape)', 'selection != 2']) {
+  if (!source.includes(marker) && !fs.readFileSync(path.join(app, 'Extensions/PokedexUniversalView.swift'), 'utf8').includes(marker)) throw new Error(`Gaming Mode incompleto: ${marker}`);
 }
 if (!source.includes('pocket.launchROM(rom, launcher: store)') || !source.includes('store.launchBCard(game)')) throw new Error('Gaming Mode não decide entre execução local e computador.');
 const gamingSource = fs.readFileSync(path.join(app, 'GamingModeView.swift'), 'utf8');

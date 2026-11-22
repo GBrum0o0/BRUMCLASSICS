@@ -50,19 +50,43 @@ public final class BrumAchievementOverlay {
     public static final class Payload {
         public final String eventId;
         public final String achievementId;
+        public final String eyebrow;
         public final String title;
         public final String description;
         public final int points;
+        public final String pillText;
         public final String badgeUrl;
+        public final int pokedexNationalDexNumber;
+        public final boolean isShinyDiscovery;
 
         public Payload(String eventId, String achievementId, String title, String description, int points, String badgeUrl) {
+            this(eventId, achievementId, "CONQUISTA DESBLOQUEADA", title, description, points, "", badgeUrl, 0, false);
+        }
+
+        public Payload(
+                String eventId,
+                String achievementId,
+                String eyebrow,
+                String title,
+                String description,
+                int points,
+                String pillText,
+                String badgeUrl,
+                int pokedexNationalDexNumber,
+                boolean isShinyDiscovery
+        ) {
             BrumAchievementModel.Payload normalized = new BrumAchievementModel.Payload(eventId, achievementId, title, description, points, badgeUrl);
             this.achievementId = normalized.achievementId;
             this.eventId = normalized.eventId;
+            String cleanEyebrow = eyebrow == null ? "" : eyebrow.trim();
+            this.eyebrow = cleanEyebrow.isEmpty() ? "CONQUISTA DESBLOQUEADA" : cleanEyebrow;
             this.title = normalized.title;
             this.description = normalized.description;
             this.points = normalized.points;
+            this.pillText = pillText == null ? "" : pillText.trim();
             this.badgeUrl = normalized.badgeUrl;
+            this.pokedexNationalDexNumber = Math.max(0, pokedexNationalDexNumber);
+            this.isShinyDiscovery = isShinyDiscovery;
         }
 
         public static String sanitizeBadgeUrl(String raw) {
@@ -86,6 +110,54 @@ public final class BrumAchievementOverlay {
             String badge = ach.optString("badgeUrl", ach.optString("badge", ""));
             return new Payload(eventId, id, title, desc, pts, badge);
         }
+
+        public static Payload fromPokedexBridgeEvent(JSONObject payload) {
+            if (payload == null) return null;
+            JSONObject disc = payload.optJSONObject("discovery");
+            if (disc == null) disc = payload;
+            int dex = disc.optInt("nationalDexNumber", 0);
+            if (dex < 1 || dex > 802) return null;
+            boolean isShiny = disc.optBoolean("isShiny", "shiny".equalsIgnoreCase(disc.optString("category", "")));
+            String formatted = disc.optString("formattedNumber", String.format(Locale.ROOT, "%03d", dex));
+            String species = disc.optString("speciesName", "Pokémon #" + formatted);
+            String headline = disc.optString("headline", formatted + " — " + species);
+            String gameTitle = disc.optString("gameTitle", "Brum Classics");
+            String subtitle = disc.optString("subtitle", "Registrado na Pokédex Universal");
+            String eventId = disc.optString("eventId", payload.optString("eventId", "pokedex-discovery:primary:" + dex + ":" + (isShiny ? "shiny" : "normal")));
+            String eyebrow = isShiny ? "✦ NOVO POKÉMON SHINY DESCOBERTO!" : "NOVO POKÉMON DESCOBERTO!";
+            String pill = isShiny ? "✦ SHINY" : "#" + formatted;
+            return new Payload(
+                    eventId,
+                    "pokedex:" + dex + ":" + (isShiny ? "shiny" : "normal"),
+                    eyebrow,
+                    headline,
+                    gameTitle + " · " + subtitle,
+                    0,
+                    pill,
+                    "",
+                    dex,
+                    isShiny
+            );
+        }
+
+        public static Payload fromPokedexNotification(com.brumclassics.mobile.extensions.PokedexUniversalEngine.DiscoveryNotification note) {
+            if (note == null) return null;
+            boolean isShiny = note.isShiny;
+            String eyebrow = isShiny ? "✦ NOVO POKÉMON SHINY DESCOBERTO!" : "NOVO POKÉMON DESCOBERTO!";
+            String pill = isShiny ? "✦ SHINY" : "#" + note.formattedNumber;
+            return new Payload(
+                    note.eventId,
+                    "pokedex:" + note.nationalDexNumber + ":" + note.category,
+                    eyebrow,
+                    note.headline,
+                    note.gameTitle + " · " + note.subtitle,
+                    0,
+                    pill,
+                    "",
+                    note.nationalDexNumber,
+                    isShiny
+            );
+        }
     }
 
     private static final int COLOR_CHARCOAL = Color.rgb(9, 13, 14);
@@ -102,7 +174,9 @@ public final class BrumAchievementOverlay {
     private final ExecutorService imageExecutor = Executors.newSingleThreadExecutor();
 
     private LinearLayout cardRoot;
+    private View accentStripe;
     private ImageView badgeImage;
+    private TextView eyebrowView;
     private TextView titleView;
     private TextView descriptionView;
     private TextView pointsView;
@@ -163,7 +237,7 @@ public final class BrumAchievementOverlay {
         cardRoot.setBackground(cardBg);
         cardRoot.setElevation(dp(12));
 
-        View accentStripe = new View(context);
+        accentStripe = new View(context);
         accentStripe.setBackgroundColor(COLOR_NEON_GREEN);
         cardRoot.addView(accentStripe, new LinearLayout.LayoutParams(dp(4), LinearLayout.LayoutParams.MATCH_PARENT));
 
@@ -193,13 +267,13 @@ public final class BrumAchievementOverlay {
         LinearLayout.LayoutParams textColLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         textColLp.setMargins(dp(12), 0, dp(8), 0);
 
-        TextView eyebrow = new TextView(context);
-        eyebrow.setText("CONQUISTA DESBLOQUEADA");
-        eyebrow.setTextColor(COLOR_NEON_GREEN);
-        eyebrow.setTypeface(Typeface.DEFAULT_BOLD);
-        eyebrow.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f);
-        eyebrow.setSingleLine(true);
-        textCol.addView(eyebrow);
+        eyebrowView = new TextView(context);
+        eyebrowView.setText("CONQUISTA DESBLOQUEADA");
+        eyebrowView.setTextColor(COLOR_NEON_GREEN);
+        eyebrowView.setTypeface(Typeface.DEFAULT_BOLD);
+        eyebrowView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f);
+        eyebrowView.setSingleLine(true);
+        textCol.addView(eyebrowView);
 
         titleView = new TextView(context);
         titleView.setTextColor(Color.WHITE);
@@ -282,18 +356,38 @@ public final class BrumAchievementOverlay {
         showing = true;
         currentEventId = next.eventId;
 
+        int activeAccent = next.isShinyDiscovery ? Color.rgb(255, 214, 64) : COLOR_NEON_GREEN;
+        if (accentStripe != null) accentStripe.setBackgroundColor(activeAccent);
+        if (eyebrowView != null) {
+            eyebrowView.setText(next.eyebrow);
+            eyebrowView.setTextColor(activeAccent);
+        }
         titleView.setText(next.title);
         descriptionView.setText(next.description);
         descriptionView.setVisibility(next.description.isEmpty() ? View.GONE : View.VISIBLE);
-        if (next.points > 0) {
+        if (!next.pillText.isEmpty()) {
+            pointsView.setText(next.pillText);
+            pointsView.setTextColor(activeAccent);
+            pointsView.setVisibility(View.VISIBLE);
+        } else if (next.points > 0) {
             pointsView.setText("+" + next.points + " PTS");
+            pointsView.setTextColor(COLOR_NEON_GREEN);
             pointsView.setVisibility(View.VISIBLE);
         } else {
             pointsView.setVisibility(View.GONE);
         }
-        badgeImage.setImageDrawable(new CartridgeDrawable(COLOR_NEON_GREEN));
-        if (!next.badgeUrl.isEmpty()) {
-            loadBadgeAsync(next.eventId, next.badgeUrl);
+        if (next.pokedexNationalDexNumber > 0) {
+            int mode = next.isShinyDiscovery
+                    ? com.brumclassics.mobile.extensions.PokedexSpriteRenderer.MODE_SHINY
+                    : com.brumclassics.mobile.extensions.PokedexSpriteRenderer.MODE_NORMAL;
+            badgeImage.setImageBitmap(com.brumclassics.mobile.extensions.PokedexSpriteRenderer.createBitmap(
+                    next.pokedexNationalDexNumber, mode, 3
+            ));
+        } else {
+            badgeImage.setImageDrawable(new CartridgeDrawable(COLOR_NEON_GREEN));
+            if (!next.badgeUrl.isEmpty()) {
+                loadBadgeAsync(next.eventId, next.badgeUrl);
+            }
         }
 
         hostContainer.bringChildToFront(cardRoot);

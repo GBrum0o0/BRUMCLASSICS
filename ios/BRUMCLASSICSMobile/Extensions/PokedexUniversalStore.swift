@@ -176,6 +176,7 @@ enum PokedexUniversalError: LocalizedError, Equatable {
 }
 
 final class PokedexUniversalStore {
+    static let shared = PokedexUniversalStore(registry: .shared)
     static let unknownLocation = "Localização desconhecida"
     static let unknownText = "???"
     static let catalogVersion = "1.0.0"
@@ -596,6 +597,10 @@ final class PokedexUniversalStore {
     func restoreBackup(profileID: String = "primary", bundle: PokedexBackupBundle) throws -> PokedexMergeResult {
         try verifyBackup(bundle)
         return try mergeCollection(profileID: profileID, incomingRecords: bundle.records, incomingOwnerProfileId: profileID)
+    }
+
+    func mergeSyncPayload(_ payload: PokedexSyncStateDocument, profileID: String = "primary") throws -> PokedexMergeResult {
+        try mergeCollection(profileID: profileID, incomingRecords: payload.records, incomingOwnerProfileId: payload.ownerProfileId)
     }
 
     static func defaultKantoAndPilotCatalog() -> [PokedexSpeciesDefinition] {

@@ -116,6 +116,33 @@ public final class IntegratedEmulatorActivity extends Activity {
             emulatorView = new BrumCoreView(this, bridge, this::showRuntimeFailure);
             virtualPadPort = Math.max(0, Math.min(3, getIntent().getIntExtra("virtualPadPort", 0)));
             emulatorView.setVirtualPadPort(virtualPadPort);
+            com.brumclassics.mobile.extensions.PokedexUniversalStore localPokedexStore =
+                new com.brumclassics.mobile.extensions.PokedexUniversalStore(this, "primary");
+            emulatorView.setPokedexCaptureListener(rawJson -> {
+                if (closing || !localPokedexStore.isExtensionEnabled()) return;
+                try {
+                    org.json.JSONObject ev = new org.json.JSONObject(rawJson);
+                    int dex = ev.optInt("nationalDexNumber", 0);
+                    if (dex < 1 || dex > 802) return;
+                    boolean isShiny = ev.optBoolean("isShiny", "shiny".equalsIgnoreCase(ev.optString("category", "")));
+                    String loc = ev.optString("captureLocation", "Localização desconhecida");
+                    com.brumclassics.mobile.extensions.PokedexUniversalEngine.RecordOutcome outcome =
+                        localPokedexStore.recordCapture(
+                            dex,
+                            isShiny,
+                            launch != null && launch.title != null && !launch.title.isEmpty() ? launch.title : "Pokémon FireRed Version",
+                            launch != null && launch.canonicalGameId != null ? launch.canonicalGameId : "",
+                            launch != null && launch.systemId != null ? launch.systemId : "gba",
+                            null,
+                            loc
+                        );
+                    if (outcome != null && outcome.recorded && outcome.notification != null && achievementOverlay != null) {
+                        BrumAchievementOverlay.Payload popup =
+                            BrumAchievementOverlay.Payload.fromPokedexNotification(outcome.notification);
+                        if (popup != null) achievementOverlay.enqueue(popup);
+                    }
+                } catch (Exception ignored) {}
+            });
             SharedPreferences prefs = getSharedPreferences("brum_mobile_prefs", MODE_PRIVATE);
             virtualHapticsEnabled = prefs.getBoolean("virtual_haptics", true);
             autoHideWithController = prefs.getBoolean("auto_hide_pad_with_controller", false);

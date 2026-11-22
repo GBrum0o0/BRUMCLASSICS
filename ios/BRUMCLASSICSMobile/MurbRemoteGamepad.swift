@@ -742,6 +742,7 @@ struct MurbRemoteGamepadView: View {
     @State private var showControls = true
     @State private var fillScreen = false
     @State private var showP2Invite = false
+    @State private var showPokedexSheet = false
 
     init(target: MurbPairingPayload, gameTitle: String = "", playerNumber: Int = 1, p2Payload: MurbPairingPayload? = nil) {
         _session = StateObject(wrappedValue: MurbRemoteSession(target: target))
@@ -796,6 +797,18 @@ struct MurbRemoteGamepadView: View {
                     .overlay(Capsule().stroke(BrumTheme.line))
 
                     Spacer()
+
+                    Button {
+                        showPokedexSheet = true
+                    } label: {
+                        Label("Pokédex", systemImage: "circle.circle.fill")
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 10).frame(height: 36)
+                            .background(BrumTheme.surface.opacity(0.9), in: Capsule())
+                            .overlay(Capsule().stroke(BrumTheme.primary.opacity(0.45)))
+                    }
+                    .foregroundStyle(BrumTheme.primary)
+                    .accessibilityIdentifier("murb-gamepad-pokedex")
 
                     if p2Payload != nil {
                         Button {
@@ -856,6 +869,23 @@ struct MurbRemoteGamepadView: View {
                 MurbP2InviteSheet(payload: p2)
                     .preferredColorScheme(.dark)
             }
+        }
+        .sheet(isPresented: $showPokedexSheet) {
+            NavigationStack {
+                ScrollView {
+                    PokedexGamingExtensionView()
+                        .padding(16)
+                }
+                .background(BrumTheme.background.ignoresSafeArea())
+                .navigationTitle("Extensões · Pokédex Universal")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Fechar") { showPokedexSheet = false }
+                    }
+                }
+            }
+            .preferredColorScheme(.dark)
         }
     }
 

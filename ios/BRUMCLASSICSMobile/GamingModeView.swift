@@ -8,7 +8,8 @@ struct GamingModeView: View {
     @Binding var selection: Int
     @State private var selectedGame: Game?
     @State private var selectedROM: ROMFolderGame?
-    @State private var showLibrary = false
+    private enum GamingSection: String { case recent, library, extensions }
+    @State private var activeSection: GamingSection = .recent
     @AppStorage("gaming-mode-favorites-v1") private var favoritesJSON = "[]"
 
     @State private var catalogSnapshot = GamingCatalogSnapshot.empty
@@ -49,17 +50,21 @@ struct GamingModeView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 18) {
                     HStack(spacing: 16) {
-                        libraryTab("JOGADOS RECENTEMENTE", selected: !showLibrary) { showLibrary = false }
+                        libraryTab("JOGADOS RECENTEMENTE", selected: activeSection == .recent) { activeSection = .recent }
                             .accessibilityIdentifier("gaming-mode-recent")
-                        libraryTab("BIBLIOTECA", selected: showLibrary) { showLibrary = true }
+                        libraryTab("BIBLIOTECA", selected: activeSection == .library) { activeSection = .library }
                             .accessibilityIdentifier("gaming-mode-library")
+                        libraryTab("EXTENSÕES", selected: activeSection == .extensions) { activeSection = .extensions }
+                            .accessibilityIdentifier("gaming-mode-extensions")
                     }
-                    if let featured = recentEntries.first ?? libraryEntries.first {
+                    if activeSection == .extensions {
+                        PokedexGamingExtensionView()
+                    } else if let featured = recentEntries.first ?? libraryEntries.first {
                         GamingHero(title: featured.title, platform: platform(for: featured), artwork: artwork(for: featured)) {
                             Button("VER DETALHES") { open(featured) }
                                 .buttonStyle(PrimaryButtonStyle()).frame(maxWidth: 180)
                         }
-                        if showLibrary || recentEntries.isEmpty {
+                        if activeSection == .library || recentEntries.isEmpty {
                             gameSection(title: "Biblioteca") { ForEach(libraryEntries) { entryTile($0) } }
                         } else {
                             gameSection(title: "Jogos recentes e favoritos") { ForEach(recentEntries) { entryTile($0) } }
