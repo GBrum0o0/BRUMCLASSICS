@@ -255,6 +255,7 @@ jobs:
             android/app/src/main/java/com/brumclassics/mobile/sync/MobileSyncState.java \
             android/app/src/main/java/com/brumclassics/mobile/murb/MurbRemoteProtocol.java \
             android/app/src/main/java/com/brumclassics/mobile/extensions/BrumExtensionContract.java \
+            android/app/src/main/java/com/brumclassics/mobile/extensions/PokedexSpeciesCatalogData.java \
             android/app/src/main/java/com/brumclassics/mobile/extensions/PokedexUniversalEngine.java \
             android/app/src/test/java/com/brumclassics/mobile/GamingModeRulesTest.java \
             android/app/src/test/java/com/brumclassics/mobile/data/HomeLibraryTest.java \

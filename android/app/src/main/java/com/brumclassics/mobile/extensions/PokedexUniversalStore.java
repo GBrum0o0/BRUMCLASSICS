@@ -6,6 +6,7 @@ import android.util.AtomicFile;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -23,7 +24,7 @@ public final class PokedexUniversalStore {
     }
 
     public PokedexUniversalStore(File baseDir, String ownerProfileId) {
-        this.ownerProfileId = (ownerProfileId == null || ownerProfileId.trim().isEmpty()) ? "primary" : ownerProfileId.trim();
+        this.ownerProfileId = PokedexUniversalEngine.validateProfileId(ownerProfileId);
         this.storageDir = new File(new File(baseDir, "profiles"), this.ownerProfileId);
         if (!this.storageDir.exists()) {
             //noinspection ResultOfMethodCallIgnored
@@ -39,19 +40,19 @@ public final class PokedexUniversalStore {
 
     private synchronized void loadFromDisk() {
         File file = collectionFile();
-        if (!file.isFile()) return;
+        File bakFile = new File(file.getPath() + ".bak");
+        if (!file.isFile() && !bakFile.isFile()) return;
         try {
             AtomicFile atomic = new AtomicFile(file);
-            byte[] bytes;
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             try (FileInputStream in = atomic.openRead()) {
-                bytes = new byte[(int) file.length()];
-                int offset = 0;
+                byte[] chunk = new byte[8192];
                 int read;
-                while (offset < bytes.length && (read = in.read(bytes, offset, bytes.length - offset)) >= 0) {
-                    offset += read;
+                while ((read = in.read(chunk)) >= 0) {
+                    buffer.write(chunk, 0, read);
                 }
             }
-            JSONObject root = new JSONObject(new String(bytes, StandardCharsets.UTF_8));
+            JSONObject root = new JSONObject(new String(buffer.toByteArray(), StandardCharsets.UTF_8));
             JSONArray arr = root.optJSONArray("records");
             if (arr != null) {
                 List<PokedexUniversalEngine.CaptureRecord> list = new ArrayList<>();
@@ -60,7 +61,7 @@ public final class PokedexUniversalStore {
                     if (obj == null) continue;
                     list.add(recordFromJson(obj, ownerProfileId));
                 }
-                engine.mergeRecords(list);
+                engine.mergeRecords(list, ownerProfileId);
             }
         } catch (Exception ignored) {
         }
@@ -158,6 +159,10 @@ public final class PokedexUniversalStore {
     }
 
     public synchronized PokedexUniversalEngine.MergeOutcome mergeSyncPayload(JSONObject incoming) throws Exception {
+        if (incoming == null) {
+            throw new IllegalArgumentException("Payload de sincronização da Pokédex inválido.");
+        }
+        String incomingProfile = incoming.optString("ownerProfileId", ownerProfileId);
         JSONArray arr = incoming.optJSONArray("records");
         List<PokedexUniversalEngine.CaptureRecord> list = new ArrayList<>();
         if (arr != null) {
@@ -168,7 +173,55 @@ public final class PokedexUniversalStore {
                 }
             }
         }
-        PokedexUniversalEngine.MergeOutcome outcome = engine.mergeRecords(list);
+        PokedexUniversalEngine.MergeOutcome outcome = engine.mergeRecords(list, incomingProfile);
+        if (outcome.addedCount > 0 || outcome.replacedWithEarlierCount > 0) {
+            saveToDisk();
+        }
+        return outcome;
+    }
+
+    public synchronized JSONObject exportBackupJson() throws Exception {
+        PokedexUniversalEngine.BackupBundle b = engine.exportBackup();
+        JSONArray arr = new JSONArray();
+        for (PokedexUniversalEngine.CaptureRecord r : b.records) {
+            arr.put(recordToJson(r));
+        }
+        JSONObject out = new JSONObject();
+        out.put("schemaVersion", b.schemaVersion);
+        out.put("backupType", b.backupType);
+        out.put("ownerProfileId", b.ownerProfileId);
+        out.put("catalogVersion", "1.0.0");
+        out.put("syncRevision", b.syncRevision);
+        out.put("recordCount", b.recordCount);
+        out.put("contentSha256", b.contentSha256);
+        out.put("records", arr);
+        return out;
+    }
+
+    public synchronized PokedexUniversalEngine.MergeOutcome restoreBackupJson(JSONObject bundleJson) throws Exception {
+        if (bundleJson == null) {
+            throw new IllegalArgumentException("Arquivo de backup da Pokédex inválido.");
+        }
+        JSONArray arr = bundleJson.optJSONArray("records");
+        List<PokedexUniversalEngine.CaptureRecord> list = new ArrayList<>();
+        if (arr != null) {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject item = arr.optJSONObject(i);
+                if (item != null) {
+                    list.add(recordFromJson(item, ownerProfileId));
+                }
+            }
+        }
+        PokedexUniversalEngine.BackupBundle bundle = new PokedexUniversalEngine.BackupBundle(
+                bundleJson.optInt("schemaVersion", 0),
+                bundleJson.optString("backupType", ""),
+                bundleJson.optString("ownerProfileId", ownerProfileId),
+                bundleJson.optInt("syncRevision", 1),
+                bundleJson.optInt("recordCount", -1),
+                bundleJson.optString("contentSha256", ""),
+                list
+        );
+        PokedexUniversalEngine.MergeOutcome outcome = engine.restoreBackup(bundle);
         if (outcome.addedCount > 0 || outcome.replacedWithEarlierCount > 0) {
             saveToDisk();
         }

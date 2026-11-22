@@ -168,6 +168,6 @@ final class BrumExtensionRegistry {
             "updatedAt": ISO8601DateFormatter().string(from: Date())
         ]
         let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
-        try data.write(to: dir.appendingPathComponent("enabled.json"), options: .atomic)
+        try data.write(to: dir.appendingPathComponent("enabled.json"), options: [.atomic, .completeFileProtectionUnlessOpen])
     }
 }

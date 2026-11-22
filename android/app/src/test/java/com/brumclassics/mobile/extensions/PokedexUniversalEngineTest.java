@@ -83,5 +83,41 @@ public final class PokedexUniversalEngineTest {
         PokedexUniversalEngine.MergeOutcome merged = engine.mergeRecords(Arrays.asList(starly, earlierPikachu));
         check(merged.addedCount == 1 && merged.replacedWithEarlierCount == 1 && merged.totalRecords == 3,
                 "Merge must add Starly and keep earliest Pikachu capture");
+
+        // 5. Full 802-species offline catalog (e.g. #16 Pidgey, #133 Eevee, #802 Marshadow), fractional ISO-8601 comparison, backup/restore & profile guard
+        PokedexUniversalEngine.RecordOutcome pidgey = engine.recordCapture(
+                16, false, "Pokémon FireRed Version", "firered-1", "gba",
+                "2026-11-22T10:00:00Z", "Route 1", "android-test"
+        );
+        check(pidgey.recorded && "Pidgey".equals(pidgey.record.speciesName), "Dex 16 must resolve offline to Pidgey (full 802 catalog)");
+        check(engine.getSpecies(133) != null && "Eevee".equals(engine.getSpecies(133).name), "Dex 133 must be Eevee");
+        check(engine.getSpecies(802) != null && "Marshadow".equals(engine.getSpecies(802).name), "Dex 802 must be Marshadow");
+
+        // Fractional timestamp .999Z is later than .000Z / Z -> must NOT replace earlier 10:00:00Z capture
+        PokedexUniversalEngine.CaptureRecord laterFractionalPidgey = new PokedexUniversalEngine.CaptureRecord(
+                "later-id", "gusta", 16, 1, "Pidgey", "Tiny Bird Pokémon",
+                "normal", "Pokémon Platinum Version", "plat-1", "nds",
+                "2026-11-22T10:00:00.999Z", "Route 229", "pc-windows"
+        );
+        PokedexUniversalEngine.MergeOutcome fracMerge = engine.mergeRecords(Collections.singletonList(laterFractionalPidgey), "gusta");
+        check(fracMerge.replacedWithEarlierCount == 0 && fracMerge.preservedCount == 1,
+                "Fractional .999Z timestamp must not overwrite earlier Z timestamp");
+
+        // Profile mismatch must throw
+        boolean rejectedWrongProfile = false;
+        try {
+            engine.mergeRecords(Collections.singletonList(laterFractionalPidgey), "other_profile");
+        } catch (IllegalArgumentException expected) {
+            rejectedWrongProfile = true;
+        }
+        check(rejectedWrongProfile, "Must reject sync merge for mismatched ownerProfileId");
+
+        // Backup & restore with SHA-256 verification
+        PokedexUniversalEngine.BackupBundle backup = engine.exportBackup();
+        check(backup.recordCount == 4, "Backup must contain all 4 records");
+        PokedexUniversalEngine freshEngine = new PokedexUniversalEngine("gusta");
+        PokedexUniversalEngine.MergeOutcome restored = freshEngine.restoreBackup(backup);
+        check(restored.totalRecords == 4 && backup.contentSha256.equals(restored.contentSha256),
+                "Restored backup must match exact record count and canonical SHA-256");
     }
 }

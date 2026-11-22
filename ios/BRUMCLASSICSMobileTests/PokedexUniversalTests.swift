@@ -125,5 +125,44 @@ final class PokedexUniversalTests: XCTestCase {
         let restored = try cleanStore.restoreBackup(profileID: "gusta", bundle: backup)
         XCTAssertEqual(restored.totalRecords, 2)
         XCTAssertEqual(restored.contentSha256, backup.contentSha256)
+
+        // 6. Verify full 802-species offline catalog (including #016 Pidgey) and fractional timestamp ordering
+        let pidgey = try cleanStore.recordCapture(
+            ownerProfileId: "gusta",
+            nationalDexNumber: 16,
+            isShiny: false,
+            gameTitle: "Pokémon FireRed Version",
+            gameId: "firered-1",
+            systemId: "gba",
+            capturedAt: "2026-11-22T10:00:00Z",
+            captureLocation: "Route 1"
+        )
+        XCTAssertTrue(pidgey.recorded)
+        XCTAssertEqual(pidgey.record.speciesName, "Pidgey")
+
+        // A later timestamp with fractional seconds (.999Z) must NOT overwrite an earlier timestamp without fractional seconds (Z)
+        var laterPidgey = pidgey.record
+        laterPidgey = PokedexCaptureRecord(
+            captureId: "later-pidgey-id",
+            ownerProfileId: "gusta",
+            nationalDexNumber: 16,
+            formattedNumber: "016",
+            generation: 1,
+            speciesName: "Pidgey",
+            speciesDescription: pidgey.record.speciesDescription,
+            genus: pidgey.record.genus,
+            spriteAsset: pidgey.record.spriteAsset,
+            category: "normal",
+            isShiny: false,
+            firstCapturedGame: "Pokémon Platinum Version",
+            firstCapturedGameId: "plat-1",
+            systemId: "nds",
+            capturedAt: "2026-11-22T10:00:00.999Z",
+            captureLocation: "Route 229",
+            sourceDeviceId: "pc-windows"
+        )
+        let mergeOutcome = try cleanStore.mergeCollection(profileID: "gusta", incomingRecords: [laterPidgey], incomingOwnerProfileId: "gusta")
+        XCTAssertEqual(mergeOutcome.replacedWithEarlierCount, 0)
+        XCTAssertEqual(mergeOutcome.preservedCount, 1)
     }
 }

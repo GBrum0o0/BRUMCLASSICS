@@ -2,6 +2,7 @@ package com.brumclassics.mobile.extensions;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Pure JDK domain engine for Extensão 001: Pokédex Universal.
@@ -23,6 +25,15 @@ public final class PokedexUniversalEngine {
     public static final String CATEGORY_NORMAL = "normal";
     public static final String CATEGORY_SHINY = "shiny";
     public static final int MAX_NATIONAL_DEX = 802;
+    private static final Pattern PROFILE_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9_-]{1,100}$");
+
+    public static String validateProfileId(String raw) {
+        String id = (raw == null || raw.trim().isEmpty()) ? "primary" : raw.trim();
+        if (!PROFILE_ID_PATTERN.matcher(id).matches()) {
+            throw new IllegalArgumentException("Identificador de perfil inválido para o sistema de extensões.");
+        }
+        return id;
+    }
 
     public static final class SpeciesDefinition {
         public final int nationalDexNumber;
@@ -80,7 +91,7 @@ public final class PokedexUniversalEngine {
                 String captureLocation,
                 String sourceDeviceId
         ) {
-            this.ownerProfileId = (ownerProfileId == null || ownerProfileId.trim().isEmpty()) ? "primary" : ownerProfileId.trim();
+            this.ownerProfileId = validateProfileId(ownerProfileId);
             this.nationalDexNumber = nationalDexNumber;
             this.formattedNumber = String.format(Locale.ROOT, "%03d", nationalDexNumber);
             this.generation = generation;
@@ -92,7 +103,7 @@ public final class PokedexUniversalEngine {
                     ? "Pokémon FireRed Version" : firstCapturedGame.trim();
             this.firstCapturedGameId = firstCapturedGameId == null ? "" : firstCapturedGameId.trim();
             this.systemId = (systemId == null || systemId.trim().isEmpty()) ? "gba" : systemId.trim().toLowerCase(Locale.ROOT);
-            this.capturedAt = (capturedAt == null || capturedAt.trim().isEmpty()) ? "2026-11-22T00:00:00Z" : capturedAt.trim();
+            this.capturedAt = (capturedAt == null || capturedAt.trim().isEmpty()) ? Instant.now().toString() : capturedAt.trim();
             this.captureLocation = sanitizeLocation(captureLocation);
             this.sourceDeviceId = (sourceDeviceId == null || sourceDeviceId.trim().isEmpty()) ? "android-mobile" : sourceDeviceId.trim();
             this.captureId = (captureId == null || captureId.trim().isEmpty())
@@ -199,6 +210,26 @@ public final class PokedexUniversalEngine {
         }
     }
 
+    public static final class BackupBundle {
+        public final int schemaVersion;
+        public final String backupType;
+        public final String ownerProfileId;
+        public final int syncRevision;
+        public final int recordCount;
+        public final String contentSha256;
+        public final List<CaptureRecord> records;
+
+        public BackupBundle(int schemaVersion, String backupType, String ownerProfileId, int syncRevision, int recordCount, String contentSha256, List<CaptureRecord> records) {
+            this.schemaVersion = schemaVersion;
+            this.backupType = backupType;
+            this.ownerProfileId = ownerProfileId;
+            this.syncRevision = syncRevision;
+            this.recordCount = recordCount;
+            this.contentSha256 = contentSha256;
+            this.records = records == null ? Collections.emptyList() : Collections.unmodifiableList(new ArrayList<>(records));
+        }
+    }
+
     public static final class ProjectedView {
         public final List<ProjectedEntry> pokemonTab;
         public final List<ProjectedEntry> shiniesTab;
@@ -216,53 +247,19 @@ public final class PokedexUniversalEngine {
     }
 
     private final String ownerProfileId;
-    private final Map<Integer, SpeciesDefinition> catalogByDex = new HashMap<>();
+    private final Map<Integer, SpeciesDefinition> catalogByDex = new HashMap<>(820);
     private final Map<String, CaptureRecord> recordsByKey = new HashMap<>();
     private final Set<Integer> enabledGenerations = new HashSet<>();
     private int syncRevision = 1;
 
     public PokedexUniversalEngine(String ownerProfileId) {
-        this.ownerProfileId = (ownerProfileId == null || ownerProfileId.trim().isEmpty()) ? "primary" : ownerProfileId.trim();
+        this.ownerProfileId = validateProfileId(ownerProfileId);
         this.enabledGenerations.add(1);
-        initDefaultCatalog();
+        PokedexSpeciesCatalogData.populate(this.catalogByDex);
     }
 
-    private void initDefaultCatalog() {
-        for (int dex = 1; dex <= MAX_NATIONAL_DEX; dex++) {
-            int gen;
-            if (dex <= 151) gen = 1;
-            else if (dex <= 251) gen = 2;
-            else if (dex <= 386) gen = 3;
-            else if (dex <= 493) gen = 4;
-            else if (dex <= 649) gen = 5;
-            else if (dex <= 721) gen = 6;
-            else gen = 7;
-
-            String name;
-            String genus;
-            String desc;
-            if (dex == 1) {
-                name = "Bulbasaur"; genus = "Seed Pokémon"; desc = "There is a plant seed on its back right from the day this Pokémon is born.";
-            } else if (dex == 4) {
-                name = "Charmander"; genus = "Lizard Pokémon"; desc = "From the time it is born, a flame burns at the tip of its tail.";
-            } else if (dex == 7) {
-                name = "Squirtle"; genus = "Tiny Turtle Pokémon"; desc = "When it retracts its long neck into its shell, it squirts out water with vigorous force.";
-            } else if (dex == 25) {
-                name = "Pikachu"; genus = "Mouse Pokémon"; desc = "It has small electric sacs on both its cheeks. If threatened, it looses electric charges from the sacs.";
-            } else if (dex == 151) {
-                name = "Mew"; genus = "New Species Pokémon"; desc = "A Pokémon of South America that was thought to have been extinct.";
-            } else if (dex == 396) {
-                name = "Starly"; genus = "Starling Pokémon"; desc = "They flock in great numbers. Though small, they flap their wings with great power.";
-            } else if (dex == 802) {
-                name = "Marshadow"; genus = "Gloomdweller Pokémon"; desc = "It slips into the shadows of others and mimics their powers and movements.";
-            } else {
-                String code = String.format(Locale.ROOT, "%03d", dex);
-                name = "Pokémon #" + code;
-                genus = "Pokémon";
-                desc = "Official National Pokédex entry #" + code + ".";
-            }
-            catalogByDex.put(dex, new SpeciesDefinition(dex, gen, name, genus, desc));
-        }
+    public SpeciesDefinition getSpecies(int nationalDexNumber) {
+        return catalogByDex.get(nationalDexNumber);
     }
 
     public static String sanitizeLocation(String raw) {
@@ -288,9 +285,9 @@ public final class PokedexUniversalEngine {
         }
     }
 
-    public List<CaptureRecord> sortedRecords() {
-        List<CaptureRecord> list = new ArrayList<>(recordsByKey.values());
-        Collections.sort(list, new Comparator<CaptureRecord>() {
+    public static String canonicalRecordsHash(List<CaptureRecord> records) {
+        List<CaptureRecord> sorted = new ArrayList<>(records == null ? Collections.emptyList() : records);
+        Collections.sort(sorted, new Comparator<CaptureRecord>() {
             @Override
             public int compare(CaptureRecord a, CaptureRecord b) {
                 if (a.nationalDexNumber != b.nationalDexNumber) {
@@ -299,11 +296,6 @@ public final class PokedexUniversalEngine {
                 return a.category.compareTo(b.category);
             }
         });
-        return list;
-    }
-
-    public String contentSha256() {
-        List<CaptureRecord> sorted = sortedRecords();
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < sorted.size(); i++) {
             CaptureRecord r = sorted.get(i);
@@ -320,6 +312,24 @@ public final class PokedexUniversalEngine {
               .append(r.captureId);
         }
         return sha256Hex(sb.toString());
+    }
+
+    public List<CaptureRecord> sortedRecords() {
+        List<CaptureRecord> list = new ArrayList<>(recordsByKey.values());
+        Collections.sort(list, new Comparator<CaptureRecord>() {
+            @Override
+            public int compare(CaptureRecord a, CaptureRecord b) {
+                if (a.nationalDexNumber != b.nationalDexNumber) {
+                    return Integer.compare(a.nationalDexNumber, b.nationalDexNumber);
+                }
+                return a.category.compareTo(b.category);
+            }
+        });
+        return list;
+    }
+
+    public String contentSha256() {
+        return canonicalRecordsHash(sortedRecords());
     }
 
     public RecordOutcome recordCapture(
@@ -363,13 +373,35 @@ public final class PokedexUniversalEngine {
         return new RecordOutcome(true, false, created, new DiscoveryNotification(created));
     }
 
-    private static boolean isEarlier(CaptureRecord candidate, CaptureRecord existing) {
+    private static Long parseIsoEpochMillis(String value) {
+        if (value == null || value.isEmpty()) return null;
+        try {
+            return Instant.parse(value).toEpochMilli();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    public static boolean isEarlier(CaptureRecord candidate, CaptureRecord existing) {
+        Long tCand = parseIsoEpochMillis(candidate.capturedAt);
+        Long tExist = parseIsoEpochMillis(existing.capturedAt);
+        if (tCand != null && tExist != null && !tCand.equals(tExist)) {
+            return tCand < tExist;
+        }
         int cmp = candidate.capturedAt.compareTo(existing.capturedAt);
         if (cmp != 0) return cmp < 0;
         return candidate.captureId.compareTo(existing.captureId) < 0;
     }
 
     public MergeOutcome mergeRecords(List<CaptureRecord> incoming) {
+        return mergeRecords(incoming, ownerProfileId);
+    }
+
+    public MergeOutcome mergeRecords(List<CaptureRecord> incoming, String incomingOwnerProfileId) {
+        if (incomingOwnerProfileId != null && !incomingOwnerProfileId.trim().isEmpty()
+                && !ownerProfileId.equals(validateProfileId(incomingOwnerProfileId))) {
+            throw new IllegalArgumentException("O perfil da coleção recebida não corresponde ao perfil ativo.");
+        }
         int added = 0;
         int replaced = 0;
         int preserved = 0;
@@ -378,13 +410,29 @@ public final class PokedexUniversalEngine {
                 if (item == null || !catalogByDex.containsKey(item.nationalDexNumber)) {
                     throw new IllegalArgumentException("Registro inválido na mesclagem da Pokédex.");
                 }
-                String key = item.key();
+                SpeciesDefinition sp = catalogByDex.get(item.nationalDexNumber);
+                CaptureRecord normalized = new CaptureRecord(
+                        item.captureId,
+                        ownerProfileId,
+                        sp.nationalDexNumber,
+                        sp.generation,
+                        sp.name,
+                        sp.description,
+                        item.category,
+                        item.firstCapturedGame,
+                        item.firstCapturedGameId,
+                        item.systemId,
+                        item.capturedAt,
+                        item.captureLocation,
+                        item.sourceDeviceId
+                );
+                String key = normalized.key();
                 CaptureRecord existing = recordsByKey.get(key);
                 if (existing == null) {
-                    recordsByKey.put(key, item);
+                    recordsByKey.put(key, normalized);
                     added++;
-                } else if (isEarlier(item, existing)) {
-                    recordsByKey.put(key, item);
+                } else if (isEarlier(normalized, existing)) {
+                    recordsByKey.put(key, normalized);
                     replaced++;
                 } else {
                     preserved++;
@@ -395,6 +443,37 @@ public final class PokedexUniversalEngine {
             syncRevision++;
         }
         return new MergeOutcome(added, replaced, preserved, recordsByKey.size(), contentSha256());
+    }
+
+    public BackupBundle exportBackup() {
+        List<CaptureRecord> sorted = sortedRecords();
+        return new BackupBundle(
+                1,
+                "brum.ext.pokedex.backup",
+                ownerProfileId,
+                syncRevision,
+                sorted.size(),
+                canonicalRecordsHash(sorted),
+                sorted
+        );
+    }
+
+    public static void verifyBackup(BackupBundle bundle) {
+        if (bundle == null || bundle.schemaVersion != 1 || !"brum.ext.pokedex.backup".equals(bundle.backupType)) {
+            throw new IllegalArgumentException("Arquivo de backup da Pokédex inválido.");
+        }
+        if (bundle.records == null || bundle.recordCount != bundle.records.size()) {
+            throw new IllegalArgumentException("Contagem de registros divergente no backup da Pokédex.");
+        }
+        String computed = canonicalRecordsHash(bundle.records);
+        if (!computed.equals(bundle.contentSha256)) {
+            throw new IllegalArgumentException("A verificação de integridade SHA-256 do backup da Pokédex falhou.");
+        }
+    }
+
+    public MergeOutcome restoreBackup(BackupBundle bundle) {
+        verifyBackup(bundle);
+        return mergeRecords(bundle.records, bundle.ownerProfileId);
     }
 
     public ProjectedView projectView() {

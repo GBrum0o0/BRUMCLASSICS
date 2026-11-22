@@ -216,6 +216,26 @@ final class PokedexUniversalStore {
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 
+    static func currentIsoTimestamp() -> String {
+        let fmt = ISO8601DateFormatter()
+        fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fmt.string(from: Date())
+    }
+
+    static func parseIsoEpochMillis(_ value: String) -> Int64? {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = fractional.date(from: value) {
+            return Int64((date.timeIntervalSince1970 * 1000.0).rounded())
+        }
+        let standard = ISO8601DateFormatter()
+        standard.formatOptions = [.withInternetDateTime]
+        if let date = standard.date(from: value) {
+            return Int64((date.timeIntervalSince1970 * 1000.0).rounded())
+        }
+        return nil
+    }
+
     static func canonicalRecordsHash(_ records: [PokedexCaptureRecord]) -> String {
         let sorted = records.sorted {
             if $0.nationalDexNumber != $1.nationalDexNumber {
@@ -244,7 +264,7 @@ final class PokedexUniversalStore {
                 catalogVersion: Self.catalogVersion,
                 ownerProfileId: profileID,
                 syncRevision: 1,
-                updatedAt: ISO8601DateFormatter().string(from: Date()),
+                updatedAt: Self.currentIsoTimestamp(),
                 contentSha256: Self.canonicalRecordsHash([]),
                 records: []
             )
@@ -287,7 +307,7 @@ final class PokedexUniversalStore {
             )
         }
 
-        let timestamp = (capturedAt?.isEmpty == false) ? capturedAt! : ISO8601DateFormatter().string(from: Date())
+        let timestamp = (capturedAt?.isEmpty == false) ? capturedAt! : Self.currentIsoTimestamp()
         let location = Self.sanitizeLocation(captureLocation)
         let game = gameTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Pokémon FireRed Version" : gameTitle
         let capId = String(Self.sha256Hex("\(ownerProfileId)|\(nationalDexNumber)|\(category)|\(game)|\(timestamp)|\(location)").prefix(32))
@@ -323,7 +343,7 @@ final class PokedexUniversalStore {
             return $0.category < $1.category
         }
         doc.syncRevision += 1
-        doc.updatedAt = ISO8601DateFormatter().string(from: Date())
+        doc.updatedAt = Self.currentIsoTimestamp()
         doc.contentSha256 = Self.canonicalRecordsHash(doc.records)
         try saveSyncState(doc)
 
@@ -482,6 +502,11 @@ final class PokedexUniversalStore {
     }
 
     private static func isEarlier(_ candidate: PokedexCaptureRecord, than existing: PokedexCaptureRecord) -> Bool {
+        if let tCand = parseIsoEpochMillis(candidate.capturedAt),
+           let tExist = parseIsoEpochMillis(existing.capturedAt),
+           tCand != tExist {
+            return tCand < tExist
+        }
         if candidate.capturedAt != existing.capturedAt {
             return candidate.capturedAt < existing.capturedAt
         }
@@ -526,7 +551,7 @@ final class PokedexUniversalStore {
                 return $0.category < $1.category
             }
             doc.syncRevision += 1
-            doc.updatedAt = ISO8601DateFormatter().string(from: Date())
+            doc.updatedAt = Self.currentIsoTimestamp()
             doc.contentSha256 = Self.canonicalRecordsHash(doc.records)
             try saveSyncState(doc)
         }
@@ -548,7 +573,7 @@ final class PokedexUniversalStore {
         return PokedexBackupBundle(
             schemaVersion: 1,
             backupType: "brum.ext.pokedex.backup",
-            exportedAt: ISO8601DateFormatter().string(from: Date()),
+            exportedAt: Self.currentIsoTimestamp(),
             ownerProfileId: profileID,
             catalogVersion: doc.catalogVersion,
             syncRevision: doc.syncRevision,
@@ -574,7 +599,6 @@ final class PokedexUniversalStore {
     }
 
     static func defaultKantoAndPilotCatalog() -> [PokedexSpeciesDefinition] {
-        // Loads full 802 catalog if bundled in docs/Resources, otherwise provides representative species 1..802 for unit tests
         if let url = Bundle.main.url(forResource: "pokedex-species-catalog-v1", withExtension: "json"),
            let data = try? Data(contentsOf: url),
            let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -584,51 +608,6 @@ final class PokedexUniversalStore {
            decoded.count >= 802 {
             return decoded
         }
-
-        let knownNames: [Int: (String, String, String)] = [
-            1: ("Bulbasaur", "Seed Pokémon", "There is a plant seed on its back right from the day this Pokémon is born."),
-            4: ("Charmander", "Lizard Pokémon", "From the time it is born, a flame burns at the tip of its tail."),
-            7: ("Squirtle", "Tiny Turtle Pokémon", "When it retracts its long neck into its shell, it squirts out water with vigorous force."),
-            25: ("Pikachu", "Mouse Pokémon", "It has small electric sacs on both its cheeks. If threatened, it looses electric charges from the sacs."),
-            133: ("Eevee", "Evolution Pokémon", "An extremely rare Pokémon that may evolve in a number of different ways depending on stimuli."),
-            150: ("Mewtwo", "Genetic Pokémon", "A Pokémon whose genetic code was repeatedly recombined for research."),
-            151: ("Mew", "New Species Pokémon", "A Pokémon of South America that was thought to have been extinct."),
-            152: ("Chikorita", "Leaf Pokémon", "A pleasantly aromatic leaf sprouts from its head."),
-            252: ("Treecko", "Wood Gecko Pokémon", "It makes its nest in a giant tree in the forest."),
-            396: ("Starly", "Starling Pokémon", "They flock in great numbers. Though small, they flap their wings with great power."),
-            494: ("Victini", "Victory Pokémon", "This Pokémon brings victory. It is said that Trainers with Victini always win."),
-            650: ("Chespin", "Spiny Nut Pokémon", "The quills on its head are usually soft."),
-            722: ("Rowlet", "Grass Quill Pokémon", "It sends its feathers, which are as sharp as blades, flying in attack."),
-            802: ("Marshadow", "Gloomdweller Pokémon", "It slips into the shadows of others and mimics their powers and movements.")
-        ]
-
-        return (1...802).map { dex in
-            let gen: Int
-            switch dex {
-            case 1...151: gen = 1
-            case 152...251: gen = 2
-            case 252...386: gen = 3
-            case 387...493: gen = 4
-            case 494...649: gen = 5
-            case 650...721: gen = 6
-            default: gen = 7
-            }
-            let code = String(format: "%03d", dex)
-            let meta = knownNames[dex] ?? ("Pokémon #\(code)", "Pokémon", "Official National Pokédex entry #\(code).")
-            return PokedexSpeciesDefinition(
-                nationalDexNumber: dex,
-                generation: gen,
-                slug: meta.0.lowercased(),
-                name: meta.0,
-                genus: meta.1,
-                description: meta.2,
-                spriteAsset: PokedexSpriteAsset(
-                    activeKey: "pokedex/normal/\(code)",
-                    normalKey: "pokedex/normal/\(code)",
-                    shinyKey: "pokedex/shiny/\(code)",
-                    silhouetteKey: "pokedex/silhouette/\(code)"
-                )
-            )
-        }
+        return PokedexSpeciesCatalogData.allSpecies
     }
 }
