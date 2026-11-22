@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## Launcher 2.1.34 — Runtime PC autocontido (núcleos incluídos na instalação)
+
+- **Pacote oficial autocontido (`resources/brum-runtime`):** inclui 26 núcleos Libretro x64, Cemu 2.6, assets livres de apoio (PPSSPP e Dolphin), utilitário `7za.exe`, redistribuíveis MSVC VC143 x64 e avisos de licença/procedência (`3.047` arquivos verificados por SHA-256), cobrindo os **33 sistemas clássicos** em computadores novos sem depender de RetroArch externo ou caminhos de desenvolvimento.
+- **Continuidade de saves e staging privado (`src/brum-core-pc-service.js` e `native/brum-core-pc/main.cpp`):** cópia verificada de assets para `brum-core-pc/system` sem sobrescrever BIOS ou configurações existentes do usuário e preparação do Cemu em `brum-core-pc/runtime/cemu` preservando `portable/settings.xml` e `portable/mlc01` entre atualizações.
+- **Verificação de build e fontes do host (`scripts/stage-brum-runtime.cjs`, `scripts/verify-brum-runtime.cjs`, `native/BRUM-HOST-LICENSE.md`):** guard `beforePack` que recusa pacotes incompletos e distribuição dos fontes correspondentes do host nativo em `resources/brum-core-pc-source` sob GPL-3.0-or-later com exceção explícita para plugins Libretro independentes. [Notas e validação](releases/v2.1.34/RELEASE-NOTES.md).
+
 ## Launcher 2.1.29 — Modo Gamepad remoto pelo celular (`gamepad_launch`) e co-op LAN
 
 - Adicionado suporte ao comando autenticado `gamepad_launch` em `mobile-bridge.js` e `main.js`, permitindo que o botão **GAMEPAD** no celular inicie automaticamente o jogo no computador e abra o joystick virtual M.U.R.B já conectado na rede local.
