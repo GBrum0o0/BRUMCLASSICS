@@ -41,6 +41,7 @@ set_source_files_properties(${RCHEEVOS_SOURCES} PROPERTIES COMPILE_OPTIONS "-w")
 add_library(brumcore SHARED
     brum_core.cpp
     "${BRUM_SHARED_ROOT}/RetroAchievementsRuntime.cpp"
+    "${BRUM_SHARED_ROOT}/PokemonFireRedAdapter.cpp"
     ${RCHEEVOS_SOURCES})
 target_include_directories(brumcore PRIVATE
     "${RCHEEVOS_ROOT}/include"

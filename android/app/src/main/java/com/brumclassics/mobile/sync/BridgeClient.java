@@ -1439,4 +1439,40 @@ public final class BridgeClient {
     private void postStatus(String state, String detail) { post(() -> { if (listener != null) listener.onStatus(state, detail); }); }
     private void postError(String message) { post(() -> { if (listener != null) listener.onError(message); }); }
     private void post(Runnable runnable) { main.post(runnable); }
+
+    public JSONObject fetchPokedexStateBlocking(int timeoutMs) throws Exception {
+        if (!isConfigured()) throw new IllegalStateException("Conecte este celular ao launcher primeiro.");
+        HttpURLConnection conn = openWithTimeout(baseUrl() + "/v1/extensions/pokedex/state?platform=android&view=1", "GET", true, timeoutMs);
+        int code = conn.getResponseCode();
+        String raw = readResponse(conn, 2 * 1024 * 1024);
+        if (code == 401) {
+            clearPairing();
+            throw new IllegalStateException("A autorização foi revogada no launcher.");
+        }
+        if (code < 200 || code >= 300) {
+            throw new IllegalStateException("Não foi possível consultar a Pokédex Universal (" + code + ").");
+        }
+        return new JSONObject(raw);
+    }
+
+    public JSONObject syncPokedexBlocking(JSONObject localSyncState, int timeoutMs) throws Exception {
+        if (!isConfigured()) throw new IllegalStateException("Conecte este celular ao launcher primeiro.");
+        HttpURLConnection conn = openWithTimeout(baseUrl() + "/v1/extensions/pokedex/sync?platform=android", "POST", true, timeoutMs);
+        conn.setDoOutput(true);
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+        byte[] payload = (localSyncState != null ? localSyncState.toString() : "{}").getBytes(StandardCharsets.UTF_8);
+        try (OutputStream out = conn.getOutputStream()) {
+            out.write(payload);
+        }
+        int code = conn.getResponseCode();
+        String raw = readResponse(conn, 2 * 1024 * 1024);
+        if (code == 401) {
+            clearPairing();
+            throw new IllegalStateException("A autorização foi revogada no launcher.");
+        }
+        if (code < 200 || code >= 300) {
+            throw new IllegalStateException("Não foi possível sincronizar a Pokédex Universal (" + code + ").");
+        }
+        return new JSONObject(raw);
+    }
 }

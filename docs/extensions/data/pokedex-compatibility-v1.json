@@ -1,0 +1,291 @@
+{
+  "schemaVersion": 1,
+  "matrixVersion": "1.0.0",
+  "extensionId": "brum.ext.pokedex",
+  "schemaSupportedGenerations": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "maxNationalDexInSchema": 802,
+  "rules": {
+    "separatePlatforms": true,
+    "corePresenceIsNotCompatibilityProof": true,
+    "libraryPresenceIsNotCompatibilityProof": true,
+    "windows3dsDoesNotImplyMobile3ds": true,
+    "requireRealValidationBeforeEnabling": true
+  },
+  "platforms": {
+    "windows": {
+      "platform": "windows",
+      "enabledGenerations": [
+        1
+      ],
+      "pilotCaptureMaxNationalDex": 386,
+      "native3dsAvailable": true,
+      "games": [
+        {
+          "gameKey": "pokemon-firered-gba",
+          "title": "Pokémon FireRed Version",
+          "systemId": "gba",
+          "primaryGeneration": 1,
+          "engineGeneration": 3,
+          "supportedNationalDexRange": [
+            1,
+            386
+          ],
+          "romCodes": [
+            "BPRE"
+          ],
+          "supportedRevisions": [
+            0,
+            1
+          ],
+          "backends": [
+            "mgba_libretro.dll"
+          ],
+          "adapterId": "firered-gba-v1",
+          "adapterImplemented": true,
+          "automatedValidationStatus": "verified",
+          "realRomBootAndCaptureVerified": true,
+          "interactivePlaythroughPendingUser": true,
+          "status": "enabled_pilot"
+        },
+        {
+          "gameKey": "pokemon-red-gb",
+          "title": "Pokémon Red / Blue / Yellow",
+          "systemId": "gb",
+          "primaryGeneration": 1,
+          "engineGeneration": 1,
+          "supportedNationalDexRange": [
+            1,
+            151
+          ],
+          "romCodes": [],
+          "backends": [
+            "gambatte_libretro.dll",
+            "sameboy_libretro.dll"
+          ],
+          "adapterId": "gen1-gb-planned",
+          "adapterImplemented": false,
+          "automatedValidationStatus": "planned_phase_4",
+          "realRomBootAndCaptureVerified": false,
+          "status": "awaiting_adapter"
+        },
+        {
+          "gameKey": "pokemon-crystal-gbc",
+          "title": "Pokémon Gold / Silver / Crystal",
+          "systemId": "gbc",
+          "primaryGeneration": 2,
+          "engineGeneration": 2,
+          "supportedNationalDexRange": [
+            1,
+            251
+          ],
+          "romCodes": [],
+          "backends": [
+            "gambatte_libretro.dll",
+            "sameboy_libretro.dll"
+          ],
+          "adapterId": "gen2-gbc-planned",
+          "adapterImplemented": false,
+          "automatedValidationStatus": "planned_phase_4",
+          "realRomBootAndCaptureVerified": false,
+          "status": "awaiting_adapter"
+        },
+        {
+          "gameKey": "pokemon-emerald-gba",
+          "title": "Pokémon Ruby / Sapphire / Emerald / LeafGreen",
+          "systemId": "gba",
+          "primaryGeneration": 3,
+          "engineGeneration": 3,
+          "supportedNationalDexRange": [
+            1,
+            386
+          ],
+          "romCodes": [
+            "BPEE",
+            "AXVE",
+            "AXPE",
+            "BPGE"
+          ],
+          "backends": [
+            "mgba_libretro.dll"
+          ],
+          "adapterId": "gen3-gba-planned",
+          "adapterImplemented": false,
+          "automatedValidationStatus": "planned_phase_4",
+          "realRomBootAndCaptureVerified": false,
+          "status": "awaiting_adapter"
+        },
+        {
+          "gameKey": "pokemon-platinum-nds",
+          "title": "Pokémon Diamond / Pearl / Platinum / HeartGold / SoulSilver",
+          "systemId": "nds",
+          "primaryGeneration": 4,
+          "engineGeneration": 4,
+          "supportedNationalDexRange": [
+            1,
+            493
+          ],
+          "romCodes": [
+            "CPUE",
+            "IPKE",
+            "IPGE"
+          ],
+          "backends": [
+            "melonds_libretro.dll"
+          ],
+          "adapterId": "gen4-nds-planned",
+          "adapterImplemented": false,
+          "automatedValidationStatus": "planned_phase_4",
+          "realRomBootAndCaptureVerified": false,
+          "status": "awaiting_adapter"
+        },
+        {
+          "gameKey": "pokemon-black2-nds",
+          "title": "Pokémon Black / White / Black 2 / White 2",
+          "systemId": "nds",
+          "primaryGeneration": 5,
+          "engineGeneration": 5,
+          "supportedNationalDexRange": [
+            1,
+            649
+          ],
+          "romCodes": [
+            "IRBO",
+            "IRDO"
+          ],
+          "backends": [
+            "melonds_libretro.dll"
+          ],
+          "adapterId": "gen5-nds-planned",
+          "adapterImplemented": false,
+          "automatedValidationStatus": "planned_phase_4",
+          "realRomBootAndCaptureVerified": false,
+          "status": "awaiting_adapter"
+        },
+        {
+          "gameKey": "pokemon-xy-oras-3ds",
+          "title": "Pokémon X / Y / Omega Ruby / Alpha Sapphire",
+          "systemId": "3ds",
+          "primaryGeneration": 6,
+          "engineGeneration": 6,
+          "supportedNationalDexRange": [
+            1,
+            721
+          ],
+          "romCodes": [],
+          "backends": [
+            "citra_libretro.dll"
+          ],
+          "adapterId": "gen6-3ds-planned",
+          "adapterImplemented": false,
+          "automatedValidationStatus": "planned_phase_4",
+          "realRomBootAndCaptureVerified": false,
+          "status": "awaiting_adapter"
+        },
+        {
+          "gameKey": "pokemon-sun-moon-3ds",
+          "title": "Pokémon Sun / Moon",
+          "systemId": "3ds",
+          "primaryGeneration": 7,
+          "engineGeneration": 7,
+          "supportedNationalDexRange": [
+            1,
+            802
+          ],
+          "romCodes": [],
+          "backends": [
+            "citra_libretro.dll"
+          ],
+          "adapterId": "gen7-3ds-planned",
+          "adapterImplemented": false,
+          "automatedValidationStatus": "planned_phase_4",
+          "realRomBootAndCaptureVerified": false,
+          "status": "awaiting_adapter"
+        }
+      ]
+    },
+    "ios": {
+      "platform": "ios",
+      "enabledGenerations": [
+        1
+      ],
+      "pilotCaptureMaxNationalDex": 386,
+      "native3dsAvailable": false,
+      "native3dsNote": "3DS no iOS requer build experimental sem JIT; não habilitado no canal pessoal estável.",
+      "games": [
+        {
+          "gameKey": "pokemon-firered-gba",
+          "title": "Pokémon FireRed Version",
+          "systemId": "gba",
+          "primaryGeneration": 1,
+          "engineGeneration": 3,
+          "supportedNationalDexRange": [
+            1,
+            386
+          ],
+          "romCodes": [
+            "BPRE"
+          ],
+          "supportedRevisions": [
+            0,
+            1
+          ],
+          "backends": [
+            "mGBA arm64"
+          ],
+          "adapterId": "firered-gba-v1",
+          "adapterImplemented": true,
+          "automatedValidationStatus": "verified_ci_simulator",
+          "realRomBootAndCaptureVerified": false,
+          "deviceGameplayValidated": false,
+          "status": "enabled_pilot_pending_device_test"
+        }
+      ]
+    },
+    "android": {
+      "platform": "android",
+      "enabledGenerations": [
+        1
+      ],
+      "pilotCaptureMaxNationalDex": 386,
+      "native3dsAvailable": true,
+      "native3dsNote": "Azahar ARM64 presente no Android, mas jogos Pokémon de 6ª/7ª geração aguardam adaptador dedicado e validação em aparelho físico.",
+      "games": [
+        {
+          "gameKey": "pokemon-firered-gba",
+          "title": "Pokémon FireRed Version",
+          "systemId": "gba",
+          "primaryGeneration": 1,
+          "engineGeneration": 3,
+          "supportedNationalDexRange": [
+            1,
+            386
+          ],
+          "romCodes": [
+            "BPRE"
+          ],
+          "supportedRevisions": [
+            0,
+            1
+          ],
+          "backends": [
+            "libmgba_libretro.so"
+          ],
+          "adapterId": "firered-gba-v1",
+          "adapterImplemented": true,
+          "automatedValidationStatus": "verified_ci_unit",
+          "realRomBootAndCaptureVerified": false,
+          "deviceGameplayValidated": false,
+          "status": "enabled_pilot_pending_device_test"
+        }
+      ]
+    }
+  }
+}

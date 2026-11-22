@@ -38,6 +38,8 @@ jobs:
         run: |
           clang++ -std=c++17 -Wall -Wextra -Werror shared/brum-core/tests.cpp -o "$RUNNER_TEMP/brum-core-tests"
           "$RUNNER_TEMP/brum-core-tests"
+          clang++ -std=c++17 -Wall -Wextra -Werror shared/brum-core/PokemonFireRedAdapter.cpp shared/brum-core/pokedex_tests.cpp -o "$RUNNER_TEMP/brum-pokedex-tests"
+          "$RUNNER_TEMP/brum-pokedex-tests"
           mkdir -p "$RUNNER_TEMP/ra_obj"
           RC_SRCS=(
             third_party/rcheevos/src/rc_client.c third_party/rcheevos/src/rc_compat.c

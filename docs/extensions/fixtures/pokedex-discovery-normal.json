@@ -1,0 +1,24 @@
+{
+  "eventId": "pokedex-discovery:primary:25:normal",
+  "type": "pokedex_discovery",
+  "extensionId": "brum.ext.pokedex",
+  "ownerProfileId": "primary",
+  "nationalDexNumber": 25,
+  "formattedNumber": "025",
+  "speciesName": "Pikachu",
+  "category": "normal",
+  "isShiny": false,
+  "spriteAsset": {
+    "normalKey": "pokedex/normal/025",
+    "shinyKey": "pokedex/shiny/025",
+    "activeKey": "pokedex/normal/025"
+  },
+  "gameTitle": "Pokémon FireRed Version",
+  "gameId": "classic-firered",
+  "systemId": "gba",
+  "capturedAt": "2026-11-22T10:00:00.000Z",
+  "captureLocation": "Viridian Forest",
+  "title": "Novo Pokémon descoberto!",
+  "headline": "025 — Pikachu",
+  "subtitle": "Registrado na Pokédex Universal"
+}

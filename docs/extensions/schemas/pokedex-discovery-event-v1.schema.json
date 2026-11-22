@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brumclassics.local/schemas/pokedex-discovery-event-v1.schema.json",
+  "title": "BrumClassicsPokedexDiscoveryEventV1",
+  "type": "object",
+  "required": [
+    "eventId",
+    "type",
+    "extensionId",
+    "ownerProfileId",
+    "nationalDexNumber",
+    "formattedNumber",
+    "speciesName",
+    "category",
+    "isShiny",
+    "spriteAsset",
+    "gameTitle",
+    "systemId",
+    "capturedAt",
+    "captureLocation",
+    "title",
+    "headline",
+    "subtitle"
+  ],
+  "properties": {
+    "eventId": { "type": "string", "minLength": 1 },
+    "type": { "const": "pokedex_discovery" },
+    "extensionId": { "const": "brum.ext.pokedex" },
+    "ownerProfileId": { "type": "string", "minLength": 1 },
+    "nationalDexNumber": { "type": "integer", "minimum": 1 },
+    "formattedNumber": { "type": "string", "pattern": "^[0-9]{3,}$" },
+    "speciesName": { "type": "string", "minLength": 1 },
+    "category": { "enum": ["normal", "shiny"] },
+    "isShiny": { "type": "boolean" },
+    "spriteAsset": {
+      "type": "object",
+      "required": ["activeKey"],
+      "properties": {
+        "activeKey": { "type": "string" },
+        "normalKey": { "type": "string" },
+        "shinyKey": { "type": "string" }
+      }
+    },
+    "gameTitle": { "type": "string", "minLength": 1 },
+    "gameId": { "type": "string" },
+    "systemId": { "type": "string", "minLength": 1 },
+    "capturedAt": { "type": "string" },
+    "captureLocation": { "type": "string", "minLength": 1 },
+    "title": { "type": "string" },
+    "headline": { "type": "string" },
+    "subtitle": { "const": "Registrado na Pokédex Universal" }
+  }
+}

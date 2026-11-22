@@ -30,6 +30,12 @@ const required = [
   'BRUMCLASSICSMobileTests/Fixtures/BrumTestCore.c',
   'BRUMCLASSICSMobile/BRUMCLASSICSMobile-Bridging-Header.h',
   'BRUMCLASSICSMobile/MomentsView.swift', 'BRUMCLASSICSMobileTests/SnapshotTests.swift',
+  'BRUMCLASSICSMobile/Extensions/BrumExtensionContract.swift',
+  'BRUMCLASSICSMobile/Extensions/PokedexUniversalStore.swift',
+  'BRUMCLASSICSMobileTests/PokedexUniversalTests.swift',
+  '../shared/brum-core/PokemonFireRedAdapter.hpp',
+  '../shared/brum-core/PokemonFireRedAdapter.cpp',
+  '../shared/brum-core/pokedex_tests.cpp',
   'ios-update.json'
 ];
 required.push('prepare_ppsspp_assets.py', 'licenses/PPSSPP-FONTS.txt', 'generate_sidestore_source.py', 'test_sidestore_source.py');

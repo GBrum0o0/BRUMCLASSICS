@@ -29,6 +29,7 @@ targets:
         compilerFlags:
           - -DRC_DISABLE_LUA=1
           - -DRC_CLIENT_SUPPORTS_HASH=1
+      - path: ../shared/brum-core/PokemonFireRedAdapter.cpp
       - path: ../third_party/rcheevos/src
         excludes:
           - "rc_client_external.c"
