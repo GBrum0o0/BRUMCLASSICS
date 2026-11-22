@@ -74,30 +74,16 @@ targets:
     type: bundle.unit-test
     platform: iOS
     sources:
-      - path: BRUMCLASSICSMobile
       - path: BRUMCLASSICSMobileTests
         excludes: [Fixtures]
       - path: build/test-fixtures/BrumTestCore.dylib
         buildPhase: resources
     dependencies:
       - target: BRUMCLASSICSMobile
-      - target: Rcheevos
-      - sdk: AudioToolbox.framework
-      - sdk: AVFoundation.framework
-      - sdk: GameController.framework
-      - sdk: OpenGLES.framework
-      - sdk: QuartzCore.framework
   BRUMCLASSICSMobileUITests:
     type: bundle.ui-testing
     platform: iOS
     sources:
-      - path: BRUMCLASSICSMobile
       - path: BRUMCLASSICSMobileUITests
     dependencies:
       - target: BRUMCLASSICSMobile
-      - target: Rcheevos
-      - sdk: AudioToolbox.framework
-      - sdk: AVFoundation.framework
-      - sdk: GameController.framework
-      - sdk: OpenGLES.framework
-      - sdk: QuartzCore.framework
