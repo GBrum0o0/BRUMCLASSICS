@@ -1,0 +1,7 @@
+Pokédex Universal — metadados
+
+Catálogo offline #001..#802 derivado de PokeAPI/pokeapi CSV. Fonte de origem declarada pelo gerador original: https://github.com/PokeAPI/pokeapi (master não fixado no momento da obtenção); não é possível afirmar a revisão histórica exata dos dados. O catálogo distribuído é identificado por hash e preservado sem regeneração nesta integração. Licença BSD-3-Clause integral: PokeAPI-LICENSE.txt. Pokémon e nomes de personagens são marcas de seus titulares. Arte do aplicativo é ilustrativa, não sprites oficiais.
+
+Adaptador FireRed: documentação pública de estruturas e nomes de mapas de https://github.com/pret/pokefirered utilizada como referência técnica; não inclui ROM, BIOS, descompilação de binários nem código executável do jogo.
+
+Runtime nativo: rcheevos v12.5.0, revisão1433173220a7eaede6a9ed7a18e94117be1821e0, https://github.com/RetroAchievements/rcheevos; MIT, texto e avisos mantidos em brum-core-pc-source/third_party/rcheevos/LICENSE. Não é autorização para criar conquistas fictícias.

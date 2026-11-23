@@ -230,6 +230,7 @@ jobs:
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/core-licenses/PPSSPP-THIRD-PARTY.txt' >/dev/null
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/GPL-3.0.txt' >/dev/null
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/rcheevos-LICENSE.txt' >/dev/null
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep 'assets/PokeAPI-LICENSE.txt' >/dev/null
           for license in mGBA SkyEmu Geolith Play PPSSPP Azahar Gearsystem Nestopia Beetle-PCE-Fast Beetle-WonderSwan bsnes-mercury; do
             unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep "assets/core-licenses/${license}-LICENSE.txt" >/dev/null
           done

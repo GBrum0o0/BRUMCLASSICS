@@ -630,7 +630,7 @@ final class PokedexUniversalStore {
     func mergeSyncPayload(_ payload: PokedexSyncStateDocument, profileID: String = "primary") throws -> PokedexMergeResult {
         lock.lock()
         defer { lock.unlock() }
-        try mergeCollection(profileID: profileID, incomingRecords: payload.records, incomingOwnerProfileId: payload.ownerProfileId)
+        return try mergeCollection(profileID: profileID, incomingRecords: payload.records, incomingOwnerProfileId: payload.ownerProfileId)
     }
 
     static func defaultKantoAndPilotCatalog() -> [PokedexSpeciesDefinition] {

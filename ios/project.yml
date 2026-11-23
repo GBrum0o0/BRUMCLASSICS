@@ -52,6 +52,8 @@ targets:
     platform: iOS
     sources:
       - path: BRUMCLASSICSMobile
+      - path: ../LICENSES/PokeAPI-LICENSE.txt
+        buildPhase: resources
     dependencies:
       - target: Rcheevos
       - sdk: AudioToolbox.framework

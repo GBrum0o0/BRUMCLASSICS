@@ -171,6 +171,7 @@ for (const marker of ['CORE_COMMIT="4b01295838ea89e3f1355bbe4cb5cf98aa6108cd"', 
 const projectSpec = fs.readFileSync(path.join(root, 'project.yml'), 'utf8');
 const marketingVersion = projectSpec.match(/MARKETING_VERSION:\s*([^\s]+)/)?.[1];
 const projectBuild = Number(projectSpec.match(/CURRENT_PROJECT_VERSION:\s*(\d+)/)?.[1]);
+if (!projectSpec.includes('path: ../LICENSES/PokeAPI-LICENSE.txt') || !fs.existsSync(path.join(root, '../LICENSES/PokeAPI-LICENSE.txt'))) throw new Error('Licença PokeAPI ausente dos recursos iOS.');
 if (marketingVersion !== updateManifest.version || projectBuild !== updateManifest.build) throw new Error('Versão e build do projeto divergem do manifesto iOS.');
 if (!workflow.includes('--target "$GITHUB_SHA"') || workflow.includes('--clobber')) throw new Error('Publicação iOS precisa fixar o commit e preservar binários publicados.');
 if (!workflow.includes(`PESSOAL' }}-${marketingVersion}`) || !workflow.includes(`IOS-TESTES-${marketingVersion}`)) throw new Error('Nome do artefato iOS diverge da versão atual.');

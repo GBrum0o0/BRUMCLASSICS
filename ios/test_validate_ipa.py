@@ -30,7 +30,7 @@ class PackageValidationTests(unittest.TestCase):
                 include_ppsspp_assets=True, candidate_cpu=0x0100000C, candidate_licenses=True,
                 include_blastem_vendor_licenses=True,
                 experimental_build="37", display_name="BRUM Core Teste", release_build="55",
-                include_ppsspp_notices=True, include_rcheevos_license=True):
+                include_ppsspp_notices=True, include_rcheevos_license=True, include_pokeapi_license=True):
         path = Path(folder) / "test.ipa"
         root = f"Payload/{app}.app/"
         info = {"CFBundleIdentifier": "com.brumclassics.mobile.ios",
@@ -45,6 +45,8 @@ class PackageValidationTests(unittest.TestCase):
                 info["CFBundleDisplayName"] = display_name
         with zipfile.ZipFile(path, "w") as archive:
             archive.writestr(root + "Info.plist", plistlib.dumps(info))
+            if include_pokeapi_license and int(info["CFBundleVersion"]) >= 59:
+                archive.writestr(root + "PokeAPI-LICENSE.txt", "BSD-3-Clause PokeAPI license fixture " * 80)
             if experimental is False and int(release_build) >= 55:
                 if include_ppsspp:
                     entry = zipfile.ZipInfo(root + "Frameworks/ppsspp_libretro_ios.dylib")
@@ -160,6 +162,13 @@ class PackageValidationTests(unittest.TestCase):
                 archive.writestr(root + "Frameworks/Beetle-WonderSwan-LICENSE.txt", "GPLv2+\n" + "x" * 2_000)
                 archive.writestr(root + "Frameworks/bsnes-mercury-LICENSE.txt", "GPLv3\n" + "x" * 2_000)
         return path
+
+    def test_pokedex_build_requires_pokeapi_license(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaisesRegex(ValueError, "license is absent"):
+                validate_ipa(self.fixture(folder, release_build="59", include_pokeapi_license=False))
+        with tempfile.TemporaryDirectory() as folder:
+            validate_ipa(self.fixture(folder, release_build="59"))
 
     def test_valid_package(self):
         with tempfile.TemporaryDirectory() as folder:

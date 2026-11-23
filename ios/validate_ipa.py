@@ -116,6 +116,8 @@ def validate_ipa(path, expected_version=None):
             root + "Frameworks/Beetle-WonderSwan-LICENSE.txt",
             root + "Frameworks/bsnes-mercury-LICENSE.txt",
         ]
+        if isinstance(build_number, str) and build_number.isdecimal() and int(build_number) >= 59:
+            required_licenses += [root + "PokeAPI-LICENSE.txt"]
         if psp_release:
             required_licenses += [root + "Frameworks/PPSSPP-LICENSE.txt"]
         if rcheevos_release:

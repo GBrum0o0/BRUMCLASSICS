@@ -62,3 +62,5 @@ O executável contém runtimes e dependências de terceiros com licenças própr
 ## Marcas e serviços
 
 Steam, Epic Games, GOG, EA App, Ubisoft Connect, Xbox, PlayStation, Nintendo e RetroAchievements pertencem aos seus respectivos proprietários. O BRUMCLASSICS não transfere nem concede direitos sobre essas marcas.
+
+A licença integral dos metadados PokeAPI está em `LICENSES/PokeAPI-LICENSE.txt`, distribuída nos assets Android e nos recursos iOS. O catálogo existente foi gerado a partir de CSVs em `master`; o commit histórico desses CSVs não foi registrado e não é presumido a partir da licença obtida posteriormente.
