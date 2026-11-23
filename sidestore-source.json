@@ -21,12 +21,22 @@
       "tintColor": "#10B981",
       "category": "games",
       "screenshotURLs": [],
-      "version": "0.25.0",
-      "versionDate": "2026-11-22T12:02:47Z",
-      "versionDescription": "# BRUMCLASSICS MÓVEL iOS 0.25.0 — Atualizações pelo iPhone com SideStore\n\n- **Fonte oficial SideStore:** disponibiliza `sidestore-source.json` na branch `sidestore-source` apontando exclusivamente para as releases oficiais `ios-v*` verificadas no GitHub (nunca `/releases/latest` de PC/Android), com versão, build (`58`), `minimumOsVersion` (`16.0`), tamanho em bytes e `SHA-256` validados após publicação do `.ipa`.\n- **Integração no Perfil do iPhone:** adiciona o botão **Verificar atualização**, consulta prioritária à fonte SideStore (com fallback seguro para `ios-update.json`), detecção do esquema `sidestore://` e encaminhamento para adicionar a fonte ou enviar o `.ipa` ao SideStore mantendo o download para Sideloadly.\n- **Backup de migração com integridade verificada:** permite exportar e restaurar saves integrados (`IntegratedEmulator/Saves`) e vínculos JSON (`ClassicsEverywhere`) com conferência `SHA-256` e cópia preventiva antes de trocar do Sideloadly para o SideStore.\n\n**Validação:** geração e validação da fonte SideStore (`test_sidestore_source.py`), parser Swift + deep links e backup/restauração verificados (`SnapshotTests`), validação do pacote (`validate_ipa.py`) e simulador/compilação no workflow passam em CI; instalação no SideStore real, renovação com StosVPN e atualização sem PC aguardam validação em iPhone físico.",
-      "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.25.0/BRUMCLASSICS-MOVEL-IOS-0.25.0.ipa",
-      "size": 15095169,
+      "version": "0.26.0",
+      "versionDate": "2026-11-23T02:55:10Z",
+      "versionDescription": "# BRUMCLASSICS MÓVEL iOS 0.26.0 — Extensão 001\n\nA Pokédex Universal passa a integrar o Gaming Mode, na aba **EXTENSÕES**, ao lado da Biblioteca. O botão abre o dispositivo e permite consultar a coleção normal e a coleção de shinies, com busca, backup verificado e sincronização manual com o PC pareado.\n\n- Espécies não descobertas continuam como `???`, com silhueta e número visível.\n- O piloto de detecção é Pokémon FireRed de GBA, código BPRE. O catálogo de 802 registros prepara outras gerações; não representa 802 jogos ou espécies capturáveis já validados.\n- Ilustrações são estilizadas; não são um pacote de 802 sprites oficiais dos jogos.\n- Corrige preservação de timestamps entre plataformas, importação parcial, separação por perfil e tratamento de leituras incompletas do detector.\n- Preserva SideStore, backup de migração, Save Sync e os núcleos da versão anterior.\n\nAs notificações da Pokédex são registros locais da extensão, separados das conquistas oficiais do RetroAchievements. Testes automatizados e builds não comprovam uma captura jogada em aparelho físico; essa validação permanece identificada separadamente no relatório.\n\nAtualize pelo SideStore usando a fonte oficial, ou assine a IPA pelo Sideloadly. Preserve os dados e não desinstale o aplicativo para atualizar.",
+      "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.26.0/BRUMCLASSICS-MOVEL-IOS-0.26.0.ipa",
+      "size": 15497788,
       "versions": [
+        {
+          "version": "0.26.0",
+          "buildVersion": "59",
+          "date": "2026-11-23T02:55:10Z",
+          "localizedDescription": "# BRUMCLASSICS MÓVEL iOS 0.26.0 — Extensão 001\n\nA Pokédex Universal passa a integrar o Gaming Mode, na aba **EXTENSÕES**, ao lado da Biblioteca. O botão abre o dispositivo e permite consultar a coleção normal e a coleção de shinies, com busca, backup verificado e sincronização manual com o PC pareado.\n\n- Espécies não descobertas continuam como `???`, com silhueta e número visível.\n- O piloto de detecção é Pokémon FireRed de GBA, código BPRE. O catálogo de 802 registros prepara outras gerações; não representa 802 jogos ou espécies capturáveis já validados.\n- Ilustrações são estilizadas; não são um pacote de 802 sprites oficiais dos jogos.\n- Corrige preservação de timestamps entre plataformas, importação parcial, separação por perfil e tratamento de leituras incompletas do detector.\n- Preserva SideStore, backup de migração, Save Sync e os núcleos da versão anterior.\n\nAs notificações da Pokédex são registros locais da extensão, separados das conquistas oficiais do RetroAchievements. Testes automatizados e builds não comprovam uma captura jogada em aparelho físico; essa validação permanece identificada separadamente no relatório.\n\nAtualize pelo SideStore usando a fonte oficial, ou assine a IPA pelo Sideloadly. Preserve os dados e não desinstale o aplicativo para atualizar.",
+          "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.26.0/BRUMCLASSICS-MOVEL-IOS-0.26.0.ipa",
+          "size": 15497788,
+          "sha256": "ef4ef9b2a92ffd66b2f34c18995ea57bde38d6744973649a92f49b41099a99d5",
+          "minOSVersion": "16.0"
+        },
         {
           "version": "0.25.0",
           "buildVersion": "58",
