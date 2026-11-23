@@ -1,0 +1,24 @@
+{
+  "eventId": "pokedex-discovery:primary:25:shiny",
+  "type": "pokedex_discovery",
+  "extensionId": "brum.ext.pokedex",
+  "ownerProfileId": "primary",
+  "nationalDexNumber": 25,
+  "formattedNumber": "025",
+  "speciesName": "Pikachu",
+  "category": "shiny",
+  "isShiny": true,
+  "spriteAsset": {
+    "normalKey": "pokedex/normal/025",
+    "shinyKey": "pokedex/shiny/025",
+    "activeKey": "pokedex/shiny/025"
+  },
+  "gameTitle": "Pokémon FireRed Version",
+  "gameId": "classic-firered",
+  "systemId": "gba",
+  "capturedAt": "2026-11-22T12:00:00.000Z",
+  "captureLocation": "Power Plant",
+  "title": "Novo Pokémon Shiny descoberto!",
+  "headline": "025 — Pikachu",
+  "subtitle": "Registrado na Pokédex Universal"
+}

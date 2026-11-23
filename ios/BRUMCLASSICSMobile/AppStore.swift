@@ -40,6 +40,7 @@ final class AppStore: ObservableObject {
     init() {
         OfflineContentPreferences.registerDefaults()
         images.countLimit = 80
+        _ = PokedexUniversalCoordinator.shared
         Task { await restore() }
     }
 
@@ -113,6 +114,22 @@ final class AppStore: ObservableObject {
         guard connection == .online, let fingerprint = configuration?.fingerprint,
               record.serverFingerprint.isEmpty || record.serverFingerprint == fingerprint else { throw PocketError.message("Conecte-se ao PC original para enviar as horas pendentes.") }
         return try await bridge.syncPocketTime(record, game: game)
+    }
+
+    func syncPokedexWithLauncher(profileID: String = "primary") async -> String {
+        guard isPaired, connection == .online else {
+            return "Modo offline ativo. A coleção local permanece salva neste iPhone e sincronizará quando o PC estiver online."
+        }
+        do {
+            let localDoc = try PokedexUniversalStore.shared.loadSyncState(profileID: profileID)
+            _ = try await bridge.syncPokedex(localDoc, platform: "ios")
+            let remoteDoc = try await bridge.fetchPokedexState(platform: "ios")
+            let merged = try PokedexUniversalStore.shared.mergeSyncPayload(remoteDoc, profileID: profileID)
+            NotificationCenter.default.post(name: .brumPokedexCollectionUpdated, object: nil)
+            return "Pokédex sincronizada com o PC (\(merged.totalRecords) registros verificados)."
+        } catch {
+            return "Coleção local preservada. Não foi possível sincronizar agora: \(error.localizedDescription)"
+        }
     }
 
     func restore() async {
@@ -205,6 +222,7 @@ final class AppStore: ObservableObject {
                 self.lastSuccessfulSyncAt = Date()
                 UserDefaults.standard.set(self.lastSuccessfulSyncAt?.timeIntervalSince1970, forKey: Self.lastSyncKey)
                 self.prefetchAllArtwork()
+                _ = await self.syncPokedexWithLauncher(profileID: "primary")
             } catch {
                 self.connection = .error(error.localizedDescription)
             }
@@ -472,6 +490,41 @@ final class AppStore: ObservableObject {
                 BrumAchievementOverlayCoordinator.shared.enqueue(payload)
             }
             await refresh()
+            return
+        }
+        if event["type"] as? String == "pokedex_discovery" {
+            let disc = (event["discovery"] as? [String: Any]) ?? event
+            guard BrumExtensionRegistry.shared.isEnabled(BrumExtensionManifest.pokedexUniversal.id, profileID: "primary"),
+                  (disc["ownerProfileId"] as? String ?? "primary") == "primary" else { return }
+            var newPokedexDiscovery = false
+            let dex = (disc["nationalDexNumber"] as? NSNumber)?.intValue ?? 0
+            let isShiny = (disc["isShiny"] as? NSNumber)?.boolValue ?? ((disc["category"] as? String) == "shiny")
+            let gameTitle = (disc["gameTitle"] as? String) ?? "Pokémon FireRed Version"
+            let gameID = (disc["gameId"] as? String) ?? ""
+            let systemID = (disc["systemId"] as? String) ?? "gba"
+            let capturedAt = disc["capturedAt"] as? String
+            let location = (disc["captureLocation"] as? String) ?? PokedexUniversalStore.unknownLocation
+            if (1...802).contains(dex) {
+                let result = try? PokedexUniversalStore.shared.recordCapture(
+                    ownerProfileId: "primary",
+                    nationalDexNumber: dex,
+                    isShiny: isShiny,
+                    gameTitle: gameTitle,
+                    gameId: gameID,
+                    systemId: systemID,
+                    capturedAt: capturedAt,
+                    captureLocation: location
+                )
+                newPokedexDiscovery = result?.recorded == true
+                NotificationCenter.default.post(name: .brumPokedexCollectionUpdated, object: nil)
+            }
+            if newPokedexDiscovery, let payload = BrumAchievementOverlayPayload.fromPokedexBridgeEvent(event) {
+                BrumAchievementOverlayCoordinator.shared.enqueue(payload)
+            }
+            return
+        }
+        if event["type"] as? String == "pokedex_synced" {
+            _ = await syncPokedexWithLauncher(profileID: "primary")
             return
         }
         guard ["ready", "library_changed", "companion_changed", "install_changed", "notes_changed", "library_state_changed", "collections_changed", "activity_changed", "profile_changed", "notifications_changed"].contains(event["type"] as? String ?? "") else { return }

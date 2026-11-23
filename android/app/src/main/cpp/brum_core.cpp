@@ -1,5 +1,6 @@
 #include "brum_libretro_api.h"
 #include "RetroAchievementsRuntime.hpp"
+#include "PokemonFireRedAdapter.hpp"
 
 #include <jni.h>
 #include <dlfcn.h>
@@ -251,6 +252,7 @@ public:
             if (!info.need_fullpath) { game.data = rom.data(); game.size = rom.size(); }
             if (!core.loadGame(&game)) throw std::runtime_error("O núcleo integrado recusou este arquivo.");
             gameLoaded = true; hardware.resetCore(); restoreSave();
+            initPokedexCaptureSession();
             brum_retro_system_av_info av{}; core.getAVInfo(&av);
             const double reportedSampleRate = av.timing.sample_rate;
             sampleRate = std::isfinite(reportedSampleRate) && reportedSampleRate >= 8000.0 && reportedSampleRate <= 192000.0
@@ -271,6 +273,7 @@ public:
     }
 
     ~CoreSession() {
+        pokedexTracker.reset();
         raRuntime.reset();
         if (raCallbackGlobalRef) {
             bool didAttach = false;
@@ -299,6 +302,7 @@ public:
             core.run();
             ++framesRun;
             if (raRuntime) raRuntime->doFrame();
+            if (pokedexTracker) pokedexTracker->doFrame();
         }
         suppressVideo = false;
         if (hardware.active()) hardware.releaseCurrent();
@@ -362,6 +366,7 @@ public:
         if (restored) {
             clearAudio();
             if (raRuntime) raRuntime->reset();
+            if (pokedexTracker) pokedexTracker->reset();
         }
         return restored;
     }
@@ -504,8 +509,64 @@ public:
     uint64_t framesRun = 0;
     std::vector<brum_retro_memory_descriptor> memoryDescriptors;
     std::unique_ptr<brum::RetroAchievementsRuntime> raRuntime;
+    std::unique_ptr<brum::pokedex::FireRedCaptureTracker> pokedexTracker;
+    std::mutex pokedexMutex;
+    std::vector<brum::pokedex::FireRedCaptureEvent> pendingPokedexCaptures;
     jobject raCallbackGlobalRef = nullptr;
     HardwareContext hardware;
+
+    void initPokedexCaptureSession() {
+        pokedexTracker.reset();
+        if (rom.size() < 0xC0u) return;
+        const auto romInfo = brum::pokedex::identifyFireRedRom(rom.data(), rom.size());
+        if (!romInfo.isFireRed || !romInfo.supportedRamLayout) return;
+
+        auto busReader = [this](uint32_t gbaAddress, uint8_t *outBuffer, size_t length) -> bool {
+            if (!gameLoaded || !outBuffer || length == 0) return false;
+            for (const auto &desc : memoryDescriptors) {
+                if (!desc.ptr || desc.len == 0) continue;
+                const size_t addr = static_cast<size_t>(gbaAddress);
+                if (addr >= desc.start && addr <= desc.start + desc.len && length <= (desc.start + desc.len - addr)) {
+                    std::memcpy(outBuffer, static_cast<const uint8_t *>(desc.ptr) + (addr - desc.start), length);
+                    return true;
+                }
+            }
+            if (core.getMemoryData && core.getMemorySize) {
+                const void *sysRam = core.getMemoryData(BRUM_RETRO_MEMORY_SYSTEM_RAM);
+                const size_t sysSize = core.getMemorySize(BRUM_RETRO_MEMORY_SYSTEM_RAM);
+                if (sysRam && sysSize >= 0x40000u && gbaAddress >= 0x02000000u && gbaAddress < 0x02040000u &&
+                    length <= static_cast<size_t>(0x02040000u - gbaAddress)) {
+                    std::memcpy(outBuffer, static_cast<const uint8_t *>(sysRam) + (gbaAddress - 0x02000000u), length);
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        auto onCapture = [this](const brum::pokedex::FireRedCaptureEvent &ev) {
+            std::lock_guard<std::mutex> lock(pokedexMutex);
+            if (pendingPokedexCaptures.size() < 256u) {
+                pendingPokedexCaptures.push_back(ev);
+            }
+        };
+
+        pokedexTracker = std::make_unique<brum::pokedex::FireRedCaptureTracker>(romInfo, busReader, onCapture, 15u);
+        void *saveRam = core.getMemoryData ? core.getMemoryData(BRUM_RETRO_MEMORY_SAVE_RAM) : nullptr;
+        size_t saveSize = core.getMemorySize ? core.getMemorySize(BRUM_RETRO_MEMORY_SAVE_RAM) : 0;
+        if (saveRam && saveSize >= 0xE000u) {
+            const auto snap = brum::pokedex::inspectFireRedSave128K(static_cast<const uint8_t *>(saveRam), saveSize);
+            if (snap.valid) {
+                pokedexTracker->seedBaselineFromSave(snap);
+            }
+        }
+    }
+
+    std::vector<brum::pokedex::FireRedCaptureEvent> drainPokedexCaptures() {
+        std::lock_guard<std::mutex> lock(pokedexMutex);
+        std::vector<brum::pokedex::FireRedCaptureEvent> out;
+        out.swap(pendingPokedexCaptures);
+        return out;
+    }
 
 private:
     void *coreHandle{}; bool initialized = false, gameLoaded = false;
@@ -779,6 +840,31 @@ Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeCompleteHttp(JNIEnv 
         g_httpCallbacks.erase(it);
     }
     if (done) done(static_cast<int>(httpStatus), jstringValue(env, responseBody));
+}
+
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeDrainPokedexCaptures(JNIEnv *env, jclass, jlong handle) {
+    auto *session = reinterpret_cast<CoreSession *>(handle);
+    jclass stringClass = env->FindClass("java/lang/String");
+    if (!session || !stringClass) return nullptr;
+    const auto events = session->drainPokedexCaptures();
+    jobjectArray arr = env->NewObjectArray(static_cast<jsize>(events.size()), stringClass, nullptr);
+    if (!arr) return nullptr;
+    for (std::size_t i = 0; i < events.size(); ++i) {
+        const auto &ev = events[i];
+        std::string serialized = std::to_string(ev.nationalDexNumber) + "|" +
+                                 (ev.isShiny ? "1" : "0") + "|" +
+                                 ev.metLocationName + "|" +
+                                 ev.storageSource + "|" +
+                                 ev.gameCode + "|" +
+                                 std::to_string(ev.romRevision);
+        jstring jstr = env->NewStringUTF(serialized.c_str());
+        if (jstr) {
+            env->SetObjectArrayElement(arr, static_cast<jsize>(i), jstr);
+            env->DeleteLocalRef(jstr);
+        }
+    }
+    return arr;
 }
 
 extern "C" JNIEXPORT void JNICALL

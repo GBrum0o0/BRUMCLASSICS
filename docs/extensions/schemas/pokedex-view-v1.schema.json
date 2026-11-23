@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brumclassics.local/schemas/pokedex-view-v1.schema.json",
+  "title": "BrumClassicsPokedexProjectedViewV1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "extensionId",
+    "catalogVersion",
+    "ownerProfileId",
+    "platform",
+    "syncRevision",
+    "contentSha256",
+    "enabledGenerations",
+    "summary",
+    "tabs"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "extensionId": { "const": "brum.ext.pokedex" },
+    "catalogVersion": { "type": "string" },
+    "ownerProfileId": { "type": "string", "minLength": 1 },
+    "platform": { "enum": ["windows", "ios", "android"] },
+    "syncRevision": { "type": "integer", "minimum": 1 },
+    "updatedAt": { "type": "string" },
+    "contentSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "enabledGenerations": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 1, "maximum": 7 }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["normalDiscovered", "normalAvailableTotal", "shinyDiscovered", "totalCatalogSpecies"],
+      "properties": {
+        "normalDiscovered": { "type": "integer", "minimum": 0 },
+        "normalAvailableTotal": { "type": "integer", "minimum": 0 },
+        "shinyDiscovered": { "type": "integer", "minimum": 0 },
+        "totalCatalogSpecies": { "type": "integer", "minimum": 802 }
+      }
+    },
+    "tabs": {
+      "type": "object",
+      "required": ["pokemon", "shinies"],
+      "properties": {
+        "pokemon": { "type": "array" },
+        "shinies": { "type": "array" }
+      }
+    }
+  }
+}

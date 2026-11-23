@@ -30,6 +30,15 @@ const required = [
   'BRUMCLASSICSMobileTests/Fixtures/BrumTestCore.c',
   'BRUMCLASSICSMobile/BRUMCLASSICSMobile-Bridging-Header.h',
   'BRUMCLASSICSMobile/MomentsView.swift', 'BRUMCLASSICSMobileTests/SnapshotTests.swift',
+  'BRUMCLASSICSMobile/Extensions/BrumExtensionContract.swift',
+  'BRUMCLASSICSMobile/Extensions/PokedexSpeciesCatalogData.swift',
+  'BRUMCLASSICSMobile/Extensions/PokedexUniversalStore.swift',
+  'BRUMCLASSICSMobile/Extensions/PokedexUniversalView.swift',
+  'BRUMCLASSICSMobile/Resources/pokedex-species-catalog-v1.json',
+  'BRUMCLASSICSMobileTests/PokedexUniversalTests.swift',
+  '../shared/brum-core/PokemonFireRedAdapter.hpp',
+  '../shared/brum-core/PokemonFireRedAdapter.cpp',
+  '../shared/brum-core/pokedex_tests.cpp',
   'ios-update.json'
 ];
 required.push('prepare_ppsspp_assets.py', 'licenses/PPSSPP-FONTS.txt', 'generate_sidestore_source.py', 'test_sidestore_source.py');
@@ -38,7 +47,13 @@ for (const relative of required) {
   if (!fs.existsSync(path.join(root, relative))) throw new Error(`Arquivo obrigatório ausente: ${relative}`);
 }
 
-const swiftFiles = fs.readdirSync(app).filter((name) => name.endsWith('.swift'));
+function swiftSources(directory, prefix = '') {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const relative = path.join(prefix, entry.name);
+    return entry.isDirectory() ? swiftSources(path.join(directory, entry.name), relative) : entry.name.endsWith('.swift') ? [relative] : [];
+  });
+}
+const swiftFiles = swiftSources(app);
 const source = swiftFiles.map((name) => fs.readFileSync(path.join(app, name), 'utf8')).join('\n');
 const requiredEndpoints = ['/v1/pair', '/v1/snapshot', '/v1/ws', '/v1/remote', '/v1/companion/notes', '/v1/companion/library-state', '/v1/companion/capture', '/v1/moments/', '/v1/notifications/read', '/v1/notifications/read-all'];
 for (const endpoint of requiredEndpoints) if (!source.includes(endpoint)) throw new Error(`Endpoint não portado: ${endpoint}`);
@@ -80,8 +95,8 @@ if (bcardView.split('private func send')[1].includes('offset = 0')) throw new Er
 for (const marker of ['ClassicsEverywhereView', 'PocketSetupView', 'PocketRules.launchURL', '/v1/classics/achievements/sync', 'API_GetGameInfoAndUserProgress.php']) if (!source.includes(marker)) throw new Error(`CLASSICS iPhone incompleto: ${marker}`);
 if (!source.includes('companion-capture') || !source.includes('MobileSettingsView')) throw new Error('Captura ou configurações móveis ausentes.');
 for (const marker of ['MobileNotificationSnapshot', 'NotificationsView', 'notifications_changed', 'markAllNotificationsRead']) if (!source.includes(marker)) throw new Error(`Central BRUM incompleta: ${marker}`);
-for (const marker of ['struct GamingModeView', 'GamingTabBar(selection:', 'JOGADOS RECENTEMENTE', 'BIBLIOTECA', 'GamingModeCatalog.library', 'pocket.romFolderGames', 'GamingOrientation.request(.landscape)', 'selection != 2']) {
-  if (!source.includes(marker)) throw new Error(`Gaming Mode incompleto: ${marker}`);
+for (const marker of ['struct GamingModeView', 'GamingTabBar(selection:', 'JOGADOS RECENTEMENTE', 'BIBLIOTECA', 'EXTENSÕES', 'gaming-mode-extensions', 'PokedexGamingExtensionView', 'GamingModeCatalog.library', 'pocket.romFolderGames', 'GamingOrientation.request(.landscape)', 'selection != 2']) {
+  if (!source.includes(marker) && !fs.readFileSync(path.join(app, 'Extensions/PokedexUniversalView.swift'), 'utf8').includes(marker)) throw new Error(`Gaming Mode incompleto: ${marker}`);
 }
 if (!source.includes('pocket.launchROM(rom, launcher: store)') || !source.includes('store.launchBCard(game)')) throw new Error('Gaming Mode não decide entre execução local e computador.');
 const gamingSource = fs.readFileSync(path.join(app, 'GamingModeView.swift'), 'utf8');
@@ -153,6 +168,14 @@ for (const marker of ['CORE_COMMIT="79d7f9de218b6ffa65a80bbdc5828532bc239232"', 
 for (const marker of ['CORE_COMMIT="4b01295838ea89e3f1355bbe4cb5cf98aa6108cd"', 'mednafen_wswan_libretro_ios.dylib', 'Beetle-WonderSwan-LICENSE.txt']) {
   if (!workflow.includes(marker)) throw new Error(`Build reproduzível do core Beetle WonderSwan incompleto: ${marker}`);
 }
+const projectSpec = fs.readFileSync(path.join(root, 'project.yml'), 'utf8');
+const marketingVersion = projectSpec.match(/MARKETING_VERSION:\s*([^\s]+)/)?.[1];
+const projectBuild = Number(projectSpec.match(/CURRENT_PROJECT_VERSION:\s*(\d+)/)?.[1]);
+if (marketingVersion !== updateManifest.version || projectBuild !== updateManifest.build) throw new Error('Versão e build do projeto divergem do manifesto iOS.');
+if (!workflow.includes('--target "$GITHUB_SHA"') || workflow.includes('--clobber')) throw new Error('Publicação iOS precisa fixar o commit e preservar binários publicados.');
+if (!workflow.includes(`PESSOAL' }}-${marketingVersion}`) || !workflow.includes(`IOS-TESTES-${marketingVersion}`)) throw new Error('Nome do artefato iOS diverge da versão atual.');
+const extensionSource = fs.readFileSync(path.join(app, 'Extensions/PokedexUniversalView.swift'), 'utf8');
+if (!extensionSource.includes('Task { @MainActor [weak self] in')) throw new Error('Callback da Pokédex precisa retornar ao MainActor.');
 if (!/^\d+\.\d+\.\d+$/.test(updateManifest.version)) throw new Error('Versão inválida em ios-update.json.');
 if (!String(updateManifest.buildUrl || '').startsWith('https://github.com/GBrum0o0/BRUMCLASSICS/')) throw new Error('URL do build pessoal inválida.');
 if (publishedUpdateManifest.version !== updateManifest.version || publishedUpdateManifest.build !== updateManifest.build || publishedUpdateManifest.buildUrl !== updateManifest.buildUrl) throw new Error('Manifesto público de atualização diverge do pacote iOS.');

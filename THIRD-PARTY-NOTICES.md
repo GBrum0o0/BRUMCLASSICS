@@ -36,6 +36,8 @@ O aplicativo móvel, licenciado sob GPL-3.0-or-later, também empacota os seguin
 - PPSSPP (PSP), GPL-2.0-or-later, revisão `7b4ddb426bbe9e287bb7f19b0cfaebb4ea0d41d8`: https://github.com/libretro/ppsspp. Incluído nas builds normais Android/iOS a partir de 0.32.0/0.22.0; iOS executa sem JIT. O núcleo mantém autoria de Henrik Rydgård e demais colaboradores. Scripts e patches públicos registram as adaptações e empacotam os avisos dos componentes utilizados; consulte `docs/PSP-MOBILE.md`.
 - Azahar (Nintendo 3DS), GPL-2.0-or-later, revisão `9e6f523a57fac9564ac0bf8286db3c3702d301ec`: https://github.com/azahar-emu/azahar. Incluído no build ARM64 Android (GLES3 + Dynarmic, sem keyblob proprietário embutido; aceita chaves fornecidas pelo usuário em `Azahar/sysdata/`). No iOS permanece experimental por software sem JIT.
 - rcheevos (runtime e cálculo de hashes RetroAchievements), MIT, versão `v12.5.0` (revisão `1433173220a7eaede6a9ed7a18e94117be1821e0`): https://github.com/RetroAchievements/rcheevos. Licença integral em `LICENSES/rcheevos-LICENSE.txt` e empacotada nos builds PC e móveis.
+- PokeAPI (`PokeAPI/pokeapi`), BSD-3-Clause: utilizado como fonte estruturada de metadados textuais (`pokemon_species.csv`, `pokemon_species_names.csv`, `pokemon_species_flavor_text.csv`) para o catálogo versionado da Extensão 001 (Pokédex Universal, 1ª à 7ª geração, `#001`..`#802`): https://github.com/PokeAPI/pokeapi. Nenhum sprite binário proprietário de terceiros é incluído no pacote.
+- Documentação técnica Gen 3 (`pret/pokefirered`): referência pública de estruturas de memória e seções de mapa para o adaptador somente leitura de Pokémon FireRed: https://github.com/pret/pokefirered.
 
 ## Candidatos no IPA experimental iOS
 

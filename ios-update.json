@@ -1,11 +1,11 @@
 {
-  "version": "0.25.0",
-  "build": 58,
+  "version": "0.26.0",
+  "build": 59,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.25.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.26.0",
   "notes": [
-    "Adiciona fonte oficial compatível com SideStore (sidestore-source.json) para consultar e instalar atualizações pelo iPhone sem voltar ao computador após o pareamento inicial.",
-    "Atualiza a tela de atualizações em Perfil com botão 'Verificar atualização' e encaminhamento seguro via sidestore:// mantendo compatibilidade com Sideloadly.",
-    "Inclui backup e restauração verificados (SHA-256) para migrar saves locais com segurança antes de trocar do Sideloadly para o SideStore."
+    "Adiciona Extensão 001 — Pokédex Universal no Gaming Mode com catálogo offline, coleção normal/shiny, backup e sincronização LAN por perfil.",
+    "Adaptador de captura piloto para Pokémon FireRed BPRE em teste; captura interativa em aparelho ainda requer validação. Catálogo não significa compatibilidade com todos os jogos.",
+    "Preserva SideStore, migração de saves e núcleos existentes; corrige isolamento de perfil, mesclagem atômica e captura falsa após falha de leitura."
   ]
 }

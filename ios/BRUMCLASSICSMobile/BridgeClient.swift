@@ -104,6 +104,24 @@ actor BridgeClient {
 
     func snapshot() async throws -> LibrarySnapshot { try await request(path: "/v1/snapshot") }
 
+    func fetchPokedexState(platform: String = "ios") async throws -> PokedexSyncStateDocument {
+        try await request(path: "/v1/extensions/pokedex/state?platform=\(platform)&view=0")
+    }
+
+    func syncPokedex(_ payload: PokedexSyncStateDocument, platform: String = "ios") async throws -> PokedexMergeResult {
+        let body = try JSONEncoder().encode(payload)
+        return try await request(path: "/v1/extensions/pokedex/sync?platform=\(platform)", method: "POST", body: body)
+    }
+
+    func exportPokedexBackup() async throws -> PokedexBackupBundle {
+        try await request(path: "/v1/extensions/pokedex/backup")
+    }
+
+    func restorePokedexBackup(_ bundle: PokedexBackupBundle) async throws -> PokedexMergeResult {
+        let body = try JSONEncoder().encode(bundle)
+        return try await request(path: "/v1/extensions/pokedex/restore", method: "POST", body: body)
+    }
+
     func nativeSaveCandidates(for identity: CanonicalGameIdentity) async throws -> [NativeSaveCandidate] {
         let catalog = try await nativeSaveCatalog(for: identity)
         return try catalog.validated(for: identity.canonicalGameID)

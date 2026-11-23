@@ -4,22 +4,92 @@ import UIKit
 struct BrumAchievementOverlayPayload: Equatable, Sendable {
     let eventID: String
     let achievementID: String
+    let eyebrow: String
     let title: String
     let description: String
     let points: Int
+    let pillText: String
     let badgeURL: URL?
+    let pokedexNationalDexNumber: Int
+    let isShinyDiscovery: Bool
 
-    init(eventID: String = "", achievementID: String = "", title: String, description: String = "", points: Int = 0, badgeURL: String? = nil) {
+    init(
+        eventID: String = "",
+        achievementID: String = "",
+        eyebrow: String = "CONQUISTA DESBLOQUEADA",
+        title: String,
+        description: String = "",
+        points: Int = 0,
+        pillText: String = "",
+        badgeURL: String? = nil,
+        pokedexNationalDexNumber: Int = 0,
+        isShinyDiscovery: Bool = false
+    ) {
         let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanDesc = description.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanAchID = achievementID.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanEvt = eventID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanEyebrow = eyebrow.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanPill = pillText.trimmingCharacters(in: .whitespacesAndNewlines)
         self.achievementID = cleanAchID
         self.eventID = cleanEvt.isEmpty ? (cleanAchID.isEmpty ? "title:\(cleanTitle.lowercased())" : "id:\(cleanAchID)") : cleanEvt
+        self.eyebrow = cleanEyebrow.isEmpty ? "CONQUISTA DESBLOQUEADA" : cleanEyebrow
         self.title = cleanTitle.isEmpty ? "Conquista desbloqueada" : cleanTitle
         self.description = cleanDesc
         self.points = max(0, points)
+        self.pillText = cleanPill
         self.badgeURL = Self.validatedBadgeURL(badgeURL)
+        self.pokedexNationalDexNumber = max(0, pokedexNationalDexNumber)
+        self.isShinyDiscovery = isShinyDiscovery
+    }
+
+    static func fromPokedexDiscovery(_ discovery: PokedexDiscoveryEvent) -> BrumAchievementOverlayPayload {
+        let eyebrow = discovery.isShiny ? "✦ NOVO POKÉMON SHINY DESCOBERTO!" : "NOVO POKÉMON DESCOBERTO!"
+        let desc = [discovery.gameTitle, discovery.subtitle]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
+        let pill = discovery.isShiny ? "✦ SHINY" : "#\(discovery.formattedNumber)"
+        return BrumAchievementOverlayPayload(
+            eventID: discovery.eventId,
+            achievementID: "pokedex:\(discovery.nationalDexNumber):\(discovery.category)",
+            eyebrow: eyebrow,
+            title: discovery.headline,
+            description: desc,
+            points: 0,
+            pillText: pill,
+            badgeURL: nil,
+            pokedexNationalDexNumber: discovery.nationalDexNumber,
+            isShinyDiscovery: discovery.isShiny
+        )
+    }
+
+    static func fromPokedexBridgeEvent(_ event: [String: Any]) -> BrumAchievementOverlayPayload? {
+        guard (event["type"] as? String) == "pokedex_discovery" else { return nil }
+        let disc = (event["discovery"] as? [String: Any]) ?? event
+        let dex = (disc["nationalDexNumber"] as? NSNumber)?.intValue ?? 0
+        guard (1...802).contains(dex) else { return nil }
+        let isShiny = (disc["isShiny"] as? NSNumber)?.boolValue ?? ((disc["category"] as? String) == "shiny")
+        let formatted = (disc["formattedNumber"] as? String) ?? String(format: "%03d", dex)
+        let species = (disc["speciesName"] as? String) ?? "Pokémon #\(formatted)"
+        let headline = (disc["headline"] as? String) ?? "\(formatted) — \(species)"
+        let gameTitle = (disc["gameTitle"] as? String) ?? "Brum Classics"
+        let subtitle = (disc["subtitle"] as? String) ?? "Registrado na Pokédex Universal"
+        let eventID = (disc["eventId"] as? String) ?? (event["eventId"] as? String) ?? "pokedex-discovery:primary:\(dex):\(isShiny ? "shiny" : "normal")"
+        let eyebrow = isShiny ? "✦ NOVO POKÉMON SHINY DESCOBERTO!" : "NOVO POKÉMON DESCOBERTO!"
+        let pill = isShiny ? "✦ SHINY" : "#\(formatted)"
+        return BrumAchievementOverlayPayload(
+            eventID: eventID,
+            achievementID: "pokedex:\(dex):\(isShiny ? "shiny" : "normal")",
+            eyebrow: eyebrow,
+            title: headline,
+            description: "\(gameTitle) · \(subtitle)",
+            points: 0,
+            pillText: pill,
+            badgeURL: nil,
+            pokedexNationalDexNumber: dex,
+            isShinyDiscovery: isShiny
+        )
     }
 
     static func validatedBadgeURL(_ raw: String?) -> URL? {
@@ -327,17 +397,33 @@ final class BrumAchievementCardView: UIView {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     func configure(with payload: BrumAchievementOverlayPayload) {
+        let shinyGold = UIColor(red: 1.0, green: 0.84, blue: 0.25, alpha: 1.0)
+        let activeAccent = payload.isShinyDiscovery ? shinyGold : Self.neonGreen
+        accentBar.backgroundColor = activeAccent
+        eyebrowLabel.text = payload.eyebrow
+        eyebrowLabel.textColor = activeAccent
         titleLabel.text = payload.title
         descriptionLabel.text = payload.description
         descriptionLabel.isHidden = payload.description.isEmpty
-        if payload.points > 0 {
+        if !payload.pillText.isEmpty {
+            pointsLabel.text = payload.pillText
+            pointsLabel.textColor = activeAccent
+            pointsPill.isHidden = false
+        } else if payload.points > 0 {
             pointsLabel.text = "+\(payload.points) PTS"
+            pointsLabel.textColor = Self.neonGreen
             pointsPill.isHidden = false
         } else {
             pointsPill.isHidden = true
         }
         badgeLoadTask?.cancel()
         badgeLoadTask = nil
+        if payload.pokedexNationalDexNumber > 0 {
+            let mode: PokedexSpriteRenderMode = payload.isShinyDiscovery ? .shiny : .normal
+            badgeImageView.image = PokedexPixelSprite.image(for: payload.pokedexNationalDexNumber, mode: mode, pixelScale: 3)
+            accessibilityIdentifier = payload.eventID
+            return
+        }
         badgeImageView.image = BrumCartridgeBrandMark.makeImage(size: CGSize(width: 44, height: 44))
 
         if let url = payload.badgeURL {
@@ -369,10 +455,41 @@ final class BrumAchievementCardView: UIView {
     private var queue: [BrumAchievementOverlayPayload] = []
     private var dismissTimer: Timer?
     private var showing = false
+    private var pokedexObserver: NSObjectProtocol?
 
     @objc public init(hostView: UIView) {
         self.hostView = hostView
         super.init()
+        pokedexObserver = NotificationCenter.default.addObserver(
+            forName: .brumPokedexCaptureDetected,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            let info = note.userInfo ?? [:]
+            let dex = (info["nationalDexNumber"] as? NSNumber)?.intValue ?? 0
+            let isShiny = (info["isShiny"] as? NSNumber)?.boolValue ?? false
+            let location = (info["captureLocation"] as? String) ?? PokedexUniversalStore.unknownLocation
+            let gameTitle = (info["gameTitle"] as? String) ?? "Pokémon FireRed Version"
+            let gameID = (info["canonicalGameID"] as? String) ?? ""
+            let systemID = (info["systemID"] as? String) ?? "gba"
+            guard BrumExtensionRegistry.shared.isEnabled(BrumExtensionManifest.pokedexUniversal.id, profileID: "primary"),
+                  (1...802).contains(dex),
+                  let res = try? PokedexUniversalStore.shared.recordCapture(
+                      ownerProfileId: "primary",
+                      nationalDexNumber: dex,
+                      isShiny: isShiny,
+                      gameTitle: gameTitle,
+                      gameId: gameID,
+                      systemId: systemID,
+                      capturedAt: nil,
+                      captureLocation: location
+                  ) else { return }
+            NotificationCenter.default.post(name: .brumPokedexCollectionUpdated, object: nil)
+            if res.recorded, let notification = res.notification {
+                let payload = BrumAchievementOverlayPayload.fromPokedexDiscovery(notification)
+                self?.enqueueOnMain(payload)
+            }
+        }
     }
 
     @objc public func enqueueUnlock(eventID: String,
@@ -395,6 +512,10 @@ final class BrumAchievementCardView: UIView {
     }
 
     @objc public func invalidate() {
+        if let pokedexObserver {
+            NotificationCenter.default.removeObserver(pokedexObserver)
+            self.pokedexObserver = nil
+        }
         DispatchQueue.main.async { [weak self] in
             self?.dismissTimer?.invalidate()
             self?.dismissTimer = nil
@@ -501,19 +622,31 @@ private struct BrumAchievementSwiftCard: View {
     private static let charcoal = Color(red: 9 / 255.0, green: 13 / 255.0, blue: 14 / 255.0)
     private static let border = Color(red: 53 / 255.0, green: 65 / 255.0, blue: 63 / 255.0)
     private static let neonGreen = Color(red: 157 / 255.0, green: 255 / 255.0, blue: 59 / 255.0)
+    private static let shinyGold = Color(red: 255 / 255.0, green: 214 / 255.0, blue: 64 / 255.0)
     private static let muted = Color(red: 173 / 255.0, green: 182 / 255.0, blue: 178 / 255.0)
     private static let pillBg = Color(red: 26 / 255.0, green: 36 / 255.0, blue: 34 / 255.0)
 
+    private var activeAccent: Color {
+        payload.isShinyDiscovery ? Self.shinyGold : Self.neonGreen
+    }
+
     var body: some View {
         HStack(spacing: 0) {
-            Self.neonGreen.frame(width: 4)
+            activeAccent.frame(width: 4)
 
             HStack(spacing: 12) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 10)
                         .fill(Color(red: 16 / 255.0, green: 23 / 255.0, blue: 24 / 255.0))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Self.border, lineWidth: 1))
-                    if let badgeImage {
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(payload.isShinyDiscovery ? Self.shinyGold.opacity(0.75) : Self.border, lineWidth: 1))
+                    if payload.pokedexNationalDexNumber > 0 {
+                        let mode: PokedexSpriteRenderMode = payload.isShinyDiscovery ? .shiny : .normal
+                        Image(uiImage: PokedexPixelSprite.image(for: payload.pokedexNationalDexNumber, mode: mode, pixelScale: 3))
+                            .interpolation(.none)
+                            .resizable()
+                            .scaledToFit()
+                            .padding(5)
+                    } else if let badgeImage {
                         Image(uiImage: badgeImage)
                             .resizable()
                             .scaledToFit()
@@ -528,9 +661,9 @@ private struct BrumAchievementSwiftCard: View {
                 .frame(width: 56, height: 56)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("CONQUISTA DESBLOQUEADA")
+                    Text(payload.eyebrow)
                         .font(.system(size: 10, weight: .heavy))
-                        .foregroundStyle(Self.neonGreen)
+                        .foregroundStyle(activeAccent)
                         .lineLimit(1)
                     Text(payload.title)
                         .font(.system(size: 15, weight: .bold))
@@ -547,7 +680,14 @@ private struct BrumAchievementSwiftCard: View {
                 Spacer(minLength: 6)
 
                 VStack(alignment: .trailing) {
-                    if payload.points > 0 {
+                    if !payload.pillText.isEmpty {
+                        Text(payload.pillText)
+                            .font(.system(size: 12, weight: .heavy))
+                            .foregroundStyle(activeAccent)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 4)
+                            .background(Self.pillBg, in: Capsule())
+                    } else if payload.points > 0 {
                         Text("+\(payload.points) PTS")
                             .font(.system(size: 12, weight: .heavy))
                             .foregroundStyle(Self.neonGreen)

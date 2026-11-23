@@ -19,9 +19,11 @@ import java.util.concurrent.locks.LockSupport;
 
 final class BrumCoreView extends View implements Runnable {
     interface RuntimeErrorListener { void onRuntimeError(String message); }
+    interface PokedexCaptureListener { void onPokedexCaptureJson(String json); }
 
     private final BrumCoreBridge core;
     private final RuntimeErrorListener errorListener;
+    private volatile PokedexCaptureListener pokedexListener;
     private final AtomicInteger[] portMasks = {
         new AtomicInteger(), new AtomicInteger(), new AtomicInteger(), new AtomicInteger()
     };
@@ -99,6 +101,10 @@ final class BrumCoreView extends View implements Runnable {
         virtualPadPort = (port >= 0 && port < 4) ? port : 0;
     }
 
+    void setPokedexCaptureListener(PokedexCaptureListener listener) {
+        this.pokedexListener = listener;
+    }
+
     void setButton(int id, boolean pressed) {
         setPortButton(virtualPadPort, id, pressed);
     }
@@ -159,9 +165,25 @@ final class BrumCoreView extends View implements Runnable {
         long lastAccounting = System.nanoTime();
         try {
             final long frameDuration = CoreTiming.frameDurationNanos(core.frameRate());
+            int pokedexPollCounter = 0;
             while (running) {
                 for (int p = 0; p < 4; p++) core.setPortMask(p, portMasks[p].get());
                 core.runFrames(fastForward ? 5 : 1, 0);
+                if (++pokedexPollCounter >= 15) {
+                    pokedexPollCounter = 0;
+                    PokedexCaptureListener listener = this.pokedexListener;
+                    if (listener != null) {
+                        String[] captures = core.drainPokedexCaptures();
+                        if (captures != null && captures.length > 0) {
+                            for (String cap : captures) {
+                                if (cap != null && !cap.isEmpty()) {
+                                    final String payload = cap;
+                                    post(() -> listener.onPokedexCaptureJson(payload));
+                                }
+                            }
+                        }
+                    }
+                }
                 long dimensions = core.copyFrame(pixels);
                 int width = (int) (dimensions >>> 32); int height = (int) dimensions;
                 if (width > 0 && height > 0 && (long) width * height <= pixels.length) {

@@ -1,0 +1,761 @@
+{
+  "schemaVersion": 1,
+  "extensionId": "brum.ext.pokedex",
+  "catalogVersion": "1.0.0",
+  "ownerProfileId": "primary",
+  "platform": "windows",
+  "syncRevision": 3,
+  "updatedAt": "2026-11-22T12:00:00.000Z",
+  "contentSha256": "49b2080cc125413962367c6994a7ea347423659abdf23304bd6c8f0929f272fb",
+  "enabledGenerations": [
+    1
+  ],
+  "compatibility": {
+    "platform": "windows",
+    "enabledGenerations": [
+      1
+    ],
+    "pilotCaptureMaxNationalDex": 386,
+    "native3dsAvailable": true,
+    "games": [
+      {
+        "gameKey": "pokemon-firered-gba",
+        "title": "Pokémon FireRed Version",
+        "systemId": "gba",
+        "primaryGeneration": 1,
+        "engineGeneration": 3,
+        "supportedNationalDexRange": [
+          1,
+          386
+        ],
+        "romCodes": [
+          "BPRE"
+        ],
+        "supportedRevisions": [
+          0,
+          1
+        ],
+        "backends": [
+          "mgba_libretro.dll"
+        ],
+        "adapterId": "firered-gba-v1",
+        "adapterImplemented": true,
+        "automatedValidationStatus": "verified",
+        "realRomBootAndCaptureVerified": true,
+        "interactivePlaythroughPendingUser": true,
+        "status": "enabled_pilot"
+      },
+      {
+        "gameKey": "pokemon-red-gb",
+        "title": "Pokémon Red / Blue / Yellow",
+        "systemId": "gb",
+        "primaryGeneration": 1,
+        "engineGeneration": 1,
+        "supportedNationalDexRange": [
+          1,
+          151
+        ],
+        "romCodes": [],
+        "backends": [
+          "gambatte_libretro.dll",
+          "sameboy_libretro.dll"
+        ],
+        "adapterId": "gen1-gb-planned",
+        "adapterImplemented": false,
+        "automatedValidationStatus": "planned_phase_4",
+        "realRomBootAndCaptureVerified": false,
+        "status": "awaiting_adapter"
+      },
+      {
+        "gameKey": "pokemon-crystal-gbc",
+        "title": "Pokémon Gold / Silver / Crystal",
+        "systemId": "gbc",
+        "primaryGeneration": 2,
+        "engineGeneration": 2,
+        "supportedNationalDexRange": [
+          1,
+          251
+        ],
+        "romCodes": [],
+        "backends": [
+          "gambatte_libretro.dll",
+          "sameboy_libretro.dll"
+        ],
+        "adapterId": "gen2-gbc-planned",
+        "adapterImplemented": false,
+        "automatedValidationStatus": "planned_phase_4",
+        "realRomBootAndCaptureVerified": false,
+        "status": "awaiting_adapter"
+      },
+      {
+        "gameKey": "pokemon-emerald-gba",
+        "title": "Pokémon Ruby / Sapphire / Emerald / LeafGreen",
+        "systemId": "gba",
+        "primaryGeneration": 3,
+        "engineGeneration": 3,
+        "supportedNationalDexRange": [
+          1,
+          386
+        ],
+        "romCodes": [
+          "BPEE",
+          "AXVE",
+          "AXPE",
+          "BPGE"
+        ],
+        "backends": [
+          "mgba_libretro.dll"
+        ],
+        "adapterId": "gen3-gba-planned",
+        "adapterImplemented": false,
+        "automatedValidationStatus": "planned_phase_4",
+        "realRomBootAndCaptureVerified": false,
+        "status": "awaiting_adapter"
+      },
+      {
+        "gameKey": "pokemon-platinum-nds",
+        "title": "Pokémon Diamond / Pearl / Platinum / HeartGold / SoulSilver",
+        "systemId": "nds",
+        "primaryGeneration": 4,
+        "engineGeneration": 4,
+        "supportedNationalDexRange": [
+          1,
+          493
+        ],
+        "romCodes": [
+          "CPUE",
+          "IPKE",
+          "IPGE"
+        ],
+        "backends": [
+          "melonds_libretro.dll"
+        ],
+        "adapterId": "gen4-nds-planned",
+        "adapterImplemented": false,
+        "automatedValidationStatus": "planned_phase_4",
+        "realRomBootAndCaptureVerified": false,
+        "status": "awaiting_adapter"
+      },
+      {
+        "gameKey": "pokemon-black2-nds",
+        "title": "Pokémon Black / White / Black 2 / White 2",
+        "systemId": "nds",
+        "primaryGeneration": 5,
+        "engineGeneration": 5,
+        "supportedNationalDexRange": [
+          1,
+          649
+        ],
+        "romCodes": [
+          "IRBO",
+          "IRDO"
+        ],
+        "backends": [
+          "melonds_libretro.dll"
+        ],
+        "adapterId": "gen5-nds-planned",
+        "adapterImplemented": false,
+        "automatedValidationStatus": "planned_phase_4",
+        "realRomBootAndCaptureVerified": false,
+        "status": "awaiting_adapter"
+      },
+      {
+        "gameKey": "pokemon-xy-oras-3ds",
+        "title": "Pokémon X / Y / Omega Ruby / Alpha Sapphire",
+        "systemId": "3ds",
+        "primaryGeneration": 6,
+        "engineGeneration": 6,
+        "supportedNationalDexRange": [
+          1,
+          721
+        ],
+        "romCodes": [],
+        "backends": [
+          "citra_libretro.dll"
+        ],
+        "adapterId": "gen6-3ds-planned",
+        "adapterImplemented": false,
+        "automatedValidationStatus": "planned_phase_4",
+        "realRomBootAndCaptureVerified": false,
+        "status": "awaiting_adapter"
+      },
+      {
+        "gameKey": "pokemon-sun-moon-3ds",
+        "title": "Pokémon Sun / Moon",
+        "systemId": "3ds",
+        "primaryGeneration": 7,
+        "engineGeneration": 7,
+        "supportedNationalDexRange": [
+          1,
+          802
+        ],
+        "romCodes": [],
+        "backends": [
+          "citra_libretro.dll"
+        ],
+        "adapterId": "gen7-3ds-planned",
+        "adapterImplemented": false,
+        "automatedValidationStatus": "planned_phase_4",
+        "realRomBootAndCaptureVerified": false,
+        "status": "awaiting_adapter"
+      }
+    ]
+  },
+  "summary": {
+    "normalDiscovered": 1,
+    "normalAvailableTotal": 151,
+    "shinyDiscovered": 1,
+    "totalCatalogSpecies": 802
+  },
+  "tabs": {
+    "pokemon": [
+      {
+        "nationalDexNumber": 1,
+        "formattedNumber": "001",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/001",
+          "silhouetteKey": "pokedex/silhouette/001"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 2,
+        "formattedNumber": "002",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/002",
+          "silhouetteKey": "pokedex/silhouette/002"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 3,
+        "formattedNumber": "003",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/003",
+          "silhouetteKey": "pokedex/silhouette/003"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 4,
+        "formattedNumber": "004",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/004",
+          "silhouetteKey": "pokedex/silhouette/004"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 5,
+        "formattedNumber": "005",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/005",
+          "silhouetteKey": "pokedex/silhouette/005"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 6,
+        "formattedNumber": "006",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/006",
+          "silhouetteKey": "pokedex/silhouette/006"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 7,
+        "formattedNumber": "007",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/007",
+          "silhouetteKey": "pokedex/silhouette/007"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 8,
+        "formattedNumber": "008",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/008",
+          "silhouetteKey": "pokedex/silhouette/008"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 9,
+        "formattedNumber": "009",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/009",
+          "silhouetteKey": "pokedex/silhouette/009"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 10,
+        "formattedNumber": "010",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/010",
+          "silhouetteKey": "pokedex/silhouette/010"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 11,
+        "formattedNumber": "011",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/011",
+          "silhouetteKey": "pokedex/silhouette/011"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 12,
+        "formattedNumber": "012",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/012",
+          "silhouetteKey": "pokedex/silhouette/012"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 13,
+        "formattedNumber": "013",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/013",
+          "silhouetteKey": "pokedex/silhouette/013"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 14,
+        "formattedNumber": "014",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/014",
+          "silhouetteKey": "pokedex/silhouette/014"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 15,
+        "formattedNumber": "015",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/015",
+          "silhouetteKey": "pokedex/silhouette/015"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 16,
+        "formattedNumber": "016",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/016",
+          "silhouetteKey": "pokedex/silhouette/016"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 17,
+        "formattedNumber": "017",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/017",
+          "silhouetteKey": "pokedex/silhouette/017"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 18,
+        "formattedNumber": "018",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/018",
+          "silhouetteKey": "pokedex/silhouette/018"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 19,
+        "formattedNumber": "019",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/019",
+          "silhouetteKey": "pokedex/silhouette/019"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 20,
+        "formattedNumber": "020",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/020",
+          "silhouetteKey": "pokedex/silhouette/020"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 21,
+        "formattedNumber": "021",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/021",
+          "silhouetteKey": "pokedex/silhouette/021"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 22,
+        "formattedNumber": "022",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/022",
+          "silhouetteKey": "pokedex/silhouette/022"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 23,
+        "formattedNumber": "023",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/023",
+          "silhouetteKey": "pokedex/silhouette/023"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 24,
+        "formattedNumber": "024",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/024",
+          "silhouetteKey": "pokedex/silhouette/024"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 25,
+        "formattedNumber": "025",
+        "generation": 1,
+        "discovered": true,
+        "silhouetteOnly": false,
+        "category": "normal",
+        "isShiny": false,
+        "name": "Pikachu",
+        "genus": "Mouse Pokémon",
+        "description": "It has small electric sacs on both its cheeks. If threatened, it looses electric charges from the sacs.",
+        "spriteAsset": {
+          "activeKey": "pokedex/normal/025",
+          "normalKey": "pokedex/normal/025",
+          "silhouetteKey": "pokedex/silhouette/025"
+        },
+        "capture": {
+          "captureId": "ec5f5157797063d747b60b5529ab557d",
+          "firstCapturedGame": "Pokémon FireRed Version",
+          "firstCapturedGameId": "classic-firered",
+          "systemId": "gba",
+          "capturedAt": "2026-11-22T10:00:00.000Z",
+          "captureLocation": "Viridian Forest",
+          "ownerProfileId": "primary"
+        }
+      },
+      {
+        "nationalDexNumber": 26,
+        "formattedNumber": "026",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/026",
+          "silhouetteKey": "pokedex/silhouette/026"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 27,
+        "formattedNumber": "027",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/027",
+          "silhouetteKey": "pokedex/silhouette/027"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 28,
+        "formattedNumber": "028",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/028",
+          "silhouetteKey": "pokedex/silhouette/028"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 29,
+        "formattedNumber": "029",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/029",
+          "silhouetteKey": "pokedex/silhouette/029"
+        },
+        "capture": null
+      },
+      {
+        "nationalDexNumber": 30,
+        "formattedNumber": "030",
+        "generation": 1,
+        "discovered": false,
+        "silhouetteOnly": true,
+        "category": "normal",
+        "isShiny": false,
+        "name": "???",
+        "genus": "???",
+        "description": "???",
+        "spriteAsset": {
+          "activeKey": "pokedex/silhouette/030",
+          "silhouetteKey": "pokedex/silhouette/030"
+        },
+        "capture": null
+      }
+    ],
+    "shinies": [
+      {
+        "nationalDexNumber": 25,
+        "formattedNumber": "025",
+        "generation": 1,
+        "discovered": true,
+        "silhouetteOnly": false,
+        "category": "shiny",
+        "isShiny": true,
+        "name": "Pikachu",
+        "genus": "Mouse Pokémon",
+        "description": "It has small electric sacs on both its cheeks. If threatened, it looses electric charges from the sacs.",
+        "spriteAsset": {
+          "activeKey": "pokedex/shiny/025",
+          "shinyKey": "pokedex/shiny/025",
+          "silhouetteKey": "pokedex/silhouette/025"
+        },
+        "capture": {
+          "captureId": "21915ea4d171a1e063b3353edf14fc52",
+          "firstCapturedGame": "Pokémon FireRed Version",
+          "firstCapturedGameId": "classic-firered",
+          "systemId": "gba",
+          "capturedAt": "2026-11-22T12:00:00.000Z",
+          "captureLocation": "Power Plant",
+          "ownerProfileId": "primary"
+        }
+      }
+    ]
+  }
+}

@@ -143,6 +143,11 @@ public final class BrumCoreBridge implements AutoCloseable {
     public void persist() { if (handle != 0) nativePersist(handle); }
     public boolean saveState(String path) { ensureOpen(); return nativeSaveState(handle, path); }
     public boolean loadState(String path) { ensureOpen(); return nativeLoadState(handle, path); }
+    public String[] drainPokedexCaptures() {
+        if (handle == 0) return new String[0];
+        String[] raw = nativeDrainPokedexCaptures(handle);
+        return raw != null ? raw : new String[0];
+    }
 
     @Override public void close() {
         long h = handle;
@@ -171,5 +176,6 @@ public final class BrumCoreBridge implements AutoCloseable {
     private static native boolean nativeLoadState(long handle, String path);
     private static native void nativeConfigureRetroAchievements(long handle, int consoleId, String username, String token, Object callbackTarget);
     private static native void nativeCompleteHttp(long requestId, int httpStatus, String responseBody);
+    private static native String[] nativeDrainPokedexCaptures(long handle);
     private static native void nativeDestroy(long handle);
 }

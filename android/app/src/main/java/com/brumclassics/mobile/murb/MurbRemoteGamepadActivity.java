@@ -56,8 +56,11 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
             String raw = intent == null ? null : intent.getStringExtra("payload");
             if (raw == null || raw.isEmpty() || achievementOverlay == null) return;
             try {
+                org.json.JSONObject json = new org.json.JSONObject(raw);
                 com.brumclassics.mobile.emulation.BrumAchievementOverlay.Payload popup =
-                    com.brumclassics.mobile.emulation.BrumAchievementOverlay.Payload.fromBridgeEvent(new org.json.JSONObject(raw));
+                    ("pokedex_discovery".equals(json.optString("type")) || json.optJSONObject("discovery") != null)
+                        ? com.brumclassics.mobile.emulation.BrumAchievementOverlay.Payload.fromPokedexBridgeEvent(json)
+                        : com.brumclassics.mobile.emulation.BrumAchievementOverlay.Payload.fromBridgeEvent(json);
                 if (popup != null) achievementOverlay.enqueue(popup);
             } catch (Exception ignored) {}
         }

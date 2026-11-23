@@ -9,6 +9,7 @@
 #include "../../../shared/brum-core/FrameCadence.hpp"
 #include "../../../shared/brum-core/ContentValidation.hpp"
 #include "../../../shared/brum-core/RetroAchievementsRuntime.hpp"
+#include "../../../shared/brum-core/PokemonFireRedAdapter.hpp"
 #include <memory>
 
 #import <AudioToolbox/AudioToolbox.h>
@@ -353,6 +354,7 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     NSData *_romData;
     std::vector<brum_retro_memory_descriptor> _memoryDescriptors;
     std::unique_ptr<brum::RetroAchievementsRuntime> _raRuntime;
+    std::unique_ptr<brum::pokedex::FireRedCaptureTracker> _pokedexTracker;
     BrumAchievementOverlayPresenter *_achievementOverlay;
     NSString *_gameTitle;
     NSString *_systemDirectory;
@@ -2217,6 +2219,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         [self showStateStatus:@"ESTADO INCOMPATÍVEL OU CORROMPIDO" error:YES]; return;
     }
     if (_raRuntime) _raRuntime->reset();
+    if (_pokedexTracker) _pokedexTracker->reset();
     os_unfair_lock_lock(&_audioLock); _audioRead = 0; _audioWrite = 0; _audioCount = 0; os_unfair_lock_unlock(&_audioLock);
     [self showStateStatus:[NSString stringWithFormat:@"SLOT %ld CARREGADO", (long)slot] error:NO];
 }
@@ -2299,6 +2302,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     if (![self initializeHardware:error]) return NO;
     [self restoreSaveRAM];
     [self startRetroAchievementsSession];
+    [self startPokedexCaptureSession];
     brum_retro_system_av_info avInfo = {};
     _core.getAVInfo(&avInfo);
     if (_hasPendingAVInfo) { avInfo = _pendingAVInfo; _hasPendingAVInfo = NO; }
@@ -2410,6 +2414,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         _suppressVideo = frame + 1 < frameCount;
         _core.run();
         if (_raRuntime) _raRuntime->doFrame();
+        if (_pokedexTracker) _pokedexTracker->doFrame();
         ++_sessionFrames;
         if (_performanceHUDEnabled) ++_measuredFrames;
         if (_shutdownRequested) break;
@@ -2544,6 +2549,72 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _raRuntime->startGame(consoleId, romPath, (const uint8_t *)_romData.bytes, (size_t)_romData.length, mapped.empty() ? nullptr : &map);
 }
 
+- (void)startPokedexCaptureSession {
+    _pokedexTracker.reset();
+    if (!_romData || _romData.length < 0xC0) return;
+    const auto romInfo = brum::pokedex::identifyFireRedRom((const uint8_t *)_romData.bytes, (size_t)_romData.length);
+    if (!romInfo.isFireRed || !romInfo.supportedRamLayout) return;
+
+    __weak BrumLibretroViewController *weakSelf = self;
+    auto busReader = [weakSelf](uint32_t gbaAddress, uint8_t *outBuffer, size_t length) -> bool {
+        BrumLibretroViewController *strongSelf = weakSelf;
+        if (!strongSelf || !strongSelf->_gameLoaded || strongSelf->_stopped || !outBuffer || length == 0) return false;
+        for (const auto &desc : strongSelf->_memoryDescriptors) {
+            if (!desc.ptr || desc.len == 0) continue;
+            const size_t addr = (size_t)gbaAddress;
+            if (addr >= desc.start && addr <= desc.start + desc.len && length <= (desc.start + desc.len - addr)) {
+                memcpy(outBuffer, (const uint8_t *)desc.ptr + (addr - desc.start), length);
+                return true;
+            }
+        }
+        if (strongSelf->_core.getMemoryData && strongSelf->_core.getMemorySize) {
+            const void *sysRam = strongSelf->_core.getMemoryData(BRUM_RETRO_MEMORY_SYSTEM_RAM);
+            const size_t sysSize = strongSelf->_core.getMemorySize(BRUM_RETRO_MEMORY_SYSTEM_RAM);
+            if (sysRam && sysSize >= 0x40000 && gbaAddress >= 0x02000000u && gbaAddress < 0x02040000u &&
+                length <= (size_t)(0x02040000u - gbaAddress)) {
+                memcpy(outBuffer, (const uint8_t *)sysRam + (gbaAddress - 0x02000000u), length);
+                return true;
+            }
+        }
+        return false;
+    };
+
+    auto onCapture = [weakSelf](const brum::pokedex::FireRedCaptureEvent &ev) {
+        BrumLibretroViewController *strongSelf = weakSelf;
+        if (!strongSelf) return;
+        NSString *loc = [NSString stringWithUTF8String:ev.metLocationName.c_str()] ?: @"Localização desconhecida";
+        NSString *src = [NSString stringWithUTF8String:ev.storageSource.c_str()] ?: @"party";
+        NSString *code = [NSString stringWithUTF8String:ev.gameCode.c_str()] ?: @"BPRE";
+        NSDictionary *info = @{
+            @"nationalDexNumber": @((NSInteger)ev.nationalDexNumber),
+            @"isShiny": @(ev.isShiny),
+            @"category": ev.isShiny ? @"shiny" : @"normal",
+            @"captureLocation": loc,
+            @"storageSource": src,
+            @"gameCode": code,
+            @"romRevision": @((NSInteger)ev.romRevision),
+            @"gameTitle": strongSelf->_gameTitle ?: @"Pokémon FireRed Version",
+            @"canonicalGameID": strongSelf->_canonicalGameID ?: @"",
+            @"systemID": strongSelf->_emulatedSystemID ?: @"gba"
+        };
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [NSNotificationCenter.defaultCenter postNotificationName:@"BrumPokedexCaptureDetectedNotification"
+                                                              object:nil
+                                                            userInfo:info];
+        });
+    };
+
+    _pokedexTracker = std::make_unique<brum::pokedex::FireRedCaptureTracker>(romInfo, busReader, onCapture, 15u);
+    void *saveRam = _core.getMemoryData ? _core.getMemoryData(BRUM_RETRO_MEMORY_SAVE_RAM) : nullptr;
+    size_t saveSize = _core.getMemorySize ? _core.getMemorySize(BRUM_RETRO_MEMORY_SAVE_RAM) : 0;
+    if (saveRam && saveSize >= 0xE000) {
+        const auto snap = brum::pokedex::inspectFireRedSave128K((const uint8_t *)saveRam, saveSize);
+        if (snap.valid) {
+            _pokedexTracker->seedBaselineFromSave(snap);
+        }
+    }
+}
+
 - (void)restoreSaveRAM {
     void *memory = _core.getMemoryData(BRUM_RETRO_MEMORY_SAVE_RAM);
     size_t size = _core.getMemorySize(BRUM_RETRO_MEMORY_SAVE_RAM);
@@ -2617,6 +2688,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         _raRuntime->unloadGame();
         _raRuntime.reset();
     }
+    _pokedexTracker.reset();
     [_achievementOverlay invalidate];
     _startupError = [NSError errorWithDomain:BrumLibretroErrorDomain code:18 userInfo:@{NSLocalizedDescriptionKey: @"O núcleo interrompeu o jogo. Consulte o aviso registrado no relatório para identificar a causa."}];
     [self captureDiagnosticsMetrics];
@@ -2645,6 +2717,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         _raRuntime->unloadGame();
         _raRuntime.reset();
     }
+    _pokedexTracker.reset();
     [_achievementOverlay invalidate];
     if (_audioQueue) { AudioQueueStop(_audioQueue, true); AudioQueueDispose(_audioQueue, true); _audioQueue = NULL; }
     _audioSampleRate = 0;
