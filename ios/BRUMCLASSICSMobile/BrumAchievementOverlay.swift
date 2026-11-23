@@ -68,7 +68,7 @@ struct BrumAchievementOverlayPayload: Equatable, Sendable {
         guard (event["type"] as? String) == "pokedex_discovery" else { return nil }
         let disc = (event["discovery"] as? [String: Any]) ?? event
         let dex = (disc["nationalDexNumber"] as? NSNumber)?.intValue ?? 0
-        guard (1...802).contains(dex) else { return nil }
+        guard (1...809).contains(dex) else { return nil }
         let isShiny = (disc["isShiny"] as? NSNumber)?.boolValue ?? ((disc["category"] as? String) == "shiny")
         let formatted = (disc["formattedNumber"] as? String) ?? String(format: "%03d", dex)
         let species = (disc["speciesName"] as? String) ?? "Pokémon #\(formatted)"
@@ -478,7 +478,7 @@ final class BrumAchievementCardView: UIView {
             let gameID = (info["canonicalGameID"] as? String) ?? ""
             let systemID = (info["systemID"] as? String) ?? "gba"
             guard BrumExtensionRegistry.shared.isEnabled(BrumExtensionManifest.pokedexUniversal.id, profileID: "primary"),
-                  (1...802).contains(dex),
+                  (1...809).contains(dex),
                   let res = try? PokedexUniversalStore.shared.recordCapture(
                       ownerProfileId: "primary",
                       nationalDexNumber: dex,

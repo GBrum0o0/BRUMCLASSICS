@@ -13,18 +13,23 @@ enum PokedexSpriteRenderMode: Equatable {
 enum PokedexPixelSprite {
     private static let cache: NSCache<NSString, UIImage> = {
         let cache = NSCache<NSString, UIImage>()
-        cache.totalCostLimit = 8 * 1024 * 1024
+        cache.totalCostLimit = 10 * 1024 * 1024
         return cache
     }()
+    private static let thumbQueue: DispatchQueue = {
+        DispatchQueue(label: "brum.pokedex.thumbnails", qos: .utility, attributes: .concurrent)
+    }()
+    private static let thumbSemaphore = DispatchSemaphore(value: 4)
+
     static func url(for dex: Int, mode: PokedexSpriteRenderMode) -> URL {
         let variant = mode == .shiny ? "shiny/" : ""
-        return URL(string: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/\(variant)\(max(1, min(802, dex))).png")!
+        return URL(string: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/\(variant)\(max(1, min(809, dex))).png")!
     }
     static func silhouette(_ image: UIImage) -> UIImage {
         image.withTintColor(.black, renderingMode: .alwaysOriginal)
     }
     @discardableResult
-    static func load(for dex: Int, mode: PokedexSpriteRenderMode,
+    static func load(for dex: Int, mode: PokedexSpriteRenderMode, highPriority: Bool = false,
                      completion: @escaping (UIImage?) -> Void) -> URLSessionDataTask? {
         let address = url(for: dex, mode: mode)
         let key = address.absoluteString as NSString
@@ -34,11 +39,15 @@ enum PokedexPixelSprite {
             }
         }
         if let image = cache.object(forKey: key) { deliver(image); return nil }
+        let clampedDex = max(1, min(809, dex))
         let folder = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("brum-pokedex-images", isDirectory: true)
-        let file = folder.appendingPathComponent("\(dex)-\(mode == .shiny ? "shiny" : "normal").png")
+        let file = folder.appendingPathComponent("\(clampedDex)-\(mode == .shiny ? "shiny" : "normal").png")
         let request = URLRequest(url: address, cachePolicy: .returnCacheDataElseLoad, timeoutInterval: 15)
         let task = URLSession.shared.dataTask(with: request) { data, response, _ in
+            if !highPriority {
+                thumbSemaphore.signal()
+            }
             guard let http = response as? HTTPURLResponse, http.statusCode == 200,
                   http.url?.host == "raw.githubusercontent.com",
                   let data, data.count <= 1_048_576, let image = UIImage(data: data),
@@ -50,10 +59,18 @@ enum PokedexPixelSprite {
             try? data.write(to: file, options: .atomic)
             deliver(image)
         }
-        DispatchQueue.global(qos: .utility).async {
+        task.priority = highPriority ? URLSessionTask.highPriority : URLSessionTask.lowPriority
+        let queue = highPriority ? DispatchQueue.global(qos: .userInitiated) : thumbQueue
+        queue.async {
             if let data = try? Data(contentsOf: file), let image = UIImage(data: data) {
-                cache.setObject(image, forKey: key, cost: Int(image.size.width * image.size.height * 4)); deliver(image)
-            } else { task.resume() }
+                cache.setObject(image, forKey: key, cost: Int(image.size.width * image.size.height * 4))
+                deliver(image)
+            } else {
+                if !highPriority {
+                    thumbSemaphore.wait()
+                }
+                task.resume()
+            }
         }
         return task
     }
@@ -62,27 +79,70 @@ enum PokedexPixelSprite {
 struct PokedexSpeciesImage: View {
     let nationalDexNumber: Int
     let mode: PokedexSpriteRenderMode
+    var highPriority: Bool = false
+    var interactiveRetry: Bool = false
     @State private var image: UIImage?
     @State private var failed = false
+    @State private var reloadToken = 0
+    @State private var activeTask: URLSessionDataTask?
     var body: some View {
         Group {
             if let image {
                 Image(uiImage: image).interpolation(.none).resizable().scaledToFit()
             } else if failed {
-                Image(systemName: "photo")
-                    .foregroundStyle(.secondary)
-                    .accessibilityLabel("Imagem indisponível. Conecte à internet para carregar.")
+                if interactiveRetry {
+                    VStack(spacing: 6) {
+                        Image(systemName: "photo")
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                        Text("Imagem indisponível")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Button("Tentar novamente") {
+                            reloadToken += 1
+                        }
+                        .font(.caption2.bold())
+                        .buttonStyle(.bordered)
+                        .tint(BrumTheme.primary)
+                        .frame(minHeight: 36)
+                        .accessibilityIdentifier("pokedex-retry-image")
+                    }
+                } else {
+                    Image(systemName: "photo")
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Imagem indisponível. Conecte à internet para carregar.")
+                }
             } else { ProgressView().accessibilityLabel("Carregando imagem da espécie") }
         }
         .accessibilityLabel(mode == .silhouette ? "Silhueta da espécie número \(nationalDexNumber)" : "Imagem da espécie número \(nationalDexNumber)")
         .accessibilityHint(failed ? "A primeira consulta da imagem requer internet; imagens já carregadas ficam em cache." : "")
-        .task(id: "\(nationalDexNumber)-\(mode)") {
+        .task(id: "\(nationalDexNumber)-\(mode)-\(reloadToken)") {
+            activeTask?.cancel()
             image = nil; failed = false
             let loaded: UIImage? = await withCheckedContinuation { continuation in
-                PokedexPixelSprite.load(for: nationalDexNumber, mode: mode) { continuation.resume(returning: $0) }
+                var resumed = false
+                let lock = NSLock()
+                let finish: (UIImage?) -> Void = { img in
+                    lock.lock()
+                    defer { lock.unlock() }
+                    guard !resumed else { return }
+                    resumed = true
+                    continuation.resume(returning: img)
+                }
+                let task = PokedexPixelSprite.load(for: nationalDexNumber, mode: mode, highPriority: highPriority) {
+                    finish($0)
+                }
+                DispatchQueue.main.async { activeTask = task }
             }
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else {
+                activeTask?.cancel()
+                return
+            }
             image = loaded; failed = loaded == nil
+        }
+        .onDisappear {
+            activeTask?.cancel()
+            activeTask = nil
         }
     }
 }
@@ -112,6 +172,7 @@ final class PokedexUniversalCoordinator: ObservableObject {
     @Published private(set) var projectedView: PokedexProjectedView
     @Published var isDeviceOpen: Bool = false
     @Published var selectedTab: PokedexDisplayTab = .pokemon
+    @Published var selectedScope: String = "pilot"
     @Published var selectedDexNumber: Int = 1
     @Published var searchQuery: String = ""
     @Published var isExtensionEnabled: Bool = true
@@ -127,7 +188,7 @@ final class PokedexUniversalCoordinator: ObservableObject {
         self.store = store
         self.profileID = profileID
         self.isExtensionEnabled = BrumExtensionRegistry.shared.isEnabled(BrumExtensionManifest.pokedexUniversal.id, profileID: profileID)
-        self.projectedView = (try? store.projectedView(profileID: profileID, platform: "ios")) ?? Self.emptyProjectedView(profileID: profileID)
+        self.projectedView = (try? store.projectedView(profileID: profileID, platform: "ios", scope: "pilot")) ?? Self.emptyProjectedView(profileID: profileID)
         if let firstDiscovered = projectedView.tabs.pokemon.first(where: \.discovered) {
             self.selectedDexNumber = firstDiscovered.nationalDexNumber
         }
@@ -149,7 +210,7 @@ final class PokedexUniversalCoordinator: ObservableObject {
                 normalDiscovered: 0,
                 normalAvailableTotal: 151,
                 shinyDiscovered: 0,
-                totalCatalogSpecies: 802
+                totalCatalogSpecies: 809
             ),
             tabs: PokedexViewTabs(pokemon: [], shinies: [])
         )
@@ -193,10 +254,15 @@ final class PokedexUniversalCoordinator: ObservableObject {
 
     func reload() {
         isExtensionEnabled = BrumExtensionRegistry.shared.isEnabled(BrumExtensionManifest.pokedexUniversal.id, profileID: profileID)
-        if let updated = try? store.projectedView(profileID: profileID, platform: "ios") {
+        if let updated = try? store.projectedView(profileID: profileID, platform: "ios", scope: selectedScope) {
             projectedView = updated
             ensureValidSelection()
         }
+    }
+
+    func selectScope(_ scope: String) {
+        selectedScope = scope
+        reload()
     }
 
     func setExtensionEnabled(_ enabled: Bool) {
@@ -215,7 +281,7 @@ final class PokedexUniversalCoordinator: ObservableObject {
         systemID: String,
         captureLocation: String
     ) {
-        guard isExtensionEnabled, (1...802).contains(nationalDexNumber) else { return }
+        guard isExtensionEnabled, (1...809).contains(nationalDexNumber) else { return }
         guard let result = try? store.recordCapture(
             ownerProfileId: profileID,
             nationalDexNumber: nationalDexNumber,
@@ -720,8 +786,8 @@ struct PokedexGamingExtensionView: View {
                         let mode: PokedexSpriteRenderMode = !entry.discovered
                             ? .silhouette
                             : (entry.isShiny ? .shiny : .normal)
-                        PokedexSpeciesImage(nationalDexNumber: entry.nationalDexNumber, mode: mode)
-                            .frame(width: 118, height: 118)
+                        PokedexSpeciesImage(nationalDexNumber: entry.nationalDexNumber, mode: mode, highPriority: true, interactiveRetry: true)
+                            .frame(width: 122, height: 122)
                             .accessibilityIdentifier("pokedex-detail-sprite")
                     } else {
                         Text("Nenhuma espécie nesta aba")
@@ -731,7 +797,7 @@ struct PokedexGamingExtensionView: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: 150, maxHeight: 164)
 
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
                     Button { navigateSpecies(-1) } label: {
                         Image(systemName: "chevron.left").frame(minWidth: 44, minHeight: 44)
                     }.accessibilityLabel("Espécie anterior")
@@ -739,8 +805,8 @@ struct PokedexGamingExtensionView: View {
                     Button {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { coordinator.isDeviceOpen = false }
                     } label: {
-                        Image(systemName: "power").frame(minWidth: 44, minHeight: 44)
-                    }.accessibilityLabel("Fechar Pokédex")
+                        Text("VOLTAR").font(.caption2.weight(.heavy)).padding(.horizontal, 10).frame(minHeight: 44)
+                    }.accessibilityLabel("Voltar e fechar Pokédex")
                     Spacer()
                     Button { navigateSpecies(1) } label: {
                         Image(systemName: "chevron.right").frame(minWidth: 44, minHeight: 44)
@@ -840,6 +906,17 @@ struct PokedexGamingExtensionView: View {
                     )
                 }
 
+                // Generation / Scope filter (Piloto G1 151 vs Catálogo G1–G7 809)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        scopeChip("Piloto G1 (151)", scope: "pilot")
+                        scopeChip("G1–G7 (809)", scope: "all")
+                        ForEach(1...7, id: \.self) { g in
+                            scopeChip("G\(g)", scope: "gen\(g)")
+                        }
+                    }
+                }
+
                 // Safe search field (filters by # number or discovered name only)
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
@@ -893,6 +970,22 @@ struct PokedexGamingExtensionView: View {
                 }
             }
         }
+    }
+
+    private func scopeChip(_ title: String, scope: String) -> some View {
+        let active = coordinator.selectedScope == scope
+        return Button {
+            coordinator.selectScope(scope)
+        } label: {
+            Text(title)
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(active ? Color.black : BrumTheme.text)
+                .padding(.horizontal, 10)
+                .frame(minHeight: 32)
+                .background(active ? BrumTheme.primary : BrumTheme.elevated, in: Capsule())
+                .overlay(Capsule().stroke(active ? BrumTheme.primary : BrumTheme.line, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     private func tabButton(tab: PokedexDisplayTab, title: String, identifier: String) -> some View {

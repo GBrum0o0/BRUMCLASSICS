@@ -187,7 +187,7 @@
         "engineGeneration": 7,
         "supportedNationalDexRange": [
           1,
-          802
+          809
         ],
         "romCodes": [],
         "backends": [
@@ -205,7 +205,7 @@
     "normalDiscovered": 1,
     "normalAvailableTotal": 151,
     "shinyDiscovered": 1,
-    "totalCatalogSpecies": 802
+    "totalCatalogSpecies": 809
   },
   "tabs": {
     "pokemon": [

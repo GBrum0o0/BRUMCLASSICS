@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generates deterministic, versioned Pokédex Universal data files:
-1. pokedex-species-catalog-v1.json (National Dex #001..#802, Gen 1..7 up to Sun & Moon)
+1. pokedex-species-catalog-v1.json (National Dex #001..#809, Gen 1..7 up to Ultra Sun/Ultra Moon & Meltan/Melmetal)
    sourced from PokeAPI/pokeapi CSV tables (BSD-3-Clause).
 2. pokedex-compatibility-v1.json (Separate Windows, iOS, and Android matrices).
 3. Optional C++ lookup table dump for pret/pokefirered species -> National Dex and MAPSEC names.
@@ -19,7 +19,7 @@ from pathlib import Path
 
 POKEAPI_BASE = "https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv"
 POKEFIRERED_BASE = "https://raw.githubusercontent.com/pret/pokefirered/master"
-MAX_NATIONAL_DEX = 802
+MAX_NATIONAL_DEX = 809
 MAX_GENERATION = 7
 
 
@@ -123,7 +123,7 @@ def build_species_catalog() -> dict:
                 {"generation": 4, "region": "Sinnoh", "minNationalDex": 387, "maxNationalDex": 493},
                 {"generation": 5, "region": "Unova", "minNationalDex": 494, "maxNationalDex": 649},
                 {"generation": 6, "region": "Kalos", "minNationalDex": 650, "maxNationalDex": 721},
-                {"generation": 7, "region": "Alola (Sun & Moon)", "minNationalDex": 722, "maxNationalDex": 802},
+                {"generation": 7, "region": "Alola (Sun, Moon, USUM & Meltan/Melmetal)", "minNationalDex": 722, "maxNationalDex": 809},
             ],
         },
         "species": entries,
@@ -267,7 +267,7 @@ def build_compatibility_matrix() -> dict:
                         "systemId": "3ds",
                         "primaryGeneration": 7,
                         "engineGeneration": 7,
-                        "supportedNationalDexRange": [1, 802],
+                        "supportedNationalDexRange": [1, 809],
                         "romCodes": [],
                         "backends": ["citra_libretro.dll"],
                         "adapterId": "gen7-3ds-planned",

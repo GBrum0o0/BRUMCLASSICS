@@ -288,4 +288,8 @@ public final class PokedexUniversalStore {
     public synchronized PokedexUniversalEngine.ProjectedView projectView() {
         return engine.projectView();
     }
+
+    public synchronized PokedexUniversalEngine.ProjectedView projectView(String scope) {
+        return engine.projectView(scope);
+    }
 }

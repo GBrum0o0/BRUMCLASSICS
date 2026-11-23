@@ -4,8 +4,8 @@
   "minimumIos": "16.0",
   "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.27.0",
   "notes": [
-    "Pokédex do Gaming Mode usa imagens correspondentes a cada espécie e variante shiny; silhuetas preservam o formato da mesma espécie.",
-    "A primeira consulta da imagem requer internet. Cache local evita downloads repetidos; imagens indisponíveis são indicadas sem criaturas substitutas.",
-    "Adiciona botões de espécie anterior/próxima e fechar no dispositivo. Preserva SideStore, Save Sync, controles e núcleos existentes."
+    "Pokédex Universal com catálogo completo da 1ª à 7ª geração (#001–#809), filtro por geração, sprites sob demanda priorizados no visor e silhuetas da mesma espécie.",
+    "Reconexão rápida do Gamepad M.U.R.B com o jogo ativo no PC pareado em 1 toque, sem precisar ler novo QR Code a cada abertura.",
+    "Preserva SideStore, Save Sync, controles e núcleos existentes."
   ]
 }

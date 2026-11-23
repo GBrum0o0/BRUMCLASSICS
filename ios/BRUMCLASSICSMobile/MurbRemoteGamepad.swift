@@ -601,6 +601,7 @@ final class MurbRemoteSession: ObservableObject {
 
 struct MurbRemoteGamepadLauncherSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var store: AppStore
     @StateObject private var remoteStore = MurbRemoteStore()
     @State private var ip = ""
     @State private var portText = "8089"
@@ -627,6 +628,22 @@ struct MurbRemoteGamepadLauncherSheet: View {
                     }
                     Text("Use este modo quando um jogo estiver rodando no PC pela M.U.R.B Engine (ou como segunda tela interativa de DS/3DS).")
                         .font(.caption).foregroundStyle(.secondary)
+                }
+
+                if let active = store.activeRemoteGamepadSession {
+                    Section("Sessão ativa no PC pareado") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(active.gameTitle.isEmpty ? "Jogo em execução no PC" : active.gameTitle)
+                                .font(.subheadline.bold())
+                            Text("Jogador atribuído: P\(active.playerNumber) · sem precisar ler QR Code.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        Button {
+                            launch(active.payload)
+                        } label: {
+                            Label("Conectar Gamepad à sessão ativa", systemImage: "gamecontroller.fill")
+                        }
+                    }
                 }
 
                 if let saved = remoteStore.lastTarget {

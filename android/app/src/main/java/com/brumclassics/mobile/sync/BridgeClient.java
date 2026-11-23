@@ -525,6 +525,30 @@ public final class BridgeClient {
         });
     }
 
+    public void fetchActiveRemoteGamepad(BCardCallback callback) {
+        if (!isConfigured()) {
+            if (callback != null) callback.onError("Conecte este celular ao launcher primeiro.");
+            return;
+        }
+        executor.execute(() -> {
+            try {
+                HttpURLConnection connection = open(baseUrl() + "/v1/remote-gamepad/active", "GET", true);
+                String response = readResponse(connection, 128 * 1024);
+                if (connection.getResponseCode() == 401) {
+                    clearPairing();
+                    throw new IllegalStateException("A autorização foi revogada no launcher.");
+                }
+                if (connection.getResponseCode() != 200) {
+                    throw new IllegalStateException("O launcher respondeu com erro " + connection.getResponseCode() + ".");
+                }
+                JSONObject root = response.isEmpty() ? new JSONObject() : new JSONObject(response);
+                post(() -> { if (callback != null) callback.onResult(root); });
+            } catch (Exception error) {
+                post(() -> { if (callback != null) callback.onError(safeMessage(error)); });
+            }
+        });
+    }
+
     public void launchGamepad(Game game, String filename, String title, String mode, int players, String hybridMode, BCardCallback callback) {
         if (!isConfigured()) { callback.onError("Conecte este celular ao launcher primeiro."); return; }
         String gameId = game != null && game.id != null ? game.id : "";

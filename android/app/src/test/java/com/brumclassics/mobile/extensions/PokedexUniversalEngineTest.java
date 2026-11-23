@@ -131,14 +131,17 @@ public final class PokedexUniversalEngineTest {
         check(merged.addedCount == 1 && merged.replacedWithEarlierCount == 1 && merged.totalRecords == 3,
                 "Merge must add Starly and keep earliest Pikachu capture");
 
-        // 5. Full 802-species offline catalog (e.g. #16 Pidgey, #133 Eevee, #802 Marshadow), fractional ISO-8601 comparison, backup/restore & profile guard
+        // 5. Full 809-species offline catalog (e.g. #16 Pidgey, #133 Eevee, #802 Marshadow .. #809 Melmetal), fractional ISO-8601 comparison, backup/restore & profile guard
         PokedexUniversalEngine.RecordOutcome pidgey = engine.recordCapture(
                 16, false, "Pokémon FireRed Version", "firered-1", "gba",
                 "2026-11-22T10:00:00Z", "Route 1", "android-test"
         );
-        check(pidgey.recorded && "Pidgey".equals(pidgey.record.speciesName), "Dex 16 must resolve offline to Pidgey (full 802 catalog)");
+        check(pidgey.recorded && "Pidgey".equals(pidgey.record.speciesName), "Dex 16 must resolve offline to Pidgey (full 809 catalog)");
         check(engine.getSpecies(133) != null && "Eevee".equals(engine.getSpecies(133).name), "Dex 133 must be Eevee");
         check(engine.getSpecies(802) != null && "Marshadow".equals(engine.getSpecies(802).name), "Dex 802 must be Marshadow");
+        check(engine.getSpecies(803) != null && "Poipole".equals(engine.getSpecies(803).name), "Dex 803 must be Poipole");
+        check(engine.getSpecies(809) != null && "Melmetal".equals(engine.getSpecies(809).name), "Dex 809 must be Melmetal");
+        check(engine.projectView("all").pokemonTab.size() == 809, "All G1-G7 scope must list 809 entries");
 
         // Fractional timestamp .999Z is later than .000Z / Z -> must NOT replace earlier 10:00:00Z capture
         PokedexUniversalEngine.CaptureRecord laterFractionalPidgey = new PokedexUniversalEngine.CaptureRecord(

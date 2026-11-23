@@ -820,5 +820,12 @@ public final class PokedexSpeciesCatalogData {
         add(m, 800, 7, "Necrozma", "Prism Pokémon", "Reminiscent of the Ultra Beasts, this life-form, apparently asleep underground, is thought to have come from another world in ancient times.");
         add(m, 801, 7, "Magearna", "Artificial Pokémon", "This artificial Pokémon, constructed more than 500 years ago, can understand human speech but cannot itself speak.");
         add(m, 802, 7, "Marshadow", "Gloomdweller Pokémon", "Able to conceal itself in shadows, it never appears before humans, so its very existence was the stuff of myth.");
+        add(m, 803, 7, "Poipole", "Poison Pin Pokémon", "This Ultra Beast is well enough liked to be chosen as a first partner in its own world.");
+        add(m, 804, 7, "Naganadel", "Poison Pin Pokémon", "It stores hundreds of liters of poisonous liquid inside its body. It is one of the organisms known as UBs.");
+        add(m, 805, 7, "Stakataka", "Rampart Pokémon", "It appeared from an Ultra Wormhole. Each one appears to be made up of many life-forms stacked one on top of each other.");
+        add(m, 806, 7, "Blacephalon", "Fireworks Pokémon", "It slithers toward people. Then, without warning, it triggers the explosion of its own head. It’s apparently one kind of Ultra Beast.");
+        add(m, 807, 7, "Zeraora", "Thunderclap Pokémon", "It electrifies its claws and tears its opponents apart with them. Even if they dodge its attack, they’ll be electrocuted by the flying sparks.");
+        add(m, 808, 7, "Meltan", "Hex Nut Pokémon", "It melts particles of iron and other metals found in the subsoil, so it can absorb them into its body of molten steel.");
+        add(m, 809, 7, "Melmetal", "Hex Nut Pokémon", "Revered long ago for its capacity to create iron from nothing, for some reason it has come back to life after 3,000 years.");
     }
 }

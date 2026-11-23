@@ -116,7 +116,7 @@ public final class BrumAchievementOverlay {
             JSONObject disc = payload.optJSONObject("discovery");
             if (disc == null) disc = payload;
             int dex = disc.optInt("nationalDexNumber", 0);
-            if (dex < 1 || dex > 802) return null;
+            if (dex < 1 || dex > 809) return null;
             boolean isShiny = disc.optBoolean("isShiny", "shiny".equalsIgnoreCase(disc.optString("category", "")));
             String formatted = disc.optString("formattedNumber", String.format(Locale.ROOT, "%03d", dex));
             String species = disc.optString("speciesName", "Pokémon #" + formatted);

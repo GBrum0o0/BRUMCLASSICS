@@ -394,17 +394,19 @@ final class PokedexUniversalStore {
         )
     }
 
-    func projectedView(profileID: String = "primary", platform: String = "ios") throws -> PokedexProjectedView {
+    func projectedView(profileID: String = "primary", platform: String = "ios", scope: String = "pilot") throws -> PokedexProjectedView {
         lock.lock()
         defer { lock.unlock() }
         let doc = try loadSyncState(profileID: profileID)
         let enabledSet = Set(enabledGenerations)
         let discoveredDexSet = Set(doc.records.map(\.nationalDexNumber))
+        let normalizedScope = scope.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let includeAll = normalizedScope == "all" || normalizedScope == "g1-g7"
+        let requestedGen: Int? = (normalizedScope.hasPrefix("gen") && normalizedScope.count == 4)
+            ? Int(String(normalizedScope.suffix(1)))
+            : nil
 
-        let visibleSpecies = speciesByDex.values
-            .filter { enabledSet.contains($0.generation) || discoveredDexSet.contains($0.nationalDexNumber) }
-            .sorted { $0.nationalDexNumber < $1.nationalDexNumber }
-
+        let allSorted = speciesByDex.values.sorted { $0.nationalDexNumber < $1.nationalDexNumber }
         var byKey: [String: PokedexCaptureRecord] = [:]
         for r in doc.records {
             byKey["\(r.nationalDexNumber):\(r.category)"] = r
@@ -415,87 +417,96 @@ final class PokedexUniversalStore {
         var normalDiscovered = 0
         var shinyDiscovered = 0
 
-        for sp in visibleSpecies {
-            if let normalRec = byKey["\(sp.nationalDexNumber):normal"] {
+        for sp in allSorted {
+            let normalRec = byKey["\(sp.nationalDexNumber):normal"]
+            if normalRec != nil {
                 normalDiscovered += 1
-                pokemonTab.append(PokedexProjectedEntry(
-                    nationalDexNumber: sp.nationalDexNumber,
-                    formattedNumber: sp.formattedNumber,
-                    generation: sp.generation,
-                    discovered: true,
-                    silhouetteOnly: false,
-                    category: "normal",
-                    isShiny: false,
-                    name: sp.name,
-                    genus: sp.genus,
-                    description: sp.description,
-                    spriteAsset: PokedexSpriteAsset(
-                        activeKey: sp.spriteAsset.normalKey,
-                        normalKey: sp.spriteAsset.normalKey,
-                        shinyKey: nil,
-                        silhouetteKey: sp.spriteAsset.silhouetteKey
-                    ),
-                    capture: PokedexCaptureDetail(
-                        captureId: normalRec.captureId,
-                        firstCapturedGame: normalRec.firstCapturedGame,
-                        firstCapturedGameId: normalRec.firstCapturedGameId,
-                        systemId: normalRec.systemId,
-                        capturedAt: normalRec.capturedAt,
-                        captureLocation: normalRec.captureLocation,
-                        ownerProfileId: normalRec.ownerProfileId
-                    )
-                ))
-            } else {
-                pokemonTab.append(PokedexProjectedEntry(
-                    nationalDexNumber: sp.nationalDexNumber,
-                    formattedNumber: sp.formattedNumber,
-                    generation: sp.generation,
-                    discovered: false,
-                    silhouetteOnly: true,
-                    category: "normal",
-                    isShiny: false,
-                    name: Self.unknownText,
-                    genus: Self.unknownText,
-                    description: Self.unknownText,
-                    spriteAsset: PokedexSpriteAsset(
-                        activeKey: sp.spriteAsset.silhouetteKey,
-                        normalKey: nil,
-                        shinyKey: nil,
-                        silhouetteKey: sp.spriteAsset.silhouetteKey
-                    ),
-                    capture: nil
-                ))
+            }
+            let inScope = includeAll
+                || (requestedGen.map { sp.generation == $0 } ?? (enabledSet.contains(sp.generation) || discoveredDexSet.contains(sp.nationalDexNumber)))
+            if inScope {
+                if let normalRec {
+                    pokemonTab.append(PokedexProjectedEntry(
+                        nationalDexNumber: sp.nationalDexNumber,
+                        formattedNumber: sp.formattedNumber,
+                        generation: sp.generation,
+                        discovered: true,
+                        silhouetteOnly: false,
+                        category: "normal",
+                        isShiny: false,
+                        name: sp.name,
+                        genus: sp.genus,
+                        description: sp.description,
+                        spriteAsset: PokedexSpriteAsset(
+                            activeKey: sp.spriteAsset.normalKey,
+                            normalKey: sp.spriteAsset.normalKey,
+                            shinyKey: nil,
+                            silhouetteKey: sp.spriteAsset.silhouetteKey
+                        ),
+                        capture: PokedexCaptureDetail(
+                            captureId: normalRec.captureId,
+                            firstCapturedGame: normalRec.firstCapturedGame,
+                            firstCapturedGameId: normalRec.firstCapturedGameId,
+                            systemId: normalRec.systemId,
+                            capturedAt: normalRec.capturedAt,
+                            captureLocation: normalRec.captureLocation,
+                            ownerProfileId: normalRec.ownerProfileId
+                        )
+                    ))
+                } else {
+                    pokemonTab.append(PokedexProjectedEntry(
+                        nationalDexNumber: sp.nationalDexNumber,
+                        formattedNumber: sp.formattedNumber,
+                        generation: sp.generation,
+                        discovered: false,
+                        silhouetteOnly: true,
+                        category: "normal",
+                        isShiny: false,
+                        name: Self.unknownText,
+                        genus: Self.unknownText,
+                        description: Self.unknownText,
+                        spriteAsset: PokedexSpriteAsset(
+                            activeKey: sp.spriteAsset.silhouetteKey,
+                            normalKey: nil,
+                            shinyKey: nil,
+                            silhouetteKey: sp.spriteAsset.silhouetteKey
+                        ),
+                        capture: nil
+                    ))
+                }
             }
 
             if let shinyRec = byKey["\(sp.nationalDexNumber):shiny"] {
                 shinyDiscovered += 1
-                shiniesTab.append(PokedexProjectedEntry(
-                    nationalDexNumber: sp.nationalDexNumber,
-                    formattedNumber: sp.formattedNumber,
-                    generation: sp.generation,
-                    discovered: true,
-                    silhouetteOnly: false,
-                    category: "shiny",
-                    isShiny: true,
-                    name: sp.name,
-                    genus: sp.genus,
-                    description: sp.description,
-                    spriteAsset: PokedexSpriteAsset(
-                        activeKey: sp.spriteAsset.shinyKey,
-                        normalKey: nil,
-                        shinyKey: sp.spriteAsset.shinyKey,
-                        silhouetteKey: sp.spriteAsset.silhouetteKey
-                    ),
-                    capture: PokedexCaptureDetail(
-                        captureId: shinyRec.captureId,
-                        firstCapturedGame: shinyRec.firstCapturedGame,
-                        firstCapturedGameId: shinyRec.firstCapturedGameId,
-                        systemId: shinyRec.systemId,
-                        capturedAt: shinyRec.capturedAt,
-                        captureLocation: shinyRec.captureLocation,
-                        ownerProfileId: shinyRec.ownerProfileId
-                    )
-                ))
+                if requestedGen == nil || sp.generation == requestedGen {
+                    shiniesTab.append(PokedexProjectedEntry(
+                        nationalDexNumber: sp.nationalDexNumber,
+                        formattedNumber: sp.formattedNumber,
+                        generation: sp.generation,
+                        discovered: true,
+                        silhouetteOnly: false,
+                        category: "shiny",
+                        isShiny: true,
+                        name: sp.name,
+                        genus: sp.genus,
+                        description: sp.description,
+                        spriteAsset: PokedexSpriteAsset(
+                            activeKey: sp.spriteAsset.shinyKey,
+                            normalKey: nil,
+                            shinyKey: sp.spriteAsset.shinyKey,
+                            silhouetteKey: sp.spriteAsset.silhouetteKey
+                        ),
+                        capture: PokedexCaptureDetail(
+                            captureId: shinyRec.captureId,
+                            firstCapturedGame: shinyRec.firstCapturedGame,
+                            firstCapturedGameId: shinyRec.firstCapturedGameId,
+                            systemId: shinyRec.systemId,
+                            capturedAt: shinyRec.capturedAt,
+                            captureLocation: shinyRec.captureLocation,
+                            ownerProfileId: shinyRec.ownerProfileId
+                        )
+                    ))
+                }
             }
         }
 
@@ -513,7 +524,7 @@ final class PokedexUniversalStore {
                 normalDiscovered: normalDiscovered,
                 normalAvailableTotal: pokemonTab.count,
                 shinyDiscovered: shinyDiscovered,
-                totalCatalogSpecies: max(802, speciesByDex.count)
+                totalCatalogSpecies: max(809, speciesByDex.count)
             ),
             tabs: PokedexViewTabs(pokemon: pokemonTab, shinies: shiniesTab)
         )
@@ -640,7 +651,7 @@ final class PokedexUniversalStore {
            let list = root["species"] as? [[String: Any]],
            let listData = try? JSONSerialization.data(withJSONObject: list),
            let decoded = try? JSONDecoder().decode([PokedexSpeciesDefinition].self, from: listData),
-           decoded.count >= 802 {
+           decoded.count >= 809 {
             return decoded
         }
         return PokedexSpeciesCatalogData.allSpecies

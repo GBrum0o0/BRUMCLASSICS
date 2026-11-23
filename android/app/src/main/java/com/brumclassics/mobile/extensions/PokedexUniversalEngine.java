@@ -24,7 +24,9 @@ public final class PokedexUniversalEngine {
     public static final String UNKNOWN_TEXT = "???";
     public static final String CATEGORY_NORMAL = "normal";
     public static final String CATEGORY_SHINY = "shiny";
-    public static final int MAX_NATIONAL_DEX = 802;
+    public static final int MAX_NATIONAL_DEX = 809;
+    public static final String SCOPE_PILOT = "pilot";
+    public static final String SCOPE_ALL = "all";
     private static final Pattern PROFILE_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9_-]{1,100}$");
 
     public static String validateProfileId(String raw) {
@@ -505,6 +507,17 @@ public final class PokedexUniversalEngine {
     }
 
     public ProjectedView projectView() {
+        return projectView(SCOPE_PILOT);
+    }
+
+    public ProjectedView projectView(String scope) {
+        String normalizedScope = scope == null ? SCOPE_PILOT : scope.trim().toLowerCase(Locale.ROOT);
+        boolean includeAll = SCOPE_ALL.equals(normalizedScope) || "g1-g7".equals(normalizedScope);
+        int requestedGen = 0;
+        if (normalizedScope.startsWith("gen") && normalizedScope.length() == 4) {
+            char c = normalizedScope.charAt(3);
+            if (c >= '1' && c <= '7') requestedGen = c - '0';
+        }
         Set<Integer> discoveredDex = new HashSet<>();
         for (CaptureRecord r : recordsByKey.values()) {
             discoveredDex.add(r.nationalDexNumber);
@@ -518,52 +531,57 @@ public final class PokedexUniversalEngine {
         for (int dex = 1; dex <= MAX_NATIONAL_DEX; dex++) {
             SpeciesDefinition sp = catalogByDex.get(dex);
             if (sp == null) continue;
-            if (!enabledGenerations.contains(sp.generation) && !discoveredDex.contains(dex)) {
-                continue;
-            }
+            boolean inPokemonScope = includeAll
+                    || (requestedGen > 0 ? sp.generation == requestedGen : (enabledGenerations.contains(sp.generation) || discoveredDex.contains(dex)));
 
             CaptureRecord normalRec = recordsByKey.get(dex + ":" + CATEGORY_NORMAL);
             if (normalRec != null) {
                 normalDiscovered++;
-                pokemonTab.add(new ProjectedEntry(
-                        sp.nationalDexNumber,
-                        sp.generation,
-                        true,
-                        false,
-                        CATEGORY_NORMAL,
-                        sp.name,
-                        sp.description,
-                        sp.normalSpriteKey,
-                        normalRec
-                ));
-            } else {
-                pokemonTab.add(new ProjectedEntry(
-                        sp.nationalDexNumber,
-                        sp.generation,
-                        false,
-                        true,
-                        CATEGORY_NORMAL,
-                        UNKNOWN_TEXT,
-                        UNKNOWN_TEXT,
-                        sp.silhouetteSpriteKey,
-                        null
-                ));
+            }
+            if (inPokemonScope) {
+                if (normalRec != null) {
+                    pokemonTab.add(new ProjectedEntry(
+                            sp.nationalDexNumber,
+                            sp.generation,
+                            true,
+                            false,
+                            CATEGORY_NORMAL,
+                            sp.name,
+                            sp.description,
+                            sp.normalSpriteKey,
+                            normalRec
+                    ));
+                } else {
+                    pokemonTab.add(new ProjectedEntry(
+                            sp.nationalDexNumber,
+                            sp.generation,
+                            false,
+                            true,
+                            CATEGORY_NORMAL,
+                            UNKNOWN_TEXT,
+                            UNKNOWN_TEXT,
+                            sp.silhouetteSpriteKey,
+                            null
+                    ));
+                }
             }
 
             CaptureRecord shinyRec = recordsByKey.get(dex + ":" + CATEGORY_SHINY);
             if (shinyRec != null) {
                 shinyDiscovered++;
-                shiniesTab.add(new ProjectedEntry(
-                        sp.nationalDexNumber,
-                        sp.generation,
-                        true,
-                        false,
-                        CATEGORY_SHINY,
-                        sp.name,
-                        sp.description,
-                        sp.shinySpriteKey,
-                        shinyRec
-                ));
+                if (requestedGen == 0 || sp.generation == requestedGen) {
+                    shiniesTab.add(new ProjectedEntry(
+                            sp.nationalDexNumber,
+                            sp.generation,
+                            true,
+                            false,
+                            CATEGORY_SHINY,
+                            sp.name,
+                            sp.description,
+                            sp.shinySpriteKey,
+                            shinyRec
+                    ));
+                }
             }
         }
 

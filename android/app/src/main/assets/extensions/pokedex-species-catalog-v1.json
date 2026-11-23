@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogVersion": "1.0.0",
   "extensionId": "brum.ext.pokedex",
-  "maxNationalDex": 802,
+  "maxNationalDex": 809,
   "maxGeneration": 7,
   "extensible": true,
   "source": {
@@ -48,9 +48,9 @@
       },
       {
         "generation": 7,
-        "region": "Alola (Sun & Moon)",
+        "region": "Alola (Sun, Moon, USUM & Meltan/Melmetal)",
         "minNationalDex": 722,
-        "maxNationalDex": 802
+        "maxNationalDex": 809
       }
     ]
   },
@@ -12083,6 +12083,111 @@
         "normalKey": "pokedex/normal/802",
         "shinyKey": "pokedex/shiny/802",
         "silhouetteKey": "pokedex/silhouette/802"
+      }
+    },
+    {
+      "nationalDexNumber": 803,
+      "generation": 7,
+      "slug": "poipole",
+      "name": "Poipole",
+      "genus": "Poison Pin Pokémon",
+      "description": "This Ultra Beast is well enough liked to be chosen as a first partner in its own world.",
+      "isLegendary": false,
+      "isMythical": false,
+      "spriteAsset": {
+        "normalKey": "pokedex/normal/803",
+        "shinyKey": "pokedex/shiny/803",
+        "silhouetteKey": "pokedex/silhouette/803"
+      }
+    },
+    {
+      "nationalDexNumber": 804,
+      "generation": 7,
+      "slug": "naganadel",
+      "name": "Naganadel",
+      "genus": "Poison Pin Pokémon",
+      "description": "It stores hundreds of liters of poisonous liquid inside its body. It is one of the organisms known as UBs.",
+      "isLegendary": false,
+      "isMythical": false,
+      "spriteAsset": {
+        "normalKey": "pokedex/normal/804",
+        "shinyKey": "pokedex/shiny/804",
+        "silhouetteKey": "pokedex/silhouette/804"
+      }
+    },
+    {
+      "nationalDexNumber": 805,
+      "generation": 7,
+      "slug": "stakataka",
+      "name": "Stakataka",
+      "genus": "Rampart Pokémon",
+      "description": "It appeared from an Ultra Wormhole. Each one appears to be made up of many life-forms stacked one on top of each other.",
+      "isLegendary": false,
+      "isMythical": false,
+      "spriteAsset": {
+        "normalKey": "pokedex/normal/805",
+        "shinyKey": "pokedex/shiny/805",
+        "silhouetteKey": "pokedex/silhouette/805"
+      }
+    },
+    {
+      "nationalDexNumber": 806,
+      "generation": 7,
+      "slug": "blacephalon",
+      "name": "Blacephalon",
+      "genus": "Fireworks Pokémon",
+      "description": "It slithers toward people. Then, without warning, it triggers the explosion of its own head. It’s apparently one kind of Ultra Beast.",
+      "isLegendary": false,
+      "isMythical": false,
+      "spriteAsset": {
+        "normalKey": "pokedex/normal/806",
+        "shinyKey": "pokedex/shiny/806",
+        "silhouetteKey": "pokedex/silhouette/806"
+      }
+    },
+    {
+      "nationalDexNumber": 807,
+      "generation": 7,
+      "slug": "zeraora",
+      "name": "Zeraora",
+      "genus": "Thunderclap Pokémon",
+      "description": "It electrifies its claws and tears its opponents apart with them. Even if they dodge its attack, they’ll be electrocuted by the flying sparks.",
+      "isLegendary": false,
+      "isMythical": true,
+      "spriteAsset": {
+        "normalKey": "pokedex/normal/807",
+        "shinyKey": "pokedex/shiny/807",
+        "silhouetteKey": "pokedex/silhouette/807"
+      }
+    },
+    {
+      "nationalDexNumber": 808,
+      "generation": 7,
+      "slug": "meltan",
+      "name": "Meltan",
+      "genus": "Hex Nut Pokémon",
+      "description": "It melts particles of iron and other metals found in the subsoil, so it can absorb them into its body of molten steel.",
+      "isLegendary": false,
+      "isMythical": true,
+      "spriteAsset": {
+        "normalKey": "pokedex/normal/808",
+        "shinyKey": "pokedex/shiny/808",
+        "silhouetteKey": "pokedex/silhouette/808"
+      }
+    },
+    {
+      "nationalDexNumber": 809,
+      "generation": 7,
+      "slug": "melmetal",
+      "name": "Melmetal",
+      "genus": "Hex Nut Pokémon",
+      "description": "Revered long ago for its capacity to create iron from nothing, for some reason it has come back to life after 3,000 years.",
+      "isLegendary": false,
+      "isMythical": true,
+      "spriteAsset": {
+        "normalKey": "pokedex/normal/809",
+        "shinyKey": "pokedex/shiny/809",
+        "silhouetteKey": "pokedex/silhouette/809"
       }
     }
   ]

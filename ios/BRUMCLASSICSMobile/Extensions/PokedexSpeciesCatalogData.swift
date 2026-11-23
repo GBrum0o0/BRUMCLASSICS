@@ -834,5 +834,12 @@ enum PokedexSpeciesCatalogData {
 800	7	necrozma	Necrozma	Prism Pokémon	Reminiscent of the Ultra Beasts, this life-form, apparently asleep underground, is thought to have come from another world in ancient times.
 801	7	magearna	Magearna	Artificial Pokémon	This artificial Pokémon, constructed more than 500 years ago, can understand human speech but cannot itself speak.
 802	7	marshadow	Marshadow	Gloomdweller Pokémon	Able to conceal itself in shadows, it never appears before humans, so its very existence was the stuff of myth.
+803	7	poipole	Poipole	Poison Pin Pokémon	This Ultra Beast is well enough liked to be chosen as a first partner in its own world.
+804	7	naganadel	Naganadel	Poison Pin Pokémon	It stores hundreds of liters of poisonous liquid inside its body. It is one of the organisms known as UBs.
+805	7	stakataka	Stakataka	Rampart Pokémon	It appeared from an Ultra Wormhole. Each one appears to be made up of many life-forms stacked one on top of each other.
+806	7	blacephalon	Blacephalon	Fireworks Pokémon	It slithers toward people. Then, without warning, it triggers the explosion of its own head. It’s apparently one kind of Ultra Beast.
+807	7	zeraora	Zeraora	Thunderclap Pokémon	It electrifies its claws and tears its opponents apart with them. Even if they dodge its attack, they’ll be electrocuted by the flying sparks.
+808	7	meltan	Meltan	Hex Nut Pokémon	It melts particles of iron and other metals found in the subsoil, so it can absorb them into its body of molten steel.
+809	7	melmetal	Melmetal	Hex Nut Pokémon	Revered long ago for its capacity to create iron from nothing, for some reason it has come back to life after 3,000 years.
 """#
 }

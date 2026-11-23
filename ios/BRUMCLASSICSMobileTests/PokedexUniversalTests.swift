@@ -171,7 +171,11 @@ final class PokedexUniversalTests: XCTestCase {
         XCTAssertEqual(restored.totalRecords, 2)
         XCTAssertEqual(restored.contentSha256, backup.contentSha256)
 
-        // 6. Verify full 802-species offline catalog (including #016 Pidgey) and fractional timestamp ordering
+        // 6. Verify full 809-species offline catalog (Gen 1..7 #001..#809) and fractional timestamp ordering
+        let allView = try cleanStore.projectedView(profileID: "gusta", platform: "ios", scope: "all")
+        XCTAssertEqual(allView.tabs.pokemon.count, 809)
+        XCTAssertEqual(allView.tabs.pokemon.last?.formattedNumber, "809")
+        XCTAssertEqual(allView.summary.totalCatalogSpecies, 809)
         let pidgey = try cleanStore.recordCapture(
             ownerProfileId: "gusta",
             nationalDexNumber: 16,

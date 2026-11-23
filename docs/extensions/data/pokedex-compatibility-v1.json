@@ -11,7 +11,7 @@
     6,
     7
   ],
-  "maxNationalDexInSchema": 802,
+  "maxNationalDexInSchema": 809,
   "rules": {
     "separatePlatforms": true,
     "corePresenceIsNotCompatibilityProof": true,
@@ -200,7 +200,7 @@
           "engineGeneration": 7,
           "supportedNationalDexRange": [
             1,
-            802
+            809
           ],
           "romCodes": [],
           "backends": [

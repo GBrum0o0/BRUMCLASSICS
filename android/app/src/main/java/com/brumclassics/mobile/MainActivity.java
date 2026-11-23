@@ -119,15 +119,9 @@ public final class MainActivity extends Activity {
     private String gamingSection = "recent";
     private boolean pokedexDeviceOpen = false;
     private String pokedexActiveTab = "pokemon";
+    private String pokedexScope = "pilot";
     private int pokedexSelectedDex = 1;
-
-    private void navigatePokedexSpecies(java.util.List<com.brumclassics.mobile.extensions.PokedexUniversalEngine.ProjectedEntry> entries, int delta) {
-        if (entries.isEmpty()) return;
-        int index = 0;
-        for (int i = 0; i < entries.size(); i++) if (entries.get(i).nationalDexNumber == pokedexSelectedDex) { index = i; break; }
-        pokedexSelectedDex = entries.get((index + delta + entries.size()) % entries.size()).nationalDexNumber;
-        showGamingMode();
-    }
+    private org.json.JSONObject activeRemoteGamepadSession = null;
 
     private String pokedexSearchQuery = "";
     private String pokedexSyncFeedback = "";
@@ -200,7 +194,19 @@ public final class MainActivity extends Activity {
         bridgeClient = new BridgeClient(this, new BridgeClient.Listener() {
             @Override public void onStatus(String state, String detail) {
                 syncState = state; syncDetail = detail;
-                if ("offline".equals(state) || "connecting".equals(state)) performanceLive.disconnect();
+                if ("offline".equals(state) || "connecting".equals(state)) {
+                    performanceLive.disconnect();
+                    activeRemoteGamepadSession = null;
+                    if ("gaming".equals(currentScreen)) showGamingMode();
+                } else if ("connected".equals(state)) {
+                    bridgeClient.fetchActiveRemoteGamepad(new BridgeClient.BCardCallback() {
+                        @Override public void onResult(org.json.JSONObject result) {
+                            activeRemoteGamepadSession = (result != null && result.optBoolean("active", false)) ? result : null;
+                            if ("gaming".equals(currentScreen)) showGamingMode();
+                        }
+                        @Override public void onError(String safeMessage) {}
+                    });
+                }
                 if ("companion".equals(currentScreen)) refreshPerformanceValues();
                 if ("profile".equals(currentScreen)) showProfile();
             }
@@ -253,7 +259,7 @@ public final class MainActivity extends Activity {
                             org.json.JSONObject disc = payload.optJSONObject("discovery");
                             if (disc == null) disc = payload;
                             int dex = disc.optInt("nationalDexNumber", 0);
-                            if (dex >= 1 && dex <= 802 && "primary".equals(disc.optString("ownerProfileId", "primary"))) {
+                            if (dex >= 1 && dex <= 809 && "primary".equals(disc.optString("ownerProfileId", "primary"))) {
                                 boolean isShiny = disc.optBoolean("isShiny", "shiny".equalsIgnoreCase(disc.optString("category", "")));
                                 newPokedexDiscovery = pokedexStore.recordCapture(
                                     dex,
@@ -282,6 +288,9 @@ public final class MainActivity extends Activity {
                     }
                 } else if ("pokedex_synced".equals(type)) {
                     syncPokedexWithLauncher(false);
+                } else if ("remote_gamepad_session".equals(type)) {
+                    activeRemoteGamepadSession = (payload != null && payload.optBoolean("active", false)) ? payload : null;
+                    if ("gaming".equals(currentScreen)) showGamingMode();
                 } else if ("install_changed".equals(type)) {
                     org.json.JSONObject update = payload.optJSONObject("update");
                     syncDetail = update == null ? "Download atualizado" : "Download · " + Math.round(update.optDouble("percent", 0)) + "% · " + update.optString("state", "em andamento");
@@ -1346,10 +1355,92 @@ public final class MainActivity extends Activity {
         dialog.show();
     }
 
+    private void launchActiveRemoteSession(org.json.JSONObject sessionPayload) {
+        if (sessionPayload == null || !sessionPayload.optBoolean("active", false)) {
+            Toast.makeText(this, "Nenhuma sessão ativa no PC no momento.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        org.json.JSONObject remote = sessionPayload.optJSONObject("remoteGamepad");
+        if (remote == null) {
+            showMurbRemoteDialog();
+            return;
+        }
+        String qr = remote.optString("qrUri", "");
+        String p2Qr = remote.optString("p2QrUri", "");
+        String title = sessionPayload.optString("gameTitle", "Jogo no PC");
+        int assignedPlayer = Math.max(1, Math.min(4, sessionPayload.optInt("assignedPlayer", 1)));
+        com.brumclassics.mobile.murb.MurbRemoteClient.PairingTarget target = com.brumclassics.mobile.murb.MurbRemoteClient.parseUri(qr);
+        String host = target != null ? target.host : remote.optString("host", "");
+        String pairedHost = bridgeClient.pairedHost();
+        if (pairedHost != null && !pairedHost.isEmpty() && !"127.0.0.1".equals(pairedHost) && !"0.0.0.0".equals(pairedHost)) {
+            host = pairedHost;
+        } else if (host.isEmpty() || "127.0.0.1".equals(host) || "0.0.0.0".equals(host)) {
+            host = pairedHost == null ? "" : pairedHost;
+        }
+        int port = target != null ? target.port : remote.optInt("port", 8089);
+        String token = target != null ? target.token : remote.optString("token", "");
+        String sys = target != null ? target.system : com.brumclassics.mobile.murb.MurbRemoteClient.normalizeSystem(remote.optString("system", "gamepad"));
+        if (host != null && !host.isEmpty() && token != null && !token.isEmpty()) {
+            getSharedPreferences("brum_murb_remote", MODE_PRIVATE).edit()
+                    .putString("host", host).putInt("port", port).putString("token", token).putString("sys", sys).apply();
+            startActivity(com.brumclassics.mobile.murb.MurbRemoteGamepadActivity.intent(
+                    this, host, port, token, sys, title, assignedPlayer, p2Qr));
+        } else {
+            showMurbRemoteDialog();
+        }
+    }
+
     private void showMurbRemoteDialog() {
         android.content.SharedPreferences prefs = getSharedPreferences("brum_murb_remote", MODE_PRIVATE);
         LinearLayout panel = gamingDialogPanel();
         panel.addView(text("Depende do PC · Rede Local (WebSocket 8089)", 13, ACCENT, true));
+        if (activeRemoteGamepadSession != null && activeRemoteGamepadSession.optBoolean("active", false)) {
+            String activeTitle = activeRemoteGamepadSession.optString("gameTitle", "Jogo ativo no PC");
+            int activePlayer = Math.max(1, Math.min(4, activeRemoteGamepadSession.optInt("assignedPlayer", 1)));
+            panel.addView(text("Sessão ativa detectada no PC pareado: " + activeTitle + " (P" + activePlayer + ")",
+                    12, Color.rgb(188, 224, 255), true), margins(-1, 6, -1, 6));
+            AlertDialog[] dialogRef = new AlertDialog[1];
+            panel.addView(gamingAction("CONECTAR À SESSÃO ATIVA (SEM QR)", true, v -> {
+                if (dialogRef[0] != null) dialogRef[0].dismiss();
+                launchActiveRemoteSession(activeRemoteGamepadSession);
+            }), margins(-1, 0, -1, 10, 44));
+            panel.addView(text("Ou cole `murb://...` / informe manualmente:", 11, Color.rgb(173, 180, 190), false), margins(-1, 2, -1, 6));
+            EditText uriOrIp = pairingField("murb://... ou IP do PC", prefs.getString("host", ""));
+            EditText portField = pairingField("Porta", String.valueOf(prefs.getInt("port", 8089)));
+            portField.setInputType(InputType.TYPE_CLASS_NUMBER);
+            EditText tokenField = pairingField("Token M.U.R.B", prefs.getString("token", ""));
+            EditText sysField = pairingField("Sistema (ds, 3ds, wiiu, gamepad)", prefs.getString("sys", "ds"));
+            panel.addView(uriOrIp, margins(-1, 0, -1, 8, 46));
+            panel.addView(portField, margins(-1, 0, -1, 8, 46));
+            panel.addView(tokenField, margins(-1, 0, -1, 8, 46));
+            panel.addView(sysField, new LinearLayout.LayoutParams(-1, dp(46)));
+            ScrollView scroll = new ScrollView(this);
+            scroll.addView(panel);
+            AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Gamepad M.U.R.B para PC")
+                    .setView(scroll).setNegativeButton("Cancelar", null).setPositiveButton("Conectar", null).create();
+            dialogRef[0] = dialog;
+            dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                String raw = uriOrIp.getText().toString().trim();
+                MurbRemoteClient.PairingTarget parsed = MurbRemoteClient.parseUri(raw);
+                String host = parsed != null ? parsed.host : raw;
+                int port = parsed != null ? parsed.port : 8089;
+                String token = parsed != null ? parsed.token : tokenField.getText().toString().trim().toUpperCase(Locale.ROOT);
+                String sys = parsed != null ? parsed.system : MurbRemoteClient.normalizeSystem(sysField.getText().toString());
+                if (parsed == null) {
+                    try { port = Integer.parseInt(portField.getText().toString().trim()); }
+                    catch (Exception e) { portField.setError("Porta inválida."); return; }
+                }
+                if (host.isEmpty() || token.isEmpty() || port < 1 || port > 65535) {
+                    uriOrIp.setError("Informe link `murb://` ou IP e token válidos.");
+                    return;
+                }
+                prefs.edit().putString("host", host).putInt("port", port).putString("token", token).putString("sys", sys).apply();
+                dialog.dismiss();
+                startActivity(MurbRemoteGamepadActivity.intent(this, host, port, token, sys));
+            }));
+            dialog.show();
+            return;
+        }
         panel.addView(text("Cole o link `murb://...` do QR Code ou informe IP, porta e token exibidos no PC.",
                 12, Color.rgb(173, 180, 190), false), margins(-1, 4, -1, 10));
         EditText uriOrIp = pairingField("murb://... ou IP do PC", prefs.getString("host", ""));
@@ -1579,6 +1670,18 @@ public final class MainActivity extends Activity {
         tabScroll.addView(navTabs);
         page.addView(tabScroll, margins(-1, 14, -1, 6));
 
+        if (activeRemoteGamepadSession != null && activeRemoteGamepadSession.optBoolean("active", false)) {
+            LinearLayout sessionCard = gamingDialogPanel();
+            sessionCard.setBackground(panel(CARD_ALT, ACCENT, 14, 1));
+            String activeTitle = activeRemoteGamepadSession.optString("gameTitle", "Jogo em execução no PC");
+            int activePlayer = Math.max(1, Math.min(4, activeRemoteGamepadSession.optInt("assignedPlayer", 1)));
+            sessionCard.addView(text("SESSÃO ATIVA NO PC PAREADO · P" + activePlayer, 10, ACCENT, true));
+            sessionCard.addView(text(activeTitle, 15, TEXT, true), margins(-1, 4, -1, 8));
+            sessionCard.addView(gamingAction("CONECTAR GAMEPAD AO JOGO NO PC (SEM QR)", true,
+                    v -> launchActiveRemoteSession(activeRemoteGamepadSession)), new LinearLayout.LayoutParams(-1, dp(44)));
+            page.addView(sessionCard, margins(-1, 6, -1, 10));
+        }
+
         if ("extensions".equals(gamingSection)) {
             renderGamingExtensionsSection(page);
             page.addView(space(22));
@@ -1767,7 +1870,7 @@ public final class MainActivity extends Activity {
     }
 
     private void renderGamingExtensionsSection(LinearLayout page) {
-        com.brumclassics.mobile.extensions.PokedexUniversalEngine.ProjectedView view = pokedexStore.projectView();
+        com.brumclassics.mobile.extensions.PokedexUniversalEngine.ProjectedView view = pokedexStore.projectView(pokedexScope);
         boolean enabled = pokedexStore.isExtensionEnabled();
         int shinyGold = Color.rgb(255, 214, 64);
 
@@ -1785,10 +1888,10 @@ public final class MainActivity extends Activity {
         extBadge.setBackground(background(ACCENT, 10, Color.TRANSPARENT, 0));
         extBadge.setPadding(dp(8), dp(3), dp(8), dp(3));
         badgesRow.addView(extBadge, margins(-2, 0, 8, 0));
-        badgesRow.addView(text("GAMEPAD & GAMING MODE", 9, MUTED, true));
+        badgesRow.addView(text("GAMEPAD & GAMING MODE · G1–G7 (#001–#809)", 9, MUTED, true));
         titleCol.addView(badgesRow);
         titleCol.addView(text("Pokédex Universal", 20, TEXT, true), margins(-1, 4, -1, 2));
-        titleCol.addView(text("Coleção permanente vinculada ao perfil · Independente dos saves · Piloto em teste: FireRed (BPRE/GBA)", 11, MUTED, false));
+        titleCol.addView(text("Coleção permanente por perfil · Independente dos saves · Piloto FireRed (BPRE/GBA)", 11, MUTED, false));
         topRow.addView(titleCol, new LinearLayout.LayoutParams(0, -2, 1));
 
         LinearLayout counters = row();
@@ -1804,14 +1907,14 @@ public final class MainActivity extends Activity {
                 pokedexDeviceOpen = !pokedexDeviceOpen;
                 showGamingMode();
             });
-            actionsRow.addView(toggleDevice, margins(-2, 0, 8, 0, 40));
+            actionsRow.addView(toggleDevice, margins(-2, 0, 8, 0, 44));
         }
         Button syncBtn = gamingAction(pokedexSyncing ? "SINCRONIZANDO…" : "SINCRONIZAR COM PC", false, v -> syncPokedexWithLauncher(true));
         syncBtn.setEnabled(!pokedexSyncing);
-        actionsRow.addView(syncBtn, margins(-2, 0, 8, 0, 40));
+        actionsRow.addView(syncBtn, margins(-2, 0, 8, 0, 44));
 
         Button backupBtn = gamingAction("BACKUP SHA-256", false, v -> showPokedexBackupDialog());
-        actionsRow.addView(backupBtn, margins(-2, 0, 8, 0, 40));
+        actionsRow.addView(backupBtn, margins(-2, 0, 8, 0, 44));
 
         View spacer = new View(this);
         actionsRow.addView(spacer, new LinearLayout.LayoutParams(0, dp(1), 1));
@@ -1843,7 +1946,7 @@ public final class MainActivity extends Activity {
             return;
         }
 
-        // 2. Section 9: Closed Pokédex Device Initial State & Open Animation
+        // 2. Closed Pokédex Device Initial State & Open Animation
         if (!pokedexDeviceOpen) {
             LinearLayout closedDevice = row();
             closedDevice.setGravity(Gravity.CENTER_VERTICAL);
@@ -1867,25 +1970,23 @@ public final class MainActivity extends Activity {
             Button openCta = gamingAction("TOQUE PARA ABRIR A POKÉDEX  ↗", true, null);
             closedDevice.addView(openCta, new LinearLayout.LayoutParams(-2, dp(46)));
 
-            View.OnClickListener openAction = v -> {
-                closedDevice.animate()
-                        .scaleX(1.04f)
-                        .scaleY(0.92f)
-                        .alpha(0f)
-                        .setDuration(220)
-                        .withEndAction(() -> {
-                            pokedexDeviceOpen = true;
-                            showGamingMode();
-                        })
-                        .start();
-            };
+            View.OnClickListener openAction = v -> closedDevice.animate()
+                    .scaleX(1.04f)
+                    .scaleY(0.92f)
+                    .alpha(0f)
+                    .setDuration(220)
+                    .withEndAction(() -> {
+                        pokedexDeviceOpen = true;
+                        showGamingMode();
+                    })
+                    .start();
             closedDevice.setOnClickListener(openAction);
             openCta.setOnClickListener(openAction);
             page.addView(closedDevice, margins(-1, 14, -1, 0));
             return;
         }
 
-        // 3. Section 9: Horizontal Split View (Left Detail Panel + Right Scrollable List & Tabs)
+        // 3. Open Pokédex Hardware Split View (Left Specimen Visor + Right Virtualized ListView)
         List<com.brumclassics.mobile.extensions.PokedexUniversalEngine.ProjectedEntry> rawList =
                 "shinies".equals(pokedexActiveTab) ? view.shiniesTab : view.pokemonTab;
         List<com.brumclassics.mobile.extensions.PokedexUniversalEngine.ProjectedEntry> filteredList = new ArrayList<>();
@@ -1907,109 +2008,168 @@ public final class MainActivity extends Activity {
             }
         }
 
-        com.brumclassics.mobile.extensions.PokedexUniversalEngine.ProjectedEntry selectedEntry = null;
+        final com.brumclassics.mobile.extensions.PokedexUniversalEngine.ProjectedEntry[] selectedHolder =
+                new com.brumclassics.mobile.extensions.PokedexUniversalEngine.ProjectedEntry[1];
         for (com.brumclassics.mobile.extensions.PokedexUniversalEngine.ProjectedEntry item : filteredList) {
-            if (item.nationalDexNumber == pokedexSelectedDex) {
-                selectedEntry = item;
-                break;
-            }
+            if (item.nationalDexNumber == pokedexSelectedDex) { selectedHolder[0] = item; break; }
         }
-        if (selectedEntry == null && !filteredList.isEmpty()) {
-            selectedEntry = filteredList.get(0);
-            pokedexSelectedDex = selectedEntry.nationalDexNumber;
+        if (selectedHolder[0] == null && !filteredList.isEmpty()) {
+            selectedHolder[0] = filteredList.get(0);
+            pokedexSelectedDex = selectedHolder[0].nationalDexNumber;
         }
+
+        LinearLayout deviceChassis = column();
+        deviceChassis.setPadding(dp(14), dp(12), dp(14), dp(14));
+        deviceChassis.setBackground(background(Color.rgb(12, 16, 19), 16, Color.argb(120, 157, 255, 59), 2));
+
+        // Hardware Top Bezel (Optical Lens + 3 LEDs + Fold Back)
+        LinearLayout hardwareBar = row();
+        hardwareBar.setGravity(Gravity.CENTER_VERTICAL);
+        FrameLayout miniLens = new FrameLayout(this);
+        miniLens.setBackground(background(Color.BLACK, 18, LINE, 1));
+        View miniLensCore = new View(this);
+        miniLensCore.setBackground(background(ACCENT, 12, Color.WHITE, 1));
+        miniLens.addView(miniLensCore, new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
+        hardwareBar.addView(miniLens, margins(30, 0, 10, 0, 30));
+        hardwareBar.addView(text("● ● ●   DEX-001 · DISPOSITIVO ABERTO", 10, MUTED, true), new LinearLayout.LayoutParams(0, -2, 1));
+        Button foldTopBtn = gamingAction("VOLTAR (FECHAR TAMPA)", false, v -> {
+            pokedexDeviceOpen = false;
+            showGamingMode();
+        });
+        hardwareBar.addView(foldTopBtn, new LinearLayout.LayoutParams(-2, dp(38)));
+        deviceChassis.addView(hardwareBar, margins(-1, 0, -1, 10));
 
         LinearLayout splitContainer = row();
         splitContainer.setBaselineAligned(false);
 
-        // LEFT PANEL: Specimen Display & First Capture Details
+        // LEFT PANEL: Specimen Visor & Details (updated in-place without tearing down the whole screen)
         LinearLayout leftPanel = column();
-        leftPanel.setPadding(dp(16), dp(16), dp(16), dp(16));
+        leftPanel.setPadding(dp(14), dp(14), dp(14), dp(14));
         leftPanel.setBackground(background(SURFACE, 12, LINE, 1));
 
         LinearLayout leftTop = row();
         leftTop.setGravity(Gravity.CENTER_VERTICAL);
-        TextView dexBadge = text(selectedEntry != null ? "#" + selectedEntry.formattedNumber : "#---", 15, ACCENT, true);
+        TextView dexBadge = text("#---", 15, ACCENT, true);
         dexBadge.setBackground(background(RAISED, 10, LINE, 1));
         dexBadge.setPadding(dp(10), dp(4), dp(10), dp(4));
         leftTop.addView(dexBadge);
         leftTop.addView(new View(this), new LinearLayout.LayoutParams(0, dp(1), 1));
-        if (selectedEntry != null) {
-            boolean shiny = selectedEntry.discovered && selectedEntry.isShiny;
-            String statusText = shiny ? "✦ SHINY" : (selectedEntry.discovered ? "CAPTURADO" : "NÃO DESCOBERTO");
-            int statusColor = shiny ? shinyGold : (selectedEntry.discovered ? ACCENT : MUTED);
-            TextView statusPill = text(statusText, 10, shiny ? BG : statusColor, true);
-            statusPill.setBackground(background(shiny ? shinyGold : RAISED, 10, LINE, 1));
-            statusPill.setPadding(dp(10), dp(4), dp(10), dp(4));
-            leftTop.addView(statusPill);
-        }
+        TextView statusPill = text("", 10, MUTED, true);
+        statusPill.setPadding(dp(10), dp(4), dp(10), dp(4));
+        leftTop.addView(statusPill);
         leftPanel.addView(leftTop);
 
         FrameLayout specimenScreen = new FrameLayout(this);
-        specimenScreen.setBackground(background(Color.rgb(20, 27, 32), 12,
-                (selectedEntry != null && selectedEntry.discovered && selectedEntry.isShiny) ? shinyGold : Color.argb(95, 157, 255, 59), 1));
-        if (selectedEntry != null) {
-            int spriteMode = !selectedEntry.discovered
-                    ? com.brumclassics.mobile.extensions.PokedexSpriteRenderer.MODE_SILHOUETTE
-                    : (selectedEntry.isShiny
-                        ? com.brumclassics.mobile.extensions.PokedexSpriteRenderer.MODE_SHINY
-                        : com.brumclassics.mobile.extensions.PokedexSpriteRenderer.MODE_NORMAL);
-            ImageView spriteView = new ImageView(this);
-            spriteView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            com.brumclassics.mobile.extensions.PokedexSpriteRenderer.bind(spriteView, selectedEntry.nationalDexNumber, spriteMode, true);
-            FrameLayout.LayoutParams spriteLp = new FrameLayout.LayoutParams(dp(116), dp(116), Gravity.CENTER);
-            specimenScreen.addView(spriteView, spriteLp);
-        } else {
-            TextView emptySpecimen = text("Nenhuma espécie nesta aba", 12, MUTED, true);
-            specimenScreen.addView(emptySpecimen, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
-        }
-        leftPanel.addView(specimenScreen, margins(-1, 12, -1, 12, 148));
+        ImageView spriteView = new ImageView(this);
+        spriteView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        specimenScreen.addView(spriteView, new FrameLayout.LayoutParams(dp(116), dp(116), Gravity.CENTER));
+        LinearLayout retryBox = column();
+        retryBox.setGravity(Gravity.CENTER);
+        retryBox.setVisibility(View.GONE);
+        TextView unavailableTxt = text("Imagem indisponível", 11, MUTED, true);
+        unavailableTxt.setGravity(Gravity.CENTER);
+        retryBox.addView(unavailableTxt, margins(-1, 0, -1, 6));
+        Button retryBtn = gamingAction("TENTAR NOVAMENTE", false, null);
+        retryBox.addView(retryBtn, new LinearLayout.LayoutParams(-2, dp(38)));
+        specimenScreen.addView(retryBox, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
+        leftPanel.addView(specimenScreen, margins(-1, 10, -1, 10, 148));
+
         LinearLayout deviceControls = row();
         deviceControls.setGravity(Gravity.CENTER_VERTICAL);
-        Button previousSpecies = gamingAction("◀", false, v -> navigatePokedexSpecies(filteredList, -1));
+        Button previousSpecies = gamingAction("◀", false, null);
         previousSpecies.setContentDescription("Espécie anterior");
         Button closeDevice = gamingAction("FECHAR", false, v -> {
             pokedexDeviceOpen = false;
             showGamingMode();
         });
         closeDevice.setContentDescription("Fechar Pokédex");
-        Button nextSpecies = gamingAction("▶", false, v -> navigatePokedexSpecies(filteredList, 1));
+        Button nextSpecies = gamingAction("▶", false, null);
         nextSpecies.setContentDescription("Próxima espécie");
-        previousSpecies.setEnabled(!filteredList.isEmpty());
-        nextSpecies.setEnabled(!filteredList.isEmpty());
+        previousSpecies.setEnabled(filteredList.size() > 1);
+        nextSpecies.setEnabled(filteredList.size() > 1);
         deviceControls.addView(previousSpecies, new LinearLayout.LayoutParams(0, dp(46), 1));
         deviceControls.addView(closeDevice, new LinearLayout.LayoutParams(0, dp(46), 1));
         deviceControls.addView(nextSpecies, new LinearLayout.LayoutParams(0, dp(46), 1));
-        leftPanel.addView(deviceControls, margins(-1, 0, -1, 12));
+        leftPanel.addView(deviceControls, margins(-1, 0, -1, 10));
 
+        TextView detailName = text("", 19, TEXT, true);
+        TextView detailDesc = text("", 12, MUTED, false);
+        leftPanel.addView(detailName);
+        leftPanel.addView(detailDesc, margins(-1, 6, -1, 10));
 
-        if (selectedEntry != null) {
-            leftPanel.addView(text("#" + selectedEntry.formattedNumber + " — " + (selectedEntry.discovered ? selectedEntry.name : "???"), 20, TEXT, true));
-            leftPanel.addView(text(selectedEntry.discovered ? selectedEntry.description : "???", 12, selectedEntry.discovered ? Color.rgb(212, 218, 224) : MUTED, false), margins(-1, 6, -1, 12));
+        LinearLayout captureContainer = column();
+        captureContainer.setPadding(dp(12), dp(10), dp(12), dp(10));
+        captureContainer.setBackground(background(RAISED, 10, LINE, 1));
+        leftPanel.addView(captureContainer);
 
-            if (selectedEntry.discovered && selectedEntry.capture != null) {
-                com.brumclassics.mobile.extensions.PokedexUniversalEngine.CaptureRecord cap = selectedEntry.capture;
-                LinearLayout captureCard = column();
-                captureCard.setPadding(dp(12), dp(10), dp(12), dp(10));
-                captureCard.setBackground(background(RAISED, 10, LINE, 1));
-                captureCard.addView(text("REGISTRO DA PRIMEIRA CAPTURA", 9, ACCENT, true));
-                captureCard.addView(text("Jogo: " + cap.firstCapturedGame, 11, TEXT, true), margins(-1, 6, -1, 0));
-                captureCard.addView(text("Data/Hora: " + formatPokedexTimestamp(cap.capturedAt), 11, Color.rgb(190, 198, 206), false), margins(-1, 3, -1, 0));
-                captureCard.addView(text("Localização: " + (cap.captureLocation == null || cap.captureLocation.isEmpty() ? "Localização desconhecida" : cap.captureLocation), 11, Color.rgb(190, 198, 206), false), margins(-1, 3, -1, 0));
-                captureCard.addView(text("Categoria: " + (selectedEntry.isShiny ? "Shiny (Independente)" : "Normal"), 11, selectedEntry.isShiny ? shinyGold : ACCENT, true), margins(-1, 3, -1, 0));
-                leftPanel.addView(captureCard);
-            } else {
-                LinearLayout lockedCard = column();
-                lockedCard.setPadding(dp(12), dp(10), dp(12), dp(10));
-                lockedCard.setBackground(background(RAISED, 10, LINE, 1));
-                lockedCard.addView(text("Informações de captura ocultas até a primeira captura confirmada.", 11, MUTED, false));
-                leftPanel.addView(lockedCard);
+        Runnable[] refreshLeftPanel = new Runnable[1];
+        refreshLeftPanel[0] = () -> {
+            com.brumclassics.mobile.extensions.PokedexUniversalEngine.ProjectedEntry entry = selectedHolder[0];
+            if (entry == null) {
+                dexBadge.setText("#---");
+                statusPill.setVisibility(View.GONE);
+                specimenScreen.setBackground(background(Color.rgb(20, 27, 32), 12, LINE, 1));
+                spriteView.setVisibility(View.GONE);
+                retryBox.setVisibility(View.GONE);
+                detailName.setText("Nenhuma espécie nesta aba");
+                detailDesc.setText("Use as abas ou filtro de geração acima.");
+                captureContainer.removeAllViews();
+                captureContainer.addView(text("Nenhum registro selecionado.", 11, MUTED, false));
+                return;
             }
-        }
+            boolean shiny = entry.discovered && entry.isShiny;
+            dexBadge.setText("#" + entry.formattedNumber);
+            statusPill.setVisibility(View.VISIBLE);
+            statusPill.setText(shiny ? "✦ SHINY" : (entry.discovered ? "CAPTURADO" : "NÃO DESCOBERTO"));
+            statusPill.setTextColor(shiny ? BG : (entry.discovered ? ACCENT : MUTED));
+            statusPill.setBackground(background(shiny ? shinyGold : RAISED, 10, LINE, 1));
 
-        // RIGHT PANEL: Tabs (Pokémon vs Shinies), Safe Search, and Scrollable Species List
+            specimenScreen.setBackground(background(Color.rgb(20, 27, 32), 12,
+                    shiny ? shinyGold : Color.argb(95, 157, 255, 59), 1));
+            int spriteMode = !entry.discovered
+                    ? com.brumclassics.mobile.extensions.PokedexSpriteRenderer.MODE_SILHOUETTE
+                    : (entry.isShiny
+                        ? com.brumclassics.mobile.extensions.PokedexSpriteRenderer.MODE_SHINY
+                        : com.brumclassics.mobile.extensions.PokedexSpriteRenderer.MODE_NORMAL);
+            spriteView.setVisibility(View.VISIBLE);
+            retryBox.setVisibility(View.GONE);
+            com.brumclassics.mobile.extensions.PokedexSpriteRenderer.LoadListener spriteListener = (loading, ok) -> {
+                if (!loading && !ok) {
+                    spriteView.setVisibility(View.INVISIBLE);
+                    retryBox.setVisibility(View.VISIBLE);
+                } else if (ok) {
+                    spriteView.setVisibility(View.VISIBLE);
+                    retryBox.setVisibility(View.GONE);
+                }
+            };
+            com.brumclassics.mobile.extensions.PokedexSpriteRenderer.bind(spriteView, entry.nationalDexNumber, spriteMode, true, spriteListener, false);
+            retryBtn.setOnClickListener(v -> {
+                spriteView.setVisibility(View.VISIBLE);
+                retryBox.setVisibility(View.GONE);
+                com.brumclassics.mobile.extensions.PokedexSpriteRenderer.bind(spriteView, entry.nationalDexNumber, spriteMode, true, spriteListener, true);
+            });
+
+            detailName.setText("#" + entry.formattedNumber + " — " + (entry.discovered ? entry.name : "???"));
+            detailDesc.setText(entry.discovered ? entry.description : "???");
+            detailDesc.setTextColor(entry.discovered ? Color.rgb(212, 218, 224) : MUTED);
+
+            captureContainer.removeAllViews();
+            if (entry.discovered && entry.capture != null) {
+                com.brumclassics.mobile.extensions.PokedexUniversalEngine.CaptureRecord cap = entry.capture;
+                captureContainer.addView(text("REGISTRO DA PRIMEIRA CAPTURA", 9, ACCENT, true));
+                captureContainer.addView(text("Jogo: " + cap.firstCapturedGame, 11, TEXT, true), margins(-1, 6, -1, 0));
+                captureContainer.addView(text("Data/Hora: " + formatPokedexTimestamp(cap.capturedAt), 11, Color.rgb(190, 198, 206), false), margins(-1, 3, -1, 0));
+                captureContainer.addView(text("Localização: " + (cap.captureLocation == null || cap.captureLocation.isEmpty() ? "Localização desconhecida" : cap.captureLocation), 11, Color.rgb(190, 198, 206), false), margins(-1, 3, -1, 0));
+                captureContainer.addView(text("Categoria: " + (entry.isShiny ? "Shiny (Independente)" : "Normal"), 11, entry.isShiny ? shinyGold : ACCENT, true), margins(-1, 3, -1, 0));
+            } else {
+                captureContainer.addView(text("Informações de captura ocultas até a primeira captura confirmada.", 11, MUTED, false));
+            }
+        };
+        refreshLeftPanel[0].run();
+
+        // RIGHT PANEL: Tabs, Generation Scope Chips, Safe Search, Virtualized ListView
         LinearLayout rightPanel = column();
-        rightPanel.setPadding(dp(16), dp(16), dp(16), dp(16));
+        rightPanel.setPadding(dp(14), dp(14), dp(14), dp(14));
         rightPanel.setBackground(background(SURFACE, 12, LINE, 1));
 
         LinearLayout tabRow = row();
@@ -2018,22 +2178,37 @@ public final class MainActivity extends Activity {
         pokemonTabBtn.setTextSize(11);
         pokemonTabBtn.setTextColor(onPokemonTab ? BG : TEXT);
         pokemonTabBtn.setBackground(background(onPokemonTab ? ACCENT : RAISED, 8, LINE, 1));
-        pokemonTabBtn.setOnClickListener(v -> {
-            pokedexActiveTab = "pokemon";
-            showGamingMode();
-        });
+        pokemonTabBtn.setOnClickListener(v -> { pokedexActiveTab = "pokemon"; showGamingMode(); });
         tabRow.addView(pokemonTabBtn, weightedMargins(0, 0, 5, 0));
 
         Button shiniesTabBtn = button("✦ SHINIES (" + view.shinyDiscovered + ")");
         shiniesTabBtn.setTextSize(11);
         shiniesTabBtn.setTextColor(!onPokemonTab ? BG : TEXT);
         shiniesTabBtn.setBackground(background(!onPokemonTab ? shinyGold : RAISED, 8, LINE, 1));
-        shiniesTabBtn.setOnClickListener(v -> {
-            pokedexActiveTab = "shinies";
-            showGamingMode();
-        });
+        shiniesTabBtn.setOnClickListener(v -> { pokedexActiveTab = "shinies"; showGamingMode(); });
         tabRow.addView(shiniesTabBtn, weightedMargins(5, 0, 0, 0));
-        rightPanel.addView(tabRow, new LinearLayout.LayoutParams(-1, dp(40)));
+        rightPanel.addView(tabRow, new LinearLayout.LayoutParams(-1, dp(42)));
+
+        // Scope filter chips: Piloto (151) / G1–G7 (809) / G1..G7
+        android.widget.HorizontalScrollView scopeScroll = new android.widget.HorizontalScrollView(this);
+        scopeScroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout scopeRow = row();
+        String[][] scopeOpts = new String[][]{
+            {"pilot", "Piloto (151)"}, {"all", "G1–G7 (809)"},
+            {"gen1", "G1"}, {"gen2", "G2"}, {"gen3", "G3"},
+            {"gen4", "G4"}, {"gen5", "G5"}, {"gen6", "G6"}, {"gen7", "G7"}
+        };
+        for (String[] opt : scopeOpts) {
+            boolean active = opt[0].equals(pokedexScope);
+            Button chip = gamingAction(opt[1], active, v -> {
+                pokedexScope = opt[0];
+                showGamingMode();
+            });
+            chip.setTextSize(10);
+            scopeRow.addView(chip, margins(-2, 0, 6, 0, 34));
+        }
+        scopeScroll.addView(scopeRow);
+        rightPanel.addView(scopeScroll, margins(-1, 8, -1, 0));
 
         LinearLayout searchRow = row();
         searchRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -2043,7 +2218,7 @@ public final class MainActivity extends Activity {
             pokedexSearchQuery = searchInput.getText().toString();
             showGamingMode();
         });
-        searchRow.addView(applySearch, margins(-2, 0, 0, 0, 42));
+        searchRow.addView(applySearch, margins(-2, 6, 0, 0, 42));
         if (!pokedexSearchQuery.isEmpty()) {
             Button clearSearch = gamingAction("Limpar", false, v -> {
                 pokedexSearchQuery = "";
@@ -2051,7 +2226,7 @@ public final class MainActivity extends Activity {
             });
             searchRow.addView(clearSearch, margins(-2, 6, 0, 0, 42));
         }
-        rightPanel.addView(searchRow, margins(-1, 10, -1, 10));
+        rightPanel.addView(searchRow, margins(-1, 8, -1, 8));
 
         if (filteredList.isEmpty()) {
             LinearLayout emptyBox = column();
@@ -2063,57 +2238,110 @@ public final class MainActivity extends Activity {
                     : "Digite o número oficial da Pokédex Nacional (ex.: 001, 025) ou o nome de um Pokémon já capturado.", 11, MUTED, false), margins(-1, 5, -1, 0));
             rightPanel.addView(emptyBox);
         } else {
-            ScrollView listScroll = new ScrollView(this);
-            listScroll.setNestedScrollingEnabled(true);
-            LinearLayout listCol = column();
-            for (com.brumclassics.mobile.extensions.PokedexUniversalEngine.ProjectedEntry entry : filteredList) {
-                boolean isSel = selectedEntry != null && selectedEntry.nationalDexNumber == entry.nationalDexNumber;
-                int rowAccent = (entry.discovered && entry.isShiny) ? shinyGold : ACCENT;
-                LinearLayout itemRow = row();
-                itemRow.setGravity(Gravity.CENTER_VERTICAL);
-                itemRow.setPadding(dp(10), dp(8), dp(10), dp(8));
-                itemRow.setBackground(background(isSel ? Color.argb(38, 157, 255, 59) : RAISED, 9,
-                        isSel ? rowAccent : LINE, 1));
+            android.widget.ListView listView = new android.widget.ListView(this);
+            listView.setDivider(null);
+            listView.setDividerHeight(dp(6));
+            listView.setNestedScrollingEnabled(true);
+            android.widget.BaseAdapter adapter = new android.widget.BaseAdapter() {
+                @Override public int getCount() { return filteredList.size(); }
+                @Override public com.brumclassics.mobile.extensions.PokedexUniversalEngine.ProjectedEntry getItem(int pos) { return filteredList.get(pos); }
+                @Override public long getItemId(int pos) { return filteredList.get(pos).nationalDexNumber; }
+                @Override public View getView(int position, View convertView, android.view.ViewGroup parent) {
+                    LinearLayout itemRow;
+                    ImageView miniSprite;
+                    TextView numTv, nameTv, subTv, tagTv;
+                    if (convertView instanceof LinearLayout && convertView.getTag() instanceof View[]) {
+                        itemRow = (LinearLayout) convertView;
+                        View[] refs = (View[]) convertView.getTag();
+                        miniSprite = (ImageView) refs[0];
+                        numTv = (TextView) refs[1];
+                        nameTv = (TextView) refs[2];
+                        subTv = (TextView) refs[3];
+                        tagTv = (TextView) refs[4];
+                    } else {
+                        itemRow = row();
+                        itemRow.setGravity(Gravity.CENTER_VERTICAL);
+                        itemRow.setPadding(dp(10), dp(8), dp(10), dp(8));
 
-                FrameLayout iconBox = new FrameLayout(this);
-                iconBox.setBackground(background(Color.rgb(20, 27, 32), 8, LINE, 1));
-                int mode = !entry.discovered
-                        ? com.brumclassics.mobile.extensions.PokedexSpriteRenderer.MODE_SILHOUETTE
-                        : (entry.isShiny
-                            ? com.brumclassics.mobile.extensions.PokedexSpriteRenderer.MODE_SHINY
-                            : com.brumclassics.mobile.extensions.PokedexSpriteRenderer.MODE_NORMAL);
-                ImageView miniSprite = new ImageView(this);
-                miniSprite.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                com.brumclassics.mobile.extensions.PokedexSpriteRenderer.bind(miniSprite, entry.nationalDexNumber, mode);
-                iconBox.addView(miniSprite, new FrameLayout.LayoutParams(dp(32), dp(32), Gravity.CENTER));
-                itemRow.addView(iconBox, margins(42, 0, 10, 0, 42));
+                        FrameLayout iconBox = new FrameLayout(MainActivity.this);
+                        iconBox.setBackground(background(Color.rgb(20, 27, 32), 8, LINE, 1));
+                        miniSprite = new ImageView(MainActivity.this);
+                        miniSprite.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                        iconBox.addView(miniSprite, new FrameLayout.LayoutParams(dp(32), dp(32), Gravity.CENTER));
+                        itemRow.addView(iconBox, margins(42, 0, 10, 0, 42));
 
-                itemRow.addView(text("#" + entry.formattedNumber, 13, entry.discovered ? rowAccent : MUTED, true), margins(52, 0, 6, 0));
+                        numTv = text("", 13, MUTED, true);
+                        itemRow.addView(numTv, margins(52, 0, 6, 0));
 
-                LinearLayout nameCol = column();
-                nameCol.addView(text(entry.discovered ? entry.name : "???", 13, entry.discovered ? TEXT : MUTED, true));
-                String sub = entry.discovered && entry.capture != null
-                        ? (entry.capture.firstCapturedGame + " · " + entry.capture.captureLocation)
-                        : "Silhueta · Não capturado";
-                nameCol.addView(text(sub, 10, MUTED, false));
-                itemRow.addView(nameCol, new LinearLayout.LayoutParams(0, -2, 1));
+                        LinearLayout nameCol = column();
+                        nameTv = text("", 13, TEXT, true);
+                        subTv = text("", 10, MUTED, false);
+                        nameCol.addView(nameTv);
+                        nameCol.addView(subTv);
+                        itemRow.addView(nameCol, new LinearLayout.LayoutParams(0, -2, 1));
 
-                if (entry.discovered) {
-                    TextView tag = text(entry.isShiny ? "✦ SHINY" : "CAPTURADO", 9, entry.isShiny ? BG : rowAccent, true);
-                    tag.setBackground(background(entry.isShiny ? shinyGold : Color.argb(35, 157, 255, 59), 8, Color.TRANSPARENT, 0));
-                    tag.setPadding(dp(8), dp(3), dp(8), dp(3));
-                    itemRow.addView(tag);
+                        tagTv = text("", 9, ACCENT, true);
+                        tagTv.setPadding(dp(8), dp(3), dp(8), dp(3));
+                        itemRow.addView(tagTv);
+                        itemRow.setTag(new View[]{miniSprite, numTv, nameTv, subTv, tagTv});
+                    }
+
+                    com.brumclassics.mobile.extensions.PokedexUniversalEngine.ProjectedEntry entry = getItem(position);
+                    boolean isSel = selectedHolder[0] != null && selectedHolder[0].nationalDexNumber == entry.nationalDexNumber;
+                    int rowAccent = (entry.discovered && entry.isShiny) ? shinyGold : ACCENT;
+                    itemRow.setBackground(background(isSel ? Color.argb(38, 157, 255, 59) : RAISED, 9, isSel ? rowAccent : LINE, 1));
+
+                    int mode = !entry.discovered
+                            ? com.brumclassics.mobile.extensions.PokedexSpriteRenderer.MODE_SILHOUETTE
+                            : (entry.isShiny
+                                ? com.brumclassics.mobile.extensions.PokedexSpriteRenderer.MODE_SHINY
+                                : com.brumclassics.mobile.extensions.PokedexSpriteRenderer.MODE_NORMAL);
+                    com.brumclassics.mobile.extensions.PokedexSpriteRenderer.bind(miniSprite, entry.nationalDexNumber, mode);
+
+                    numTv.setText("#" + entry.formattedNumber);
+                    numTv.setTextColor(entry.discovered ? rowAccent : MUTED);
+                    nameTv.setText(entry.discovered ? entry.name : "???");
+                    nameTv.setTextColor(entry.discovered ? TEXT : MUTED);
+                    subTv.setText(entry.discovered && entry.capture != null
+                            ? (entry.capture.firstCapturedGame + " · " + entry.capture.captureLocation)
+                            : "Silhueta · Não capturado");
+                    if (entry.discovered) {
+                        tagTv.setVisibility(View.VISIBLE);
+                        tagTv.setText(entry.isShiny ? "✦ SHINY" : "CAPTURADO");
+                        tagTv.setTextColor(entry.isShiny ? BG : rowAccent);
+                        tagTv.setBackground(background(entry.isShiny ? shinyGold : Color.argb(35, 157, 255, 59), 8, Color.TRANSPARENT, 0));
+                    } else {
+                        tagTv.setVisibility(View.GONE);
+                    }
+                    return itemRow;
                 }
-
-                final int targetDex = entry.nationalDexNumber;
-                itemRow.setOnClickListener(v -> {
-                    pokedexSelectedDex = targetDex;
-                    showGamingMode();
-                });
-                listCol.addView(itemRow, margins(-1, 0, -1, 6));
+            };
+            listView.setAdapter(adapter);
+            listView.setOnItemClickListener((parent, view1, pos, id) -> {
+                com.brumclassics.mobile.extensions.PokedexUniversalEngine.ProjectedEntry chosen = filteredList.get(pos);
+                selectedHolder[0] = chosen;
+                pokedexSelectedDex = chosen.nationalDexNumber;
+                adapter.notifyDataSetChanged();
+                refreshLeftPanel[0].run();
+            });
+            View.OnClickListener stepNav(int delta) {
+                return ignored -> {
+                    if (filteredList.isEmpty()) return;
+                    int idx = 0;
+                    for (int i = 0; i < filteredList.size(); i++) {
+                        if (filteredList.get(i).nationalDexNumber == pokedexSelectedDex) { idx = i; break; }
+                    }
+                    int nextPos = (idx + delta + filteredList.size()) % filteredList.size();
+                    selectedHolder[0] = filteredList.get(nextPos);
+                    pokedexSelectedDex = selectedHolder[0].nationalDexNumber;
+                    adapter.notifyDataSetChanged();
+                    listView.smoothScrollToPosition(nextPos);
+                    refreshLeftPanel[0].run();
+                };
             }
-            listScroll.addView(listCol);
-            rightPanel.addView(listScroll, new LinearLayout.LayoutParams(-1, dp(360)));
+            previousSpecies.setOnClickListener(stepNav(-1));
+            nextSpecies.setOnClickListener(stepNav(1));
+            rightPanel.addView(listView, new LinearLayout.LayoutParams(-1, dp(360)));
         }
 
         LinearLayout.LayoutParams leftLp = new LinearLayout.LayoutParams(0, -2, 0.45f);
@@ -2122,7 +2350,8 @@ public final class MainActivity extends Activity {
         rightLp.leftMargin = dp(8);
         splitContainer.addView(leftPanel, leftLp);
         splitContainer.addView(rightPanel, rightLp);
-        page.addView(splitContainer, margins(-1, 14, -1, 0));
+        deviceChassis.addView(splitContainer);
+        page.addView(deviceChassis, margins(-1, 14, -1, 0));
     }
 
     private View pokedexCounterBox(String label, String value, int accentColor) {

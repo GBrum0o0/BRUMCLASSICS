@@ -123,7 +123,7 @@ public final class IntegratedEmulatorActivity extends Activity {
                 try {
                     org.json.JSONObject ev = new org.json.JSONObject(rawJson);
                     int dex = ev.optInt("nationalDexNumber", 0);
-                    if (dex < 1 || dex > 802) return;
+                    if (dex < 1 || dex > 809) return;
                     boolean isShiny = ev.optBoolean("isShiny", "shiny".equalsIgnoreCase(ev.optString("category", "")));
                     String loc = ev.optString("captureLocation", "Localização desconhecida");
                     com.brumclassics.mobile.extensions.PokedexUniversalEngine.RecordOutcome outcome =

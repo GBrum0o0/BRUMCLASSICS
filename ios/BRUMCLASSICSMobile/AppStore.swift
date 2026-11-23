@@ -19,6 +19,7 @@ final class AppStore: ObservableObject {
     @Published private(set) var performanceReceivedUptime: TimeInterval?
     @Published private(set) var personalUpdate: PersonalUpdateState = .idle
     @Published private(set) var lastSuccessfulSyncAt: Date?
+    @Published private(set) var activeRemoteGamepadSession: MurbRemoteLaunchTarget?
     @Published var selectedGame: Game?
     @Published var message: String?
 
@@ -223,12 +224,34 @@ final class AppStore: ObservableObject {
                 UserDefaults.standard.set(self.lastSuccessfulSyncAt?.timeIntervalSince1970, forKey: Self.lastSyncKey)
                 self.prefetchAllArtwork()
                 _ = await self.syncPokedexWithLauncher(profileID: "primary")
+                await self.refreshActiveRemoteGamepad()
             } catch {
                 self.connection = .error(error.localizedDescription)
+                self.activeRemoteGamepadSession = nil
             }
             self.refreshTask = nil
         }
         await refreshTask?.value
+    }
+
+    func refreshActiveRemoteGamepad() async {
+        guard isPaired, connection == .online else { return }
+        do {
+            let resp = try await bridge.fetchActiveRemoteGamepad()
+            if resp.active, let info = resp.remoteGamepad {
+                activeRemoteGamepadSession = MurbRemoteLaunchTarget.from(
+                    info,
+                    fallbackHost: configuration?.host,
+                    gameTitle: resp.gameTitle ?? "",
+                    playerNumber: resp.assignedPlayer ?? 1,
+                    preferFallbackHost: true
+                )
+            } else {
+                activeRemoteGamepadSession = nil
+            }
+        } catch {
+            // Keep existing session state on transient network jitter.
+        }
     }
 
     func resume() async {
@@ -241,6 +264,7 @@ final class AppStore: ObservableObject {
         appActive = false
         eventTask?.cancel(); eventTask = nil
         artworkTask?.cancel(); artworkTask = nil; artworkSignature = ""
+        activeRemoteGamepadSession = nil
         if connection == .online { connection = .offline }
     }
 
@@ -504,7 +528,7 @@ final class AppStore: ObservableObject {
             let systemID = (disc["systemId"] as? String) ?? "gba"
             let capturedAt = disc["capturedAt"] as? String
             let location = (disc["captureLocation"] as? String) ?? PokedexUniversalStore.unknownLocation
-            if (1...802).contains(dex) {
+            if (1...809).contains(dex) {
                 let result = try? PokedexUniversalStore.shared.recordCapture(
                     ownerProfileId: "primary",
                     nationalDexNumber: dex,
@@ -525,6 +549,25 @@ final class AppStore: ObservableObject {
         }
         if event["type"] as? String == "pokedex_synced" {
             _ = await syncPokedexWithLauncher(profileID: "primary")
+            return
+        }
+        if event["type"] as? String == "remote_gamepad_session" {
+            if (event["active"] as? Bool) == true,
+               let payload = event["remoteGamepad"],
+               let infoData = try? JSONSerialization.data(withJSONObject: payload),
+               let info = try? JSONDecoder().decode(BridgeClient.MurbRemoteSessionInfo.self, from: infoData) {
+                let title = (event["gameTitle"] as? String) ?? ""
+                let player = (event["assignedPlayer"] as? NSNumber)?.intValue ?? 1
+                activeRemoteGamepadSession = MurbRemoteLaunchTarget.from(
+                    info,
+                    fallbackHost: configuration?.host,
+                    gameTitle: title,
+                    playerNumber: player,
+                    preferFallbackHost: true
+                )
+            } else {
+                activeRemoteGamepadSession = nil
+            }
             return
         }
         guard ["ready", "library_changed", "companion_changed", "install_changed", "notes_changed", "library_state_changed", "collections_changed", "activity_changed", "profile_changed", "notifications_changed"].contains(event["type"] as? String ?? "") else { return }

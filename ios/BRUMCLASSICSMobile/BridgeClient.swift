@@ -72,6 +72,15 @@ actor BridgeClient {
         let alreadyRunning: Bool?
         let remoteGamepad: MurbRemoteSessionInfo?
     }
+    struct ActiveRemoteGamepadResponse: Decodable {
+        let ok: Bool?
+        let active: Bool
+        let gameId: String?
+        let gameTitle: String?
+        let system: String?
+        let assignedPlayer: Int?
+        let remoteGamepad: MurbRemoteSessionInfo?
+    }
     struct StreamingLaunchResult: Decodable { let ok: Bool; let session: StreamingSession }
     struct NotificationReadResponse: Decodable { let ok: Bool; let unread: Int }
     struct MomentResponse: Decodable { let id: String; let gameId: String; let gameTitle: String; let capturedAt: String; let imagePath: String }
@@ -393,6 +402,10 @@ actor BridgeClient {
         let envelope: ServerEnvelope<StreamingLaunchResult> = try await request(path: "/v1/remote", method: "POST", body: body)
         guard let result = envelope.result, result.ok else { throw BridgeError.server(envelope.message ?? "O launcher não preparou a transmissão.") }
         return result.session
+    }
+
+    func fetchActiveRemoteGamepad() async throws -> ActiveRemoteGamepadResponse {
+        try await request(path: "/v1/remote-gamepad/active")
     }
 
     func launchGamepad(gameID: String?, filename: String?, title: String?, mode: String = "new", players: Int = 1, hybridMode: String = "") async throws -> GamepadLaunchResult {

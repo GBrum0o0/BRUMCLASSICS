@@ -8,6 +8,7 @@ struct GamingModeView: View {
     @Binding var selection: Int
     @State private var selectedGame: Game?
     @State private var selectedROM: ROMFolderGame?
+    @State private var quickRemoteTarget: MurbRemoteLaunchTarget?
     private enum GamingSection: String { case recent, library, extensions }
     @State private var activeSection: GamingSection = .recent
     @AppStorage("gaming-mode-favorites-v1") private var favoritesJSON = "[]"
@@ -57,6 +58,27 @@ struct GamingModeView: View {
                         libraryTab("EXTENSÕES", selected: activeSection == .extensions) { activeSection = .extensions }
                             .accessibilityIdentifier("gaming-mode-extensions")
                     }
+                    if let activeRemote = store.activeRemoteGamepadSession {
+                        BrumCard {
+                            HStack(spacing: 12) {
+                                Image(systemName: "gamecontroller.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(BrumTheme.primary)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Sessão ativa no PC pareado (P\(activeRemote.playerNumber))")
+                                        .font(.caption.bold())
+                                        .foregroundStyle(BrumTheme.primary)
+                                    Text(activeRemote.gameTitle.isEmpty ? "Jogo em execução no computador" : activeRemote.gameTitle)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(BrumTheme.text)
+                                }
+                                Spacer()
+                                Button("CONECTAR GAMEPAD") {
+                                    quickRemoteTarget = activeRemote
+                                }.buttonStyle(PrimaryButtonStyle())
+                            }
+                        }
+                    }
                     if activeSection == .extensions {
                         PokedexGamingExtensionView()
                     } else if let featured = recentEntries.first ?? libraryEntries.first {
@@ -96,6 +118,9 @@ struct GamingModeView: View {
         }
         .fullScreenCover(item: $selectedGame) { GamingGameView(game: $0) }
         .fullScreenCover(item: $selectedROM) { GamingROMDetailView(rom: $0) }
+        .fullScreenCover(item: $quickRemoteTarget) { target in
+            MurbRemoteGamepadView(target: target.payload, gameTitle: target.gameTitle, playerNumber: target.playerNumber, p2Payload: target.p2Payload)
+        }
     }
 
     private func libraryTab(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
