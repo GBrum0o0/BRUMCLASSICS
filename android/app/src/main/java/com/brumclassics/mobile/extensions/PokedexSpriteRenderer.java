@@ -1,333 +1,162 @@
 package com.brumclassics.mobile.extensions;
 
 import android.graphics.Bitmap;
-import android.graphics.Canvas;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
-import android.graphics.Paint;
-
+import android.graphics.PorterDuff;
+import android.graphics.Rect;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.AtomicFile;
+import android.util.LruCache;
+import android.view.View;
+import android.view.ViewTreeObserver;
+import android.widget.ImageView;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.lang.ref.WeakReference;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
+/** Actual species sprites, on demand. Hidden silhouettes use the same image alpha. */
 public final class PokedexSpriteRenderer {
-    public static final int MODE_SILHOUETTE = 0;
-    public static final int MODE_NORMAL = 1;
-    public static final int MODE_SHINY = 2;
-
-    private static final Map<Integer, String[]> CURATED = new HashMap<>();
-
-    static {
-        CURATED.put(1, new String[]{ // Bulbasaur (#001)
-                ".....OOOOOO.....",
-                "...OOSSSSSSOO...",
-                "..OSSSSSSSSSSO..",
-                ".OSSSSSHHSSSSSO.",
-                ".OSSSSOOOOSSSSO.",
-                ".OOOOPPPPPPOOOO.",
-                "OOPPPPPPPPPPPPOO",
-                "OPPHOPPPPPPOHPPO",
-                "OPPAOPPPPPPOAPPO",
-                "OPPPPPPPPPPPPPPO",
-                ".OPPPPOOOOPPPPO.",
-                ".OPPP.OOOO.PPPO.",
-                ".OPPO......OPPO.",
-                "..OO........OO..",
-                "................",
-                "................"
-        });
-        CURATED.put(4, new String[]{ // Charmander (#004)
-                "....OOOOOO......",
-                "...OPPPPPPO.....",
-                "..OPPPPPPPHO....",
-                "..OPPHO..PPO....",
-                "..OPPPPPPPPO..A.",
-                "...OOPPPPPOO.ASA",
-                "....OPPSSPPO.ASA",
-                "...OPPPSSPPPO.S.",
-                "..OPO.PSSP.OPO..",
-                "..OO..PSSP..OOO.",
-                ".....OPSSPO..SO.",
-                ".....OPPPPO.OO..",
-                "....OPO..OPOO...",
-                "....OO....OO....",
-                "................",
-                "................"
-        });
-        CURATED.put(6, new String[]{ // Charizard (#006)
-                ".OO....OOOO....O",
-                "OSSO..OPPPPO..OS",
-                "OSSSOOPPPPPPOOSS",
-                "OSSSSOPPHO.POSS.",
-                ".OSSSOPPPPPPOSSO",
-                "..OOOOPPSSPPOOO.",
-                "....OPPPSSPPPO..",
-                "...OPPPPSSPPPPO.",
-                "...OPO.PSSP.OPO.",
-                ".......PSSP..OOA",
-                "......OPSSPO..SA",
-                ".....OPPPPPPO.O.",
-                ".....OPO..OPO...",
-                ".....OO....OO...",
-                "................",
-                "................"
-        });
-        CURATED.put(7, new String[]{ // Squirtle (#007)
-                "....OOOOOO......",
-                "...OPPPPPPO.....",
-                "..OPPPPPPPHO....",
-                "..OPPHO..PPO....",
-                "..OPPPPPPPPO....",
-                "...OOPPPPPOO....",
-                "..OOSSSSSSSSOO..",
-                ".OSSSSSSPPSSSSO.",
-                ".OSSSSSPPPPSSSOO",
-                ".OSSSSSSPPSSSSPO",
-                "..OOSSSSSSSSOPPO",
-                "...OPPP..PPPOOO.",
-                "...OPO....OPO...",
-                "...OO......OO...",
-                "................",
-                "................"
-        });
-        CURATED.put(25, new String[]{ // Pikachu (#025)
-                ".OO..........OO.",
-                ".OPO........OPO.",
-                "..OPO......OPO..",
-                "..OPPOO..OOPPO..",
-                "...OPPPPPPPPO...",
-                "..OPPPPPPPPPPO..",
-                "..OPHO.PP.OHPO..",
-                "..OPPPPPPPPPPO..",
-                "..OAPPPPPPPPAO..",
-                "...OPPPPPPPPO.OO",
-                "...OPPPSSPPPOSSO",
-                "..OPPPPSSPPPPSO.",
-                "..OPPPPPPPPPPPO.",
-                "...OPPP..PPPPO..",
-                "...OOO....OOO...",
-                "................"
-        });
-        CURATED.put(133, new String[]{ // Eevee (#133)
-                ".OO..........OO.",
-                ".OPO........OPO.",
-                ".OPP........PPO.",
-                "..OPPOO..OOPPO..",
-                "...OPPPPPPPPO...",
-                "..OPHO.PP.OHPO..",
-                "..OPPPPPPPPPPO..",
-                "..OOSSSSSSSSOO..",
-                ".OSSSSSSSSSSSSO.",
-                "..OOSSSSSSSSOO..",
-                "...OPPPPPPPPO.OO",
-                "...OPPPPPPPPPSPO",
-                "...OPPP..PPPPOO.",
-                "...OOO....OOO...",
-                "................",
-                "................"
-        });
-        CURATED.put(143, new String[]{ // Snorlax (#143)
-                "...OO......OO...",
-                "..OPPOO..OOPPO..",
-                ".OPPPPPPPPPPPPO.",
-                ".OPP.OO..OO.PPO.",
-                ".OPPSSPPPPSSPPO.",
-                "OOPSSSSSSSSSSPOO",
-                "OPSSSSSSSSSSSSPO",
-                "OPSSSSSSSSSSSSPO",
-                "OPSSSSSSSSSSSSPO",
-                "OOPSSSSSSSSSSPOO",
-                ".OPSSSSSSSSSSPO.",
-                ".OPPPPPPPPPPPPO.",
-                ".OSSSSO..OSSSSO.",
-                "..OOOO....OOOO..",
-                "................",
-                "................"
-        });
-        CURATED.put(150, new String[]{ // Mewtwo (#150)
-                "....OO....OO....",
-                "...OPO....OPO...",
-                "...OPPPPPPPPO...",
-                "...OPHO..OHPO...",
-                "....OPPPPPPO....",
-                ".....OOPPOO.....",
-                "...OOPPPPPPOO...",
-                "..OPO.PSSP.OPO..",
-                "..OO..PSSP..OO..",
-                ".....OSSSSO..OO.",
-                "....OSSSSSSO.SO.",
-                "....OSP..PSOOO..",
-                "...OPPO..OPPO...",
-                "...OOO....OOO...",
-                "................",
-                "................"
-        });
-        CURATED.put(151, new String[]{ // Mew (#151)
-                "....OO....OO....",
-                "...OPPOO.OPPO...",
-                "..OPPPPPPPPPPO..",
-                "..OPPHO..OHPPO..",
-                "..OPPPPPPPPPPO..",
-                "...OOPPPPPPOO...",
-                "....OPPPPPPO..OO",
-                "...OPPPPPPPPO.PO",
-                "...OO.PPPP.OO.PO",
-                ".....OPPPPPO.PO.",
-                "....OPPP.PPPOO..",
-                "....OPO...OPO...",
-                "....OO.....OO...",
-                "................",
-                "................",
-                "................"
-        });
-    }
-
+    public static final int MODE_SILHOUETTE = 0, MODE_NORMAL = 1, MODE_SHINY = 2;
+    private static final Handler MAIN = new Handler(Looper.getMainLooper());
+    private static final AtomicLong SEQUENCE = new AtomicLong();
+    private static final Map<String, Fetch> IN_FLIGHT = new HashMap<>();
+    private static final ThreadPoolExecutor WORK = new ThreadPoolExecutor(3, 3, 0L,
+            TimeUnit.MILLISECONDS, new PriorityBlockingQueue<Runnable>());
+    private static final LruCache<String, Bitmap> CACHE = new LruCache<String, Bitmap>(8 * 1024 * 1024) {
+        @Override protected int sizeOf(String key, Bitmap value) { return value.getByteCount(); }
+    };
     private PokedexSpriteRenderer() {}
-
-    public static Bitmap createBitmap(int nationalDexNumber, int mode, int pixelScale) {
-        int dex = Math.max(1, Math.min(802, nationalDexNumber));
-        int scale = Math.max(2, Math.min(12, pixelScale));
-        String[] grid = CURATED.containsKey(dex) ? CURATED.get(dex) : proceduralGrid(dex);
-        int[] palette = paletteFor(dex, mode);
-
-        Bitmap bmp = Bitmap.createBitmap(16 * scale, 16 * scale, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bmp);
-        Paint paint = new Paint();
-        paint.setAntiAlias(false);
-        paint.setStyle(Paint.Style.FILL);
-
-        for (int y = 0; y < Math.min(16, grid.length); y++) {
-            String row = grid[y];
-            for (int x = 0; x < Math.min(16, row.length()); x++) {
-                char ch = row.charAt(x);
-                if (ch == '.') continue;
-                int color;
-                if (mode == MODE_SILHOUETTE) {
-                    color = Color.BLACK;
-                } else {
-                    switch (ch) {
-                        case 'O': color = palette[0]; break;
-                        case 'P': color = palette[1]; break;
-                        case 'S': color = palette[2]; break;
-                        case 'H': color = palette[3]; break;
-                        case 'A': color = palette[4]; break;
-                        default: color = palette[1]; break;
-                    }
-                }
-                paint.setColor(color);
-                canvas.drawRect(x * scale, y * scale, (x + 1) * scale, (y + 1) * scale, paint);
-            }
-        }
-
-        if (mode == MODE_SHINY) {
-            paint.setColor(Color.rgb(255, 224, 64));
-            int[][] sparkles = {{1, 1}, {1, 2}, {2, 1}, {14, 2}, {13, 3}, {14, 3}};
-            for (int[] sp : sparkles) {
-                canvas.drawRect(sp[0] * scale, sp[1] * scale, (sp[0] + 1) * scale, (sp[1] + 1) * scale, paint);
-            }
-        }
-        return bmp;
+    public static String spriteUrl(int dex, int mode) {
+        return "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/"
+                + (mode == MODE_SHINY ? "shiny/" : "") + Math.max(1, Math.min(802, dex)) + ".png";
     }
-
-    private static int[] paletteFor(int dex, int mode) {
-        if (mode == MODE_SILHOUETTE) {
-            return new int[]{Color.BLACK, Color.BLACK, Color.BLACK, Color.BLACK, Color.BLACK};
-        }
-        float shift = (mode == MODE_SHINY) ? 96f : 0f;
-        if (dex == 25 || dex == 26) {
-            return new int[]{
-                    Color.rgb(51, 36, 10),
-                    mode == MODE_SHINY ? Color.rgb(255, 164, 32) : Color.rgb(255, 224, 46),
-                    Color.rgb(142, 82, 26),
-                    Color.WHITE,
-                    Color.rgb(245, 62, 62)
-            };
-        }
-        if (dex >= 4 && dex <= 6) {
-            return new int[]{
-                    Color.rgb(51, 23, 12),
-                    (mode == MODE_SHINY && dex == 6) ? Color.rgb(56, 61, 72) : Color.HSVToColor(new float[]{(22f + shift) % 360f, 0.88f, 0.96f}),
-                    Color.rgb(252, 219, 112),
-                    Color.WHITE,
-                    Color.rgb(255, 90, 38)
-            };
-        }
-        float baseHue = ((dex * 47) % 360 + shift) % 360f;
-        float secHue = (baseHue + 50f) % 360f;
-        float accHue = (baseHue + 172f) % 360f;
-        return new int[]{
-                Color.HSVToColor(new float[]{baseHue, 0.65f, 0.18f}),
-                Color.HSVToColor(new float[]{baseHue, 0.76f, 0.90f}),
-                Color.HSVToColor(new float[]{secHue, 0.55f, 0.95f}),
-                Color.WHITE,
-                Color.HSVToColor(new float[]{accHue, 0.85f, 0.96f})
-        };
+    public static void bind(ImageView target, int dex, int mode) { bind(target, dex, mode, false); }
+    public static void bind(ImageView target, int dex, int mode, boolean selected) {
+        String address = spriteUrl(dex, mode), request = address + ":" + mode;
+        target.setTag(request);
+        target.setImageDrawable(null);
+        if (mode == MODE_SILHOUETTE) target.setColorFilter(Color.BLACK, PorterDuff.Mode.SRC_IN);
+        else target.clearColorFilter();
+        target.setContentDescription((mode == MODE_SILHOUETTE ? "Silhueta da espécie número " : "Imagem da espécie número ") + dex);
+        Bitmap cached = CACHE.get(address);
+        if (cached != null) { target.setImageBitmap(cached); return; }
+        if (selected) enqueue(target, dex, mode, true);
+        else new VisibleLoad(target, dex, mode).attach();
     }
-
-    public static String[] proceduralGrid(int dex) {
-        char[][] grid = new char[16][16];
-        for (int y = 0; y < 16; y++) {
-            for (int x = 0; x < 16; x++) grid[y][x] = '.';
-        }
-        long seed = ((long) dex * 2654435761L) & 0xFFFFFFFFL;
-        int earType = dex % 4;
-        int bodyWidth = 4 + (dex % 3);
-        boolean hasWings = (dex % 5 == 0);
-        boolean hasCrest = (dex % 3 == 0);
-
-        if (earType == 0) {
-            grid[1][3] = 'O'; grid[2][3] = 'P'; grid[2][4] = 'O';
-            grid[1][12] = 'O'; grid[2][12] = 'P'; grid[2][11] = 'O';
-        } else if (earType == 1) {
-            grid[1][5] = 'O'; grid[2][5] = 'A';
-            grid[1][10] = 'O'; grid[2][10] = 'A';
-        } else if (hasCrest) {
-            grid[1][7] = 'A'; grid[1][8] = 'A'; grid[2][7] = 'P'; grid[2][8] = 'P';
-        }
-
-        for (int y = 3; y <= 7; y++) {
-            int halfW = (y == 3 || y == 7) ? 3 : 4;
-            for (int dx = 0; dx <= halfW; dx++) {
-                char ch = (dx == halfW || y == 3) ? 'O' : 'P';
-                grid[y][7 - dx] = ch;
-                grid[y][8 + dx] = ch;
+    // Off-screen rows never enqueue downloads or retain Activities in the worker queue.
+    private static final class VisibleLoad implements View.OnAttachStateChangeListener,
+            ViewTreeObserver.OnScrollChangedListener, View.OnLayoutChangeListener {
+        final WeakReference<ImageView> target; final int dex, mode; final Rect visible = new Rect();
+        ViewTreeObserver observer;
+        VisibleLoad(ImageView view, int dex, int mode) { target = new WeakReference<>(view); this.dex = dex; this.mode = mode; }
+        void attach() { ImageView view = target.get(); if (view == null) return; view.addOnAttachStateChangeListener(this); if (view.isAttachedToWindow()) onViewAttachedToWindow(view); }
+        void unwatch() { if (observer != null && observer.isAlive()) observer.removeOnScrollChangedListener(this); observer = null; ImageView view = target.get(); if (view != null) view.removeOnLayoutChangeListener(this); }
+        void check() {
+            ImageView view = target.get();
+            if (view == null) { unwatch(); return; }
+            if (!(spriteUrl(dex, mode) + ":" + mode).equals(view.getTag())) { unwatch(); view.removeOnAttachStateChangeListener(this); return; }
+            if (view.isAttachedToWindow() && view.getGlobalVisibleRect(visible) && !visible.isEmpty()) {
+                unwatch(); view.removeOnAttachStateChangeListener(this); enqueue(view, dex, mode, false);
             }
         }
-        grid[5][5] = 'H'; grid[5][6] = 'O';
-        grid[5][10] = 'H'; grid[5][9] = 'O';
-        if (dex % 2 == 0) {
-            grid[6][4] = 'A'; grid[6][11] = 'A';
-        }
-
-        for (int y = 8; y <= 12; y++) {
-            int halfW = Math.min(6, bodyWidth + (y == 10 ? 1 : 0));
-            for (int dx = 0; dx <= halfW; dx++) {
-                seed = (seed * 1664525L + 1013904223L) & 0xFFFFFFFFL;
-                char ch;
-                if (dx == halfW || y == 12) {
-                    ch = 'O';
-                } else if (dx <= 1 && y >= 9 && y <= 11) {
-                    ch = 'S';
-                } else {
-                    ch = (((seed >>> 16) & 3L) == 0L) ? 'S' : 'P';
+        @Override public void onViewAttachedToWindow(View view) { unwatch(); observer = view.getViewTreeObserver(); observer.addOnScrollChangedListener(this); view.addOnLayoutChangeListener(this); view.post(this::check); }
+        @Override public void onViewDetachedFromWindow(View view) { unwatch(); }
+        @Override public void onScrollChanged() { check(); }
+        @Override public void onLayoutChange(View v, int a, int b, int c, int d, int e, int f, int g, int h) { check(); }
+    }
+    private static void enqueue(ImageView target, int dex, int mode, boolean selected) {
+        String address = spriteUrl(dex, mode);
+        Bitmap cached = CACHE.get(address);
+        if (cached != null) { target.setImageBitmap(cached); return; }
+        synchronized (IN_FLIGHT) {
+            Fetch fetch = IN_FLIGHT.get(address);
+            if (fetch == null) {
+                // A bound also covers rapid page recreation while offline.
+                if (IN_FLIGHT.size() >= 64) { unavailable(target); return; }
+                File folder = new File(target.getContext().getCacheDir(), "brum-pokedex-images");
+                File file = new File(folder, Math.max(1, Math.min(802, dex)) + (mode == MODE_SHINY ? "-shiny.png" : "-normal.png"));
+                fetch = new Fetch(address, folder, file, selected ? 0 : 1);
+                IN_FLIGHT.put(address, fetch);
+                fetch.listeners.add(new Subscriber(target));
+                WORK.execute(fetch);
+            } else {
+                fetch.listeners.add(new Subscriber(target));
+                if (selected && fetch.priority != 0 && WORK.getQueue().remove(fetch)) {
+                    fetch.priority = 0; WORK.execute(fetch);
                 }
-                grid[y][7 - dx] = ch;
-                grid[y][8 + dx] = ch;
             }
         }
-
-        if (hasWings) {
-            for (int y = 6; y <= 10; y++) {
-                grid[y][1] = 'O'; grid[y][2] = 'S';
-                grid[y][14] = 'O'; grid[y][13] = 'S';
+    }
+    private static void unavailable(ImageView target) {
+        target.clearColorFilter(); target.setImageResource(android.R.drawable.ic_menu_report_image);
+        target.setContentDescription("Imagem indisponível. Conecte à internet e tente novamente.");
+    }
+    private static final class Subscriber {
+        final WeakReference<ImageView> target; final Object request;
+        Subscriber(ImageView view) { target = new WeakReference<>(view); request = view.getTag(); }
+    }
+    private static final class Fetch implements Runnable, Comparable<Fetch> {
+        final String address; final File folder, file; final long sequence = SEQUENCE.incrementAndGet();
+        final List<Subscriber> listeners = new ArrayList<>(); int priority;
+        Fetch(String address, File folder, File file, int priority) { this.address = address; this.folder = folder; this.file = file; this.priority = priority; }
+        @Override public int compareTo(Fetch other) { int p = Integer.compare(priority, other.priority); return p == 0 ? Long.compare(sequence, other.sequence) : p; }
+        @Override public void run() {
+            Bitmap image = CACHE.get(address);
+            if (image == null && file.isFile()) {
+                try (InputStream input = new FileInputStream(file)) { image = decode(readLimited(input)); }
+                catch (Exception ignored) { /* Corrupt cache falls through to the remote source. */ }
             }
+            if (image == null) {
+                try {
+                    HttpURLConnection connection = (HttpURLConnection) new URL(address).openConnection();
+                    connection.setConnectTimeout(10000); connection.setReadTimeout(15000); connection.setInstanceFollowRedirects(false);
+                    try {
+                        if (connection.getResponseCode() != 200) throw new java.io.IOException("Sprite unavailable");
+                        byte[] bytes; try (InputStream input = connection.getInputStream()) { bytes = readLimited(input); }
+                        image = decode(bytes); if (image == null) throw new java.io.IOException("Invalid sprite");
+                        if (folder.isDirectory() || folder.mkdirs()) {
+                            AtomicFile atomic = new AtomicFile(file); FileOutputStream output = null;
+                            try { output = atomic.startWrite(); output.write(bytes); atomic.finishWrite(output); }
+                            catch (java.io.IOException error) { if (output != null) atomic.failWrite(output); }
+                        }
+                    } finally { connection.disconnect(); }
+                } catch (Exception ignored) { /* Never synthesize an invented species. */ }
+            }
+            if (image != null) CACHE.put(address, image);
+            final Bitmap result = image;
+            final List<Subscriber> notify;
+            synchronized (IN_FLIGHT) { IN_FLIGHT.remove(address); notify = new ArrayList<>(listeners); }
+            MAIN.post(() -> { for (Subscriber subscriber : notify) {
+                ImageView view = subscriber.target.get();
+                if (view == null || !subscriber.request.equals(view.getTag())) continue;
+                if (result != null) view.setImageBitmap(result); else unavailable(view);
+            }});
         }
-
-        grid[13][4] = 'O'; grid[13][5] = 'P'; grid[13][6] = 'O';
-        grid[13][11] = 'O'; grid[13][10] = 'P'; grid[13][9] = 'O';
-        grid[14][4] = 'O'; grid[14][5] = 'O';
-        grid[14][11] = 'O'; grid[14][10] = 'O';
-
-        String[] rows = new String[16];
-        for (int y = 0; y < 16; y++) rows[y] = new String(grid[y]);
-        return rows;
+    }
+    private static byte[] readLimited(InputStream input) throws java.io.IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream(); byte[] buffer = new byte[8192]; int count;
+        while ((count = input.read(buffer)) != -1) { if (out.size() + count > 1_048_576) throw new java.io.IOException("Sprite too large"); out.write(buffer, 0, count); }
+        return out.toByteArray();
+    }
+    private static Bitmap decode(byte[] bytes) {
+        BitmapFactory.Options bounds = new BitmapFactory.Options(); bounds.inJustDecodeBounds = true;
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bounds);
+        if (bounds.outWidth < 1 || bounds.outHeight < 1 || bounds.outWidth > 1024 || bounds.outHeight > 1024) return null;
+        return BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
     }
 }

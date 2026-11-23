@@ -420,8 +420,13 @@ final class BrumAchievementCardView: UIView {
         badgeLoadTask = nil
         if payload.pokedexNationalDexNumber > 0 {
             let mode: PokedexSpriteRenderMode = payload.isShinyDiscovery ? .shiny : .normal
-            badgeImageView.image = PokedexPixelSprite.image(for: payload.pokedexNationalDexNumber, mode: mode, pixelScale: 3)
+            badgeImageView.image = nil
             accessibilityIdentifier = payload.eventID
+            let currentEvent = payload.eventID
+            badgeLoadTask = PokedexPixelSprite.load(for: payload.pokedexNationalDexNumber, mode: mode) { [weak self] image in
+                guard let self, self.accessibilityIdentifier == currentEvent else { return }
+                self.badgeImageView.image = image
+            }
             return
         }
         badgeImageView.image = BrumCartridgeBrandMark.makeImage(size: CGSize(width: 44, height: 44))
@@ -641,10 +646,7 @@ private struct BrumAchievementSwiftCard: View {
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(payload.isShinyDiscovery ? Self.shinyGold.opacity(0.75) : Self.border, lineWidth: 1))
                     if payload.pokedexNationalDexNumber > 0 {
                         let mode: PokedexSpriteRenderMode = payload.isShinyDiscovery ? .shiny : .normal
-                        Image(uiImage: PokedexPixelSprite.image(for: payload.pokedexNationalDexNumber, mode: mode, pixelScale: 3))
-                            .interpolation(.none)
-                            .resizable()
-                            .scaledToFit()
+                        PokedexSpeciesImage(nationalDexNumber: payload.pokedexNationalDexNumber, mode: mode)
                             .padding(5)
                     } else if let badgeImage {
                         Image(uiImage: badgeImage)

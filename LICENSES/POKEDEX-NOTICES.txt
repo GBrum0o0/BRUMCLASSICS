@@ -1,7 +1,12 @@
 Pokédex Universal — metadados
 
-Catálogo offline #001..#802 derivado de PokeAPI/pokeapi CSV. Fonte de origem declarada pelo gerador original: https://github.com/PokeAPI/pokeapi (master não fixado no momento da obtenção); não é possível afirmar a revisão histórica exata dos dados. O catálogo distribuído é identificado por hash e preservado sem regeneração nesta integração. Licença BSD-3-Clause integral: PokeAPI-LICENSE.txt. Pokémon e nomes de personagens são marcas de seus titulares. Arte do aplicativo é ilustrativa, não sprites oficiais.
+Catálogo offline #001..#802 derivado de PokeAPI/pokeapi CSV. Fonte de origem declarada pelo gerador original: https://github.com/PokeAPI/pokeapi (master não fixado no momento da obtenção); não é possível afirmar a revisão histórica exata dos dados. O catálogo distribuído é identificado por hash e preservado sem regeneração nesta integração. Licença BSD-3-Clause integral: PokeAPI-LICENSE.txt. Pokémon e nomes de personagens são marcas de seus titulares. As imagens das espécies são carregadas sob demanda do repositório PokeAPI/sprites, sem PNGs das espécies incorporados ou redistribuídos neste pacote.
 
 Adaptador FireRed: documentação pública de estruturas e nomes de mapas de https://github.com/pret/pokefirered utilizada como referência técnica; não inclui ROM, BIOS, descompilação de binários nem código executável do jogo.
 
 Runtime nativo: rcheevos v12.5.0, revisão1433173220a7eaede6a9ed7a18e94117be1821e0, https://github.com/RetroAchievements/rcheevos; MIT, texto e avisos mantidos em brum-core-pc-source/third_party/rcheevos/LICENSE. Não é autorização para criar conquistas fictícias.
+
+Imagens das espécies: https://github.com/PokeAPI/sprites
+URLs remotas: https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{numero}.png e shiny/{numero}.png.
+O arquivo LICENCE.txt desse repositório contém o texto CC0 e também a declaração específica "All image contents are Copyright The Pokémon Company". Não se atribui autoria BRUM nem se afirma que as imagens Pokémon sejam CC0. Referência integral: https://raw.githubusercontent.com/PokeAPI/sprites/master/LICENCE.txt.
+A primeira consulta de uma imagem requer internet. Imagens obtidas ficam em cache local; falhas são indicadas sem gerar criaturas substitutas. A silhueta usa a mesma imagem normal da espécie com pixels opacos tingidos de preto, preservando a transparência; a variante shiny usa sua imagem correspondente.

@@ -120,6 +120,15 @@ public final class MainActivity extends Activity {
     private boolean pokedexDeviceOpen = false;
     private String pokedexActiveTab = "pokemon";
     private int pokedexSelectedDex = 1;
+
+    private void navigatePokedexSpecies(java.util.List<com.brumclassics.mobile.extensions.PokedexUniversalEngine.ProjectedEntry> entries, int delta) {
+        if (entries.isEmpty()) return;
+        int index = 0;
+        for (int i = 0; i < entries.size(); i++) if (entries.get(i).nationalDexNumber == pokedexSelectedDex) { index = i; break; }
+        pokedexSelectedDex = entries.get((index + delta + entries.size()) % entries.size()).nationalDexNumber;
+        showGamingMode();
+    }
+
     private String pokedexSearchQuery = "";
     private String pokedexSyncFeedback = "";
     private boolean pokedexSyncing = false;
@@ -1947,9 +1956,7 @@ public final class MainActivity extends Activity {
                         : com.brumclassics.mobile.extensions.PokedexSpriteRenderer.MODE_NORMAL);
             ImageView spriteView = new ImageView(this);
             spriteView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            spriteView.setImageBitmap(com.brumclassics.mobile.extensions.PokedexSpriteRenderer.createBitmap(
-                    selectedEntry.nationalDexNumber, spriteMode, 7
-            ));
+            com.brumclassics.mobile.extensions.PokedexSpriteRenderer.bind(spriteView, selectedEntry.nationalDexNumber, spriteMode, true);
             FrameLayout.LayoutParams spriteLp = new FrameLayout.LayoutParams(dp(116), dp(116), Gravity.CENTER);
             specimenScreen.addView(spriteView, spriteLp);
         } else {
@@ -1957,6 +1964,24 @@ public final class MainActivity extends Activity {
             specimenScreen.addView(emptySpecimen, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
         }
         leftPanel.addView(specimenScreen, margins(-1, 12, -1, 12, 148));
+        LinearLayout deviceControls = row();
+        deviceControls.setGravity(Gravity.CENTER_VERTICAL);
+        Button previousSpecies = gamingAction("◀", false, v -> navigatePokedexSpecies(filteredList, -1));
+        previousSpecies.setContentDescription("Espécie anterior");
+        Button closeDevice = gamingAction("FECHAR", false, v -> {
+            pokedexDeviceOpen = false;
+            showGamingMode();
+        });
+        closeDevice.setContentDescription("Fechar Pokédex");
+        Button nextSpecies = gamingAction("▶", false, v -> navigatePokedexSpecies(filteredList, 1));
+        nextSpecies.setContentDescription("Próxima espécie");
+        previousSpecies.setEnabled(!filteredList.isEmpty());
+        nextSpecies.setEnabled(!filteredList.isEmpty());
+        deviceControls.addView(previousSpecies, new LinearLayout.LayoutParams(0, dp(46), 1));
+        deviceControls.addView(closeDevice, new LinearLayout.LayoutParams(0, dp(46), 1));
+        deviceControls.addView(nextSpecies, new LinearLayout.LayoutParams(0, dp(46), 1));
+        leftPanel.addView(deviceControls, margins(-1, 0, -1, 12));
+
 
         if (selectedEntry != null) {
             leftPanel.addView(text("#" + selectedEntry.formattedNumber + " — " + (selectedEntry.discovered ? selectedEntry.name : "???"), 20, TEXT, true));
@@ -2059,9 +2084,7 @@ public final class MainActivity extends Activity {
                             : com.brumclassics.mobile.extensions.PokedexSpriteRenderer.MODE_NORMAL);
                 ImageView miniSprite = new ImageView(this);
                 miniSprite.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                miniSprite.setImageBitmap(com.brumclassics.mobile.extensions.PokedexSpriteRenderer.createBitmap(
-                        entry.nationalDexNumber, mode, 2
-                ));
+                com.brumclassics.mobile.extensions.PokedexSpriteRenderer.bind(miniSprite, entry.nationalDexNumber, mode);
                 iconBox.addView(miniSprite, new FrameLayout.LayoutParams(dp(32), dp(32), Gravity.CENTER));
                 itemRow.addView(iconBox, margins(42, 0, 10, 0, 42));
 

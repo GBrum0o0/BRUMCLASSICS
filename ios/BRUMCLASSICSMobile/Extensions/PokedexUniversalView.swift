@@ -8,372 +8,82 @@ enum PokedexSpriteRenderMode: Equatable {
     case shiny
 }
 
+// Species artwork is loaded on demand from PokeAPI; the exact same alpha mask
+// is used for an undiscovered silhouette. No procedural substitute is generated.
 enum PokedexPixelSprite {
-    private static let cache = NSCache<NSString, UIImage>()
-
-    // 16x16 curated pixel templates for signature pilot & iconic Pokémon:
-    // '.' = transparent, 'O' = outline/dark, 'P' = primary body, 'S' = secondary/belly/flame, 'H' = highlight/eye, 'A' = accent/cheeks
-    private static let curatedTemplates: [Int: [String]] = [
-        1: [ // Bulbasaur (#001)
-            ".....OOOOOO.....",
-            "...OOSSSSSSOO...",
-            "..OSSSSSSSSSSO..",
-            ".OSSSSSHHSSSSSO.",
-            ".OSSSSOOOOSSSSO.",
-            ".OOOOPPPPPPOOOO.",
-            "OOPPPPPPPPPPPPOO",
-            "OPPHOPPPPPPOHPPO",
-            "OPPAOPPPPPPOAPPO",
-            "OPPPPPPPPPPPPPPO",
-            ".OPPPPOOOOPPPPO.",
-            ".OPPP.OOOO.PPPO.",
-            ".OPPO......OPPO.",
-            "..OO........OO..",
-            "................",
-            "................"
-        ],
-        4: [ // Charmander (#004)
-            "....OOOOOO......",
-            "...OPPPPPPO.....",
-            "..OPPPPPPPHO....",
-            "..OPPHO..PPO....",
-            "..OPPPPPPPPO..A.",
-            "...OOPPPPPOO.ASA",
-            "....OPPSSPPO.ASA",
-            "...OPPPSSPPPO.S.",
-            "..OPO.PSSP.OPO..",
-            "..OO..PSSP..OOO.",
-            ".....OPSSPO..SO.",
-            ".....OPPPPO.OO..",
-            "....OPO..OPOO...",
-            "....OO....OO....",
-            "................",
-            "................"
-        ],
-        6: [ // Charizard (#006)
-            ".OO....OOOO....O",
-            "OSSO..OPPPPO..OS",
-            "OSSSOOPPPPPPOOSS",
-            "OSSSSOPPHO.POSS.",
-            ".OSSSOPPPPPPOSSO",
-            "..OOOOPPSSPPOOO.",
-            "....OPPPSSPPPO..",
-            "...OPPPPSSPPPPO.",
-            "...OPO.PSSP.OPO.",
-            ".......PSSP..OOA",
-            "......OPSSPO..SA",
-            ".....OPPPPPPO.O.",
-            ".....OPO..OPO...",
-            ".....OO....OO...",
-            "................",
-            "................"
-        ],
-        7: [ // Squirtle (#007)
-            "....OOOOOO......",
-            "...OPPPPPPO.....",
-            "..OPPPPPPPHO....",
-            "..OPPHO..PPO....",
-            "..OPPPPPPPPO....",
-            "...OOPPPPPOO....",
-            "..OOSSSSSSSSOO..",
-            ".OSSSSSSPPSSSSO.",
-            ".OSSSSSPPPPSSSOO",
-            ".OSSSSSSPPSSSSPO",
-            "..OOSSSSSSSSOPPO",
-            "...OPPP..PPPOOO.",
-            "...OPO....OPO...",
-            "...OO......OO...",
-            "................",
-            "................"
-        ],
-        25: [ // Pikachu (#025)
-            ".OO..........OO.",
-            ".OPO........OPO.",
-            "..OPO......OPO..",
-            "..OPPOO..OOPPO..",
-            "...OPPPPPPPPO...",
-            "..OPPPPPPPPPPO..",
-            "..OPHO.PP.OHPO..",
-            "..OPPPPPPPPPPO..",
-            "..OAPPPPPPPPAO..",
-            "...OPPPPPPPPO.OO",
-            "...OPPPSSPPPOSSO",
-            "..OPPPPSSPPPPSO.",
-            "..OPPPPPPPPPPPO.",
-            "...OPPP..PPPPO..",
-            "...OOO....OOO...",
-            "................"
-        ],
-        133: [ // Eevee (#133)
-            ".OO..........OO.",
-            ".OPO........OPO.",
-            ".OPP........PPO.",
-            "..OPPOO..OOPPO..",
-            "...OPPPPPPPPO...",
-            "..OPHO.PP.OHPO..",
-            "..OPPPPPPPPPPO..",
-            "..OOSSSSSSSSOO..",
-            ".OSSSSSSSSSSSSO.",
-            "..OOSSSSSSSSOO..",
-            "...OPPPPPPPPO.OO",
-            "...OPPPPPPPPPSPO",
-            "...OPPP..PPPPOO.",
-            "...OOO....OOO...",
-            "................",
-            "................"
-        ],
-        143: [ // Snorlax (#143)
-            "...OO......OO...",
-            "..OPPOO..OOPPO..",
-            ".OPPPPPPPPPPPPO.",
-            ".OPP.OO..OO.PPO.",
-            ".OPPSSPPPPSSPPO.",
-            "OOPSSSSSSSSSSPOO",
-            "OPSSSSSSSSSSSSPO",
-            "OPSSSSSSSSSSSSPO",
-            "OPSSSSSSSSSSSSPO",
-            "OOPSSSSSSSSSSPOO",
-            ".OPSSSSSSSSSSPO.",
-            ".OPPPPPPPPPPPPO.",
-            ".OSSSSO..OSSSSO.",
-            "..OOOO....OOOO..",
-            "................",
-            "................"
-        ],
-        150: [ // Mewtwo (#150)
-            "....OO....OO....",
-            "...OPO....OPO...",
-            "...OPPPPPPPPO...",
-            "...OPHO..OHPO...",
-            "....OPPPPPPO....",
-            ".....OOPPOO.....",
-            "...OOPPPPPPOO...",
-            "..OPO.PSSP.OPO..",
-            "..OO..PSSP..OO..",
-            ".....OSSSSO..OO.",
-            "....OSSSSSSO.SO.",
-            "....OSP..PSOOO..",
-            "...OPPO..OPPO...",
-            "...OOO....OOO...",
-            "................",
-            "................"
-        ],
-        151: [ // Mew (#151)
-            "....OO....OO....",
-            "...OPPOO.OPPO...",
-            "..OPPPPPPPPPPO..",
-            "..OPPHO..OHPPO..",
-            "..OPPPPPPPPPPO..",
-            "...OOPPPPPPOO...",
-            "....OPPPPPPO..OO",
-            "...OPPPPPPPPO.PO",
-            "...OO.PPPP.OO.PO",
-            ".....OPPPPPO.PO.",
-            "....OPPP.PPPOO..",
-            "....OPO...OPO...",
-            "....OO.....OO...",
-            "................",
-            "................",
-            "................"
-        ]
-    ]
-
-    static func image(for nationalDexNumber: Int, mode: PokedexSpriteRenderMode, pixelScale: Int = 6) -> UIImage {
-        let clampedDex = max(1, min(802, nationalDexNumber))
-        let scale = max(2, min(12, pixelScale))
-        let cacheKey = "\(clampedDex):\(mode):\(scale)" as NSString
-        if let cached = cache.object(forKey: cacheKey) {
-            return cached
-        }
-
-        let grid = curatedTemplates[clampedDex] ?? proceduralGrid(for: clampedDex)
-        let palette = paletteFor(dex: clampedDex, mode: mode)
-        let size = CGSize(width: 16 * scale, height: 16 * scale)
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1.0
-        format.opaque = false
-
-        let renderer = UIGraphicsImageRenderer(size: size, format: format)
-        let img = renderer.image { ctx in
-            let cg = ctx.cgContext
-            cg.interpolationQuality = .none
-
-            for y in 0..<min(16, grid.count) {
-                let row = Array(grid[y])
-                for x in 0..<min(16, row.count) {
-                    let ch = row[x]
-                    guard ch != "." else { continue }
-                    let color: UIColor
-                    if mode == .silhouette {
-                        color = .black
-                    } else {
-                        switch ch {
-                        case "O": color = palette.outline
-                        case "P": color = palette.primary
-                        case "S": color = palette.secondary
-                        case "H": color = palette.highlight
-                        case "A": color = palette.accent
-                        default: color = palette.primary
-                        }
-                    }
-                    cg.setFillColor(color.cgColor)
-                    cg.fill(CGRect(x: x * scale, y: y * scale, width: scale, height: scale))
-                }
-            }
-
-            if mode == .shiny {
-                let sparkleColor = UIColor(red: 1.0, green: 0.88, blue: 0.25, alpha: 1.0)
-                cg.setFillColor(sparkleColor.cgColor)
-                let sparkleCoords = [(1, 1), (1, 2), (2, 1), (14, 2), (13, 3), (14, 3)]
-                for (sx, sy) in sparkleCoords {
-                    cg.fill(CGRect(x: sx * scale, y: sy * scale, width: scale, height: scale))
-                }
-            }
-        }
-        cache.setObject(img, forKey: cacheKey)
-        return img
+    private static let cache: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.totalCostLimit = 8 * 1024 * 1024
+        return cache
+    }()
+    static func url(for dex: Int, mode: PokedexSpriteRenderMode) -> URL {
+        let variant = mode == .shiny ? "shiny/" : ""
+        return URL(string: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/\(variant)\(max(1, min(802, dex))).png")!
     }
-
-    private struct SpritePalette {
-        let outline: UIColor
-        let primary: UIColor
-        let secondary: UIColor
-        let highlight: UIColor
-        let accent: UIColor
+    static func silhouette(_ image: UIImage) -> UIImage {
+        image.withTintColor(.black, renderingMode: .alwaysOriginal)
     }
-
-    private static func paletteFor(dex: Int, mode: PokedexSpriteRenderMode) -> SpritePalette {
-        if mode == .silhouette {
-            return SpritePalette(outline: .black, primary: .black, secondary: .black, highlight: .black, accent: .black)
+    @discardableResult
+    static func load(for dex: Int, mode: PokedexSpriteRenderMode,
+                     completion: @escaping (UIImage?) -> Void) -> URLSessionDataTask? {
+        let address = url(for: dex, mode: mode)
+        let key = address.absoluteString as NSString
+        let deliver: (UIImage?) -> Void = { source in
+            DispatchQueue.main.async {
+                completion(source.map { mode == .silhouette ? silhouette($0) : $0 })
+            }
         }
-        let shinyShift: CGFloat = (mode == .shiny) ? 0.27 : 0.0
-        switch dex {
-        case 1, 2, 3, 252, 253, 254:
-            return SpritePalette(
-                outline: UIColor(red: 0.08, green: 0.18, blue: 0.14, alpha: 1),
-                primary: UIColor(hue: fmod(0.45 + shinyShift, 1.0), saturation: 0.72, brightness: 0.85, alpha: 1),
-                secondary: UIColor(hue: fmod(0.34 + shinyShift, 1.0), saturation: 0.80, brightness: 0.78, alpha: 1),
-                highlight: .white,
-                accent: UIColor(red: 0.92, green: 0.26, blue: 0.34, alpha: 1)
-            )
-        case 4, 5, 6:
-            return SpritePalette(
-                outline: UIColor(red: 0.20, green: 0.09, blue: 0.05, alpha: 1),
-                primary: mode == .shiny && dex == 6
-                    ? UIColor(red: 0.22, green: 0.24, blue: 0.28, alpha: 1)
-                    : UIColor(hue: fmod(0.06 + shinyShift, 1.0), saturation: 0.88, brightness: 0.96, alpha: 1),
-                secondary: UIColor(red: 0.99, green: 0.86, blue: 0.44, alpha: 1),
-                highlight: .white,
-                accent: UIColor(red: 1.0, green: 0.35, blue: 0.15, alpha: 1)
-            )
-        case 7, 8, 9:
-            return SpritePalette(
-                outline: UIColor(red: 0.07, green: 0.14, blue: 0.22, alpha: 1),
-                primary: UIColor(hue: fmod(0.56 + shinyShift, 1.0), saturation: 0.74, brightness: 0.92, alpha: 1),
-                secondary: UIColor(hue: fmod(0.11 + shinyShift, 1.0), saturation: 0.65, brightness: 0.86, alpha: 1),
-                highlight: .white,
-                accent: UIColor(red: 0.95, green: 0.78, blue: 0.38, alpha: 1)
-            )
-        case 25, 26:
-            return SpritePalette(
-                outline: UIColor(red: 0.20, green: 0.14, blue: 0.04, alpha: 1),
-                primary: mode == .shiny
-                    ? UIColor(red: 1.0, green: 0.64, blue: 0.12, alpha: 1)
-                    : UIColor(red: 1.0, green: 0.88, blue: 0.18, alpha: 1),
-                secondary: UIColor(red: 0.56, green: 0.32, blue: 0.10, alpha: 1),
-                highlight: .white,
-                accent: UIColor(red: 0.96, green: 0.24, blue: 0.24, alpha: 1)
-            )
-        default:
-            let baseHue = fmod(CGFloat((dex * 47) % 360) / 360.0 + shinyShift, 1.0)
-            let secHue = fmod(baseHue + 0.14, 1.0)
-            let accHue = fmod(baseHue + 0.48, 1.0)
-            return SpritePalette(
-                outline: UIColor(hue: baseHue, saturation: 0.65, brightness: 0.18, alpha: 1),
-                primary: UIColor(hue: baseHue, saturation: 0.76, brightness: 0.90, alpha: 1),
-                secondary: UIColor(hue: secHue, saturation: 0.55, brightness: 0.95, alpha: 1),
-                highlight: .white,
-                accent: UIColor(hue: accHue, saturation: 0.85, brightness: 0.96, alpha: 1)
-            )
+        if let image = cache.object(forKey: key) { deliver(image); return nil }
+        let folder = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("brum-pokedex-images", isDirectory: true)
+        let file = folder.appendingPathComponent("\(dex)-\(mode == .shiny ? "shiny" : "normal").png")
+        let request = URLRequest(url: address, cachePolicy: .returnCacheDataElseLoad, timeoutInterval: 15)
+        let task = URLSession.shared.dataTask(with: request) { data, response, _ in
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+                  http.url?.host == "raw.githubusercontent.com",
+                  let data, data.count <= 1_048_576, let image = UIImage(data: data),
+                  image.size.width <= 1024, image.size.height <= 1024 else {
+                deliver(nil); return
+            }
+            cache.setObject(image, forKey: key, cost: Int(image.size.width * image.size.height * 4))
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try? data.write(to: file, options: .atomic)
+            deliver(image)
         }
+        DispatchQueue.global(qos: .utility).async {
+            if let data = try? Data(contentsOf: file), let image = UIImage(data: data) {
+                cache.setObject(image, forKey: key, cost: Int(image.size.width * image.size.height * 4)); deliver(image)
+            } else { task.resume() }
+        }
+        return task
     }
+}
 
-    private static func proceduralGrid(for dex: Int) -> [String] {
-        var grid = Array(repeating: Array(repeating: Character("."), count: 16), count: 16)
-        var seed = UInt32(dex * 2654435761 & 0xFFFFFFFF)
-        func nextBits(_ bits: Int) -> Int {
-            seed = seed &* 1664525 &+ 1013904223
-            return Int((seed >> 16) & UInt32((1 << bits) - 1))
+struct PokedexSpeciesImage: View {
+    let nationalDexNumber: Int
+    let mode: PokedexSpriteRenderMode
+    @State private var image: UIImage?
+    @State private var failed = false
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image).interpolation(.none).resizable().scaledToFit()
+            } else if failed {
+                Image(systemName: "photo")
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Imagem indisponível. Conecte à internet para carregar.")
+            } else { ProgressView().accessibilityLabel("Carregando imagem da espécie") }
         }
-
-        let earType = dex % 4
-        let bodyWidth = 4 + (dex % 3)
-        let hasWings = (dex % 5 == 0)
-        let hasCrest = (dex % 3 == 0)
-
-        // Ears / horns
-        if earType == 0 {
-            grid[1][3] = "O"; grid[2][3] = "P"; grid[2][4] = "O"
-            grid[1][12] = "O"; grid[2][12] = "P"; grid[2][11] = "O"
-        } else if earType == 1 {
-            grid[1][5] = "O"; grid[2][5] = "A"
-            grid[1][10] = "O"; grid[2][10] = "A"
-        } else if hasCrest {
-            grid[1][7] = "A"; grid[1][8] = "A"; grid[2][7] = "P"; grid[2][8] = "P"
-        }
-
-        // Head (rows 3..7)
-        for y in 3...7 {
-            let halfW = (y == 3 || y == 7) ? 3 : 4
-            for dx in 0...halfW {
-                let lx = 7 - dx
-                let rx = 8 + dx
-                let ch: Character = (dx == halfW || y == 3) ? "O" : "P"
-                grid[y][lx] = ch
-                grid[y][rx] = ch
+        .accessibilityLabel(mode == .silhouette ? "Silhueta da espécie número \(nationalDexNumber)" : "Imagem da espécie número \(nationalDexNumber)")
+        .accessibilityHint(failed ? "A primeira consulta da imagem requer internet; imagens já carregadas ficam em cache." : "")
+        .task(id: "\(nationalDexNumber)-\(mode)") {
+            image = nil; failed = false
+            let loaded: UIImage? = await withCheckedContinuation { continuation in
+                PokedexPixelSprite.load(for: nationalDexNumber, mode: mode) { continuation.resume(returning: $0) }
             }
+            guard !Task.isCancelled else { return }
+            image = loaded; failed = loaded == nil
         }
-        // Eyes
-        grid[5][5] = "H"; grid[5][6] = "O"
-        grid[5][10] = "H"; grid[5][9] = "O"
-        if dex % 2 == 0 {
-            grid[6][4] = "A"; grid[6][11] = "A"
-        }
-
-        // Torso (rows 8..12)
-        for y in 8...12 {
-            let halfW = min(6, bodyWidth + (y == 10 ? 1 : 0))
-            for dx in 0...halfW {
-                let lx = 7 - dx
-                let rx = 8 + dx
-                let ch: Character
-                if dx == halfW || y == 12 {
-                    ch = "O"
-                } else if dx <= 1 && y >= 9 && y <= 11 {
-                    ch = "S"
-                } else {
-                    ch = (nextBits(2) == 0) ? "S" : "P"
-                }
-                grid[y][lx] = ch
-                grid[y][rx] = ch
-            }
-        }
-
-        // Wings or arms
-        if hasWings {
-            for y in 6...10 {
-                grid[y][1] = "O"; grid[y][2] = "S"
-                grid[y][14] = "O"; grid[y][13] = "S"
-            }
-        }
-
-        // Feet (rows 13..14)
-        grid[13][4] = "O"; grid[13][5] = "P"; grid[13][6] = "O"
-        grid[13][11] = "O"; grid[13][10] = "P"; grid[13][9] = "O"
-        grid[14][4] = "O"; grid[14][5] = "O"
-        grid[14][11] = "O"; grid[14][10] = "O"
-
-        return grid.map { String($0) }
     }
 }
 
@@ -912,7 +622,7 @@ struct PokedexGamingExtensionView: View {
                         .padding(.vertical, 12)
                         .background(BrumTheme.primary, in: RoundedRectangle(cornerRadius: 10))
 
-                        Text("Animação de abertura horizontal · Abas Pokémon & Shinies")
+                        Text("Abra, consulte as espécies e navegue pelos botões do dispositivo")
                             .font(.caption2)
                             .foregroundStyle(BrumTheme.muted)
                     }
@@ -933,6 +643,13 @@ struct PokedexGamingExtensionView: View {
             rightListPanel
                 .frame(maxWidth: .infinity)
         }
+    }
+
+    private func navigateSpecies(_ delta: Int) {
+        let entries = coordinator.displayedEntries
+        guard !entries.isEmpty else { return }
+        let index = entries.firstIndex { $0.nationalDexNumber == coordinator.selectedDexNumber } ?? 0
+        coordinator.selectedDexNumber = entries[(index + delta + entries.count) % entries.count].nationalDexNumber
     }
 
     private var leftDetailPanel: some View {
@@ -1003,10 +720,7 @@ struct PokedexGamingExtensionView: View {
                         let mode: PokedexSpriteRenderMode = !entry.discovered
                             ? .silhouette
                             : (entry.isShiny ? .shiny : .normal)
-                        Image(uiImage: PokedexPixelSprite.image(for: entry.nationalDexNumber, mode: mode, pixelScale: 7))
-                            .interpolation(.none)
-                            .resizable()
-                            .scaledToFit()
+                        PokedexSpeciesImage(nationalDexNumber: entry.nationalDexNumber, mode: mode)
                             .frame(width: 118, height: 118)
                             .accessibilityIdentifier("pokedex-detail-sprite")
                     } else {
@@ -1016,6 +730,25 @@ struct PokedexGamingExtensionView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, minHeight: 150, maxHeight: 164)
+
+                HStack(spacing: 12) {
+                    Button { navigateSpecies(-1) } label: {
+                        Image(systemName: "chevron.left").frame(minWidth: 44, minHeight: 44)
+                    }.accessibilityLabel("Espécie anterior")
+                    Spacer()
+                    Button {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { coordinator.isDeviceOpen = false }
+                    } label: {
+                        Image(systemName: "power").frame(minWidth: 44, minHeight: 44)
+                    }.accessibilityLabel("Fechar Pokédex")
+                    Spacer()
+                    Button { navigateSpecies(1) } label: {
+                        Image(systemName: "chevron.right").frame(minWidth: 44, minHeight: 44)
+                    }.accessibilityLabel("Próxima espécie")
+                }
+                .buttonStyle(.bordered)
+                .tint(BrumTheme.primary)
+                .accessibilityIdentifier("pokedex-device-controls")
 
                 if let entry {
                     VStack(alignment: .leading, spacing: 6) {
@@ -1201,10 +934,7 @@ struct PokedexGamingExtensionView: View {
                             RoundedRectangle(cornerRadius: 8)
                                 .stroke(isSelected ? accentColor : BrumTheme.line, lineWidth: 1)
                         )
-                    Image(uiImage: PokedexPixelSprite.image(for: entry.nationalDexNumber, mode: mode, pixelScale: 3))
-                        .interpolation(.none)
-                        .resizable()
-                        .scaledToFit()
+                    PokedexSpeciesImage(nationalDexNumber: entry.nationalDexNumber, mode: mode)
                         .frame(width: 34, height: 34)
                 }
                 .frame(width: 44, height: 44)

@@ -1,11 +1,11 @@
 {
-  "version": "0.26.0",
-  "build": 59,
+  "version": "0.27.0",
+  "build": 60,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.26.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.27.0",
   "notes": [
-    "Adiciona Extensão 001 — Pokédex Universal no Gaming Mode com catálogo offline, coleção normal/shiny, backup e sincronização LAN por perfil.",
-    "Adaptador de captura piloto para Pokémon FireRed BPRE em teste; captura interativa em aparelho ainda requer validação. Catálogo não significa compatibilidade com todos os jogos.",
-    "Preserva SideStore, migração de saves e núcleos existentes; corrige isolamento de perfil, mesclagem atômica e captura falsa após falha de leitura."
+    "Pokédex do Gaming Mode usa imagens correspondentes a cada espécie e variante shiny; silhuetas preservam o formato da mesma espécie.",
+    "A primeira consulta da imagem requer internet. Cache local evita downloads repetidos; imagens indisponíveis são indicadas sem criaturas substitutas.",
+    "Adiciona botões de espécie anterior/próxima e fechar no dispositivo. Preserva SideStore, Save Sync, controles e núcleos existentes."
   ]
 }

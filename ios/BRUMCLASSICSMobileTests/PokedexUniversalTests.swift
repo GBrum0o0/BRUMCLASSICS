@@ -255,13 +255,10 @@ final class PokedexUniversalTests: XCTestCase {
         XCTAssertEqual(coordinator.displayedEntries.first?.name, "Pikachu")
         coordinator.searchQuery = ""
 
-        // 4. Pixel-art sprite renderer produces non-empty images for silhouette, normal, and shiny
-        let silhouetteImg = PokedexPixelSprite.image(for: 1, mode: .silhouette, pixelScale: 4)
-        let normalImg = PokedexPixelSprite.image(for: 25, mode: .normal, pixelScale: 4)
-        let shinyImg = PokedexPixelSprite.image(for: 25, mode: .shiny, pixelScale: 4)
-        XCTAssertEqual(silhouetteImg.size.width, 64)
-        XCTAssertEqual(normalImg.size.width, 64)
-        XCTAssertEqual(shinyImg.size.width, 64)
+        // 4. Normal and hidden species use exactly the same sprite alpha source.
+        XCTAssertEqual(PokedexPixelSprite.url(for: 25, mode: .normal), PokedexPixelSprite.url(for: 25, mode: .silhouette))
+        XCTAssertEqual(PokedexPixelSprite.url(for: 25, mode: .normal).lastPathComponent, "25.png")
+        XCTAssertTrue(PokedexPixelSprite.url(for: 25, mode: .shiny).path.contains("/shiny/25.png"))
 
         // 5. Verify Bridge Event -> Discovery Overlay Payload
         let bridgeEvent: [String: Any] = [

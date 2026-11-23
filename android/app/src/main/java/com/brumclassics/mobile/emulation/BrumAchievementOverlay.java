@@ -376,13 +376,12 @@ public final class BrumAchievementOverlay {
         } else {
             pointsView.setVisibility(View.GONE);
         }
+        badgeImage.setTag(null); // Invalidate an in-flight sprite from the preceding popup.
         if (next.pokedexNationalDexNumber > 0) {
             int mode = next.isShinyDiscovery
                     ? com.brumclassics.mobile.extensions.PokedexSpriteRenderer.MODE_SHINY
                     : com.brumclassics.mobile.extensions.PokedexSpriteRenderer.MODE_NORMAL;
-            badgeImage.setImageBitmap(com.brumclassics.mobile.extensions.PokedexSpriteRenderer.createBitmap(
-                    next.pokedexNationalDexNumber, mode, 3
-            ));
+            com.brumclassics.mobile.extensions.PokedexSpriteRenderer.bind(badgeImage, next.pokedexNationalDexNumber, mode, true);
         } else {
             badgeImage.setImageDrawable(new CartridgeDrawable(COLOR_NEON_GREEN));
             if (!next.badgeUrl.isEmpty()) {
