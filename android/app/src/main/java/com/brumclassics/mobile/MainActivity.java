@@ -1672,7 +1672,7 @@ public final class MainActivity extends Activity {
 
         if (activeRemoteGamepadSession != null && activeRemoteGamepadSession.optBoolean("active", false)) {
             LinearLayout sessionCard = gamingDialogPanel();
-            sessionCard.setBackground(panel(CARD_ALT, ACCENT, 14, 1));
+            sessionCard.setBackground(background(RAISED, 14, ACCENT, 1));
             String activeTitle = activeRemoteGamepadSession.optString("gameTitle", "Jogo em execução no PC");
             int activePlayer = Math.max(1, Math.min(4, activeRemoteGamepadSession.optInt("assignedPlayer", 1)));
             sessionCard.addView(text("SESSÃO ATIVA NO PC PAREADO · P" + activePlayer, 10, ACCENT, true));
@@ -2324,23 +2324,21 @@ public final class MainActivity extends Activity {
                 adapter.notifyDataSetChanged();
                 refreshLeftPanel[0].run();
             });
-            View.OnClickListener stepNav(int delta) {
-                return ignored -> {
-                    if (filteredList.isEmpty()) return;
-                    int idx = 0;
-                    for (int i = 0; i < filteredList.size(); i++) {
-                        if (filteredList.get(i).nationalDexNumber == pokedexSelectedDex) { idx = i; break; }
-                    }
-                    int nextPos = (idx + delta + filteredList.size()) % filteredList.size();
-                    selectedHolder[0] = filteredList.get(nextPos);
-                    pokedexSelectedDex = selectedHolder[0].nationalDexNumber;
-                    adapter.notifyDataSetChanged();
-                    listView.smoothScrollToPosition(nextPos);
-                    refreshLeftPanel[0].run();
-                };
-            }
-            previousSpecies.setOnClickListener(stepNav(-1));
-            nextSpecies.setOnClickListener(stepNav(1));
+            java.util.function.IntConsumer stepNav = (delta) -> {
+                if (filteredList.isEmpty()) return;
+                int idx = 0;
+                for (int i = 0; i < filteredList.size(); i++) {
+                    if (filteredList.get(i).nationalDexNumber == pokedexSelectedDex) { idx = i; break; }
+                }
+                int nextPos = (idx + delta + filteredList.size()) % filteredList.size();
+                selectedHolder[0] = filteredList.get(nextPos);
+                pokedexSelectedDex = selectedHolder[0].nationalDexNumber;
+                adapter.notifyDataSetChanged();
+                listView.smoothScrollToPosition(nextPos);
+                refreshLeftPanel[0].run();
+            };
+            previousSpecies.setOnClickListener(ignored -> stepNav.accept(-1));
+            nextSpecies.setOnClickListener(ignored -> stepNav.accept(1));
             rightPanel.addView(listView, new LinearLayout.LayoutParams(-1, dp(360)));
         }
 

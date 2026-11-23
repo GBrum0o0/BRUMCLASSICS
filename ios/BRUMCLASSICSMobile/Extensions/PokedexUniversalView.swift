@@ -16,10 +16,20 @@ enum PokedexPixelSprite {
         cache.totalCostLimit = 10 * 1024 * 1024
         return cache
     }()
-    private static let thumbQueue: DispatchQueue = {
-        DispatchQueue(label: "brum.pokedex.thumbnails", qos: .utility, attributes: .concurrent)
+    private static let highPrioritySession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.httpMaximumConnectionsPerHost = 2
+        config.timeoutIntervalForRequest = 10
+        config.requestCachePolicy = .returnCacheDataElseLoad
+        return URLSession(configuration: config)
     }()
-    private static let thumbSemaphore = DispatchSemaphore(value: 4)
+    private static let thumbSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.httpMaximumConnectionsPerHost = 4
+        config.timeoutIntervalForRequest = 10
+        config.requestCachePolicy = .returnCacheDataElseLoad
+        return URLSession(configuration: config)
+    }()
 
     static func url(for dex: Int, mode: PokedexSpriteRenderMode) -> URL {
         let variant = mode == .shiny ? "shiny/" : ""
@@ -27,6 +37,50 @@ enum PokedexPixelSprite {
     }
     static func silhouette(_ image: UIImage) -> UIImage {
         image.withTintColor(.black, renderingMode: .alwaysOriginal)
+    }
+    private static func cacheFileURL(for dex: Int, mode: PokedexSpriteRenderMode) -> (folder: URL, file: URL) {
+        let clampedDex = max(1, min(809, dex))
+        let folder = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("brum-pokedex-images", isDirectory: true)
+        let file = folder.appendingPathComponent("\(clampedDex)-\(mode == .shiny ? "shiny" : "normal").png")
+        return (folder, file)
+    }
+    static func loadAsync(for dex: Int, mode: PokedexSpriteRenderMode, highPriority: Bool = false) async -> UIImage? {
+        let address = url(for: dex, mode: mode)
+        let key = address.absoluteString as NSString
+        if let cached = cache.object(forKey: key) {
+            return mode == .silhouette ? silhouette(cached) : cached
+        }
+        let (folder, file) = cacheFileURL(for: dex, mode: mode)
+        let diskImage: UIImage? = await Task.detached(priority: highPriority ? .userInitiated : .utility) {
+            guard let data = try? Data(contentsOf: file), let img = UIImage(data: data) else { return nil }
+            return img
+        }.value
+        if Task.isCancelled { return nil }
+        if let diskImage {
+            cache.setObject(diskImage, forKey: key, cost: Int(diskImage.size.width * diskImage.size.height * 4))
+            return mode == .silhouette ? silhouette(diskImage) : diskImage
+        }
+        let session = highPriority ? highPrioritySession : thumbSession
+        let request = URLRequest(url: address, cachePolicy: .returnCacheDataElseLoad, timeoutInterval: 10)
+        do {
+            let (data, response) = try await session.data(for: request)
+            if Task.isCancelled { return nil }
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+                  http.url?.host == "raw.githubusercontent.com",
+                  data.count <= 1_048_576, let image = UIImage(data: data),
+                  image.size.width <= 1024, image.size.height <= 1024 else {
+                return nil
+            }
+            cache.setObject(image, forKey: key, cost: Int(image.size.width * image.size.height * 4))
+            Task.detached(priority: .utility) {
+                try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                try? data.write(to: file, options: .atomic)
+            }
+            return mode == .silhouette ? silhouette(image) : image
+        } catch {
+            return nil
+        }
     }
     @discardableResult
     static func load(for dex: Int, mode: PokedexSpriteRenderMode, highPriority: Bool = false,
@@ -39,15 +93,14 @@ enum PokedexPixelSprite {
             }
         }
         if let image = cache.object(forKey: key) { deliver(image); return nil }
-        let clampedDex = max(1, min(809, dex))
-        let folder = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("brum-pokedex-images", isDirectory: true)
-        let file = folder.appendingPathComponent("\(clampedDex)-\(mode == .shiny ? "shiny" : "normal").png")
-        let request = URLRequest(url: address, cachePolicy: .returnCacheDataElseLoad, timeoutInterval: 15)
-        let task = URLSession.shared.dataTask(with: request) { data, response, _ in
-            if !highPriority {
-                thumbSemaphore.signal()
-            }
+        let (folder, file) = cacheFileURL(for: dex, mode: mode)
+        if let data = try? Data(contentsOf: file), let image = UIImage(data: data) {
+            cache.setObject(image, forKey: key, cost: Int(image.size.width * image.size.height * 4))
+            deliver(image); return nil
+        }
+        let request = URLRequest(url: address, cachePolicy: .returnCacheDataElseLoad, timeoutInterval: 10)
+        let session = highPriority ? highPrioritySession : thumbSession
+        let task = session.dataTask(with: request) { data, response, _ in
             guard let http = response as? HTTPURLResponse, http.statusCode == 200,
                   http.url?.host == "raw.githubusercontent.com",
                   let data, data.count <= 1_048_576, let image = UIImage(data: data),
@@ -60,18 +113,7 @@ enum PokedexPixelSprite {
             deliver(image)
         }
         task.priority = highPriority ? URLSessionTask.highPriority : URLSessionTask.lowPriority
-        let queue = highPriority ? DispatchQueue.global(qos: .userInitiated) : thumbQueue
-        queue.async {
-            if let data = try? Data(contentsOf: file), let image = UIImage(data: data) {
-                cache.setObject(image, forKey: key, cost: Int(image.size.width * image.size.height * 4))
-                deliver(image)
-            } else {
-                if !highPriority {
-                    thumbSemaphore.wait()
-                }
-                task.resume()
-            }
-        }
+        task.resume()
         return task
     }
 }
@@ -84,7 +126,6 @@ struct PokedexSpeciesImage: View {
     @State private var image: UIImage?
     @State private var failed = false
     @State private var reloadToken = 0
-    @State private var activeTask: URLSessionDataTask?
     var body: some View {
         Group {
             if let image {
@@ -112,37 +153,19 @@ struct PokedexSpeciesImage: View {
                         .foregroundStyle(.secondary)
                         .accessibilityLabel("Imagem indisponível. Conecte à internet para carregar.")
                 }
-            } else { ProgressView().accessibilityLabel("Carregando imagem da espécie") }
+            } else {
+                Image(systemName: "photo")
+                    .foregroundStyle(.secondary.opacity(0.45))
+                    .accessibilityLabel("Carregando imagem da espécie")
+            }
         }
         .accessibilityLabel(mode == .silhouette ? "Silhueta da espécie número \(nationalDexNumber)" : "Imagem da espécie número \(nationalDexNumber)")
         .accessibilityHint(failed ? "A primeira consulta da imagem requer internet; imagens já carregadas ficam em cache." : "")
         .task(id: "\(nationalDexNumber)-\(mode)-\(reloadToken)") {
-            activeTask?.cancel()
             image = nil; failed = false
-            let loaded: UIImage? = await withCheckedContinuation { continuation in
-                var resumed = false
-                let lock = NSLock()
-                let finish: (UIImage?) -> Void = { img in
-                    lock.lock()
-                    defer { lock.unlock() }
-                    guard !resumed else { return }
-                    resumed = true
-                    continuation.resume(returning: img)
-                }
-                let task = PokedexPixelSprite.load(for: nationalDexNumber, mode: mode, highPriority: highPriority) {
-                    finish($0)
-                }
-                DispatchQueue.main.async { activeTask = task }
-            }
-            guard !Task.isCancelled else {
-                activeTask?.cancel()
-                return
-            }
+            let loaded = await PokedexPixelSprite.loadAsync(for: nationalDexNumber, mode: mode, highPriority: highPriority)
+            guard !Task.isCancelled else { return }
             image = loaded; failed = loaded == nil
-        }
-        .onDisappear {
-            activeTask?.cancel()
-            activeTask = nil
         }
     }
 }
