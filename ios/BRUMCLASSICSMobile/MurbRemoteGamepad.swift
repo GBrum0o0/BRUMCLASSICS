@@ -1662,7 +1662,7 @@ final class MyBrumControlStore: ObservableObject {
 
     func clearConnection() {
         UserDefaults.standard.removeObject(forKey: Self.savedPayloadKey)
-        try? SecureStore.delete(Self.tokenAccount)
+        SecureStore.remove(Self.tokenAccount)
         savedTarget = nil
     }
 }
@@ -1750,7 +1750,7 @@ struct MyBrumControlView: View {
                                     .background(BrumTheme.background, in: RoundedRectangle(cornerRadius: 8))
                                 TextField("Porta", text: $manualPort)
                                     .keyboardType(.numberPad)
-                                    .padding(.horizontal, 10).frame(width: 90, minHeight: 40)
+                                    .padding(.horizontal, 10).frame(width: 90, height: 40)
                                     .background(BrumTheme.background, in: RoundedRectangle(cornerRadius: 8))
                             }
                             HStack(spacing: 8) {
