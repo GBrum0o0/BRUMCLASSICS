@@ -21,12 +21,22 @@
       "tintColor": "#10B981",
       "category": "games",
       "screenshotURLs": [],
-      "version": "0.27.0",
-      "versionDate": "2026-11-24T00:02:36Z",
-      "versionDescription": "# BRUMCLASSICS MÓVEL iOS 0.27.0 — Pokédex G1–G7 e Gamepad Rápido\n\nA Pokédex Universal do Gaming Mode expande o catálogo oficial da 1ª à 7ª geração (`#001–#809`), com filtro por geração, abertura interativa no formato de dispositivo portátil, imagens correspondentes à espécie e variante shiny sob demanda (com prioridade para o visor e botão **Tentar novamente**), e silhuetas em preto preservando formato e transparência antes da captura.\n\n- **Reconexão rápida sem novo QR Code:** quando um jogo compatível estiver em execução no computador pareado (`M.U.R.B Engine`), o Gaming Mode e a folha do Gamepad M.U.R.B oferecem conexão em 1 toque diretamente à sessão ativa, sem necessidade de ler outro QR Code.\n- A primeira consulta de cada imagem requer internet; imagens carregadas ficam em cache local. Não são distribuídos PNGs das espécies neste pacote (origem `PokeAPI/sprites`, sem autoria BRUM às imagens Pokémon).\n- Popups da Pokédex continuam separados das conquistas oficiais do RetroAchievements.\n- Preserva Save Sync, saves, controles, coleções e núcleos existentes. A detecção automática de captura continua piloto em Pokémon FireRed (`BPRE`).\n\nSideStore e atualização pelo fluxo existente preservados. Atualize mantendo os dados; não é necessário desinstalar.",
-      "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.27.0/BRUMCLASSICS-MOVEL-IOS-0.27.0.ipa",
-      "size": 15543076,
+      "version": "0.28.0",
+      "versionDate": "2026-11-24T09:06:20Z",
+      "versionDescription": "# BRUMCLASSICS MÓVEL iOS 0.28.0 — PSP iOS, Pesquisa/Filtros no Gaming Mode e MYbrumCONTROL\n\n- **PSP no iOS (`PPSSPP`):** corrige mapeamento de memória mascarada (`MASKED_PSP_MEMORY`), alinhamento de página de 16 KB no Darwin (`arm64`), tamanho inicial da superfície OpenGL ES (`1024`), detecção de arquivos `.cso`/extensões multi-console e inicialização assíncrona de identidade em imagens de disco.\n- **Pesquisa e Filtro por Console no Gaming Mode:** barra de pesquisa instantânea (ignorando maiúsculas/acentos) com botão de limpar, chips dinâmicos com **Todos os consoles** e categoria explícita **Não identificado**, preservando variantes (`GB`/`GBC`/`GBA`, `DS`/`3DS`, `PS1`/`PS2`/`PSP`) e ocultando títulos exclusivos de PC/Steam.\n- **MYbrumCONTROL (Rede Local Only):** nova aba dedicada no Gaming Mode para conectar o iPhone como controle virtual a **outro PC** rodando Brum Classics via QR Code (`murb://`), código `MBC-...` ou entrada manual na LAN, isolado do PC principal, saves, biblioteca e credenciais.\n- **Cache de identidade de ROMs:** cache `(size, mtimeMs)` para inicialização mais rápida de jogos repetidos sem alterar saves ou configurações existentes.\n\nSideStore e atualização pelo fluxo existente preservados. Atualize mantendo os dados; não é necessário desinstalar.",
+      "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.28.0/BRUMCLASSICS-MOVEL-IOS-0.28.0.ipa",
+      "size": 15644817,
       "versions": [
+        {
+          "version": "0.28.0",
+          "buildVersion": "61",
+          "date": "2026-11-24T09:06:20Z",
+          "localizedDescription": "# BRUMCLASSICS MÓVEL iOS 0.28.0 — PSP iOS, Pesquisa/Filtros no Gaming Mode e MYbrumCONTROL\n\n- **PSP no iOS (`PPSSPP`):** corrige mapeamento de memória mascarada (`MASKED_PSP_MEMORY`), alinhamento de página de 16 KB no Darwin (`arm64`), tamanho inicial da superfície OpenGL ES (`1024`), detecção de arquivos `.cso`/extensões multi-console e inicialização assíncrona de identidade em imagens de disco.\n- **Pesquisa e Filtro por Console no Gaming Mode:** barra de pesquisa instantânea (ignorando maiúsculas/acentos) com botão de limpar, chips dinâmicos com **Todos os consoles** e categoria explícita **Não identificado**, preservando variantes (`GB`/`GBC`/`GBA`, `DS`/`3DS`, `PS1`/`PS2`/`PSP`) e ocultando títulos exclusivos de PC/Steam.\n- **MYbrumCONTROL (Rede Local Only):** nova aba dedicada no Gaming Mode para conectar o iPhone como controle virtual a **outro PC** rodando Brum Classics via QR Code (`murb://`), código `MBC-...` ou entrada manual na LAN, isolado do PC principal, saves, biblioteca e credenciais.\n- **Cache de identidade de ROMs:** cache `(size, mtimeMs)` para inicialização mais rápida de jogos repetidos sem alterar saves ou configurações existentes.\n\nSideStore e atualização pelo fluxo existente preservados. Atualize mantendo os dados; não é necessário desinstalar.",
+          "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.28.0/BRUMCLASSICS-MOVEL-IOS-0.28.0.ipa",
+          "size": 15644817,
+          "sha256": "742ef6b14397506906be61c5e3ba44cd223820162747b839afdb256c6b0d5a7b",
+          "minOSVersion": "16.0"
+        },
         {
           "version": "0.27.0",
           "buildVersion": "60",
