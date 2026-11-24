@@ -33,7 +33,7 @@ struct GamingModeView: View {
     private var activeBaseEntries: [GamingCatalogEntry] {
         (activeSection == .library || recentEntries.isEmpty) ? libraryEntries : recentEntries
     }
-    private var consoleOptions: [GamingConsoleOption] {
+    private var consoleOptions: [GamingModeCatalog.GamingConsoleOption] {
         GamingModeCatalog.availableConsoles(in: activeBaseEntries)
     }
     private var filteredEntries: [GamingCatalogEntry] {
