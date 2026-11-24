@@ -294,28 +294,6 @@ index 2f272def8..536665286 100644
  }
  
  void TessellationDataTransferGLES::SendDataToShader(const SimpleVertex *const *points, int size_u, int size_v, u32 vertType, const Spline::Weight2D &weights) {
-diff --git a/ext/native/thin3d/GLQueueRunner.cpp b/ext/native/thin3d/GLQueueRunner.cpp
-index 2ea228fcd..8912a4964 100644
---- a/ext/native/thin3d/GLQueueRunner.cpp
-+++ b/ext/native/thin3d/GLQueueRunner.cpp
-@@ -15,7 +15,7 @@
- 
- #define TEXCACHE_NAME_CACHE_SIZE 16
- 
--#ifdef IOS
-+#if defined(IOS) && !defined(__LIBRETRO__)
- extern void bindDefaultFBO();
- #endif
- 
-@@ -1543,7 +1543,7 @@ void GLQueueRunner::fbo_unbind() {
- 	glBindFramebuffer(GL_FRAMEBUFFER, g_defaultFBO);
- #endif
- 
--#ifdef IOS
-+#if defined(IOS) && !defined(__LIBRETRO__)
- 	bindDefaultFBO();
- #endif
- 
 diff --git a/libretro/CMakeLists.txt b/libretro/CMakeLists.txt
 index b590cc25d..e1b15f187 100644
 --- a/libretro/CMakeLists.txt
@@ -329,11 +307,78 @@ index b590cc25d..e1b15f187 100644
     target_link_libraries(ppsspp_libretro "-Wl,-Bsymbolic")
  endif()
  target_link_libraries(ppsspp_libretro ${LinkCommon})
+diff --git a/ext/native/thin3d/GLQueueRunner.cpp b/ext/native/thin3d/GLQueueRunner.cpp
+index 2ea228f..1af08fe 100644
+--- a/ext/native/thin3d/GLQueueRunner.cpp
++++ b/ext/native/thin3d/GLQueueRunner.cpp
+@@ -15,7 +15,7 @@
+ 
+ #define TEXCACHE_NAME_CACHE_SIZE 16
+ 
+-#ifdef IOS
++#if defined(IOS) && !defined(__LIBRETRO__)
+ extern void bindDefaultFBO();
+ #endif
+ 
+@@ -832,7 +832,7 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
+ 			if (c.clear.clearMask & GL_DEPTH_BUFFER_BIT)
+ 				attachments[count++] = GL_DEPTH_ATTACHMENT;
+ 			if (c.clear.clearMask & GL_STENCIL_BUFFER_BIT)
+-				attachments[count++] = GL_STENCIL_BUFFER_BIT;
++				attachments[count++] = GL_STENCIL_ATTACHMENT;
+ 			glInvalidateFramebuffer(GL_FRAMEBUFFER, count, attachments);
+ 			CHECK_GL_ERROR_IF_DEBUG();
+ 			break;
+@@ -1543,7 +1543,7 @@ void GLQueueRunner::fbo_unbind() {
+ 	glBindFramebuffer(GL_FRAMEBUFFER, g_defaultFBO);
+ #endif
+ 
+-#ifdef IOS
++#if defined(IOS) && !defined(__LIBRETRO__)
+ 	bindDefaultFBO();
+ #endif
+ 
+diff --git a/libretro/LibretroGLContext.cpp b/libretro/LibretroGLContext.cpp
+index c826065..b7ba432 100644
+--- a/libretro/LibretroGLContext.cpp
++++ b/libretro/LibretroGLContext.cpp
+@@ -28,6 +28,7 @@ void LibretroGLContext::CreateDrawContext() {
+ 	}
+ 	draw_ = Draw::T3DCreateGLContext();
+ 	renderManager_ = (GLRenderManager *)draw_->GetNativeObject(Draw::NativeObject::RENDER_MANAGER);
++	SetRenderTarget();
+ }
+ 
+ void LibretroGLContext::DestroyDrawContext() {
+diff --git a/libretro/LibretroGLContext.h b/libretro/LibretroGLContext.h
+index b85c8af..6757cf5 100644
+--- a/libretro/LibretroGLContext.h
++++ b/libretro/LibretroGLContext.h
+@@ -27,7 +27,10 @@ public:
+ 	}
+ 
+ 	void ThreadStart() override { renderManager_->ThreadStart(draw_); }
+-	bool ThreadFrame() override { return renderManager_->ThreadFrame(); }
++	bool ThreadFrame() override {
++		SetRenderTarget();
++		return renderManager_->ThreadFrame();
++	}
+ 	void ThreadEnd() override { renderManager_->ThreadEnd(); }
+ 	void StopThread() override {
+ 		renderManager_->WaitUntilQueueIdle();
 diff --git a/libretro/LibretroGraphicsContext.cpp b/libretro/LibretroGraphicsContext.cpp
-index 508353f6b..418d8d967 100644
+index 508353f..54f7cea 100644
 --- a/libretro/LibretroGraphicsContext.cpp
 +++ b/libretro/LibretroGraphicsContext.cpp
-@@ -65,9 +65,11 @@ void LibretroHWRenderContext::ContextDestroy() {
+@@ -47,6 +47,7 @@ void LibretroHWRenderContext::ContextReset() {
+ 		assert(success);
+ 	}
+ 
++	SetRenderTarget();
+ 	GotBackbuffer();
+ 
+ 	if (gpu) {
+@@ -65,16 +66,23 @@ void LibretroHWRenderContext::ContextDestroy() {
  #endif
  	}
  
@@ -347,6 +392,19 @@ index 508353f6b..418d8d967 100644
  
  	if (!hw_render_.cache_context && !Libretro::useEmuThread) {
  		Shutdown();
+ 	}
+ }
+ 
+-void LibretroGraphicsContext::GotBackbuffer() { draw_->HandleEvent(Draw::Event::GOT_BACKBUFFER, PSP_CoreParameter().pixelWidth, PSP_CoreParameter().pixelHeight); }
++void LibretroGraphicsContext::GotBackbuffer() {
++	if (draw_) {
++		draw_->SetTargetSize(PSP_CoreParameter().pixelWidth, PSP_CoreParameter().pixelHeight);
++		draw_->HandleEvent(Draw::Event::GOT_BACKBUFFER, PSP_CoreParameter().pixelWidth, PSP_CoreParameter().pixelHeight);
++	}
++}
+ 
+ void LibretroGraphicsContext::LostBackbuffer() { draw_->HandleEvent(Draw::Event::LOST_BACKBUFFER, -1, -1); }
+ 
 diff --git a/libretro/libretro.cpp b/libretro/libretro.cpp
 index 45185748c..f3e338ec4 100644
 --- a/libretro/libretro.cpp

@@ -1,11 +1,11 @@
 {
-  "version": "0.28.0",
-  "build": 61,
+  "version": "0.29.0",
+  "build": 62,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.28.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.29.0",
   "notes": [
-    "Corrige suporte PSP (PPSSPP) no iOS com MASKED_PSP_MEMORY, alinhamento de 16 KB, superfície OpenGL ES 1024 e leitura de .cso.",
-    "Adiciona pesquisa por nome sem distinção de maiúsculas/acentos e filtro dinâmico por console no Gaming Mode.",
-    "Adiciona aba MYbrumCONTROL (somente rede local Wi-Fi/LAN) para usar o iPhone como controle virtual isolado em outro PC."
+    "Corrige tela preta na execução nativa do PSP (PPSSPP) com atualização explícita de FBO/alvo OpenGL ES 3 e estado de leitura.",
+    "Corrige toque nativo e remoto no Nintendo DS e Nintendo 3DS com mapeamento fiel na tela inferior e liberação limpa ao desconectar.",
+    "Mantém compatibilidade do MYbrumCONTROL, pesquisa no Gaming Mode, Pokédex Universal e atualização via SideStore."
   ]
 }

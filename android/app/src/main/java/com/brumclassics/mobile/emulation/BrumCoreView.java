@@ -47,6 +47,21 @@ final class BrumCoreView extends View implements Runnable {
     private float touchScreenX;
     private float touchScreenY;
     private boolean touchActive;
+    private String systemId = "";
+    private String coreName = "";
+
+    void setSystemContext(String systemId, String coreName) {
+        this.systemId = systemId == null ? "" : systemId.toLowerCase(java.util.Locale.ROOT);
+        this.coreName = coreName == null ? "" : coreName.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private void clearTouchPointer() {
+        if (touchActive) {
+            touchActive = false;
+            core.setPointer(0f, 0f, false);
+            postInvalidateOnAnimation();
+        }
+    }
 
     BrumCoreView(Context context, BrumCoreBridge core, RuntimeErrorListener errorListener) {
         super(context);
@@ -79,6 +94,7 @@ final class BrumCoreView extends View implements Runnable {
             core.setAnalog(p, 1, 0, 0f);
             core.setAnalog(p, 1, 1, 0f);
         }
+        clearTouchPointer();
         touchActive = false;
         core.setPointer(0, 0, false);
         if (audioTrack != null) { audioTrack.pause(); audioTrack.flush(); }
@@ -139,7 +155,11 @@ final class BrumCoreView extends View implements Runnable {
     }
 
     boolean isFastForward() { return fastForward; }
-    void toggleFillDisplay() { fillDisplay = !fillDisplay; postInvalidateOnAnimation(); }
+    void toggleFillDisplay() { fillDisplay = !fillDisplay; clearTouchPointer(); postInvalidateOnAnimation(); }
+    @Override protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        clearTouchPointer();
+    }
     boolean fillsDisplay() { return fillDisplay; }
     long playedSeconds() { return Math.max(0L, playedNanos / 1_000_000_000L); }
 
@@ -252,23 +272,51 @@ final class BrumCoreView extends View implements Runnable {
         synchronized (bitmapLock) { touchTarget.set(displayTarget); }
         float tw = touchTarget.width();
         float th = touchTarget.height();
-        boolean inside = tw > 0 && th > 0 && touchTarget.contains(event.getX(), event.getY());
+        if (tw <= 0f || th <= 0f) {
+            clearTouchPointer();
+            return true;
+        }
+        boolean is3ds = "3ds".equals(systemId) || "n3ds".equals(systemId) || coreName.contains("azahar") || coreName.contains("citra");
+        boolean isNds = "nds".equals(systemId) || "ds".equals(systemId) || coreName.contains("skyemu") || coreName.contains("desmume") || coreName.contains("melonds");
+        float activeLeft = touchTarget.left;
+        float activeRight = touchTarget.right;
+        float activeTop = touchTarget.top;
+        float activeBottom = touchTarget.bottom;
+        if (is3ds) {
+            activeLeft = touchTarget.left + tw * 0.10f;
+            activeRight = touchTarget.left + tw * 0.90f;
+            activeTop = touchTarget.top + th * 0.50f;
+        } else if (isNds) {
+            activeTop = touchTarget.top + th * 0.50f;
+        }
+        boolean inside = event.getX() >= activeLeft && event.getX() <= activeRight
+            && event.getY() >= activeTop && event.getY() <= activeBottom;
         boolean pressed;
         if (action == MotionEvent.ACTION_DOWN) {
             pressed = inside;
         } else if (action == MotionEvent.ACTION_MOVE) {
-            pressed = touchActive && tw > 0 && th > 0;
+            pressed = touchActive;
         } else {
             pressed = false;
         }
-        float clampedX = tw <= 0 ? 0f : Math.max(touchTarget.left, Math.min(touchTarget.right, event.getX()));
-        float clampedY = th <= 0 ? 0f : Math.max(touchTarget.top, Math.min(touchTarget.bottom, event.getY()));
-        float x = tw <= 0 ? 0f : Math.max(-1f, Math.min(1f, ((clampedX - touchTarget.left) / tw) * 2f - 1f));
-        float y = th <= 0 ? 0f : Math.max(-1f, Math.min(1f, ((clampedY - touchTarget.top) / th) * 2f - 1f));
-        touchActive = pressed;
+        if (!pressed) {
+            touchActive = false;
+            core.setPointer(0f, 0f, false);
+            postInvalidateOnAnimation();
+            return true;
+        }
+        float clampedX = Math.max(activeLeft, Math.min(activeRight, event.getX()));
+        float clampedY = Math.max(activeTop, Math.min(activeBottom, event.getY()));
+        float x = Math.max(-1f, Math.min(1f, ((clampedX - touchTarget.left) / tw) * 2f - 1f));
+        float y = Math.max(-1f, Math.min(1f, ((clampedY - touchTarget.top) / th) * 2f - 1f));
+        if (isNds || is3ds) {
+            // Dual-screen Libretro cores (SkyEmu / Azahar) treat Y == 0 as top-half/pen-up boundary
+            y = Math.max(0.002f, y);
+        }
+        touchActive = true;
         touchScreenX = clampedX;
         touchScreenY = clampedY;
-        core.setPointer(x, y, pressed);
+        core.setPointer(x, y, true);
         postInvalidateOnAnimation();
         return true;
     }

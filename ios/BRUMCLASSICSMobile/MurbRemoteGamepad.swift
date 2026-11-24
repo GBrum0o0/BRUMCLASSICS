@@ -877,7 +877,8 @@ struct MurbRemoteGamepadView: View {
                 system: session.activeSystem,
                 session: session,
                 showControls: isDualScreen ? showControls : true,
-                fillScreen: fillScreen
+                fillScreen: fillScreen,
+                connected: session.state == .connected
             ) { buttons, touching, tx, ty, sx, sy in
                 session.updateVirtualInput(buttons: buttons, touching: touching, touchX: tx, touchY: ty, stickX: sx, stickY: sy)
             }
@@ -1074,6 +1075,7 @@ private struct MurbRemotePadCanvas: UIViewRepresentable {
     let session: MurbRemoteSession
     let showControls: Bool
     let fillScreen: Bool
+    let connected: Bool
     let onInput: (Int, Bool, Int, Int, Int, Int) -> Void
 
     func makeUIView(context: Context) -> MurbRemotePadUIView {
@@ -1082,7 +1084,7 @@ private struct MurbRemotePadCanvas: UIViewRepresentable {
         session.onVideoFrame = { [weak view] cgImage in
             view?.updateVideoFrame(cgImage)
         }
-        view.apply(system: system, showControls: showControls, fillScreen: fillScreen)
+        view.apply(system: system, showControls: showControls, fillScreen: fillScreen, connected: connected)
         if let existing = session.latestFrame {
             view.updateVideoFrame(existing)
         }
@@ -1092,9 +1094,9 @@ private struct MurbRemotePadCanvas: UIViewRepresentable {
     func updateUIView(_ uiView: MurbRemotePadUIView, context: Context) {
         uiView.onInput = onInput
         session.onVideoFrame = { [weak uiView] cgImage in
-            uiView?.updateVideoFrame(cgImage)
+            view?.updateVideoFrame(cgImage)
         }
-        uiView.apply(system: system, showControls: showControls, fillScreen: fillScreen)
+        uiView.apply(system: system, showControls: showControls, fillScreen: fillScreen, connected: connected)
     }
 }
 
@@ -1152,6 +1154,7 @@ private final class MurbRemotePadUIView: UIView {
     private var system = "ds"
     private var showControls = true
     private var fillScreen = false
+    private var connected = false
     private var useStickForAnalog = true
     private var hasReceivedFrame = false
     private var screenRect = CGRect.zero
@@ -1199,13 +1202,34 @@ private final class MurbRemotePadUIView: UIView {
         }
     }
 
-    func apply(system: String, showControls: Bool, fillScreen: Bool) {
+    private func resetActiveTouchesAndEmit() {
+        let hadInput = !activeButtonTouches.isEmpty || dpadTouchID != nil || stickTouchID != nil || screenTouchID != nil
+        activeButtonTouches.removeAll()
+        dpadTouchID = nil; dpadMask = 0
+        stickTouchID = nil; stickVector = .zero
+        screenTouchID = nil; lastTouchRipple = nil
+        overlayView.setNeedsDisplay()
+        if hadInput || !connected {
+            emit()
+        }
+    }
+
+    func apply(system: String, showControls: Bool, fillScreen: Bool, connected: Bool) {
         let layoutChanged = self.system != system || self.showControls != showControls || self.fillScreen != fillScreen
+        let disconnectedNow = self.connected && !connected
         self.system = system
         self.showControls = showControls
         self.fillScreen = fillScreen
+        self.connected = connected
+        if disconnectedNow || !connected {
+            resetActiveTouchesAndEmit()
+        }
         if layoutChanged {
+            let oldRect = screenRect
             rebuildZones()
+            if oldRect != screenRect {
+                resetActiveTouchesAndEmit()
+            }
             overlayView.setNeedsDisplay()
         }
     }
@@ -1214,7 +1238,11 @@ private final class MurbRemotePadUIView: UIView {
         super.layoutSubviews()
         videoHostView.frame = bounds
         overlayView.frame = bounds
+        let oldRect = screenRect
         rebuildZones()
+        if oldRect != screenRect {
+            resetActiveTouchesAndEmit()
+        }
         overlayView.setNeedsDisplay()
     }
 
@@ -1283,9 +1311,14 @@ private final class MurbRemotePadUIView: UIView {
             zones.append(Zone(bit: MurbProtocol.buttonR2, label: isPcGamepad ? "RT" : "R2", rect: CGRect(x: safe.maxX - 162, y: safe.minY + 56, width: 62, height: 42)))
         }
 
-        // Menu buttons
-        zones.append(Zone(bit: MurbProtocol.buttonSelect, label: isPcGamepad ? "BACK" : "SELECT", rect: CGRect(x: safe.midX - 88, y: safe.maxY - 46, width: 78, height: 36)))
-        zones.append(Zone(bit: MurbProtocol.buttonStart, label: "START", rect: CGRect(x: safe.midX + 10, y: safe.maxY - 46, width: 78, height: 36)))
+        // Menu buttons (keep clear of dual-screen touch surface)
+        if !screenRect.isEmpty {
+            zones.append(Zone(bit: MurbProtocol.buttonSelect, label: isPcGamepad ? "BACK" : "SELECT", rect: CGRect(x: safe.minX + 18, y: safe.minY + 106, width: 78, height: 36)))
+            zones.append(Zone(bit: MurbProtocol.buttonStart, label: "START", rect: CGRect(x: safe.maxX - 96, y: safe.minY + 106, width: 78, height: 36)))
+        } else {
+            zones.append(Zone(bit: MurbProtocol.buttonSelect, label: isPcGamepad ? "BACK" : "SELECT", rect: CGRect(x: safe.midX - 88, y: safe.maxY - 46, width: 78, height: 36)))
+            zones.append(Zone(bit: MurbProtocol.buttonStart, label: "START", rect: CGRect(x: safe.midX + 10, y: safe.maxY - 46, width: 78, height: 36)))
+        }
 
         // Face diamond
         let rightCenter = CGPoint(x: safe.maxX - 112, y: safe.maxY - 106)
@@ -1510,10 +1543,12 @@ private final class MurbRemotePadUIView: UIView {
     }
 
     private func updateScreenTouch(at point: CGPoint) {
-        let u = max(0, min(1, (point.x - screenRect.minX) / max(1, screenRect.width)))
-        let v = max(0, min(1, (point.y - screenRect.minY) / max(1, screenRect.height)))
+        let cx = max(screenRect.minX, min(screenRect.maxX, point.x))
+        let cy = max(screenRect.minY, min(screenRect.maxY, point.y))
+        let u = max(0, min(1, (cx - screenRect.minX) / max(1, screenRect.width)))
+        let v = max(0, min(1, (cy - screenRect.minY) / max(1, screenRect.height)))
         screenTouchNormalized = CGPoint(x: u, y: v)
-        lastTouchRipple = point
+        lastTouchRipple = CGPoint(x: cx, y: cy)
     }
 
     private func emit() {

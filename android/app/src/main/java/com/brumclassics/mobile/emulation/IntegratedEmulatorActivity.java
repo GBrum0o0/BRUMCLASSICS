@@ -114,6 +114,7 @@ public final class IntegratedEmulatorActivity extends Activity {
             }
             BrumCoreBridge bridge = new BrumCoreBridge(corePath, romPath, launch);
             emulatorView = new BrumCoreView(this, bridge, this::showRuntimeFailure);
+            emulatorView.setSystemContext(launch.systemId, launch.coreLibraryName);
             virtualPadPort = Math.max(0, Math.min(3, getIntent().getIntExtra("virtualPadPort", 0)));
             emulatorView.setVirtualPadPort(virtualPadPort);
             com.brumclassics.mobile.extensions.PokedexUniversalStore localPokedexStore =

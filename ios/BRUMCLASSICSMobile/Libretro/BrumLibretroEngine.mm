@@ -694,13 +694,16 @@ static void BrumVideo(const void *data, unsigned width, unsigned height, size_t 
         if (!host->_hardwareInitialized || width > (unsigned)host->_hardwareSurfaceSize || height > (unsigned)host->_hardwareSurfaceSize) return;
         while (glGetError() != GL_NO_ERROR) {}
         GLint prevFramebuffer = 0;
+        GLint prevReadFramebuffer = 0, prevDrawFramebuffer = 0, prevReadBuffer = GL_COLOR_ATTACHMENT0;
         GLint prevPackAlignment = 4, prevPackRowLength = 0, prevPackSkipRows = 0, prevPackSkipPixels = 0;
         GLint prevPackBuffer = 0;
         const GLboolean hadScissor = glIsEnabled(GL_SCISSOR_TEST);
         const BOOL isES3 = host->_hardwareContext && host->_hardwareContext.API >= kEAGLRenderingAPIOpenGLES3;
-        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFramebuffer);
         glGetIntegerv(GL_PACK_ALIGNMENT, &prevPackAlignment);
         if (isES3) {
+            glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevReadFramebuffer);
+            glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevDrawFramebuffer);
+            glGetIntegerv(GL_READ_BUFFER, &prevReadBuffer);
             glGetIntegerv(GL_PACK_ROW_LENGTH, &prevPackRowLength);
             glGetIntegerv(GL_PACK_SKIP_ROWS, &prevPackSkipRows);
             glGetIntegerv(GL_PACK_SKIP_PIXELS, &prevPackSkipPixels);
@@ -709,9 +712,16 @@ static void BrumVideo(const void *data, unsigned width, unsigned height, size_t 
             glPixelStorei(GL_PACK_ROW_LENGTH, 0);
             glPixelStorei(GL_PACK_SKIP_ROWS, 0);
             glPixelStorei(GL_PACK_SKIP_PIXELS, 0);
+        } else {
+            glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFramebuffer);
         }
         if (hadScissor) glDisable(GL_SCISSOR_TEST);
-        glBindFramebuffer(GL_FRAMEBUFFER, host->_hardwareFramebuffer);
+        if (isES3) {
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, host->_hardwareFramebuffer);
+            glReadBuffer(GL_COLOR_ATTACHMENT0);
+        } else {
+            glBindFramebuffer(GL_FRAMEBUFFER, host->_hardwareFramebuffer);
+        }
         host->_hwReadbackRGBA.resize(byteCount);
         glPixelStorei(GL_PACK_ALIGNMENT, 1);
         glReadPixels(0, 0, (GLsizei)width, (GLsizei)height, GL_RGBA, GL_UNSIGNED_BYTE, host->_hwReadbackRGBA.data());
@@ -722,10 +732,17 @@ static void BrumVideo(const void *data, unsigned width, unsigned height, size_t 
             glPixelStorei(GL_PACK_SKIP_ROWS, prevPackSkipRows);
             glPixelStorei(GL_PACK_SKIP_PIXELS, prevPackSkipPixels);
             if (prevPackBuffer != 0) glBindBuffer(GL_PIXEL_PACK_BUFFER, (GLuint)prevPackBuffer);
+            glReadBuffer((GLenum)prevReadBuffer);
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)prevReadFramebuffer);
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)prevDrawFramebuffer);
+        } else {
+            glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)prevFramebuffer);
         }
         if (hadScissor) glEnable(GL_SCISSOR_TEST);
-        glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)prevFramebuffer);
-        if (readErr != GL_NO_ERROR) return;
+        if (readErr != GL_NO_ERROR) {
+            NSLog(@"BRUM Core GL readback error=0x%X (%ux%u)", readErr, width, height);
+            return;
+        }
         const uint8_t *source = host->_hwReadbackRGBA.data();
         for (unsigned y = 0; y < height; y++) {
             unsigned sourceY = host->_hardwareCallback.bottom_left_origin ? height - 1 - y : y;
@@ -981,6 +998,11 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     // Exact option/value from pinned libretro PPSSPP. Sideloadly provides no JIT.
     _variables[@"ppsspp_cpu_core"] = @"interpreter";
     _variables[@"ppsspp_internal_resolution"] = @"480x272";
+    _variables[@"ppsspp_rendering_mode"] = @"buffered";
+    _variables[@"ppsspp_auto_frameskip"] = @"disabled";
+    _variables[@"ppsspp_frameskip"] = @"0";
+    _variables[@"ppsspp_gpu_hardware_transform"] = @"enabled";
+    _variables[@"ppsspp_block_transfer_gpu"] = @"enabled";
     _variables[@"system_core_override"] = @"Automatic";
     _variables[@"system_gb_bios_enable"] = @"ON";
     _variables[@"system_gba_bios_enable"] = @"ON";
@@ -1209,8 +1231,12 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         [self destroyHardware];
         return NO;
     }
+    glViewport(0, 0, _hardwareSurfaceSize, _hardwareSurfaceSize);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     _hardwareInitialized = YES;
     if (_hardwareCallback.context_reset) _hardwareCallback.context_reset();
+    glBindFramebuffer(GL_FRAMEBUFFER, _hardwareFramebuffer);
     return YES;
 }
 
@@ -1394,6 +1420,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         [_rightVirtualStick reset];
         _rightVirtualStick.enabled = NO;
         _pointerPressed = NO;
+        _pointerX = 0;
+        _pointerY = 0;
+        _touchReticle.hidden = YES;
         if (_audioQueue) AudioQueuePause(_audioQueue);
         os_unfair_lock_lock(&_audioLock); _audioRead = 0; _audioWrite = 0; _audioCount = 0; os_unfair_lock_unlock(&_audioLock);
         [self persistSaveRAM];
@@ -1901,19 +1930,28 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 - (void)screenTouch:(UILongPressGestureRecognizer *)gesture {
     if (_paused || !_frameWidth || !_frameHeight || !(self.capabilities & BrumBackendTouch)) {
         _pointerPressed = NO;
+        _pointerX = 0;
+        _pointerY = 0;
         _touchReticle.hidden = YES;
         return;
     }
     CGPoint point = [gesture locationInView:_screen];
     if (_screenManager.screens.size() > 1) {
         const auto touch = brum::ScreenManager::hitTest({point.x, point.y}, _screenPlacements);
-        _pointerPressed = touch.pressed && (gesture.state == UIGestureRecognizerStateBegan || gesture.state == UIGestureRecognizerStateChanged);
-        _pointerX = (int16_t)lrint((touch.atlas.x * 2 - 1) * 32767);
-        _pointerY = (int16_t)lrint((touch.atlas.y * 2 - 1) * 32767);
-        // Dual-screen cores treat Y == 0 on the lower half as pen-up or boundary.
-        if (_pointerPressed && touch.screenID == "secondary") _pointerY = MAX(1, _pointerY);
-        _touchReticle.hidden = !_pointerPressed;
-        if (_pointerPressed) _touchReticle.center = point;
+        _pointerPressed = touch.pressed && touch.screenID == "secondary" &&
+            (gesture.state == UIGestureRecognizerStateBegan || gesture.state == UIGestureRecognizerStateChanged);
+        if (_pointerPressed) {
+            _pointerX = (int16_t)lrint((touch.atlas.x * 2 - 1) * 32767);
+            _pointerY = (int16_t)lrint((touch.atlas.y * 2 - 1) * 32767);
+            // Dual-screen cores treat Y == 0 on the lower half as pen-up or boundary.
+            _pointerY = MAX(1, _pointerY);
+            _touchReticle.center = point;
+            _touchReticle.hidden = NO;
+        } else {
+            _pointerX = 0;
+            _pointerY = 0;
+            _touchReticle.hidden = YES;
+        }
         return;
     }
     const auto local = _singleViewport.toContent({point.x, point.y});
@@ -2029,6 +2067,10 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 }
 
 - (void)layoutScreens {
+    _pointerPressed = NO;
+    _pointerX = 0;
+    _pointerY = 0;
+    _touchReticle.hidden = YES;
     const brum::Rect available = [self availableGameRect];
     if (_screenManager.screens.size() < 2) {
         _screenPlacements.clear();
@@ -2448,6 +2490,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     if (_hardwareInitialized) [EAGLContext setCurrentContext:_hardwareContext];
     const CFTimeInterval started = _performanceHUDEnabled ? CACurrentMediaTime() : 0;
     NSUInteger frameCount = _fastForwardEnabled ? 5 : _frameCadence.framesDue(CACurrentMediaTime());
+    if (_hardwareInitialized && !_fastForwardEnabled && frameCount > 1) frameCount = 1;
     if (frameCount == 0) return;
     for (NSUInteger frame = 0; frame < frameCount; frame++) {
         _suppressVideo = frame + 1 < frameCount;

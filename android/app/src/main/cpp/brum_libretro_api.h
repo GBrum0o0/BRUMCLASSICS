@@ -37,6 +37,7 @@
 #define BRUM_RETRO_ENVIRONMENT_GET_LANGUAGE 39
 #define BRUM_RETRO_ENVIRONMENT_SET_HW_SHARED_CONTEXT (44 | 0x10000)
 #define BRUM_RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE (47 | 0x10000)
+#define BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2 67
 #define BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2_INTL 68
 #define BRUM_RETRO_ENVIRONMENT_GET_JIT_CAPABLE 74
 
@@ -98,3 +99,29 @@ typedef struct {
     const brum_retro_memory_descriptor *descriptors;
     unsigned num_descriptors;
 } brum_retro_memory_map;
+
+typedef struct {
+    const char *value;
+    const char *label;
+} brum_retro_core_option_v2_value;
+
+typedef struct {
+    const char *key;
+    const char *desc;
+    const char *desc_categorized;
+    const char *info;
+    const char *info_categorized;
+    const char *category_key;
+    brum_retro_core_option_v2_value values[128];
+    const char *default_value;
+} brum_retro_core_option_v2_definition;
+
+typedef struct {
+    const void *categories;
+    const brum_retro_core_option_v2_definition *definitions;
+} brum_retro_core_options_v2;
+
+typedef struct {
+    const brum_retro_core_options_v2 *us;
+    const brum_retro_core_options_v2 *local;
+} brum_retro_core_options_v2_intl;

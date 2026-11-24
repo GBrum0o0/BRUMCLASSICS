@@ -294,6 +294,9 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
     @Override public void onConnected() { updateStatusPill(); }
 
     @Override public void onDisconnected() {
+        virtualButtons = 0;
+        virtualTouching = false;
+        if (canvasView != null) canvasView.resetTouchesAndEmit();
         updateStatusPill();
         if (!isFinishing() && !isDestroyed()) {
             canvasView.postDelayed(() -> {
@@ -386,6 +389,7 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
         physicalRStickY = 0;
         virtualButtons = 0;
         virtualTouching = false;
+        if (canvasView != null) canvasView.resetTouchesAndEmit();
         dispatchCombinedInput();
         super.onPause();
     }
@@ -473,8 +477,16 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
         boolean isShowControls() { return showControls; }
         boolean isFillScreen() { return fillScreen; }
         void setShowControls(boolean show) { showControls = show; rebuildZones(); invalidate(); emit(); }
-        void setFillScreen(boolean fill) { fillScreen = fill; rebuildZones(); invalidate(); }
-        void setSystem(String sys) { system = sys; rebuildZones(); invalidate(); }
+        void resetTouchesAndEmit() {
+            buttonPointers.clear();
+            dpadPointer = -1; dpadMask = 0;
+            stickPointer = -1; stickX = 0; stickY = 0;
+            screenPointer = -1;
+            invalidate();
+            emit();
+        }
+        void setFillScreen(boolean fill) { fillScreen = fill; resetTouchesAndEmit(); rebuildZones(); invalidate(); }
+        void setSystem(String sys) { system = sys; resetTouchesAndEmit(); rebuildZones(); invalidate(); }
 
         void updateFrame(byte[] rgb565Pixels, int width, int height) {
             if (frameBitmap == null || frameBitmap.getWidth() != width || frameBitmap.getHeight() != height) {
@@ -486,6 +498,7 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
 
         @Override protected void onSizeChanged(int w, int h, int oldw, int oldh) {
             super.onSizeChanged(w, h, oldw, oldh);
+            resetTouchesAndEmit();
             rebuildZones();
         }
 
@@ -527,8 +540,13 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
                 zones.add(new Zone(MurbRemoteClient.BTN_L2, xbox ? "LT" : "L2", new RectF(92f * d, 56f * d, 152f * d, 96f * d), false));
                 zones.add(new Zone(MurbRemoteClient.BTN_R2, xbox ? "RT" : "R2", new RectF(w - 152f * d, 56f * d, w - 92f * d, 96f * d), false));
             }
-            zones.add(new Zone(MurbRemoteClient.BTN_SELECT, xbox ? "BACK" : "SELECT", new RectF(w / 2f - 84f * d, h - 46f * d, w / 2f - 6f * d, h - 12f * d), false));
-            zones.add(new Zone(MurbRemoteClient.BTN_START, "START", new RectF(w / 2f + 6f * d, h - 46f * d, w / 2f + 84f * d, h - 12f * d), false));
+            if (!screenRect.isEmpty()) {
+                zones.add(new Zone(MurbRemoteClient.BTN_SELECT, xbox ? "BACK" : "SELECT", new RectF(16f * d, 104f * d, 92f * d, 140f * d), false));
+                zones.add(new Zone(MurbRemoteClient.BTN_START, "START", new RectF(w - 92f * d, 104f * d, w - 16f * d, 140f * d), false));
+            } else {
+                zones.add(new Zone(MurbRemoteClient.BTN_SELECT, xbox ? "BACK" : "SELECT", new RectF(w / 2f - 84f * d, h - 46f * d, w / 2f - 6f * d, h - 12f * d), false));
+                zones.add(new Zone(MurbRemoteClient.BTN_START, "START", new RectF(w / 2f + 6f * d, h - 46f * d, w / 2f + 84f * d, h - 12f * d), false));
+            }
 
             float rx = w - 104f * d, ry = h - 98f * d;
             float r = 27f * d, dist = 50f * d;
@@ -719,9 +737,11 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
         }
 
         private void updateScreen(float x, float y) {
-            normTouchX = Math.max(0f, Math.min(1f, (x - screenRect.left) / Math.max(1f, screenRect.width())));
-            normTouchY = Math.max(0f, Math.min(1f, (y - screenRect.top) / Math.max(1f, screenRect.height())));
-            rawTouchX = x; rawTouchY = y;
+            float cx = Math.max(screenRect.left, Math.min(screenRect.right, x));
+            float cy = Math.max(screenRect.top, Math.min(screenRect.bottom, y));
+            normTouchX = Math.max(0f, Math.min(1f, (cx - screenRect.left) / Math.max(1f, screenRect.width())));
+            normTouchY = Math.max(0f, Math.min(1f, (cy - screenRect.top) / Math.max(1f, screenRect.height())));
+            rawTouchX = cx; rawTouchY = cy;
         }
 
         private void emit() {

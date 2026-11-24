@@ -124,6 +124,26 @@ public:
         makeCurrent();
         const char *version = reinterpret_cast<const char *>(glGetString(GL_VERSION));
         if (!version) fail("O driver gráfico não respondeu ao BRUM Core.");
+        glGenFramebuffers(1, &hwFbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, hwFbo);
+        glGenTextures(1, &hwColorTex);
+        glBindTexture(GL_TEXTURE_2D, hwColorTex);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, surfaceSize, surfaceSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, hwColorTex, 0);
+        glGenRenderbuffers(1, &hwDepthStencil);
+        glBindRenderbuffer(GL_RENDERBUFFER, hwDepthStencil);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, surfaceSize, surfaceSize);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, hwDepthStencil);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, hwDepthStencil);
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            fail("A GPU recusou o framebuffer offscreen GLES3 do BRUM Core.");
+        }
+        glViewport(0, 0, surfaceSize, surfaceSize);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+        activeHardware = this;
     }
 
     void makeCurrent() {
@@ -135,14 +155,42 @@ public:
     }
 
     void capture(unsigned width, unsigned height, std::vector<uint32_t> &target) {
-        if (!initialized || !width || !height || width > surfaceSize || height > surfaceSize) return;
+        if (!initialized || !hwFbo || !width || !height || width > surfaceSize || height > surfaceSize) return;
         const size_t pixelCount = static_cast<size_t>(width) * height;
         if (pixelCount > 16u * 1024u * 1024u) return;
         rgba.resize(pixelCount * 4);
         while (glGetError() != GL_NO_ERROR) {}
+        GLint prevReadFbo = 0, prevDrawFbo = 0, prevReadBuffer = GL_COLOR_ATTACHMENT0;
+        GLint prevPackAlign = 4, prevPackRowLen = 0, prevPackSkipRows = 0, prevPackSkipPixels = 0, prevPackBuf = 0;
+        const GLboolean hadScissor = glIsEnabled(GL_SCISSOR_TEST);
+        glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevReadFbo);
+        glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevDrawFbo);
+        glGetIntegerv(GL_READ_BUFFER, &prevReadBuffer);
+        glGetIntegerv(GL_PACK_ALIGNMENT, &prevPackAlign);
+        glGetIntegerv(GL_PACK_ROW_LENGTH, &prevPackRowLen);
+        glGetIntegerv(GL_PACK_SKIP_ROWS, &prevPackSkipRows);
+        glGetIntegerv(GL_PACK_SKIP_PIXELS, &prevPackSkipPixels);
+        glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING, &prevPackBuf);
+        if (prevPackBuf != 0) glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+        glPixelStorei(GL_PACK_ROW_LENGTH, 0);
+        glPixelStorei(GL_PACK_SKIP_ROWS, 0);
+        glPixelStorei(GL_PACK_SKIP_PIXELS, 0);
         glPixelStorei(GL_PACK_ALIGNMENT, 1);
+        if (hadScissor) glDisable(GL_SCISSOR_TEST);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, hwFbo);
+        glReadBuffer(GL_COLOR_ATTACHMENT0);
         glReadPixels(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height), GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
-        if (glGetError() != GL_NO_ERROR) return;
+        const GLenum err = glGetError();
+        if (hadScissor) glEnable(GL_SCISSOR_TEST);
+        glPixelStorei(GL_PACK_ALIGNMENT, prevPackAlign);
+        glPixelStorei(GL_PACK_ROW_LENGTH, prevPackRowLen);
+        glPixelStorei(GL_PACK_SKIP_ROWS, prevPackSkipRows);
+        glPixelStorei(GL_PACK_SKIP_PIXELS, prevPackSkipPixels);
+        if (prevPackBuf != 0) glBindBuffer(GL_PIXEL_PACK_BUFFER, static_cast<GLuint>(prevPackBuf));
+        glReadBuffer(static_cast<GLenum>(prevReadBuffer));
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, static_cast<GLuint>(prevReadFbo));
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, static_cast<GLuint>(prevDrawFbo));
+        if (err != GL_NO_ERROR) return;
         target.resize(pixelCount);
         for (unsigned y = 0; y < height; y++) {
             const unsigned sourceY = callback.bottom_left_origin ? height - 1 - y : y;
@@ -159,7 +207,10 @@ public:
     void resetCore() {
         if (!pending) return;
         initialize();
+        makeCurrent();
+        glBindFramebuffer(GL_FRAMEBUFFER, hwFbo);
         if (callback.context_reset) callback.context_reset();
+        glBindFramebuffer(GL_FRAMEBUFFER, hwFbo);
         coreReset = true;
         releaseCurrent();
     }
@@ -174,6 +225,11 @@ public:
     void shutdown() {
         if (!initialized) return;
         destroyCore();
+        if (hwDepthStencil) glDeleteRenderbuffers(1, &hwDepthStencil);
+        if (hwColorTex) glDeleteTextures(1, &hwColorTex);
+        if (hwFbo) glDeleteFramebuffers(1, &hwFbo);
+        hwDepthStencil = 0; hwColorTex = 0; hwFbo = 0;
+        if (activeHardware == this) activeHardware = nullptr;
         releaseCurrent();
         eglDestroyContext(display, context);
         eglDestroySurface(display, surface);
@@ -186,10 +242,14 @@ public:
 
 private:
     static constexpr EGLint surfaceSize = 2048;
+    inline static HardwareContext *activeHardware = nullptr;
     EGLDisplay display = EGL_NO_DISPLAY;
     EGLContext context = EGL_NO_CONTEXT;
     EGLSurface surface = EGL_NO_SURFACE;
     EGLConfig config{};
+    GLuint hwFbo = 0;
+    GLuint hwColorTex = 0;
+    GLuint hwDepthStencil = 0;
     brum_retro_hw_render_callback callback{};
     bool pending = false;
     bool initialized = false;
@@ -197,7 +257,9 @@ private:
     std::vector<uint8_t> rgba;
 
     [[noreturn]] static void fail(const char *message) { throw std::runtime_error(message); }
-    static uintptr_t currentFramebuffer() { return 0; }
+    static uintptr_t currentFramebuffer() {
+        return activeHardware ? static_cast<uintptr_t>(activeHardware->hwFbo) : 0;
+    }
     static brum_retro_proc_address_t getProcAddress(const char *name) {
         void *symbol = name ? reinterpret_cast<void *>(eglGetProcAddress(name)) : nullptr;
         if (!symbol && name) symbol = dlsym(RTLD_DEFAULT, name);
@@ -216,6 +278,11 @@ public:
             variables["system_gba_bios_enable"] = "ON";
             variables["system_nds_bios_enable"] = "ON";
             variables["ppsspp_internal_resolution"] = "480x272";
+            variables["ppsspp_rendering_mode"] = "buffered";
+            variables["ppsspp_auto_frameskip"] = "disabled";
+            variables["ppsspp_frameskip"] = "0";
+            variables["ppsspp_gpu_hardware_transform"] = "enabled";
+            variables["ppsspp_block_transfer_gpu"] = "enabled";
             variables["citra_graphics_api"] = "OpenGLES";
             variables["citra_use_cpu_jit"] = "enabled";
             variables["citra_layout_option"] = "Top/Bottom";
@@ -640,7 +707,7 @@ private:
             case BRUM_RETRO_ENVIRONMENT_SET_HW_RENDER:
                 return session->hardware.configure(static_cast<brum_retro_hw_render_callback *>(data));
             case BRUM_RETRO_ENVIRONMENT_SET_HW_SHARED_CONTEXT:
-                return true;
+                return false;
             case BRUM_RETRO_ENVIRONMENT_GET_JIT_CAPABLE:
                 if (data) *static_cast<bool *>(data) = true;
                 return true;
@@ -652,7 +719,26 @@ private:
                 }
                 return true;
             }
-            case BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2_INTL: return true;
+            case BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2:
+            case BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2_INTL: {
+                if (!data) return false;
+                const brum_retro_core_options_v2 *opts = nullptr;
+                if (command == BRUM_RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2_INTL) {
+                    const auto *intl = static_cast<const brum_retro_core_options_v2_intl *>(data);
+                    opts = intl->local && intl->local->definitions ? intl->local : intl->us;
+                } else {
+                    opts = static_cast<const brum_retro_core_options_v2 *>(data);
+                }
+                if (opts && opts->definitions) {
+                    for (const auto *def = opts->definitions; def->key; ++def) {
+                        if (session->variables.find(def->key) == session->variables.end()) {
+                            const char *val = def->default_value ? def->default_value : def->values[0].value;
+                            if (val) session->variables[def->key] = val;
+                        }
+                    }
+                }
+                return true;
+            }
             case BRUM_RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL:
             case BRUM_RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS:
             case BRUM_RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME: return true;
