@@ -1094,7 +1094,7 @@ private struct MurbRemotePadCanvas: UIViewRepresentable {
     func updateUIView(_ uiView: MurbRemotePadUIView, context: Context) {
         uiView.onInput = onInput
         session.onVideoFrame = { [weak uiView] cgImage in
-            view?.updateVideoFrame(cgImage)
+            uiView?.updateVideoFrame(cgImage)
         }
         uiView.apply(system: system, showControls: showControls, fillScreen: fillScreen, connected: connected)
     }
