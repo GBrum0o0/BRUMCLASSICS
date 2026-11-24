@@ -435,10 +435,10 @@ enum ROMContentInspector {
         var digest = ""
 
         if !isDiscManifest,
-           let attrs = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey]),
-           let sizeInt = attrs.fileSize, sizeInt > 0,
-           let mdate = attrs.contentModificationDate {
-            let fileSize = UInt64(sizeInt)
+           let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+           let sizeNum = attrs[.size] as? NSNumber, sizeNum.int64Value > 0,
+           let mdate = attrs[.modificationDate] as? Date {
+            let fileSize = UInt64(sizeNum.int64Value)
             let modifiedMs = Int64((mdate.timeIntervalSince1970 * 1000.0).rounded())
             if let hit = cachedDigest(for: url, fileSize: fileSize, modifiedTimeMs: modifiedMs) {
                 header = try readHeaderSample(url)

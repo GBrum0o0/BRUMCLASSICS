@@ -29,14 +29,14 @@ struct MurbPairingPayload: Codable, Equatable {
         self.isExternalControl = try c.decodeIfPresent(Bool.self, forKey: .isExternalControl) ?? false
     }
 
-    static func isValidHost(_ host: String, allowLoopback: Bool = false) -> Bool {
+    static func isValidHost(_ host: String, allowLoopback: Bool = false, allowUnspecifiedBind: Bool = false) -> Bool {
         let cleaned = host.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleaned.isEmpty,
               cleaned.rangeOfCharacter(from: .whitespacesAndNewlines) == nil else { return false }
         let parts = cleaned.split(separator: ".", omittingEmptySubsequences: false)
         if parts.count == 4, parts.allSatisfy({ Int($0).map { (0...255).contains($0) } ?? false }) {
             let octets = parts.compactMap { Int($0) }
-            if octets.allSatisfy({ $0 == 0 }) { return false }
+            if octets.allSatisfy({ $0 == 0 }) { return allowUnspecifiedBind && cleaned == "0.0.0.0" }
             if octets.first == 127 { return allowLoopback && cleaned == "127.0.0.1" }
             return true
         }
@@ -53,7 +53,7 @@ struct MurbPairingPayload: Codable, Equatable {
         }
     }
 
-    static func parse(_ url: URL, allowLoopback: Bool = false) -> MurbPairingPayload? {
+    static func parse(_ url: URL, allowLoopback: Bool = false, allowUnspecifiedBind: Bool = false) -> MurbPairingPayload? {
         guard url.scheme?.lowercased() == "murb",
               let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
         let items = components.queryItems ?? []
@@ -65,7 +65,7 @@ struct MurbPairingPayload: Codable, Equatable {
         let token = query("token").uppercased()
         let rawPort = query("port")
         let parsedPort = rawPort.isEmpty ? 8089 : (Int(rawPort) ?? 0)
-        guard isValidHost(host, allowLoopback: allowLoopback),
+        guard isValidHost(host, allowLoopback: allowLoopback, allowUnspecifiedBind: allowUnspecifiedBind),
               isValidToken(token),
               (1...65535).contains(parsedPort) else { return nil }
         let querySystem = query("sys").lowercased()
@@ -127,11 +127,14 @@ struct MurbPairingPayload: Codable, Equatable {
         guard let info, info.available == true else { return nil }
         let cleanedFallback = (fallbackHost ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let fallbackUsable = !cleanedFallback.isEmpty && cleanedFallback != "127.0.0.1" && cleanedFallback != "0.0.0.0"
-        if let rawQR = info.qrUri, let url = URL(string: rawQR), var parsed = parse(url) {
+        if let rawQR = info.qrUri, let url = URL(string: rawQR),
+           var parsed = parse(url, allowLoopback: fallbackUsable, allowUnspecifiedBind: fallbackUsable) {
             if fallbackUsable && (preferFallbackHost || parsed.host.isEmpty || parsed.host == "127.0.0.1" || parsed.host == "0.0.0.0") {
                 parsed.host = cleanedFallback
             }
-            return parsed
+            if isValidHost(parsed.host, allowLoopback: false) {
+                return parsed
+            }
         }
         let host = {
             if preferFallbackHost && fallbackUsable { return cleanedFallback }
@@ -175,11 +178,15 @@ struct MurbRemoteLaunchTarget: Identifiable {
     ) -> MurbRemoteLaunchTarget? {
         guard let payload = MurbPairingPayload.resolve(from: info, fallbackHost: fallbackHost, preferFallbackHost: preferFallbackHost) else { return nil }
         var p2Payload: MurbPairingPayload?
-        if let rawP2 = info?.p2QrUri, let urlP2 = URL(string: rawP2), var parsedP2 = MurbPairingPayload.parse(urlP2) {
-            if !payload.host.isEmpty && (preferFallbackHost || parsedP2.host.isEmpty || parsedP2.host == "127.0.0.1" || parsedP2.host == "0.0.0.0") {
+        let canSubstituteP2 = !payload.host.isEmpty
+        if let rawP2 = info?.p2QrUri, let urlP2 = URL(string: rawP2),
+           var parsedP2 = MurbPairingPayload.parse(urlP2, allowLoopback: canSubstituteP2, allowUnspecifiedBind: canSubstituteP2) {
+            if canSubstituteP2 && (preferFallbackHost || parsedP2.host.isEmpty || parsedP2.host == "127.0.0.1" || parsedP2.host == "0.0.0.0") {
                 parsedP2.host = payload.host
             }
-            p2Payload = parsedP2
+            if MurbPairingPayload.isValidHost(parsedP2.host, allowLoopback: false) {
+                p2Payload = parsedP2
+            }
         }
         return MurbRemoteLaunchTarget(
             payload: payload,
