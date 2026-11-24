@@ -21,12 +21,22 @@
       "tintColor": "#10B981",
       "category": "games",
       "screenshotURLs": [],
-      "version": "0.26.0",
-      "versionDate": "2026-11-23T02:55:10Z",
-      "versionDescription": "# BRUMCLASSICS MÓVEL iOS 0.26.0 — Extensão 001\n\nA Pokédex Universal passa a integrar o Gaming Mode, na aba **EXTENSÕES**, ao lado da Biblioteca. O botão abre o dispositivo e permite consultar a coleção normal e a coleção de shinies, com busca, backup verificado e sincronização manual com o PC pareado.\n\n- Espécies não descobertas continuam como `???`, com silhueta e número visível.\n- O piloto de detecção é Pokémon FireRed de GBA, código BPRE. O catálogo de 802 registros prepara outras gerações; não representa 802 jogos ou espécies capturáveis já validados.\n- Ilustrações são estilizadas; não são um pacote de 802 sprites oficiais dos jogos.\n- Corrige preservação de timestamps entre plataformas, importação parcial, separação por perfil e tratamento de leituras incompletas do detector.\n- Preserva SideStore, backup de migração, Save Sync e os núcleos da versão anterior.\n\nAs notificações da Pokédex são registros locais da extensão, separados das conquistas oficiais do RetroAchievements. Testes automatizados e builds não comprovam uma captura jogada em aparelho físico; essa validação permanece identificada separadamente no relatório.\n\nAtualize pelo SideStore usando a fonte oficial, ou assine a IPA pelo Sideloadly. Preserve os dados e não desinstale o aplicativo para atualizar.",
-      "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.26.0/BRUMCLASSICS-MOVEL-IOS-0.26.0.ipa",
-      "size": 15497788,
+      "version": "0.27.0",
+      "versionDate": "2026-11-24T00:02:36Z",
+      "versionDescription": "# BRUMCLASSICS MÓVEL iOS 0.27.0 — Pokédex G1–G7 e Gamepad Rápido\n\nA Pokédex Universal do Gaming Mode expande o catálogo oficial da 1ª à 7ª geração (`#001–#809`), com filtro por geração, abertura interativa no formato de dispositivo portátil, imagens correspondentes à espécie e variante shiny sob demanda (com prioridade para o visor e botão **Tentar novamente**), e silhuetas em preto preservando formato e transparência antes da captura.\n\n- **Reconexão rápida sem novo QR Code:** quando um jogo compatível estiver em execução no computador pareado (`M.U.R.B Engine`), o Gaming Mode e a folha do Gamepad M.U.R.B oferecem conexão em 1 toque diretamente à sessão ativa, sem necessidade de ler outro QR Code.\n- A primeira consulta de cada imagem requer internet; imagens carregadas ficam em cache local. Não são distribuídos PNGs das espécies neste pacote (origem `PokeAPI/sprites`, sem autoria BRUM às imagens Pokémon).\n- Popups da Pokédex continuam separados das conquistas oficiais do RetroAchievements.\n- Preserva Save Sync, saves, controles, coleções e núcleos existentes. A detecção automática de captura continua piloto em Pokémon FireRed (`BPRE`).\n\nSideStore e atualização pelo fluxo existente preservados. Atualize mantendo os dados; não é necessário desinstalar.",
+      "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.27.0/BRUMCLASSICS-MOVEL-IOS-0.27.0.ipa",
+      "size": 15543076,
       "versions": [
+        {
+          "version": "0.27.0",
+          "buildVersion": "60",
+          "date": "2026-11-24T00:02:36Z",
+          "localizedDescription": "# BRUMCLASSICS MÓVEL iOS 0.27.0 — Pokédex G1–G7 e Gamepad Rápido\n\nA Pokédex Universal do Gaming Mode expande o catálogo oficial da 1ª à 7ª geração (`#001–#809`), com filtro por geração, abertura interativa no formato de dispositivo portátil, imagens correspondentes à espécie e variante shiny sob demanda (com prioridade para o visor e botão **Tentar novamente**), e silhuetas em preto preservando formato e transparência antes da captura.\n\n- **Reconexão rápida sem novo QR Code:** quando um jogo compatível estiver em execução no computador pareado (`M.U.R.B Engine`), o Gaming Mode e a folha do Gamepad M.U.R.B oferecem conexão em 1 toque diretamente à sessão ativa, sem necessidade de ler outro QR Code.\n- A primeira consulta de cada imagem requer internet; imagens carregadas ficam em cache local. Não são distribuídos PNGs das espécies neste pacote (origem `PokeAPI/sprites`, sem autoria BRUM às imagens Pokémon).\n- Popups da Pokédex continuam separados das conquistas oficiais do RetroAchievements.\n- Preserva Save Sync, saves, controles, coleções e núcleos existentes. A detecção automática de captura continua piloto em Pokémon FireRed (`BPRE`).\n\nSideStore e atualização pelo fluxo existente preservados. Atualize mantendo os dados; não é necessário desinstalar.",
+          "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.27.0/BRUMCLASSICS-MOVEL-IOS-0.27.0.ipa",
+          "size": 15543076,
+          "sha256": "67b49d74ba519162a3198aa0ec682a8f87f35be4683da2775da5d077009c6b8a",
+          "minOSVersion": "16.0"
+        },
         {
           "version": "0.26.0",
           "buildVersion": "59",
