@@ -107,4 +107,61 @@ final class MobileExperienceTests: XCTestCase {
                                                     launcherFingerprint: fingerprint, bindingsRoot: root)
         XCTAssertEqual(NativeSaveTransfer.readLastSyncedRevision(for: identity, bindingsRoot: root), revision)
     }
+
+    func testGamingModeSearchAndConsoleFilterPreserveVariantsAndUnidentified() throws {
+        let popPSP = ROMFolderGame(relativePath: "PSP/Prince of Persia.iso", filename: "Prince of Persia.iso", title: "Prince of Persia", detectedSystem: .playStationPortable, fileSize: 1024)
+        let gbTetris = ROMFolderGame(relativePath: "GB/Tetris.gb", filename: "Tetris.gb", title: "Tetris", detectedSystem: .gameBoy, fileSize: 512)
+        let gbaPkmn = ROMFolderGame(relativePath: "GBA/Pokemon.gba", filename: "Pokemon.gba", title: "Pokémon FireRed", detectedSystem: .gameBoyAdvance, fileSize: 512)
+        let unknownROM = ROMFolderGame(relativePath: "Outros/Homebrew.bin", filename: "Homebrew.bin", title: "Homebrew Demo", detectedSystem: nil, fileSize: 256)
+        let entries: [GamingCatalogEntry] = [
+            .local(popPSP, nil),
+            .local(gbTetris, nil),
+            .local(gbaPkmn, nil),
+            .local(unknownROM, nil)
+        ]
+
+        let consoles = GamingModeCatalog.availableConsoles(in: entries)
+        XCTAssertEqual(consoles.first?.id, "all")
+        XCTAssertEqual(consoles.first?.label, "Todos os consoles")
+        XCTAssertEqual(consoles.last?.id, "unidentified")
+        XCTAssertTrue(consoles.contains { $0.id == "gb" })
+        XCTAssertTrue(consoles.contains { $0.id == "gba" })
+        XCTAssertTrue(consoles.contains { $0.id == "psp" })
+
+        let accentSearch = GamingModeCatalog.filter(entries, query: "pokemon firered", consoleKey: "all")
+        XCTAssertEqual(accentSearch.map(\.title), ["Pokémon FireRed"])
+
+        let pspFiltered = GamingModeCatalog.filter(entries, query: "prince", consoleKey: "psp")
+        XCTAssertEqual(pspFiltered.map(\.title), ["Prince of Persia"])
+
+        let emptyResult = GamingModeCatalog.filter(entries, query: "zelda", consoleKey: "psp")
+        XCTAssertTrue(emptyResult.isEmpty)
+    }
+
+    func testMyBrumControlPairingCodeRoundTripAndStrictValidation() throws {
+        let code = try XCTUnwrap(MurbControlPairingCode.encode(host: "192.168.15.42", port: 8089, token: "AB34CD"))
+        XCTAssertTrue(code.hasPrefix("MBC-"))
+        let decoded = try XCTUnwrap(MurbControlPairingCode.decode(code.lowercased()))
+        XCTAssertEqual(decoded.host, "192.168.15.42")
+        XCTAssertEqual(decoded.port, 8089)
+        XCTAssertEqual(decoded.token, "AB34CD")
+
+        // Corrupting a character must fail CRC-8 check
+        var chars = Array(code)
+        chars[chars.count - 1] = chars.last == "Z" ? "A" : "Z"
+        XCTAssertNil(MurbControlPairingCode.decode(String(chars)))
+
+        // Strict user input validator accepts MBC and murb:// only
+        let fromCode = try XCTUnwrap(MurbPairingPayload.parseUserInput(code))
+        XCTAssertEqual(fromCode.host, "192.168.15.42")
+        XCTAssertTrue(fromCode.isExternalControl)
+
+        let fromUri = try XCTUnwrap(MurbPairingPayload.parseUserInput("murb://3ds?ip=192.168.15.42&port=8089&token=AB34CD&pc=SALA"))
+        XCTAssertEqual(fromUri.system, "3ds")
+        XCTAssertEqual(fromUri.pcName, "SALA")
+
+        XCTAssertNil(MurbPairingPayload.parseUserInput("https://evil.example/?ip=192.168.1.5&token=ABCDEF"))
+        XCTAssertNil(MurbPairingPayload.parseUserInput("brumclassics://pair?host=192.168.1.5&code=123456"))
+        XCTAssertNil(MurbPairingPayload.parseUserInput("murb://ds?ip=127.0.0.1&port=8089&token=AB34CD"))
+    }
 }

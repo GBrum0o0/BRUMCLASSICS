@@ -16,5 +16,5 @@
   <key>NSCameraUsageDescription</key><string>A câmera lê o QR Code de pareamento exibido pelo BRUMCLASSICS no computador.</string>
   <key>NSLocalNetworkUsageDescription</key><string>O BRUMCLASSICS MÓVEL sincroniza sua biblioteca diretamente com o launcher na sua rede local.</string>
   <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
-  <key>CFBundleURLTypes</key><array><dict><key>CFBundleURLName</key><string>BRUMCLASSICS Pairing</string><key>CFBundleURLSchemes</key><array><string>brumclassics</string></array></dict></array>
+  <key>CFBundleURLTypes</key><array><dict><key>CFBundleURLName</key><string>BRUMCLASSICS Pairing</string><key>CFBundleURLSchemes</key><array><string>brumclassics</string><string>murb</string></array></dict></array>
 </dict></plist>

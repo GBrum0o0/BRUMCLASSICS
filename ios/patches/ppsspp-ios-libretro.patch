@@ -48,6 +48,42 @@ index 5f8082b59..b48720b14 100644
  	set(DEPLOYMENT_TARGET 8.0)
  	file(GLOB IOSAssets ios/assets/*.png)
  	list(REMOVE_ITEM IOSAssets ${CMAKE_CURRENT_SOURCE_DIR}/ios/assets/Default-568h@2x.png)
+diff --git a/Common/MemArenaDarwin.cpp b/Common/MemArenaDarwin.cpp
+index 593bb14..a7a374d 100644
+--- a/Common/MemArenaDarwin.cpp
++++ b/Common/MemArenaDarwin.cpp
+@@ -36,7 +36,8 @@
+ #include <mach/vm_map.h>
+ 
+ size_t MemArena::roundup(size_t x) {
+-	return x;
++	size_t mask = (size_t)vm_page_size - 1;
++	return (x + mask) & ~mask;
+ }
+ 
+ void MemArena::GrabLowMemSpace(size_t size) {
+@@ -92,12 +93,8 @@ bool MemArena::NeedsProbing() {
+ }
+ 
+ u8* MemArena::Find4GBBase() {
+-#if defined(IOS) && PPSSPP_ARCH(64BIT)
+-	// The caller will need to do probing, like on 32-bit Windows.
+-	return nullptr;
+-#else
+ 	size_t size;
+-#if PPSSPP_ARCH(64BIT)
++#if PPSSPP_ARCH(64BIT) && !defined(IOS)
+ 	size = 0xE1000000;
+ #else
+ 	size = 0x10000000;
+@@ -110,7 +107,6 @@ u8* MemArena::Find4GBBase() {
+ 		vm_deallocate(mach_task_self(), addr, size);
+ 		return (u8 *)addr;
+ 	}
+-#endif
+ 	return nullptr;
+ }
+ 
 diff --git a/Common/MemoryUtil.cpp b/Common/MemoryUtil.cpp
 index 519bfc6bd..23ca1b9c2 100644
 --- a/Common/MemoryUtil.cpp
@@ -78,10 +114,44 @@ index 519bfc6bd..23ca1b9c2 100644
  			(memProtFlags & MEM_PROT_READ) != 0, (memProtFlags & MEM_PROT_WRITE) != 0, (memProtFlags & MEM_PROT_EXEC) != 0);
  
 diff --git a/Core/MemMap.cpp b/Core/MemMap.cpp
-index 9c7a2cce1..57bf0f9f5 100644
+index 9c7a2cc..00a9640 100644
 --- a/Core/MemMap.cpp
 +++ b/Core/MemMap.cpp
-@@ -226,12 +226,6 @@ bool MemoryMap_Setup(u32 flags) {
+@@ -117,7 +117,7 @@ static MemoryView views[] =
+ static const int num_views = sizeof(views) / sizeof(MemoryView);
+ 
+ inline static bool CanIgnoreView(const MemoryView &view) {
+-#if PPSSPP_ARCH(32BIT)
++#ifdef MASKED_PSP_MEMORY
+ 	// Basically, 32-bit platforms can ignore views that are masked out anyway.
+ 	return (view.flags & MV_MIRROR_PREVIOUS) && (view.virtual_address & ~MEMVIEW32_MASK) != 0;
+ #else
+@@ -185,9 +185,9 @@ static bool Memory_TryBase(u32 flags) {
+ bail:
+ 	// Argh! ERROR! Free what we grabbed so far so we can try again.
+ 	for (int j = 0; j <= i; j++) {
+-		if (views[i].size == 0)
++		if (views[j].size == 0)
+ 			continue;
+-		SKIP(flags, views[i].flags);
++		SKIP(flags, views[j].flags);
+ 		if (*views[j].out_ptr) {
+ 			if (!CanIgnoreView(views[j])) {
+ 				g_arena.ReleaseView(*views[j].out_ptr, views[j].size);
+@@ -220,18 +220,19 @@ bool MemoryMap_Setup(u32 flags) {
+ 
+ #if !PPSSPP_PLATFORM(ANDROID)
+ 	if (g_arena.NeedsProbing()) {
++#if defined(IOS) && defined(MASKED_PSP_MEMORY)
++		base = g_arena.Find4GBBase();
++		if (base && Memory_TryBase(flags)) {
++			INFO_LOG(MEMMAP, "Found valid iOS masked memory base at %p via Find4GBBase.", base);
++			return true;
++		}
++#endif
+ 		int base_attempts = 0;
+ #if defined(_WIN32) && PPSSPP_ARCH(32BIT)
+ 		// Try a whole range of possible bases. Return once we got a valid one.
  		uintptr_t max_base_addr = 0x7FFF0000 - 0x10000000;
  		uintptr_t min_base_addr = 0x01000000;
  		uintptr_t stride = 0x400000;
@@ -94,7 +164,7 @@ index 9c7a2cce1..57bf0f9f5 100644
  		for (uintptr_t base_addr = min_base_addr; base_addr < max_base_addr; base_addr += stride) {
  			base_attempts++;
  			base = (u8 *)base_addr;
-@@ -240,8 +234,25 @@ bool MemoryMap_Setup(u32 flags) {
+@@ -240,8 +241,25 @@ bool MemoryMap_Setup(u32 flags) {
  				return true;
  			}
  		}
@@ -121,7 +191,16 @@ index 9c7a2cce1..57bf0f9f5 100644
  		return false;
  	}
  	else
-@@ -286,7 +297,10 @@ void Init() {
+@@ -261,7 +279,7 @@ void MemoryMap_Shutdown(u32 flags) {
+ 		if (views[i].size == 0)
+ 			continue;
+ 		SKIP(flags, views[i].flags);
+-		if (*views[i].out_ptr)
++		if (*views[i].out_ptr && !CanIgnoreView(views[i]))
+ 			g_arena.ReleaseView(*views[i].out_ptr, views[i].size);
+ 		*views[i].out_ptr = nullptr;
+ 	}
+@@ -286,7 +304,10 @@ void Init() {
  			views[i].size = std::min(std::max((int)g_MemorySize - MAX_MMAP_SIZE * 2, 0), MAX_MMAP_SIZE);
  	}
  	int flags = 0;
@@ -133,6 +212,19 @@ index 9c7a2cce1..57bf0f9f5 100644
  
  	INFO_LOG(MEMMAP, "Memory system initialized. Base at %p (RAM at @ %p, uncached @ %p)",
  		base, m_pPhysicalRAM, m_pUncachedRAM);
+diff --git a/Core/MemMap.h b/Core/MemMap.h
+index 28c635c..4eb9b67 100644
+--- a/Core/MemMap.h
++++ b/Core/MemMap.h
+@@ -84,7 +84,7 @@ extern u32 g_PSPModel;
+ 
+ // UWP has such limited memory management that we need to mask
+ // even in 64-bit mode. Also, when using the sanitizer, we need to mask as well.
+-#if PPSSPP_ARCH(32BIT) || PPSSPP_PLATFORM(UWP) || USE_ADDRESS_SANITIZER
++#if PPSSPP_ARCH(32BIT) || PPSSPP_PLATFORM(UWP) || USE_ADDRESS_SANITIZER || defined(IOS)
+ #define MASKED_PSP_MEMORY
+ #endif
+ 
 diff --git a/Core/System.cpp b/Core/System.cpp
 index eff04fbea..b09cb92cf 100644
 --- a/Core/System.cpp

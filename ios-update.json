@@ -1,11 +1,11 @@
 {
-  "version": "0.27.0",
-  "build": 60,
+  "version": "0.28.0",
+  "build": 61,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.27.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.28.0",
   "notes": [
-    "Pokédex do Gaming Mode usa imagens correspondentes a cada espécie e variante shiny; silhuetas preservam o formato da mesma espécie.",
-    "A primeira consulta da imagem requer internet. Cache local evita downloads repetidos; imagens indisponíveis são indicadas sem criaturas substitutas.",
-    "Adiciona botões de espécie anterior/próxima e fechar no dispositivo. Preserva SideStore, Save Sync, controles e núcleos existentes."
+    "Corrige suporte PSP (PPSSPP) no iOS com MASKED_PSP_MEMORY, alinhamento de 16 KB, superfície OpenGL ES 1024 e leitura de .cso.",
+    "Adiciona pesquisa por nome sem distinção de maiúsculas/acentos e filtro dinâmico por console no Gaming Mode.",
+    "Adiciona aba MYbrumCONTROL (somente rede local Wi-Fi/LAN) para usar o iPhone como controle virtual isolado em outro PC."
   ]
 }

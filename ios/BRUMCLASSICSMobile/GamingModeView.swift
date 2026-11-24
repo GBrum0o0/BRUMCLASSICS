@@ -9,11 +9,13 @@ struct GamingModeView: View {
     @State private var selectedGame: Game?
     @State private var selectedROM: ROMFolderGame?
     @State private var quickRemoteTarget: MurbRemoteLaunchTarget?
-    private enum GamingSection: String { case recent, library, extensions }
+    private enum GamingSection: String { case recent, library, extensions, myBrumControl }
     @State private var activeSection: GamingSection = .recent
     @AppStorage("gaming-mode-favorites-v1") private var favoritesJSON = "[]"
 
     @State private var catalogSnapshot = GamingCatalogSnapshot.empty
+    @State private var searchQuery = ""
+    @State private var selectedConsole = "all"
     private let columns = [GridItem(.adaptive(minimum: 135), spacing: 16)]
     private var favoriteIDs: Set<String> {
         guard let data = favoritesJSON.data(using: .utf8),
@@ -28,6 +30,18 @@ struct GamingModeView: View {
     }
     private var libraryEntries: [GamingCatalogEntry] { catalogSnapshot.library }
     private var recentEntries: [GamingCatalogEntry] { catalogSnapshot.recent }
+    private var activeBaseEntries: [GamingCatalogEntry] {
+        (activeSection == .library || recentEntries.isEmpty) ? libraryEntries : recentEntries
+    }
+    private var consoleOptions: [GamingConsoleOption] {
+        GamingModeCatalog.availableConsoles(in: activeBaseEntries)
+    }
+    private var filteredEntries: [GamingCatalogEntry] {
+        GamingModeCatalog.filter(activeBaseEntries, query: searchQuery, consoleKey: selectedConsole)
+    }
+    private var hasActiveFilters: Bool {
+        !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || selectedConsole != "all"
+    }
 
     private func refreshCatalog() {
         catalogSnapshot = GamingModeCatalog.buildSnapshot(
@@ -36,6 +50,10 @@ struct GamingModeView: View {
             computer: store.snapshot.games,
             favorites: favoriteIDs
         )
+        let validKeys = Set(consoleOptions.map(\.id))
+        if selectedConsole != "all" && !validKeys.contains(selectedConsole) {
+            selectedConsole = "all"
+        }
     }
 
     var body: some View {
@@ -57,6 +75,8 @@ struct GamingModeView: View {
                             .accessibilityIdentifier("gaming-mode-library")
                         libraryTab("EXTENSÕES", selected: activeSection == .extensions) { activeSection = .extensions }
                             .accessibilityIdentifier("gaming-mode-extensions")
+                        libraryTab("MYbrumCONTROL", selected: activeSection == .myBrumControl) { activeSection = .myBrumControl }
+                            .accessibilityIdentifier("gaming-mode-mybrumcontrol")
                     }
                     if let activeRemote = store.activeRemoteGamepadSession {
                         BrumCard {
@@ -81,23 +101,41 @@ struct GamingModeView: View {
                     }
                     if activeSection == .extensions {
                         PokedexGamingExtensionView()
-                    } else if let featured = recentEntries.first ?? libraryEntries.first {
-                        GamingHero(title: featured.title, platform: platform(for: featured), artwork: artwork(for: featured)) {
-                            Button("VER DETALHES") { open(featured) }
-                                .buttonStyle(PrimaryButtonStyle()).frame(maxWidth: 180)
-                        }
-                        if activeSection == .library || recentEntries.isEmpty {
-                            gameSection(title: "Biblioteca") { ForEach(libraryEntries) { entryTile($0) } }
-                        } else {
-                            gameSection(title: "Jogos recentes e favoritos") { ForEach(recentEntries) { entryTile($0) } }
-                        }
-                    } else {
+                    } else if activeSection == .myBrumControl {
+                        MyBrumControlView()
+                    } else if activeBaseEntries.isEmpty {
                         BrumCard {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Nenhum jogo pronto").font(.headline).foregroundStyle(BrumTheme.text)
                                 Text("Toque na engrenagem acima para selecionar uma pasta de ROMs ou instale um jogo no computador.")
                                     .font(.subheadline).foregroundStyle(.secondary)
                             }.frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    } else {
+                        gamingSearchAndFilterBar
+                        if let featured = filteredEntries.first {
+                            GamingHero(title: featured.title, platform: platform(for: featured), artwork: artwork(for: featured)) {
+                                Button("VER DETALHES") { open(featured) }
+                                    .buttonStyle(PrimaryButtonStyle()).frame(maxWidth: 180)
+                            }
+                            let title = (activeSection == .library || recentEntries.isEmpty) ? "Biblioteca" : "Jogos recentes e favoritos"
+                            gameSection(title: title) { ForEach(filteredEntries) { entryTile($0) } }
+                        } else {
+                            BrumCard {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Text("Nenhum jogo encontrado").font(.headline).foregroundStyle(BrumTheme.text)
+                                    Text("Nenhum clássico corresponde à pesquisa ou ao console selecionado.")
+                                        .font(.subheadline).foregroundStyle(.secondary)
+                                    if hasActiveFilters {
+                                        Button("Limpar pesquisa e filtros") {
+                                            searchQuery = ""
+                                            selectedConsole = "all"
+                                        }
+                                        .buttonStyle(PrimaryButtonStyle())
+                                        .frame(maxWidth: 240)
+                                    }
+                                }.frame(maxWidth: .infinity, alignment: .leading)
+                            }
                         }
                     }
                 }.padding(20).frame(maxWidth: 1200, alignment: .leading).frame(maxWidth: .infinity)
@@ -120,6 +158,74 @@ struct GamingModeView: View {
         .fullScreenCover(item: $selectedROM) { GamingROMDetailView(rom: $0) }
         .fullScreenCover(item: $quickRemoteTarget) { target in
             MurbRemoteGamepadView(target: target.payload, gameTitle: target.gameTitle, playerNumber: target.playerNumber, p2Payload: target.p2Payload)
+        }
+    }
+
+    @ViewBuilder
+    private var gamingSearchAndFilterBar: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                    TextField("Pesquisar jogos clássicos…", text: $searchQuery)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled(true)
+                        .foregroundStyle(BrumTheme.text)
+                        .accessibilityIdentifier("gaming-mode-search-field")
+                    if !searchQuery.isEmpty {
+                        Button {
+                            searchQuery = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Limpar pesquisa")
+                        .accessibilityIdentifier("gaming-mode-search-clear")
+                    }
+                }
+                .padding(.horizontal, 12)
+                .frame(minHeight: 42)
+                .background(BrumTheme.surface, in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.08), lineWidth: 1))
+
+                if hasActiveFilters {
+                    Button("Limpar filtros") {
+                        searchQuery = ""
+                        selectedConsole = "all"
+                    }
+                    .font(.caption.bold())
+                    .foregroundStyle(BrumTheme.primary)
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 42)
+                    .background(BrumTheme.primary.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                    .accessibilityIdentifier("gaming-mode-clear-filters")
+                }
+            }
+
+            if consoleOptions.count > 1 {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(consoleOptions) { option in
+                            let selected = selectedConsole == option.id
+                            Button {
+                                selectedConsole = option.id
+                            } label: {
+                                Text(option.id == "all" ? option.label : "\(option.label) (\(option.count))")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(selected ? Color.black : BrumTheme.text)
+                                    .padding(.horizontal, 12)
+                                    .frame(minHeight: 34)
+                                    .background(selected ? BrumTheme.primary : BrumTheme.surface, in: Capsule())
+                                    .overlay(Capsule().stroke(selected ? BrumTheme.primary : Color.white.opacity(0.1), lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("gaming-mode-console-\(option.id)")
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -543,6 +649,98 @@ enum GamingModeCatalog {
         dateLock.lock()
         defer { dateLock.unlock() }
         return isoFractionalFormatter.date(from: stamp) ?? isoFormatter.date(from: stamp)
+    }
+
+    struct GamingConsoleOption: Identifiable, Equatable {
+        let id: String
+        let label: String
+        let count: Int
+    }
+
+    static func normalizeSearch(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+    }
+
+    static func consoleKey(for entry: GamingCatalogEntry) -> String {
+        switch entry {
+        case .local(let rom, _):
+            guard let sys = IntegratedEmulatorSupport.system(for: rom) else { return "unidentified" }
+            return sys.rawValue
+        case .computer(let game):
+            let key = normalizedPlatform(game.platform)
+            if ["", "unknown", "unidentified", "classic", "retro", "auto", "other", "outros"].contains(key) {
+                return "unidentified"
+            }
+            return key
+        }
+    }
+
+    static func consoleLabel(for key: String) -> String {
+        switch key {
+        case "all": return "Todos os consoles"
+        case "unidentified": return "Não identificado"
+        case "gb": return "Game Boy"
+        case "gbc": return "Game Boy Color"
+        case "gba": return "Game Boy Advance"
+        case "nds", "ds": return "Nintendo DS"
+        case "3ds": return "Nintendo 3DS"
+        case "nes": return "NES"
+        case "sfc", "snes": return "Super Nintendo"
+        case "n64": return "Nintendo 64"
+        case "gamecube": return "GameCube"
+        case "wii": return "Nintendo Wii"
+        case "wiiu": return "Wii U"
+        case "psx", "ps1": return "PlayStation"
+        case "ps2": return "PlayStation 2"
+        case "psp": return "PSP"
+        case "md": return "Mega Drive"
+        case "sms": return "Master System"
+        case "gg": return "Game Gear"
+        case "segacd": return "Sega CD"
+        case "32x": return "Sega 32X"
+        case "saturn": return "Sega Saturn"
+        case "dreamcast": return "Dreamcast"
+        case "pce": return "PC Engine"
+        case "neogeo": return "Neo Geo"
+        case "ws": return "WonderSwan"
+        case "wsc": return "WonderSwan Color"
+        case "atari2600": return "Atari 2600"
+        case "arcade": return "Arcade"
+        default: return key.uppercased()
+        }
+    }
+
+    static func availableConsoles(in entries: [GamingCatalogEntry]) -> [GamingConsoleOption] {
+        var counts: [String: Int] = [:]
+        for entry in entries {
+            counts[consoleKey(for: entry), default: 0] += 1
+        }
+        var sorted = counts
+            .filter { $0.key != "unidentified" }
+            .map { GamingConsoleOption(id: $0.key, label: consoleLabel(for: $0.key), count: $0.value) }
+            .sorted { $0.label.localizedStandardCompare($1.label) == .orderedAscending }
+        if let unidentifiedCount = counts["unidentified"] {
+            sorted.append(GamingConsoleOption(id: "unidentified", label: consoleLabel(for: "unidentified"), count: unidentifiedCount))
+        }
+        return [GamingConsoleOption(id: "all", label: consoleLabel(for: "all"), count: entries.count)] + sorted
+    }
+
+    static func filter(_ entries: [GamingCatalogEntry], query: String, consoleKey selectedConsole: String) -> [GamingCatalogEntry] {
+        let foldedQuery = normalizeSearch(query)
+        let console = selectedConsole.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return entries.filter { entry in
+            if !console.isEmpty && console != "all" && consoleKey(for: entry) != console {
+                return false
+            }
+            if !foldedQuery.isEmpty {
+                return normalizeSearch(entry.title).contains(foldedQuery)
+            }
+            return true
+        }
     }
 }
 

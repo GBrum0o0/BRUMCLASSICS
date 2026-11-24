@@ -44,12 +44,18 @@ public final class MurbRemoteClient {
         public final int port;
         public final String token;
         public final String system;
+        public final String pcName;
 
         public PairingTarget(String host, int port, String token, String system) {
+            this(host, port, token, system, "");
+        }
+
+        public PairingTarget(String host, int port, String token, String system, String pcName) {
             this.host = host;
             this.port = port;
             this.token = token;
             this.system = system;
+            this.pcName = pcName == null ? "" : pcName;
         }
     }
 
@@ -63,6 +69,8 @@ public final class MurbRemoteClient {
         void onPingRtt(int rttMs);
 
         void onSystemIdentified(String system);
+
+        default void onSessionMetadata(String pcName, String gameTitle, int player) {}
 
         void onError(String message);
     }
@@ -80,28 +88,9 @@ public final class MurbRemoteClient {
     }
 
     public static PairingTarget parseUri(String raw) {
-        if (raw == null || !raw.trim().toLowerCase(Locale.ROOT).startsWith("murb://"))
-            return null;
-        try {
-            Uri uri = Uri.parse(raw.trim());
-            String ip = uri.getQueryParameter("ip");
-            if (ip == null || ip.trim().isEmpty())
-                ip = uri.getQueryParameter("host");
-            String token = uri.getQueryParameter("token");
-            String portStr = uri.getQueryParameter("port");
-            int port = (portStr == null || portStr.trim().isEmpty()) ? 8089 : Integer.parseInt(portStr.trim());
-            if (ip == null || ip.trim().isEmpty() || token == null || token.trim().isEmpty() || port < 1
-                    || port > 65535) {
-                return null;
-            }
-            String sys = uri.getQueryParameter("sys");
-            if (sys == null || sys.trim().isEmpty())
-                sys = uri.getHost();
-            return new PairingTarget(ip.trim(), port, token.trim().toUpperCase(Locale.ROOT),
-                    MurbRemoteProtocol.normalizeSystem(sys));
-        } catch (Exception ignored) {
-            return null;
-        }
+        MurbRemoteProtocol.PairingPayload p = MurbRemoteProtocol.validateMurbUri(raw, false);
+        if (p == null) return null;
+        return new PairingTarget(p.host, p.port, p.token, p.system, p.pcName);
     }
 
     public static MurbRemoteProtocol.FrameHeader parseFrameHeader(byte[] payload) {
@@ -199,6 +188,12 @@ public final class MurbRemoteClient {
 
     public void disconnect() {
         running.set(false);
+        if (connected.get() && output != null) {
+            try {
+                sendText("{\"type\":\"input\",\"buttons\":0,\"touching\":false,\"x\":0,\"y\":0,\"stickX\":0,\"stickY\":0,\"rStickX\":0,\"rStickY\":0}");
+            } catch (Exception ignored) {
+            }
+        }
         connected.set(false);
         pendingInputJson.set(null);
         pendingFrame.set(null);
@@ -332,6 +327,12 @@ public final class MurbRemoteClient {
                     if (obj.has("sys")) {
                         String sys = normalizeSystem(obj.optString("sys"));
                         mainHandler.post(() -> listener.onSystemIdentified(sys));
+                    }
+                    String pcName = obj.optString("pcName", "").trim();
+                    String gameTitle = obj.optString("gameTitle", "").trim();
+                    int player = obj.optInt("player", 0);
+                    if (!pcName.isEmpty() || !gameTitle.isEmpty() || player > 0) {
+                        mainHandler.post(() -> listener.onSessionMetadata(pcName, gameTitle, player));
                     }
                     if (obj.has("pong") || "pong".equals(obj.optString("type"))) {
                         long sent = obj.optLong("ts", 0);

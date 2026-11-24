@@ -110,15 +110,24 @@ enum ROMFolderScanner {
         let lower = folderName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let format = ext.lowercased()
         switch lower {
-        case "ps1", "psx" where ["cue", "chd", "pbp", "m3u", "bin", "iso"].contains(format): return .playStation
-        case "ps2" where ["iso", "bin", "chd", "m3u"].contains(format): return .playStation2
-        case "saturn" where ["cue", "chd", "m3u"].contains(format): return .saturn
-        case "sega cd", "segacd", "mega cd", "megacd" where ["cue", "chd", "iso"].contains(format): return .segaCD
-        case "arcade", "fbneo", "mame" where ["zip", "7z"].contains(format): return .arcade
-        case "psp", "playstation portable", "sony psp" where ["iso", "pbp", "prx"].contains(format): return .playStationPortable
-        case "dreamcast" where ["chd", "cdi", "m3u"].contains(format): return .dreamcast
-        case "3ds" where ["app", "elf", "axf"].contains(format): return .nintendo3DS
-        case "gamecube" where ["iso", "ciso", "gcm"].contains(format): return .gameCube
+        case "ps1", "psx":
+            return ["cue", "chd", "pbp", "m3u", "bin", "iso"].contains(format) ? .playStation : nil
+        case "ps2":
+            return ["iso", "bin", "chd", "m3u"].contains(format) ? .playStation2 : nil
+        case "saturn":
+            return ["cue", "chd", "m3u"].contains(format) ? .saturn : nil
+        case "sega cd", "segacd", "mega cd", "megacd":
+            return ["cue", "chd", "iso"].contains(format) ? .segaCD : nil
+        case "arcade", "fbneo", "mame":
+            return ["zip", "7z"].contains(format) ? .arcade : nil
+        case "psp", "playstation portable", "sony psp":
+            return ["iso", "cso", "pbp", "prx"].contains(format) ? .playStationPortable : nil
+        case "dreamcast":
+            return ["chd", "cdi", "m3u"].contains(format) ? .dreamcast : nil
+        case "3ds":
+            return ["app", "elf", "axf"].contains(format) ? .nintendo3DS : nil
+        case "gamecube":
+            return ["iso", "ciso", "gcm"].contains(format) ? .gameCube : nil
         default: return nil
         }
     }

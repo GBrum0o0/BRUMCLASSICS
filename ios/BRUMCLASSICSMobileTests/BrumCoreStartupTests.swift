@@ -168,4 +168,25 @@ final class BrumCoreStartupTests: XCTestCase {
             XCTAssertEqual(ready(), 1, controller.diagnosticsReport)
         }
     }
+
+    func testPSPFolderHintAndIdentityCacheInvalidateOnContentChange() throws {
+        XCTAssertEqual(ROMFolderLibrary.folderSystemHint(folderName: "psp", extension: "iso"), .playStationPortable)
+        XCTAssertEqual(ROMFolderLibrary.folderSystemHint(folderName: "playstation portable", extension: "cso"), .playStationPortable)
+        XCTAssertEqual(ROMFolderLibrary.folderSystemHint(folderName: "sony psp", extension: "pbp"), .playStationPortable)
+
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let csoURL = directory.appendingPathComponent("demo.cso")
+        try Data([0x43, 0x49, 0x53, 0x4F, 0x01, 0x02]).write(to: csoURL)
+        let first = try ROMContentInspector.inspect(url: csoURL, filename: "demo.cso")
+        let cached = try ROMContentInspector.inspect(url: csoURL, filename: "demo.cso")
+        XCTAssertEqual(first.systemID, .playStationPortable)
+        XCTAssertEqual(first.contentSHA256, cached.contentSHA256)
+
+        try Data([0x43, 0x49, 0x53, 0x4F, 0x09, 0x0A, 0x0B]).write(to: csoURL)
+        let modified = try ROMContentInspector.inspect(url: csoURL, filename: "demo.cso")
+        XCTAssertNotEqual(first.contentSHA256, modified.contentSHA256)
+    }
 }

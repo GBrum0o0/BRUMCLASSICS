@@ -693,11 +693,39 @@ static void BrumVideo(const void *data, unsigned width, unsigned height, size_t 
     if (data == BrumHardwareFrameBuffer) {
         if (!host->_hardwareInitialized || width > (unsigned)host->_hardwareSurfaceSize || height > (unsigned)host->_hardwareSurfaceSize) return;
         while (glGetError() != GL_NO_ERROR) {}
+        GLint prevFramebuffer = 0;
+        GLint prevPackAlignment = 4, prevPackRowLength = 0, prevPackSkipRows = 0, prevPackSkipPixels = 0;
+        GLint prevPackBuffer = 0;
+        const GLboolean hadScissor = glIsEnabled(GL_SCISSOR_TEST);
+        const BOOL isES3 = host->_hardwareContext && host->_hardwareContext.API >= kEAGLRenderingAPIOpenGLES3;
+        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFramebuffer);
+        glGetIntegerv(GL_PACK_ALIGNMENT, &prevPackAlignment);
+        if (isES3) {
+            glGetIntegerv(GL_PACK_ROW_LENGTH, &prevPackRowLength);
+            glGetIntegerv(GL_PACK_SKIP_ROWS, &prevPackSkipRows);
+            glGetIntegerv(GL_PACK_SKIP_PIXELS, &prevPackSkipPixels);
+            glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING, &prevPackBuffer);
+            if (prevPackBuffer != 0) glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+            glPixelStorei(GL_PACK_ROW_LENGTH, 0);
+            glPixelStorei(GL_PACK_SKIP_ROWS, 0);
+            glPixelStorei(GL_PACK_SKIP_PIXELS, 0);
+        }
+        if (hadScissor) glDisable(GL_SCISSOR_TEST);
         glBindFramebuffer(GL_FRAMEBUFFER, host->_hardwareFramebuffer);
         host->_hwReadbackRGBA.resize(byteCount);
         glPixelStorei(GL_PACK_ALIGNMENT, 1);
         glReadPixels(0, 0, (GLsizei)width, (GLsizei)height, GL_RGBA, GL_UNSIGNED_BYTE, host->_hwReadbackRGBA.data());
-        if (glGetError() != GL_NO_ERROR) return;
+        const GLenum readErr = glGetError();
+        glPixelStorei(GL_PACK_ALIGNMENT, prevPackAlignment);
+        if (isES3) {
+            glPixelStorei(GL_PACK_ROW_LENGTH, prevPackRowLength);
+            glPixelStorei(GL_PACK_SKIP_ROWS, prevPackSkipRows);
+            glPixelStorei(GL_PACK_SKIP_PIXELS, prevPackSkipPixels);
+            if (prevPackBuffer != 0) glBindBuffer(GL_PIXEL_PACK_BUFFER, (GLuint)prevPackBuffer);
+        }
+        if (hadScissor) glEnable(GL_SCISSOR_TEST);
+        glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)prevFramebuffer);
+        if (readErr != GL_NO_ERROR) return;
         const uint8_t *source = host->_hwReadbackRGBA.data();
         for (unsigned y = 0; y < height; y++) {
             unsigned sourceY = host->_hardwareCallback.bottom_left_origin ? height - 1 - y : y;
@@ -975,9 +1003,8 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _rgbColorSpace = CGColorSpaceCreateDeviceRGB();
     _audioCapacity = 262144;
     _audioRing = (int16_t *)calloc(_audioCapacity, sizeof(int16_t));
-    // 2048x2048 bounds the experimental GLES adapter's native output while
-    // avoiding a 128+ MB color/depth allocation that can terminate the app.
-    _hardwareSurfaceSize = 2048;
+    // PSP benefits from a 1024x1024 surface (supports up to 960x544 while saving GPU RAM on iPhone).
+    _hardwareSurfaceSize = [_emulatedSystemID isEqualToString:@"psp"] ? 1024 : 2048;
     NSError *startupError = nil;
     if (![self prepareDirectories:&startupError]) {
         _startupError = startupError;
@@ -1145,9 +1172,12 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 
 - (BOOL)initializeHardware:(NSError **)error {
     if (!_hardwarePending || _hardwareInitialized) return YES;
-    EAGLRenderingAPI api = _hardwareCallback.context_type == BRUM_RETRO_HW_CONTEXT_OPENGLES2
-        ? kEAGLRenderingAPIOpenGLES2 : kEAGLRenderingAPIOpenGLES3;
+    EAGLRenderingAPI api = kEAGLRenderingAPIOpenGLES3;
     _hardwareContext = [[EAGLContext alloc] initWithAPI:api];
+    if (!_hardwareContext && _hardwareCallback.context_type == BRUM_RETRO_HW_CONTEXT_OPENGLES2) {
+        api = kEAGLRenderingAPIOpenGLES2;
+        _hardwareContext = [[EAGLContext alloc] initWithAPI:api];
+    }
     if (!_hardwareContext || ![EAGLContext setCurrentContext:_hardwareContext]) {
         if (error) *error = [NSError errorWithDomain:BrumLibretroErrorDomain code:9 userInfo:@{NSLocalizedDescriptionKey: @"Este aparelho não conseguiu criar o contexto OpenGL ES exigido pelo núcleo."}];
         return NO;
@@ -2301,7 +2331,16 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [_diagnostics enterStage:@"initialize_graphics"];
     if (![self initializeHardware:error]) return NO;
     [self restoreSaveRAM];
-    [self startRetroAchievementsSession];
+    if (_romData && _romData.length > 0) {
+        [self startRetroAchievementsSession];
+    } else {
+        __weak BrumLibretroViewController *weakSelf = self;
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+            BrumLibretroViewController *strongSelf = weakSelf;
+            if (!strongSelf || strongSelf->_stopped) return;
+            [strongSelf startRetroAchievementsSession];
+        });
+    }
     [self startPokedexCaptureSession];
     brum_retro_system_av_info avInfo = {};
     _core.getAVInfo(&avInfo);

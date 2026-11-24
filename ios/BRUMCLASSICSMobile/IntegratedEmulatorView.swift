@@ -45,15 +45,24 @@ enum IntegratedEmulatorSupport {
         // Nearest recognized directory wins, but only for a supported format.
         for folder in folders.reversed() {
             switch folder {
-            case "ps1", "psx": return ["cue", "chd", "pbp", "m3u", "bin", "iso"].contains(ext) ? .playStation : nil
-            case "ps2" where ["iso", "bin", "chd", "m3u"].contains(ext): return .playStation2
-            case "saturn" where ["cue", "chd", "m3u"].contains(ext): return .saturn
-            case "sega cd", "segacd", "mega cd", "megacd": return ["cue", "chd", "iso"].contains(ext) ? .segaCD : nil
-            case "arcade", "fbneo", "mame": return ["zip", "7z"].contains(ext) ? .arcade : nil
-            case "psp", "playstation portable", "sony psp" where ["iso", "pbp", "prx"].contains(ext): return .playStationPortable
-            case "dreamcast" where ["chd", "cdi", "m3u"].contains(ext): return .dreamcast
-            case "3ds" where ["app", "elf", "axf"].contains(ext): return .nintendo3DS
-            case "gamecube" where ["iso", "ciso", "gcm"].contains(ext): return .gameCube
+            case "ps1", "psx":
+                if ["cue", "chd", "pbp", "m3u", "bin", "iso"].contains(ext) { return .playStation }
+            case "ps2":
+                if ["iso", "bin", "chd", "m3u"].contains(ext) { return .playStation2 }
+            case "saturn":
+                if ["cue", "chd", "m3u"].contains(ext) { return .saturn }
+            case "sega cd", "segacd", "mega cd", "megacd":
+                if ["cue", "chd", "iso"].contains(ext) { return .segaCD }
+            case "arcade", "fbneo", "mame":
+                if ["zip", "7z"].contains(ext) { return .arcade }
+            case "psp", "playstation portable", "sony psp":
+                if ["iso", "cso", "pbp", "prx"].contains(ext) { return .playStationPortable }
+            case "dreamcast":
+                if ["chd", "cdi", "m3u"].contains(ext) { return .dreamcast }
+            case "3ds":
+                if ["app", "elf", "axf"].contains(ext) { return .nintendo3DS }
+            case "gamecube":
+                if ["iso", "ciso", "gcm"].contains(ext) { return .gameCube }
             default: continue
             }
         }

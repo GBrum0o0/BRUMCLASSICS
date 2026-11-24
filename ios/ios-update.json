@@ -1,11 +1,11 @@
 {
-  "version": "0.27.0",
-  "build": 60,
+  "version": "0.28.0",
+  "build": 61,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.27.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.28.0",
   "notes": [
-    "Pokédex Universal com catálogo completo da 1ª à 7ª geração (#001–#809), filtro por geração, sprites sob demanda priorizados no visor e silhuetas da mesma espécie.",
-    "Reconexão rápida do Gamepad M.U.R.B com o jogo ativo no PC pareado em 1 toque, sem precisar ler novo QR Code a cada abertura.",
-    "Preserva SideStore, Save Sync, controles e núcleos existentes."
+    "Corrige suporte PSP (PPSSPP) no iOS com MASKED_PSP_MEMORY, alinhamento de 16 KB, superfície OpenGL ES 1024 e leitura de .cso.",
+    "Adiciona pesquisa por nome sem distinção de maiúsculas/acentos e filtro dinâmico por console no Gaming Mode.",
+    "Adiciona aba MYbrumCONTROL (somente rede local Wi-Fi/LAN) para usar o iPhone como controle virtual isolado em outro PC."
   ]
 }

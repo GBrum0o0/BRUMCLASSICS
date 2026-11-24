@@ -11,8 +11,49 @@ struct MurbPairingPayload: Codable, Equatable {
     var token: String
     var system: String
     var session: String
+    var pcName: String = ""
+    var isExternalControl: Bool = false
 
-    static func parse(_ url: URL) -> MurbPairingPayload? {
+    enum CodingKeys: String, CodingKey {
+        case host, port, token, system, session, pcName, isExternalControl
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.host = try c.decode(String.self, forKey: .host)
+        self.port = try c.decode(Int.self, forKey: .port)
+        self.token = try c.decode(String.self, forKey: .token)
+        self.system = try c.decode(String.self, forKey: .system)
+        self.session = try c.decodeIfPresent(String.self, forKey: .session) ?? ""
+        self.pcName = try c.decodeIfPresent(String.self, forKey: .pcName) ?? ""
+        self.isExternalControl = try c.decodeIfPresent(Bool.self, forKey: .isExternalControl) ?? false
+    }
+
+    static func isValidHost(_ host: String, allowLoopback: Bool = false) -> Bool {
+        let cleaned = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty,
+              cleaned.rangeOfCharacter(from: .whitespacesAndNewlines) == nil else { return false }
+        let parts = cleaned.split(separator: ".", omittingEmptySubsequences: false)
+        if parts.count == 4, parts.allSatisfy({ Int($0).map { (0...255).contains($0) } ?? false }) {
+            let octets = parts.compactMap { Int($0) }
+            if octets.allSatisfy({ $0 == 0 }) { return false }
+            if octets.first == 127 { return allowLoopback && cleaned == "127.0.0.1" }
+            return true
+        }
+        if !allowLoopback && cleaned.lowercased() == "localhost" { return false }
+        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-")
+        return cleaned.rangeOfCharacter(from: allowed.inverted) == nil && cleaned.count <= 253
+    }
+
+    static func isValidToken(_ token: String) -> Bool {
+        let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard (4...32).contains(trimmed.count) else { return false }
+        return trimmed.unicodeScalars.allSatisfy {
+            ($0.value >= 48 && $0.value <= 57) || ($0.value >= 65 && $0.value <= 90)
+        }
+    }
+
+    static func parse(_ url: URL, allowLoopback: Bool = false) -> MurbPairingPayload? {
         guard url.scheme?.lowercased() == "murb",
               let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
         let items = components.queryItems ?? []
@@ -24,7 +65,9 @@ struct MurbPairingPayload: Codable, Equatable {
         let token = query("token").uppercased()
         let rawPort = query("port")
         let parsedPort = rawPort.isEmpty ? 8089 : (Int(rawPort) ?? 0)
-        guard !host.isEmpty, !token.isEmpty, (1...65535).contains(parsedPort) else { return nil }
+        guard isValidHost(host, allowLoopback: allowLoopback),
+              isValidToken(token),
+              (1...65535).contains(parsedPort) else { return nil }
         let querySystem = query("sys").lowercased()
         let hostSystem = url.host?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
         let resolved = !querySystem.isEmpty ? querySystem : (!hostSystem.isEmpty ? hostSystem : "ds")
@@ -33,16 +76,41 @@ struct MurbPairingPayload: Codable, Equatable {
             port: parsedPort,
             token: token,
             system: MurbProtocol.normalizeSystem(resolved),
-            session: query("session")
+            session: query("session"),
+            pcName: query("pc"),
+            isExternalControl: false
         )
     }
 
-    init(host: String, port: Int = 8089, token: String, system: String = "ds", session: String = "") {
+    static func parseUserInput(_ raw: String, allowLoopback: Bool = false) -> MurbPairingPayload? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if let decoded = MurbControlPairingCode.decode(trimmed) {
+            return MurbPairingPayload(
+                host: decoded.host,
+                port: decoded.port,
+                token: decoded.token,
+                system: "gamepad",
+                session: "",
+                pcName: "",
+                isExternalControl: true
+            )
+        }
+        if trimmed.lowercased().hasPrefix("murb://"), let url = URL(string: trimmed), var parsed = parse(url, allowLoopback: allowLoopback) {
+            parsed.isExternalControl = true
+            return parsed
+        }
+        return nil
+    }
+
+    init(host: String, port: Int = 8089, token: String, system: String = "ds", session: String = "", pcName: String = "", isExternalControl: Bool = false) {
         self.host = host.trimmingCharacters(in: .whitespacesAndNewlines)
         self.port = port
         self.token = token.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         self.system = MurbProtocol.normalizeSystem(system)
         self.session = session
+        self.pcName = pcName.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.isExternalControl = isExternalControl
     }
 
     var streamURL: URL? {
@@ -348,6 +416,9 @@ final class MurbRemoteSession: ObservableObject {
     @Published private(set) var rttMs = 0
     @Published private(set) var activeSystem: String
     @Published private(set) var physicalControllerName: String?
+    @Published private(set) var remotePCName: String
+    @Published private(set) var remoteGameTitle = ""
+    @Published private(set) var assignedPlayer = 1
 
     var onVideoFrame: ((CGImage) -> Void)?
     private(set) var latestFrame: CGImage?
@@ -378,6 +449,7 @@ final class MurbRemoteSession: ObservableObject {
     init(target: MurbPairingPayload) {
         self.target = target
         self.activeSystem = target.system
+        self.remotePCName = target.pcName
     }
 
     func start() {
@@ -579,6 +651,15 @@ final class MurbRemoteSession: ObservableObject {
                 activeSystem = normalized
             }
         }
+        if let pc = object["pcName"] as? String, !pc.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            remotePCName = pc.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let title = object["gameTitle"] as? String, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            remoteGameTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let player = (object["player"] as? NSNumber)?.intValue, (1...4).contains(player) {
+            assignedPlayer = player
+        }
         if let ts = (object["ts"] as? NSNumber)?.int64Value,
            object["pong"] != nil || (object["type"] as? String) == "pong" {
             let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
@@ -770,6 +851,18 @@ struct MurbRemoteGamepadView: View {
 
     private var isDualScreen: Bool { MurbProtocol.supportsDualScreen(session.activeSystem) }
 
+    var effectiveGameTitle: String {
+        let sessionTitle = session.remoteGameTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !gameTitle.isEmpty { return gameTitle }
+        if !sessionTitle.isEmpty { return sessionTitle }
+        if !session.remotePCName.isEmpty { return session.remotePCName }
+        return ""
+    }
+
+    var effectivePlayer: Int {
+        max(1, min(4, session.assignedPlayer > 0 ? session.assignedPlayer : playerNumber))
+    }
+
     var body: some View {
         ZStack {
             BrumTheme.deepBackground.ignoresSafeArea()
@@ -800,9 +893,9 @@ struct MurbRemoteGamepadView: View {
                         Circle()
                             .fill(session.state == .connected ? BrumTheme.primary : .orange)
                             .frame(width: 8, height: 8)
-                        Text(gameTitle.isEmpty
-                             ? "P\(playerNumber) · M.U.R.B \(session.activeSystem.uppercased()) · PC"
-                             : "P\(playerNumber) · \(gameTitle)")
+                        Text(effectiveGameTitle.isEmpty
+                             ? "P\(effectivePlayer) · M.U.R.B \(session.activeSystem.uppercased()) · PC"
+                             : "P\(effectivePlayer) · \(effectiveGameTitle)")
                             .font(.caption2.bold()).foregroundStyle(BrumTheme.text).lineLimit(1)
                         Text(telemetryText).font(.caption2.monospacedDigit()).foregroundStyle(BrumTheme.muted)
                         if let controller = session.physicalControllerName {
@@ -1425,5 +1518,369 @@ private final class MurbRemotePadUIView: UIView {
         let sx = Int((stickVector.x * 32767.0).rounded())
         let sy = Int((stickVector.y * 32767.0).rounded())
         onInput?(buttonMask, screenTouchID != nil, tx, ty, sx, sy)
+    }
+}
+
+enum MurbControlPairingCode {
+    private static let alphabet = Array("0123456789ABCDEFGHJKMNPQRSTVWXYZ")
+    private static let decodeMap: [Character: Int] = {
+        var map: [Character: Int] = [:]
+        for (i, ch) in alphabet.enumerated() { map[ch] = i }
+        map["O"] = 0
+        map["I"] = 1
+        map["L"] = 1
+        return map
+    }()
+
+    static func crc8(_ bytes: [UInt8]) -> UInt8 {
+        var crc: UInt8 = 0
+        for byte in bytes {
+            crc ^= byte
+            for _ in 0..<8 {
+                if (crc & 0x80) != 0 {
+                    crc = (crc &<< 1) ^ 0x07
+                } else {
+                    crc = crc &<< 1
+                }
+            }
+        }
+        return crc
+    }
+
+    static func encode(host: String, port: Int, token: String) -> String? {
+        let parts = host.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 4 else { return nil }
+        let octets = parts.compactMap { Int($0) }
+        guard octets.count == 4, octets.allSatisfy({ (0...255).contains($0) }),
+              !octets.allSatisfy({ $0 == 0 }), octets[0] != 127,
+              (1...65535).contains(port) else { return nil }
+        let cleanToken = token.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard cleanToken.count == 6,
+              cleanToken.unicodeScalars.allSatisfy({ ($0.value >= 48 && $0.value <= 57) || ($0.value >= 65 && $0.value <= 90) }) else {
+            return nil
+        }
+
+        var payload: [UInt8] = [
+            1,
+            UInt8(octets[0]), UInt8(octets[1]), UInt8(octets[2]), UInt8(octets[3]),
+            UInt8((port >> 8) & 0xFF), UInt8(port & 0xFF)
+        ]
+        payload.append(contentsOf: cleanToken.utf8)
+        payload.append(crc8(payload))
+
+        var buffer = 0
+        var bitsLeft = 0
+        var encoded = ""
+        for byte in payload {
+            buffer = (buffer << 8) | Int(byte)
+            bitsLeft += 8
+            while bitsLeft >= 5 {
+                encoded.append(alphabet[(buffer >> (bitsLeft - 5)) & 0x1F])
+                bitsLeft -= 5
+            }
+        }
+        if bitsLeft > 0 {
+            encoded.append(alphabet[(buffer << (5 - bitsLeft)) & 0x1F])
+        }
+        let chars = Array(encoded)
+        guard chars.count == 23 else { return nil }
+        return "MBC-\(String(chars[0..<4]))-\(String(chars[4..<8]))-\(String(chars[8..<12]))-\(String(chars[12..<16]))-\(String(chars[16..<20]))-\(String(chars[20..<23]))"
+    }
+
+    static func decode(_ raw: String) -> (host: String, port: Int, token: String)? {
+        let upper = raw.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !upper.isEmpty, !upper.contains("://") else { return nil }
+        let body = (upper.hasPrefix("MBC") ? String(upper.dropFirst(3)) : upper)
+            .filter { !$0.isWhitespace && $0 != "-" }
+        guard body.count == 23 else { return nil }
+
+        var buffer = 0
+        var bitsLeft = 0
+        var bytes: [UInt8] = []
+        for ch in body {
+            guard let val = decodeMap[ch] else { return nil }
+            buffer = (buffer << 5) | val
+            bitsLeft += 5
+            if bitsLeft >= 8 {
+                bytes.append(UInt8((buffer >> (bitsLeft - 8)) & 0xFF))
+                bitsLeft -= 8
+            }
+        }
+        guard bytes.count == 14, bytes[0] == 1, crc8(Array(bytes[0..<13])) == bytes[13] else { return nil }
+        let host = "\(bytes[1]).\(bytes[2]).\(bytes[3]).\(bytes[4])"
+        let port = (Int(bytes[5]) << 8) | Int(bytes[6])
+        guard MurbPairingPayload.isValidHost(host), (1...65535).contains(port) else { return nil }
+        let tokenBytes = Array(bytes[7..<13])
+        guard tokenBytes.allSatisfy({ ($0 >= 48 && $0 <= 57) || ($0 >= 65 && $0 <= 90) }),
+              let token = String(bytes: tokenBytes, encoding: .ascii) else { return nil }
+        return (host, port, token)
+    }
+}
+
+@MainActor
+final class MyBrumControlStore: ObservableObject {
+    private static let savedPayloadKey = "mybrumcontrol_last_target_v1"
+    private static let tokenAccount = "mybrumcontrol-token-v1"
+
+    @Published var savedTarget: MurbPairingPayload?
+
+    init() {
+        restore()
+    }
+
+    func restore() {
+        guard let data = UserDefaults.standard.data(forKey: Self.savedPayloadKey),
+              var decoded = try? JSONDecoder().decode(MurbPairingPayload.self, from: data) else { return }
+        if decoded.token.isEmpty, let tok = SecureStore.read(Self.tokenAccount) {
+            decoded.token = tok
+        }
+        if MurbPairingPayload.isValidHost(decoded.host), MurbPairingPayload.isValidToken(decoded.token) {
+            decoded.isExternalControl = true
+            savedTarget = decoded
+        }
+    }
+
+    func remember(_ payload: MurbPairingPayload) {
+        var copy = payload
+        copy.isExternalControl = true
+        let tokenToStore = copy.token
+        copy.token = ""
+        if let encoded = try? JSONEncoder().encode(copy) {
+            UserDefaults.standard.set(encoded, forKey: Self.savedPayloadKey)
+        }
+        try? SecureStore.write(tokenToStore, account: Self.tokenAccount)
+        copy.token = tokenToStore
+        savedTarget = copy
+    }
+
+    func updatePCName(_ name: String) {
+        let cleaned = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty, var current = savedTarget, current.pcName != cleaned else { return }
+        current.pcName = cleaned
+        remember(current)
+    }
+
+    func clearConnection() {
+        UserDefaults.standard.removeObject(forKey: Self.savedPayloadKey)
+        try? SecureStore.delete(Self.tokenAccount)
+        savedTarget = nil
+    }
+}
+
+struct MyBrumControlView: View {
+    @StateObject private var controlStore = MyBrumControlStore()
+    @State private var codeInput = ""
+    @State private var showManualFields = false
+    @State private var manualHost = ""
+    @State private var manualPort = "8089"
+    @State private var manualToken = ""
+    @State private var validationError = ""
+    @State private var statusBanner = ""
+    @State private var scanning = false
+    @State private var activeTarget: MurbPairingPayload?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            BrumCard {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("MYbrumCONTROL · Controle em outro PC (LAN)")
+                        .font(.headline)
+                        .foregroundStyle(BrumTheme.primary)
+                    Text("Conecte este iPhone somente pela rede local (Wi-Fi/LAN) como joystick virtual em outro computador rodando Brum Classics. Não altera o PC principal, biblioteca, saves ou contas.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            BrumCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Conectar a outro computador")
+                        .font(.subheadline.bold())
+                        .foregroundStyle(BrumTheme.text)
+
+                    HStack(spacing: 12) {
+                        Button {
+                            validationError = ""
+                            scanning = true
+                        } label: {
+                            Label("Escanear QR Code", systemImage: "qrcode.viewfinder")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                        .accessibilityIdentifier("mybrumcontrol-scan-qr")
+
+                        Button {
+                            withAnimation { showManualFields.toggle() }
+                        } label: {
+                            Text(showManualFields ? "Ocultar IP/Token" : "IP / Porta / Token")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(BrumTheme.text)
+                    }
+
+                    HStack(spacing: 8) {
+                        TextField("Digite o código MBC-... ou link murb://...", text: $codeInput)
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled(true)
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 44)
+                            .background(BrumTheme.background, in: RoundedRectangle(cornerRadius: 8))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.12)))
+                            .foregroundStyle(BrumTheme.text)
+                            .accessibilityIdentifier("mybrumcontrol-code-input")
+
+                        Button("Conectar") {
+                            connectWithInput(codeInput)
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                        .frame(minWidth: 110, minHeight: 44)
+                        .accessibilityIdentifier("mybrumcontrol-code-connect")
+                    }
+
+                    if showManualFields {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 8) {
+                                TextField("IP LAN do PC (ex: 192.168.1.50)", text: $manualHost)
+                                    .keyboardType(.URL)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled(true)
+                                    .padding(.horizontal, 10).frame(minHeight: 40)
+                                    .background(BrumTheme.background, in: RoundedRectangle(cornerRadius: 8))
+                                TextField("Porta", text: $manualPort)
+                                    .keyboardType(.numberPad)
+                                    .padding(.horizontal, 10).frame(width: 90, minHeight: 40)
+                                    .background(BrumTheme.background, in: RoundedRectangle(cornerRadius: 8))
+                            }
+                            HStack(spacing: 8) {
+                                TextField("Token da sessão", text: $manualToken)
+                                    .textInputAutocapitalization(.characters)
+                                    .autocorrectionDisabled(true)
+                                    .padding(.horizontal, 10).frame(minHeight: 40)
+                                    .background(BrumTheme.background, in: RoundedRectangle(cornerRadius: 8))
+                                Button("Conectar IP") {
+                                    connectManual()
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(BrumTheme.primary)
+                            }
+                        }
+                    }
+
+                    if !validationError.isEmpty {
+                        Text(validationError)
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                    if !statusBanner.isEmpty {
+                        Text(statusBanner)
+                            .font(.caption)
+                            .foregroundStyle(BrumTheme.primary)
+                    }
+                }
+            }
+
+            if let target = controlStore.savedTarget {
+                BrumCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(target.pcName.isEmpty ? "Computador externo na LAN" : target.pcName)
+                                    .font(.headline)
+                                    .foregroundStyle(BrumTheme.text)
+                                Text("\(target.host):\(target.port) · \(MurbProtocol.displaySystemName(target.system))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text(activeTarget == target ? "Ativo" : "Pronto para reconectar")
+                                .font(.caption2.bold())
+                                .foregroundStyle(BrumTheme.primary)
+                        }
+
+                        HStack(spacing: 10) {
+                            Button("Abrir Joystick Virtual") {
+                                launchTarget(target)
+                            }
+                            .buttonStyle(PrimaryButtonStyle())
+                            .accessibilityIdentifier("mybrumcontrol-open-pad")
+
+                            Button("Reconectar") {
+                                launchTarget(target)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(BrumTheme.primary)
+
+                            Button("Encerrar conexão") {
+                                activeTarget = nil
+                                controlStore.clearConnection()
+                                statusBanner = "Conexão MYbrumCONTROL encerrada e controles liberados."
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(.orange)
+                            .accessibilityIdentifier("mybrumcontrol-disconnect")
+                        }
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $scanning) {
+            ZStack(alignment: .topTrailing) {
+                PairingScannerView(validator: { url in
+                    MurbPairingPayload.parse(url) != nil
+                }, onCode: { url in
+                    scanning = false
+                    if var parsed = MurbPairingPayload.parse(url) {
+                        parsed.isExternalControl = true
+                        launchTarget(parsed)
+                    } else {
+                        validationError = "QR Code recusado: utilize o QR murb:// gerado pelo PC de destino."
+                    }
+                }, onError: { detail in
+                    scanning = false
+                    validationError = detail + " Use o campo de código MBC-... abaixo como alternativa."
+                })
+                Button { scanning = false } label: {
+                    Image(systemName: "xmark").font(.headline).padding(14).background(.black.opacity(0.6)).clipShape(Circle())
+                }.foregroundStyle(.white).padding()
+            }.ignoresSafeArea()
+        }
+        .fullScreenCover(item: Binding(
+            get: { activeTarget.map { MurbTargetBox(payload: $0) } },
+            set: { activeTarget = $0?.payload }
+        )) { box in
+            MurbRemoteGamepadView(target: box.payload)
+        }
+    }
+
+    private func connectWithInput(_ raw: String) {
+        validationError = ""
+        statusBanner = ""
+        guard let parsed = MurbPairingPayload.parseUserInput(raw) else {
+            validationError = "Código inválido. Informe um código MBC-... válido ou link murb:// na rede local."
+            return
+        }
+        launchTarget(parsed)
+    }
+
+    private func connectManual() {
+        validationError = ""
+        statusBanner = ""
+        let host = manualHost.trimmingCharacters(in: .whitespacesAndNewlines)
+        let port = Int(manualPort.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        let token = manualToken.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard MurbPairingPayload.isValidHost(host), (1...65535).contains(port), MurbPairingPayload.isValidToken(token) else {
+            validationError = "Informe um IP de rede local válido, porta (1–65535) e token válido."
+            return
+        }
+        launchTarget(MurbPairingPayload(host: host, port: port, token: token, system: "gamepad", isExternalControl: true))
+    }
+
+    private func launchTarget(_ payload: MurbPairingPayload) {
+        validationError = ""
+        statusBanner = "Conectando joystick virtual em \(payload.pcName.isEmpty ? payload.host : payload.pcName)..."
+        controlStore.remember(payload)
+        activeTarget = payload
     }
 }

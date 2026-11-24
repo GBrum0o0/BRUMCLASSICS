@@ -19,8 +19,15 @@ struct BRUMCLASSICSMobileApp: App {
                 .tint(BrumTheme.primary)
                 .onOpenURL { url in
                     Task {
-                        if url.scheme?.lowercased() == "brumclassics", url.host?.lowercased() == "retroarch" { await pocket.receiveRetroArchLibrary(url, launcher: store) }
-                        else { await store.pair(from: url) }
+                        if url.scheme?.lowercased() == "brumclassics", url.host?.lowercased() == "retroarch" {
+                            await pocket.receiveRetroArchLibrary(url, launcher: store)
+                        } else if url.scheme?.lowercased() == "murb" {
+                            if let payload = MurbPairingPayload.parse(url, allowLoopback: false) {
+                                MyBrumControlStore().remember(payload)
+                            }
+                        } else {
+                            await store.pair(from: url)
+                        }
                     }
                 }
                 .onChange(of: store.connection) { connection in

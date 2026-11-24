@@ -57,6 +57,30 @@ public final class GamingModeRulesTest {
         if (!GamingModeRules.includes(pspClassic)) throw new AssertionError("PC Classic PSP missing");
         if (!"Disponível".equals(GamingModeRules.availabilityLabel(true))) throw new AssertionError("Wrong local label");
         if (!"No computador".equals(GamingModeRules.availabilityLabel(false))) throw new AssertionError("Wrong PC label");
-        System.out.println("GamingModeRulesTest: OK (Classics-only cache, stale links, platform matching and existing fallbacks)");
+
+        // Search normalization (case & diacritics) + console key/filter rules
+        if (!"pokemon firered".equals(GamingModeRules.normalizeSearch("  PokéMON   FíreRed ")))
+            throw new AssertionError("Accent/case normalization failed");
+        if (!"gb".equals(GamingModeRules.canonicalConsoleKey("Game Boy"))) throw new AssertionError("gb key");
+        if (!"gbc".equals(GamingModeRules.canonicalConsoleKey("Game Boy Color"))) throw new AssertionError("gbc key");
+        if (!"gba".equals(GamingModeRules.canonicalConsoleKey("GBA"))) throw new AssertionError("gba key");
+        if (!"nds".equals(GamingModeRules.canonicalConsoleKey("Nintendo DS"))) throw new AssertionError("nds key");
+        if (!"3ds".equals(GamingModeRules.canonicalConsoleKey("Nintendo 3DS"))) throw new AssertionError("3ds key");
+        if (!"ps1".equals(GamingModeRules.canonicalConsoleKey("psx"))) throw new AssertionError("ps1 key");
+        if (!"ps2".equals(GamingModeRules.canonicalConsoleKey("PlayStation 2"))) throw new AssertionError("ps2 key");
+        if (!"psp".equals(GamingModeRules.canonicalConsoleKey("PSP"))) throw new AssertionError("psp key");
+        if (!"ws".equals(GamingModeRules.canonicalConsoleKey("WonderSwan"))) throw new AssertionError("ws key");
+        if (!"wsc".equals(GamingModeRules.canonicalConsoleKey("WonderSwan Color"))) throw new AssertionError("wsc key");
+        if (!"unidentified".equals(GamingModeRules.canonicalConsoleKey(""))) throw new AssertionError("unidentified key");
+        if (!"Não identificado".equals(GamingModeRules.consoleDisplayName("unidentified")))
+            throw new AssertionError("unidentified label");
+        if (!GamingModeRules.matchesFilter("Pokémon Crystal", "gbc", "pokemon", "gbc"))
+            throw new AssertionError("Combined filter failed on match");
+        if (GamingModeRules.matchesFilter("Pokémon Crystal", "gbc", "pokemon", "gba"))
+            throw new AssertionError("Combined filter leaked wrong console");
+        if (!GamingModeRules.matchesFilter("ROM Sem Plataforma", "", "", "all"))
+            throw new AssertionError("Cleared filter must keep unidentified");
+
+        System.out.println("GamingModeRulesTest: OK (Classics-only cache, stale links, platform matching, search & filters)");
     }
 }

@@ -68,6 +68,7 @@ import com.brumclassics.mobile.emulation.BrumAchievementOverlay;
 import com.brumclassics.mobile.emulation.IntegratedEmulatorActivity;
 import com.brumclassics.mobile.murb.MurbRemoteClient;
 import com.brumclassics.mobile.murb.MurbRemoteGamepadActivity;
+import com.brumclassics.mobile.murb.MurbRemoteProtocol;
 import com.brumclassics.mobile.emulation.IntegratedEmulatorLaunch;
 import com.brumclassics.mobile.sync.BridgeClient;
 import com.brumclassics.mobile.sync.MobileSyncState;
@@ -91,6 +92,8 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_ROM_TREE = 7301;
     private static final int REQUEST_RUNTIME_TREE = 7302;
     private static final int REQUEST_INTEGRATED_EMULATOR = 7303;
+    private static final int REQUEST_MYBRUM_QR_SCAN = 7304;
+    private static final int REQUEST_CAMERA_PERMISSION = 7305;
     private static final int BG = Color.rgb(9, 10, 12);
     private static final int SURFACE = Color.rgb(17, 19, 23);
     private static final int RAISED = Color.rgb(23, 26, 31);
@@ -126,6 +129,10 @@ public final class MainActivity extends Activity {
     private String pokedexSearchQuery = "";
     private String pokedexSyncFeedback = "";
     private boolean pokedexSyncing = false;
+    private String gamingSearchQuery = "";
+    private String gamingConsoleFilter = "all";
+    private String myBrumControlStatus = "";
+    private String myBrumControlError = "";
     private List<Game> games = new ArrayList<>();
     private String currentScreen = "home";
     private String detailsReturnScreen = "library";
@@ -415,6 +422,23 @@ public final class MainActivity extends Activity {
                         }
                     } catch (Exception error) { handler.post(() -> Toast.makeText(this, error.getMessage(), Toast.LENGTH_LONG).show()); }
                 });
+            }
+            return;
+        }
+        if (requestCode == REQUEST_MYBRUM_QR_SCAN) {
+            if (resultCode == RESULT_OK && data != null) {
+                String scanned = data.getStringExtra("SCAN_RESULT");
+                if (scanned == null && data.getData() != null) scanned = data.getData().toString();
+                if (scanned != null && !scanned.trim().isEmpty()) {
+                    MurbRemoteProtocol.PairingPayload parsed = MurbRemoteProtocol.parseUserInput(scanned);
+                    if (parsed != null) {
+                        connectMyBrumControl(parsed);
+                    } else {
+                        myBrumControlError = "O QR Code lido não contém um pareamento MYbrumCONTROL válido.";
+                        gamingSection = "mybrumcontrol";
+                        showGamingMode();
+                    }
+                }
             }
             return;
         }
@@ -1664,6 +1688,7 @@ public final class MainActivity extends Activity {
         navTabs.setGravity(Gravity.CENTER_VERTICAL);
         navTabs.addView(gamingSectionTab("JOGADOS RECENTEMENTE", "recent"), margins(-2, 0, 10, 0, 42));
         navTabs.addView(gamingSectionTab("BIBLIOTECA", "library"), margins(-2, 0, 10, 0, 42));
+        navTabs.addView(gamingSectionTab("MYbrumCONTROL", "mybrumcontrol"), margins(-2, 0, 10, 0, 42));
         navTabs.addView(gamingSectionTab("EXTENSÕES", "extensions"), new LinearLayout.LayoutParams(-2, dp(42)));
         HorizontalScrollView tabScroll = new HorizontalScrollView(this);
         tabScroll.setHorizontalScrollBarEnabled(false);
@@ -1680,6 +1705,13 @@ public final class MainActivity extends Activity {
             sessionCard.addView(gamingAction("CONECTAR GAMEPAD AO JOGO NO PC (SEM QR)", true,
                     v -> launchActiveRemoteSession(activeRemoteGamepadSession)), new LinearLayout.LayoutParams(-1, dp(44)));
             page.addView(sessionCard, margins(-1, 6, -1, 10));
+        }
+
+        if ("mybrumcontrol".equals(gamingSection)) {
+            renderMyBrumControlSection(page);
+            page.addView(space(22));
+            setScreen("gaming", scroll);
+            return;
         }
 
         if ("extensions".equals(gamingSection)) {
@@ -1724,37 +1756,171 @@ public final class MainActivity extends Activity {
         }
         installedGames.sort((left, right) -> left.title.compareToIgnoreCase(right.title));
 
-        LocalClassic recentLocal = null;
-        for (LocalClassic local : localGames)
-            if (local.lastPlayedAt > 0 && (recentLocal == null || local.lastPlayedAt > recentLocal.lastPlayedAt))
-                recentLocal = local;
-        Game recentComputer = HomeLibrary.lastPlayed(installedGames);
-        if (recentLocal != null || !localGames.isEmpty()) {
-            LocalClassic featured = recentLocal != null ? recentLocal : localGames.get(0);
-            Game linked = launcherGameFor(featured);
-            Button open = gamingAction("Detalhes", true, v -> showGamingClassicGame(featured));
-            page.addView(gamingHero(featured.title, classicPlatform(featured), linked, featured,
-                    formatClassicTime(featured.creditedSeconds), null, open), margins(-1, 10, -1, 0));
-        } else if (recentComputer != null) {
-            Button open = gamingAction("Detalhes", true, v -> showGamingGame(recentComputer));
-            page.addView(gamingHero(recentComputer.title, recentComputer.platform, recentComputer, null,
-                    recentComputer.playedLabel(), null, open), margins(-1, 10, -1, 0));
-        }
+        if (!localGames.isEmpty() || !installedGames.isEmpty()) {
+            java.util.Map<String, Integer> consoleCounts = new java.util.LinkedHashMap<>();
+            for (LocalClassic local : localGames) {
+                String ck = GamingModeRules.canonicalConsoleKey(local.systemId);
+                consoleCounts.put(ck, (consoleCounts.containsKey(ck) ? consoleCounts.get(ck) : 0) + 1);
+            }
+            for (Game g : installedGames) {
+                String ck = GamingModeRules.canonicalConsoleKey(g.platform);
+                consoleCounts.put(ck, (consoleCounts.containsKey(ck) ? consoleCounts.get(ck) : 0) + 1);
+            }
+            if (!"all".equals(gamingConsoleFilter) && !consoleCounts.containsKey(gamingConsoleFilter)) {
+                gamingConsoleFilter = "all";
+            }
 
-        if (!localGames.isEmpty()) {
-            page.addView(sectionHeading("NO CELULAR", localGames.size() + " JOGOS", null), margins(-1, 24, -1, 12));
-            HorizontalScrollView localScroll = new HorizontalScrollView(this); localScroll.setHorizontalScrollBarEnabled(false);
-            LinearLayout localShelf = row();
-            for (LocalClassic game : localGames) localShelf.addView(gamingClassicCard(game), margins(138, 0, 12, 0));
-            localScroll.addView(localShelf); page.addView(localScroll);
-        }
+            LinearLayout filterBar = column();
+            filterBar.setPadding(dp(12), dp(10), dp(12), dp(10));
+            filterBar.setBackground(background(SURFACE, 12, LINE, 1));
+            LinearLayout searchRow = row();
+            searchRow.setGravity(Gravity.CENTER_VERTICAL);
+            EditText searchInput = new EditText(this);
+            searchInput.setHint("Pesquisar jogos clássicos...");
+            searchInput.setHintTextColor(MUTED);
+            searchInput.setTextColor(TEXT);
+            searchInput.setTextSize(12);
+            searchInput.setSingleLine(true);
+            searchInput.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH | android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+            searchInput.setText(gamingSearchQuery);
+            searchInput.setSelection(gamingSearchQuery.length());
+            searchInput.setPadding(dp(12), dp(8), dp(12), dp(8));
+            searchInput.setBackground(background(RAISED, 8, LINE, 1));
+            searchRow.addView(searchInput, new LinearLayout.LayoutParams(0, dp(40), 1));
+            Button clearBtn = gamingAction("Limpar", false, v -> {});
+            clearBtn.setVisibility(gamingSearchQuery.isEmpty() && "all".equals(gamingConsoleFilter) ? View.GONE : View.VISIBLE);
+            LinearLayout.LayoutParams clearLp = new LinearLayout.LayoutParams(-2, dp(40));
+            clearLp.leftMargin = dp(8);
+            searchRow.addView(clearBtn, clearLp);
+            filterBar.addView(searchRow, new LinearLayout.LayoutParams(-1, -2));
 
-        if (!installedGames.isEmpty()) {
-            page.addView(sectionHeading("CLASSICS NO COMPUTADOR", installedGames.size() + " JOGOS", null), margins(-1, localGames.isEmpty() ? 24 : 28, -1, 12));
-            HorizontalScrollView pcScroll = new HorizontalScrollView(this); pcScroll.setHorizontalScrollBarEnabled(false);
-            LinearLayout pcShelf = row();
-            for (Game game : installedGames) pcShelf.addView(gamingGameCard(game), margins(138, 0, 12, 0));
-            pcScroll.addView(pcShelf); page.addView(pcScroll);
+            HorizontalScrollView chipScroll = new HorizontalScrollView(this);
+            chipScroll.setHorizontalScrollBarEnabled(false);
+            LinearLayout chipRow = row();
+            filterBar.addView(chipScroll, margins(-1, 8, -1, 0));
+            chipScroll.addView(chipRow);
+            page.addView(filterBar, margins(-1, 8, -1, 8));
+
+            LinearLayout gamingCatalogContainer = column();
+            page.addView(gamingCatalogContainer, new LinearLayout.LayoutParams(-1, -2));
+
+            final Runnable[] rebuildChipsHolder = new Runnable[1];
+            final Runnable[] renderCatalogHolder = new Runnable[1];
+            renderCatalogHolder[0] = () -> {
+                gamingCatalogContainer.removeAllViews();
+                List<LocalClassic> filteredLocal = new ArrayList<>();
+                for (LocalClassic local : localGames) {
+                    if (GamingModeRules.matchesFilter(local.title, local.systemId, gamingSearchQuery, gamingConsoleFilter)) {
+                        filteredLocal.add(local);
+                    }
+                }
+                List<Game> filteredPc = new ArrayList<>();
+                for (Game game : installedGames) {
+                    if (GamingModeRules.matchesFilter(game.title, game.platform, gamingSearchQuery, gamingConsoleFilter)) {
+                        filteredPc.add(game);
+                    }
+                }
+                boolean hasFilter = !gamingSearchQuery.trim().isEmpty() || !"all".equals(gamingConsoleFilter);
+                clearBtn.setVisibility(hasFilter ? View.VISIBLE : View.GONE);
+
+                if (filteredLocal.isEmpty() && filteredPc.isEmpty()) {
+                    LinearLayout empty = column();
+                    empty.setPadding(dp(18), dp(20), dp(18), dp(20));
+                    empty.setBackground(background(SURFACE, 10, LINE, 1));
+                    empty.addView(text("Nenhum jogo encontrado", 13, TEXT, true));
+                    empty.addView(text("Nenhum clássico corresponde à pesquisa ou ao console selecionado.", 10, MUTED, false), margins(-1, 6, -1, 10));
+                    Button resetEmpty = gamingAction("Limpar pesquisa e filtros", true, v -> {
+                        gamingSearchQuery = "";
+                        gamingConsoleFilter = "all";
+                        searchInput.setText("");
+                        rebuildChipsHolder[0].run();
+                        renderCatalogHolder[0].run();
+                    });
+                    empty.addView(resetEmpty, new LinearLayout.LayoutParams(-2, dp(40)));
+                    gamingCatalogContainer.addView(empty, margins(-1, 14, -1, 0));
+                    return;
+                }
+
+                LocalClassic recentLocal = null;
+                for (LocalClassic local : filteredLocal)
+                    if (local.lastPlayedAt > 0 && (recentLocal == null || local.lastPlayedAt > recentLocal.lastPlayedAt))
+                        recentLocal = local;
+                Game recentComputer = HomeLibrary.lastPlayed(filteredPc);
+                if (recentLocal != null || !filteredLocal.isEmpty()) {
+                    LocalClassic featured = recentLocal != null ? recentLocal : filteredLocal.get(0);
+                    Game linked = launcherGameFor(featured);
+                    Button open = gamingAction("Detalhes", true, v -> showGamingClassicGame(featured));
+                    gamingCatalogContainer.addView(gamingHero(featured.title, classicPlatform(featured), linked, featured,
+                            formatClassicTime(featured.creditedSeconds), null, open), margins(-1, 6, -1, 0));
+                } else if (recentComputer != null) {
+                    Button open = gamingAction("Detalhes", true, v -> showGamingGame(recentComputer));
+                    gamingCatalogContainer.addView(gamingHero(recentComputer.title, recentComputer.platform, recentComputer, null,
+                            recentComputer.playedLabel(), null, open), margins(-1, 6, -1, 0));
+                }
+
+                if (!filteredLocal.isEmpty()) {
+                    gamingCatalogContainer.addView(sectionHeading("NO CELULAR", filteredLocal.size() + " JOGOS", null), margins(-1, 20, -1, 10));
+                    HorizontalScrollView localScroll = new HorizontalScrollView(this); localScroll.setHorizontalScrollBarEnabled(false);
+                    LinearLayout localShelf = row();
+                    for (LocalClassic game : filteredLocal) localShelf.addView(gamingClassicCard(game), margins(138, 0, 12, 0));
+                    localScroll.addView(localShelf); gamingCatalogContainer.addView(localScroll);
+                }
+
+                if (!filteredPc.isEmpty()) {
+                    gamingCatalogContainer.addView(sectionHeading("CLASSICS NO COMPUTADOR", filteredPc.size() + " JOGOS", null), margins(-1, filteredLocal.isEmpty() ? 20 : 24, -1, 10));
+                    HorizontalScrollView pcScroll = new HorizontalScrollView(this); pcScroll.setHorizontalScrollBarEnabled(false);
+                    LinearLayout pcShelf = row();
+                    for (Game game : filteredPc) pcShelf.addView(gamingGameCard(game), margins(138, 0, 12, 0));
+                    pcScroll.addView(pcShelf); gamingCatalogContainer.addView(pcScroll);
+                }
+            };
+
+            rebuildChipsHolder[0] = () -> {
+                chipRow.removeAllViews();
+                List<String> keys = new ArrayList<>();
+                keys.add("all");
+                List<String> sortedConsoles = new ArrayList<>();
+                for (String k : consoleCounts.keySet()) {
+                    if (!"unidentified".equals(k)) sortedConsoles.add(k);
+                }
+                sortedConsoles.sort((a, b) -> GamingModeRules.consoleDisplayName(a).compareToIgnoreCase(GamingModeRules.consoleDisplayName(b)));
+                keys.addAll(sortedConsoles);
+                if (consoleCounts.containsKey("unidentified")) keys.add("unidentified");
+
+                for (String k : keys) {
+                    boolean active = k.equals(gamingConsoleFilter);
+                    String label = "all".equals(k)
+                            ? GamingModeRules.consoleDisplayName(k)
+                            : GamingModeRules.consoleDisplayName(k) + " (" + consoleCounts.get(k) + ")";
+                    Button chip = gamingAction(label, active, v -> {
+                        gamingConsoleFilter = k;
+                        rebuildChipsHolder[0].run();
+                        renderCatalogHolder[0].run();
+                    });
+                    chip.setTextSize(10);
+                    chip.setPadding(dp(12), 0, dp(12), 0);
+                    chipRow.addView(chip, margins(-2, 0, 8, 0, 34));
+                }
+            };
+
+            clearBtn.setOnClickListener(v -> {
+                gamingSearchQuery = "";
+                gamingConsoleFilter = "all";
+                searchInput.setText("");
+                rebuildChipsHolder[0].run();
+                renderCatalogHolder[0].run();
+            });
+            searchInput.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                @Override public void afterTextChanged(Editable s) {
+                    gamingSearchQuery = s == null ? "" : s.toString();
+                    renderCatalogHolder[0].run();
+                }
+            });
+
+            rebuildChipsHolder[0].run();
+            renderCatalogHolder[0].run();
         }
 
         if (localGames.isEmpty() && installedGames.isEmpty()) {
@@ -2350,6 +2516,187 @@ public final class MainActivity extends Activity {
         splitContainer.addView(rightPanel, rightLp);
         deviceChassis.addView(splitContainer);
         page.addView(deviceChassis, margins(-1, 14, -1, 0));
+    }
+
+    private void renderMyBrumControlSection(LinearLayout page) {
+        android.content.SharedPreferences prefs = getSharedPreferences("brum_mybrumcontrol", MODE_PRIVATE);
+        String savedHost = prefs.getString("host", "");
+        int savedPort = prefs.getInt("port", 8089);
+        String savedToken = prefs.getString("token", "");
+        String savedSys = prefs.getString("system", "gamepad");
+        String savedPcName = prefs.getString("pcName", "");
+        boolean hasSavedTarget = !savedHost.isEmpty() && !savedToken.isEmpty() && savedPort > 0 && savedPort <= 65535;
+
+        LinearLayout headerCard = column();
+        headerCard.setPadding(dp(16), dp(14), dp(16), dp(14));
+        headerCard.setBackground(background(SURFACE, 12, LINE, 1));
+
+        LinearLayout badgesRow = row();
+        badgesRow.setGravity(Gravity.CENTER_VERTICAL);
+        TextView badge = text("REDE LOCAL ONLY", 9, BG, true);
+        badge.setBackground(background(ACCENT, 10, Color.TRANSPARENT, 0));
+        badge.setPadding(dp(8), dp(3), dp(8), dp(3));
+        badgesRow.addView(badge, margins(-2, 0, 8, 0));
+        badgesRow.addView(text("MYbrumCONTROL · CONTROLE VIRTUAL PARA OUTRO PC", 9, MUTED, true));
+        headerCard.addView(badgesRow);
+        headerCard.addView(text("Usar celular como controle em outro PC", 19, TEXT, true), margins(-1, 6, -1, 4));
+        headerCard.addView(text(
+                "Conecta apenas como controle virtual na mesma rede Wi-Fi/LAN. Nunca sincroniza saves, biblioteca, credenciais ou o PC principal já pareado.",
+                11, Color.rgb(176, 184, 194), false));
+        if (!myBrumControlStatus.isEmpty()) {
+            headerCard.addView(text(myBrumControlStatus, 11, ACCENT, true), margins(-1, 8, -1, 0));
+        }
+        if (!myBrumControlError.isEmpty()) {
+            headerCard.addView(text(myBrumControlError, 11, Color.rgb(255, 138, 128), true), margins(-1, 6, -1, 0));
+        }
+        page.addView(headerCard, margins(-1, 8, -1, 10));
+
+        if (hasSavedTarget) {
+            LinearLayout activeCard = column();
+            activeCard.setPadding(dp(16), dp(14), dp(16), dp(14));
+            activeCard.setBackground(background(RAISED, 12, ACCENT, 1));
+            String pcLabel = savedPcName.isEmpty() ? savedHost : (savedPcName + " (" + savedHost + ")");
+            activeCard.addView(text("DESTINO LAN PRONTO (ISOLADO)", 10, ACCENT, true));
+            activeCard.addView(text(pcLabel, 15, TEXT, true), margins(-1, 4, -1, 2));
+            activeCard.addView(text("Porta " + savedPort + " · Perfil " + MurbRemoteProtocol.normalizeSystem(savedSys).toUpperCase(Locale.ROOT),
+                    11, MUTED, false), margins(-1, 0, -1, 10));
+
+            LinearLayout btnRow = row();
+            Button openPad = gamingAction("Abrir Joystick Virtual", true, v ->
+                    openMyBrumGamepad(new MurbRemoteProtocol.PairingPayload(savedHost, savedPort, savedToken, savedSys, "", savedPcName)));
+            btnRow.addView(openPad, weightedMargins(0, 0, 6, 0));
+            Button disconnectBtn = gamingAction("Encerrar conexão", false, v -> {
+                prefs.edit().clear().apply();
+                myBrumControlError = "";
+                myBrumControlStatus = "Sessão MYbrumCONTROL encerrada com segurança. PC principal intacto.";
+                showGamingMode();
+            });
+            btnRow.addView(disconnectBtn, weightedMargins(6, 0, 0, 0));
+            activeCard.addView(btnRow, new LinearLayout.LayoutParams(-1, dp(44)));
+            page.addView(activeCard, margins(-1, 0, -1, 10));
+        }
+
+        LinearLayout pairCard = column();
+        pairCard.setPadding(dp(16), dp(14), dp(16), dp(14));
+        pairCard.setBackground(background(SURFACE, 12, LINE, 1));
+        pairCard.addView(text("PAREAR COM OUTRO PC NA REDE LOCAL", 12, TEXT, true));
+        pairCard.addView(text(
+                "Escaneie o QR Code exibido em Configurações -> Controles -> MYbrumCONTROL no PC de destino, ou digite o código MBC-... / link murb://...",
+                11, MUTED, false), margins(-1, 4, -1, 10));
+
+        Button qrBtn = gamingAction("Ler QR Code com a Câmera", true, v -> triggerMyBrumQrScan());
+        pairCard.addView(qrBtn, margins(-1, 0, -1, 10, 44));
+
+        EditText codeInput = pairingField("MBC-XXXX-... ou murb://...", "");
+        codeInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        pairCard.addView(codeInput, margins(-1, 0, -1, 8, 46));
+
+        Button connectCodeBtn = gamingAction("Conectar pelo Código ou Link murb://", false, v -> {
+            String raw = codeInput.getText().toString().trim();
+            MurbRemoteProtocol.PairingPayload parsed = MurbRemoteProtocol.parseUserInput(raw);
+            if (parsed == null) {
+                myBrumControlError = "Código MBC-... ou link murb://... inválido para rede local.";
+                myBrumControlStatus = "";
+                showGamingMode();
+                return;
+            }
+            connectMyBrumControl(parsed);
+        });
+        pairCard.addView(connectCodeBtn, margins(-1, 0, -1, 14, 44));
+
+        pairCard.addView(text("OU ENTRADA MANUAL (IP / PORTA / TOKEN)", 10, MUTED, true), margins(-1, 2, -1, 8));
+        EditText hostField = pairingField("IP local do PC (ex.: 192.168.1.40)", savedHost);
+        EditText portField = pairingField("Porta LAN", String.valueOf(savedPort > 0 ? savedPort : 8089));
+        portField.setInputType(InputType.TYPE_CLASS_NUMBER);
+        EditText tokenField = pairingField("Token M.U.R.B (6+ caracteres)", savedToken);
+        tokenField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        EditText sysField = pairingField("Sistema (gamepad, psp, ds, 3ds, wiiu)", savedSys);
+
+        pairCard.addView(hostField, margins(-1, 0, -1, 8, 44));
+        pairCard.addView(portField, margins(-1, 0, -1, 8, 44));
+        pairCard.addView(tokenField, margins(-1, 0, -1, 8, 44));
+        pairCard.addView(sysField, margins(-1, 0, -1, 10, 44));
+
+        Button manualBtn = gamingAction("Conectar Manualmente (Somente Controle)", false, v -> {
+            String host = hostField.getText().toString().trim();
+            int port;
+            try { port = Integer.parseInt(portField.getText().toString().trim()); }
+            catch (Exception ignored) {
+                myBrumControlError = "Porta inválida (use 1 a 65535).";
+                myBrumControlStatus = "";
+                showGamingMode();
+                return;
+            }
+            String token = tokenField.getText().toString().trim().toUpperCase(Locale.ROOT);
+            String sys = MurbRemoteProtocol.normalizeSystem(sysField.getText().toString());
+            if (!MurbRemoteProtocol.isValidHost(host, false) || port < 1 || port > 65535 || !MurbRemoteProtocol.isValidToken(token)) {
+                myBrumControlError = "Informe um IP/host da rede local e um token válido (sem loopback 127.0.0.1).";
+                myBrumControlStatus = "";
+                showGamingMode();
+                return;
+            }
+            connectMyBrumControl(new MurbRemoteProtocol.PairingPayload(host, port, token, sys, "", ""));
+        });
+        pairCard.addView(manualBtn, new LinearLayout.LayoutParams(-1, dp(44)));
+        page.addView(pairCard);
+    }
+
+    private void triggerMyBrumQrScan() {
+        if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.CAMERA}, REQUEST_CAMERA_PERMISSION);
+            return;
+        }
+        launchMyBrumQrIntentOrHint();
+    }
+
+    private void launchMyBrumQrIntentOrHint() {
+        Intent zxing = new Intent("com.google.zxing.client.android.SCAN");
+        zxing.putExtra("SCAN_MODE", "QR_CODE_MODE");
+        if (zxing.resolveActivity(getPackageManager()) != null) {
+            startActivityForResult(zxing, REQUEST_MYBRUM_QR_SCAN);
+            return;
+        }
+        myBrumControlError = "";
+        myBrumControlStatus = "Câmera autorizada! Aponte o leitor de QR Code nativo do celular para o QR do PC (abre murb:// direto no Brum Classics) ou cole o código MBC-... abaixo.";
+        showGamingMode();
+    }
+
+    private void connectMyBrumControl(MurbRemoteProtocol.PairingPayload target) {
+        if (target == null) return;
+        getSharedPreferences("brum_mybrumcontrol", MODE_PRIVATE).edit()
+                .putString("host", target.host)
+                .putInt("port", target.port)
+                .putString("token", target.token)
+                .putString("system", target.system)
+                .putString("pcName", target.pcName == null ? "" : target.pcName)
+                .apply();
+        myBrumControlError = "";
+        myBrumControlStatus = "Conectando ao controle virtual em " + target.host + ":" + target.port + "…";
+        openMyBrumGamepad(target);
+    }
+
+    private void openMyBrumGamepad(MurbRemoteProtocol.PairingPayload target) {
+        if (target == null) return;
+        Intent remoteIntent = MurbRemoteGamepadActivity.intent(
+                this, target.host, target.port, target.token, target.system, "", 1, "");
+        if (target.pcName != null && !target.pcName.isEmpty()) {
+            remoteIntent.putExtra("pcName", target.pcName);
+        }
+        startActivity(remoteIntent);
+    }
+
+    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_CAMERA_PERMISSION) {
+            boolean granted = grantResults != null && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+            if (granted) {
+                launchMyBrumQrIntentOrHint();
+            } else {
+                myBrumControlStatus = "";
+                myBrumControlError = "Permissão da câmera negada. Você ainda pode colar o código MBC-... ou link murb://... manualmente.";
+                if ("gaming".equals(currentScreen)) showGamingMode();
+            }
+        }
     }
 
     private View pokedexCounterBox(String label, String value, int accentColor) {
@@ -4260,7 +4607,22 @@ public final class MainActivity extends Activity {
 
     private void handlePairingIntent(Intent intent) {
         Uri data = intent == null ? null : intent.getData();
-        if (data == null || !"brumclassics".equals(data.getScheme()) || !"pair".equals(data.getHost())) return;
+        if (data == null) return;
+        if ("murb".equalsIgnoreCase(data.getScheme())) {
+            String rawUri = data.toString();
+            intent.setData(null);
+            MurbRemoteProtocol.PairingPayload payload = MurbRemoteProtocol.validateMurbUri(rawUri);
+            if (payload != null) {
+                gamingSection = "mybrumcontrol";
+                connectMyBrumControl(payload);
+            } else {
+                gamingSection = "mybrumcontrol";
+                myBrumControlError = "Link murb:// inválido ou fora da rede local.";
+                openGamingMode();
+            }
+            return;
+        }
+        if (!"brumclassics".equals(data.getScheme()) || !"pair".equals(data.getHost())) return;
         String host = data.getQueryParameter("host");
         String code = data.getQueryParameter("code");
         String pin = data.getQueryParameter("pin");

@@ -71,4 +71,72 @@ final class GamingModeRules {
         if (platformMatch != null) return platformMatch;
         return titleCount == 1 ? titleMatch : null;
     }
+
+    static String normalizeSearch(String value) {
+        if (value == null) return "";
+        String decomposed = java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFD);
+        String stripped = decomposed.replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
+        return stripped.toLowerCase(java.util.Locale.ROOT).trim().replaceAll("\\s+", " ");
+    }
+
+    static String canonicalConsoleKey(String platform) {
+        if (platform == null) return "unidentified";
+        String lower = platform.trim().toLowerCase(java.util.Locale.ROOT).replace('_', ' ').replaceAll("\\s+", " ");
+        if (lower.isEmpty() || "unknown".equals(lower) || "unidentified".equals(lower)
+            || "classic".equals(lower) || "retro".equals(lower) || "auto".equals(lower)
+            || "other".equals(lower) || "outros".equals(lower)) {
+            return "unidentified";
+        }
+        String norm = ClassicsRules.normalizedPlatform(lower);
+        if ("psx".equals(norm)) return "ps1";
+        if ("sfc".equals(norm)) return "snes";
+        if (norm.isEmpty() || "unknown".equals(norm) || "classic".equals(norm)) return "unidentified";
+        return norm;
+    }
+
+    static String consoleDisplayName(String consoleKey) {
+        if (consoleKey == null) return "Não identificado";
+        switch (consoleKey) {
+            case "all": return "Todos os consoles";
+            case "unidentified": return "Não identificado";
+            case "gb": return "Game Boy";
+            case "gbc": return "Game Boy Color";
+            case "gba": return "Game Boy Advance";
+            case "nds": case "ds": return "Nintendo DS";
+            case "3ds": return "Nintendo 3DS";
+            case "nes": return "NES";
+            case "snes": case "sfc": return "Super Nintendo";
+            case "n64": return "Nintendo 64";
+            case "gamecube": return "GameCube";
+            case "wii": return "Nintendo Wii";
+            case "wiiu": return "Wii U";
+            case "ps1": case "psx": return "PlayStation";
+            case "ps2": return "PlayStation 2";
+            case "psp": return "PSP";
+            case "md": return "Mega Drive";
+            case "sms": return "Master System";
+            case "gg": return "Game Gear";
+            case "segacd": return "Sega CD";
+            case "32x": return "Sega 32X";
+            case "saturn": return "Sega Saturn";
+            case "dreamcast": return "Dreamcast";
+            case "pce": return "PC Engine";
+            case "neogeo": return "Neo Geo";
+            case "ngp": return "Neo Geo Pocket";
+            case "ws": return "WonderSwan";
+            case "wsc": return "WonderSwan Color";
+            case "atari2600": return "Atari 2600";
+            case "arcade": return "Arcade";
+            default: return consoleKey.toUpperCase(java.util.Locale.ROOT);
+        }
+    }
+
+    static boolean matchesFilter(String title, String platform, String query, String consoleKey) {
+        if (consoleKey != null && !"all".equals(consoleKey) && !consoleKey.isEmpty()) {
+            if (!canonicalConsoleKey(platform).equals(consoleKey)) return false;
+        }
+        String q = normalizeSearch(query);
+        if (q.isEmpty()) return true;
+        return normalizeSearch(title).contains(q);
+    }
 }

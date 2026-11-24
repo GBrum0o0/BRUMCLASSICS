@@ -354,35 +354,138 @@ enum ROMContentInspector {
         }
     }
 
-    static func inspect(url: URL, filename: String, expectedSystem: EmulatedSystemID? = nil) throws -> CanonicalGameIdentity {
-        var hasher = SHA256()
-        var header = Data()
-        try streamFile(url) { chunk in
-            if header.count < 512, let base = chunk.baseAddress {
-                let take = min(chunk.count, 512 - header.count)
-                header.append(UnsafeRawBufferPointer(start: base, count: take).bindMemory(to: UInt8.self))
-            }
-            hasher.update(bufferPointer: chunk)
+    private struct CachedDigestEntry: Codable {
+        let sizeBytes: UInt64
+        let modifiedTimeMs: Int64
+        let sha256: String
+    }
+
+    private static let identityCacheLock = NSLock()
+    private static var memoryIdentityCache: [String: CachedDigestEntry]?
+
+    private static var identityCacheURL: URL? {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("IntegratedPlay", isDirectory: true)
+            .appendingPathComponent(".identity-cache.json")
+    }
+
+    private static func loadIdentityCacheLocked() -> [String: CachedDigestEntry] {
+        if let loaded = memoryIdentityCache { return loaded }
+        guard let cacheURL = identityCacheURL,
+              let data = try? Data(contentsOf: cacheURL),
+              let decoded = try? JSONDecoder().decode([String: CachedDigestEntry].self, from: data) else {
+            let empty: [String: CachedDigestEntry] = [:]
+            memoryIdentityCache = empty
+            return empty
         }
+        memoryIdentityCache = decoded
+        return decoded
+    }
+
+    private static func cachedDigest(for url: URL, fileSize: UInt64, modifiedTimeMs: Int64) -> String? {
+        identityCacheLock.lock()
+        defer { identityCacheLock.unlock() }
+        let cache = loadIdentityCacheLocked()
+        guard let entry = cache[url.standardizedFileURL.path],
+              entry.sizeBytes == fileSize,
+              entry.modifiedTimeMs == modifiedTimeMs,
+              entry.sha256.count == 64 else {
+            return nil
+        }
+        return entry.sha256
+    }
+
+    private static func storeCachedDigest(_ digest: String, for url: URL, fileSize: UInt64, modifiedTimeMs: Int64) {
+        identityCacheLock.lock()
+        defer { identityCacheLock.unlock() }
+        var cache = loadIdentityCacheLocked()
+        if cache.count >= 256, let firstKey = cache.keys.first {
+            cache.removeValue(forKey: firstKey)
+        }
+        cache[url.standardizedFileURL.path] = CachedDigestEntry(
+            sizeBytes: fileSize,
+            modifiedTimeMs: modifiedTimeMs,
+            sha256: digest
+        )
+        memoryIdentityCache = cache
+        guard let cacheURL = identityCacheURL else { return }
+        try? FileManager.default.createDirectory(at: cacheURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if let encoded = try? JSONEncoder().encode(cache) {
+            try? encoded.write(to: cacheURL, options: .atomic)
+        }
+    }
+
+    private static func readHeaderSample(_ url: URL) throws -> Data {
+        let fd = Darwin.open(url.path, O_RDONLY)
+        if fd < 0 {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+        defer { Darwin.close(fd) }
+        var buffer = [UInt8](repeating: 0, count: 512)
+        let bytesRead = Darwin.read(fd, &buffer, 512)
+        if bytesRead < 0 {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+        return Data(buffer.prefix(bytesRead))
+    }
+
+    static func inspect(url: URL, filename: String, expectedSystem: EmulatedSystemID? = nil) throws -> CanonicalGameIdentity {
+        let isDiscManifest = ["cue", "m3u", "gdi"].contains(url.pathExtension.lowercased())
+        var header = Data()
+        var digest = ""
+
+        if !isDiscManifest,
+           let attrs = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey]),
+           let sizeInt = attrs.fileSize, sizeInt > 0,
+           let mdate = attrs.contentModificationDate {
+            let fileSize = UInt64(sizeInt)
+            let modifiedMs = Int64((mdate.timeIntervalSince1970 * 1000.0).rounded())
+            if let hit = cachedDigest(for: url, fileSize: fileSize, modifiedTimeMs: modifiedMs) {
+                header = try readHeaderSample(url)
+                digest = hit
+            } else {
+                var hasher = SHA256()
+                try streamFile(url) { chunk in
+                    if header.count < 512, let base = chunk.baseAddress {
+                        let take = min(chunk.count, 512 - header.count)
+                        header.append(UnsafeRawBufferPointer(start: base, count: take).bindMemory(to: UInt8.self))
+                    }
+                    hasher.update(bufferPointer: chunk)
+                }
+                digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+                if !header.isEmpty {
+                    storeCachedDigest(digest, for: url, fileSize: fileSize, modifiedTimeMs: modifiedMs)
+                }
+            }
+        } else {
+            var hasher = SHA256()
+            try streamFile(url) { chunk in
+                if header.count < 512, let base = chunk.baseAddress {
+                    let take = min(chunk.count, 512 - header.count)
+                    header.append(UnsafeRawBufferPointer(start: base, count: take).bindMemory(to: UInt8.self))
+                }
+                hasher.update(bufferPointer: chunk)
+            }
+            if isDiscManifest {
+                // Versioned disc-set hash; cartridge identities remain unchanged.
+                var discHasher = SHA256()
+                discHasher.update(data: Data("BRUM-DISC-SET-v1\0".utf8))
+                for file in try ROMExportStager.contentFiles(for: url) {
+                    var fileHasher = SHA256()
+                    try streamFile(file) { chunk in
+                        fileHasher.update(bufferPointer: chunk)
+                    }
+                    discHasher.update(data: Data(fileHasher.finalize()))
+                }
+                hasher = discHasher
+            }
+            digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        }
+
         guard !header.isEmpty else {
             throw PocketError.message("A ROM está vazia e não pode ser identificada.")
         }
 
-        if ["cue", "m3u", "gdi"].contains(url.pathExtension.lowercased()) {
-            // Versioned disc-set hash; cartridge identities remain unchanged.
-            var discHasher = SHA256()
-            discHasher.update(data: Data("BRUM-DISC-SET-v1\0".utf8))
-            for file in try ROMExportStager.contentFiles(for: url) {
-                var fileHasher = SHA256()
-                try streamFile(file) { chunk in
-                    fileHasher.update(bufferPointer: chunk)
-                }
-                discHasher.update(data: Data(fileHasher.finalize()))
-            }
-            hasher = discHasher
-        }
-
-        let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
         // A folder hint must not override a ROM header or an unambiguous format.
         let detected = detectSystem(header: header, filename: filename)
             ?? detectDiscSystem(at: url, filename: filename).map { (system: $0, source: ROMDetectionSource.header) }

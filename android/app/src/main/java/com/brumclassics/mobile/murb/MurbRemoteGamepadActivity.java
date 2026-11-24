@@ -42,6 +42,7 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
     private String token;
     private String system = "ds";
     private String gameTitle = "";
+    private String pcName = "";
     private int playerNumber = 1;
     private String p2Uri = "";
 
@@ -120,6 +121,8 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
         system = MurbRemoteClient.normalizeSystem(getIntent().getStringExtra("sys"));
         gameTitle = getIntent().getStringExtra("gameTitle");
         if (gameTitle == null) gameTitle = "";
+        pcName = getIntent().getStringExtra("pcName");
+        if (pcName == null) pcName = "";
         playerNumber = Math.max(1, Math.min(4, getIntent().getIntExtra("playerNumber", 1)));
         p2Uri = getIntent().getStringExtra("p2Uri");
         if (p2Uri == null) p2Uri = "";
@@ -325,6 +328,13 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
         updateStatusPill();
     }
 
+    @Override public void onSessionMetadata(String pc, String title, int player) {
+        if (pc != null && !pc.trim().isEmpty()) pcName = pc.trim();
+        if (title != null && !title.trim().isEmpty()) gameTitle = title.trim();
+        if (player >= 1 && player <= 4) playerNumber = player;
+        updateStatusPill();
+    }
+
     @Override public void onError(String message) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
@@ -344,9 +354,8 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
     private void updateStatusPill() {
         boolean online = client != null && client.isConnected();
         String dot = online ? "●" : "○";
-        String prefix = gameTitle.isEmpty()
-            ? dot + " P" + playerNumber + " · M.U.R.B " + system.toUpperCase(Locale.ROOT) + " · PC"
-            : dot + " P" + playerNumber + " · " + gameTitle;
+        String label = !gameTitle.isEmpty() ? gameTitle : (!pcName.isEmpty() ? pcName : "M.U.R.B " + system.toUpperCase(Locale.ROOT) + " · PC");
+        String prefix = dot + " P" + playerNumber + " · " + label;
         if (online && MurbRemoteClient.supportsDualScreen(system)) {
             statusPill.setText(String.format(Locale.US, "%s · %d FPS · %d ms", prefix, fps, lastRtt));
         } else if (online) {
