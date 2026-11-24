@@ -170,9 +170,9 @@ final class BrumCoreStartupTests: XCTestCase {
     }
 
     func testPSPFolderHintAndIdentityCacheInvalidateOnContentChange() throws {
-        XCTAssertEqual(ROMFolderLibrary.folderSystemHint(folderName: "psp", extension: "iso"), .playStationPortable)
-        XCTAssertEqual(ROMFolderLibrary.folderSystemHint(folderName: "playstation portable", extension: "cso"), .playStationPortable)
-        XCTAssertEqual(ROMFolderLibrary.folderSystemHint(folderName: "sony psp", extension: "pbp"), .playStationPortable)
+        XCTAssertEqual(ROMFolderScanner.folderSystemHint(folderName: "psp", extension: "iso"), .playStationPortable)
+        XCTAssertEqual(ROMFolderScanner.folderSystemHint(folderName: "playstation portable", extension: "cso"), .playStationPortable)
+        XCTAssertEqual(ROMFolderScanner.folderSystemHint(folderName: "sony psp", extension: "pbp"), .playStationPortable)
 
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

@@ -109,10 +109,10 @@ final class MobileExperienceTests: XCTestCase {
     }
 
     func testGamingModeSearchAndConsoleFilterPreserveVariantsAndUnidentified() throws {
-        let popPSP = ROMFolderGame(relativePath: "PSP/Prince of Persia.iso", filename: "Prince of Persia.iso", title: "Prince of Persia", detectedSystem: .playStationPortable, fileSize: 1024)
-        let gbTetris = ROMFolderGame(relativePath: "GB/Tetris.gb", filename: "Tetris.gb", title: "Tetris", detectedSystem: .gameBoy, fileSize: 512)
-        let gbaPkmn = ROMFolderGame(relativePath: "GBA/Pokemon.gba", filename: "Pokemon.gba", title: "Pokémon FireRed", detectedSystem: .gameBoyAdvance, fileSize: 512)
-        let unknownROM = ROMFolderGame(relativePath: "Outros/Homebrew.bin", filename: "Homebrew.bin", title: "Homebrew Demo", detectedSystem: nil, fileSize: 256)
+        let popPSP = ROMFolderGame(relativePath: "PSP/Prince of Persia.iso", filename: "Prince of Persia.iso", title: "Prince of Persia", fileSize: 1024, detectedSystem: .playStationPortable)
+        let gbTetris = ROMFolderGame(relativePath: "GB/Tetris.gb", filename: "Tetris.gb", title: "Tetris", fileSize: 512, detectedSystem: .gameBoy)
+        let gbaPkmn = ROMFolderGame(relativePath: "GBA/Pokemon.gba", filename: "Pokemon.gba", title: "Pokémon FireRed", fileSize: 512, detectedSystem: .gameBoyAdvance)
+        let unknownROM = ROMFolderGame(relativePath: "Outros/Homebrew.bin", filename: "Homebrew.bin", title: "Homebrew Demo", fileSize: 256, detectedSystem: nil)
         let entries: [GamingCatalogEntry] = [
             .local(popPSP, nil),
             .local(gbTetris, nil),
@@ -146,9 +146,9 @@ final class MobileExperienceTests: XCTestCase {
         XCTAssertEqual(decoded.port, 8089)
         XCTAssertEqual(decoded.token, "AB34CD")
 
-        // Corrupting a character must fail CRC-8 check
+        // Corrupting a payload/CRC character must fail CRC-8 check
         var chars = Array(code)
-        chars[chars.count - 1] = chars.last == "Z" ? "A" : "Z"
+        chars[chars.count - 2] = chars[chars.count - 2] == "Z" ? "A" : "Z"
         XCTAssertNil(MurbControlPairingCode.decode(String(chars)))
 
         // Strict user input validator accepts MBC and murb:// only
