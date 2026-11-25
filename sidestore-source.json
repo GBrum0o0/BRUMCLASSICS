@@ -21,12 +21,22 @@
       "tintColor": "#10B981",
       "category": "games",
       "screenshotURLs": [],
-      "version": "0.29.0",
-      "versionDate": "2026-11-24T22:39:10Z",
-      "versionDescription": "# BRUMCLASSICS MÓVEL iOS 0.29.0 — Correções PSP Nativo e Toque DS/3DS\n\n- **PSP nativo no iOS (`PPSSPP`):** garante vinculação do FBO de saída na thread GL (`ThreadFrame` / `CreateDrawContext` / `ContextReset`), atualização de `SetTargetSize` em `GotBackbuffer`, correção de `glInvalidateFramebuffer` com `GL_STENCIL_ATTACHMENT`, preservação completa de estado GLES3 no readback de frame e padrões explícitos de renderização buffered.\n- **Toque no DS e 3DS (nativo e controle remoto):** evita sobreposição de `SELECT`/`START` na área de toque em modo dual-screen, mapeia o toque exclusivamente na imagem ativa da tela inferior (ignorando bordas) e libera o ponteiro automaticamente ao desconectar, pausar ou rotacionar a tela.\n\nSideStore e atualização pelo fluxo existente preservados. Atualize mantendo os dados; não é necessário desinstalar.",
-      "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.29.0/BRUMCLASSICS-MOVEL-IOS-0.29.0.ipa",
-      "size": 15646343,
+      "version": "0.30.0",
+      "versionDate": "2026-11-25T02:57:09Z",
+      "versionDescription": "# BRUMCLASSICS MÓVEL iOS 0.30.0 — Correções PSP Nativo, Toque DS/3DS e Modo Gamepad\n\n- **PSP nativo no iOS (`PPSSPP`):** muda a emulação CPU para `IR jit` (`CPUCore::IR_JIT` via interpretador IR seguro, sem precisar de JIT executável no iOS) com `ppsspp_auto_frameskip = enabled`, acelerando a inicialização e eliminando telas pretas longas.\n- **Toque no Nintendo DS e Nintendo 3DS:** retém toques rápidos por 4 quadros em execuções nativas (`BrumLibretroEngine`), desativa `citra_enable_mouse_touchscreen` e garante que o WebSocket remoto envie eventos `touching: true` antes de um `touching: false` subsequente.\n- **Modo Gamepad (Wii, PSP e Wii U):** amplia o timeout do comando `/v1/remote` para 45 segundos e evita repetição em hosts alternativos quando um lançamento está demorando no computador.\n\nAtualize via SideStore ou baixando o `.ipa` desta release preservando saves e biblioteca.",
+      "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.30.0/BRUMCLASSICS-MOVEL-IOS-0.30.0.ipa",
+      "size": 15647478,
       "versions": [
+        {
+          "version": "0.30.0",
+          "buildVersion": "63",
+          "date": "2026-11-25T02:57:09Z",
+          "localizedDescription": "# BRUMCLASSICS MÓVEL iOS 0.30.0 — Correções PSP Nativo, Toque DS/3DS e Modo Gamepad\n\n- **PSP nativo no iOS (`PPSSPP`):** muda a emulação CPU para `IR jit` (`CPUCore::IR_JIT` via interpretador IR seguro, sem precisar de JIT executável no iOS) com `ppsspp_auto_frameskip = enabled`, acelerando a inicialização e eliminando telas pretas longas.\n- **Toque no Nintendo DS e Nintendo 3DS:** retém toques rápidos por 4 quadros em execuções nativas (`BrumLibretroEngine`), desativa `citra_enable_mouse_touchscreen` e garante que o WebSocket remoto envie eventos `touching: true` antes de um `touching: false` subsequente.\n- **Modo Gamepad (Wii, PSP e Wii U):** amplia o timeout do comando `/v1/remote` para 45 segundos e evita repetição em hosts alternativos quando um lançamento está demorando no computador.\n\nAtualize via SideStore ou baixando o `.ipa` desta release preservando saves e biblioteca.",
+          "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.30.0/BRUMCLASSICS-MOVEL-IOS-0.30.0.ipa",
+          "size": 15647478,
+          "sha256": "959d26e841e35fd80ac6bb63c1b2ea2edf76b903d7f1e36891a83e9987fbe20a",
+          "minOSVersion": "16.0"
+        },
         {
           "version": "0.29.0",
           "buildVersion": "62",
