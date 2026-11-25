@@ -505,7 +505,7 @@ public final class BridgeClient {
                 body.put("requestId", UUID.randomUUID().toString());
                 body.put("issuedAt", System.currentTimeMillis());
                 body.put("payload", payload);
-                HttpURLConnection connection = open(baseUrl() + "/v1/remote", "POST", true);
+                HttpURLConnection connection = open(baseUrl() + "/v1/remote", "POST", true, 45000);
                 connection.setDoOutput(true);
                 byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
                 connection.setFixedLengthStreamingMode(bytes.length);
@@ -570,7 +570,7 @@ public final class BridgeClient {
                 body.put("requestId", UUID.randomUUID().toString());
                 body.put("issuedAt", System.currentTimeMillis());
                 body.put("payload", payload);
-                HttpURLConnection connection = open(baseUrl() + "/v1/remote", "POST", true);
+                HttpURLConnection connection = open(baseUrl() + "/v1/remote", "POST", true, 45000);
                 connection.setDoOutput(true);
                 byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
                 connection.setFixedLengthStreamingMode(bytes.length);
@@ -603,7 +603,7 @@ public final class BridgeClient {
                 body.put("requestId", UUID.randomUUID().toString());
                 body.put("issuedAt", System.currentTimeMillis());
                 body.put("payload", payload);
-                HttpURLConnection connection = open(baseUrl() + "/v1/remote", "POST", true);
+                HttpURLConnection connection = open(baseUrl() + "/v1/remote", "POST", true, 45000);
                 connection.setDoOutput(true);
                 byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
                 connection.setFixedLengthStreamingMode(bytes.length);
@@ -630,7 +630,7 @@ public final class BridgeClient {
                 JSONObject body = new JSONObject();
                 body.put("command", command);
                 body.put("payload", payload == null ? new JSONObject() : payload);
-                HttpURLConnection connection = open(baseUrl() + "/v1/remote", "POST", true);
+                HttpURLConnection connection = open(baseUrl() + "/v1/remote", "POST", true, 45000);
                 connection.setDoOutput(true);
                 byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
                 connection.setFixedLengthStreamingMode(bytes.length);
@@ -1282,15 +1282,23 @@ public final class BridgeClient {
     }
 
     private HttpURLConnection open(String url, String method, boolean authenticated) throws Exception {
+        return open(url, method, authenticated, 12000);
+    }
+
+    private HttpURLConnection open(String url, String method, boolean authenticated, int readTimeoutMs) throws Exception {
         HttpURLConnection connection = PinnedTls.open(url, preferences.getString("tls_pin", ""));
-        configure(connection, method, authenticated);
+        configure(connection, method, authenticated, readTimeoutMs);
         return connection;
     }
 
     private void configure(HttpURLConnection connection, String method, boolean authenticated) throws Exception {
+        configure(connection, method, authenticated, 12000);
+    }
+
+    private void configure(HttpURLConnection connection, String method, boolean authenticated, int readTimeoutMs) throws Exception {
         connection.setRequestMethod(method);
         connection.setConnectTimeout(6000);
-        connection.setReadTimeout(12000);
+        connection.setReadTimeout(readTimeoutMs);
         connection.setUseCaches(false);
         connection.setRequestProperty("Accept", "application/json");
         connection.setRequestProperty("User-Agent", "BRUMCLASSICS-MOVEL/0.25.0 Android");

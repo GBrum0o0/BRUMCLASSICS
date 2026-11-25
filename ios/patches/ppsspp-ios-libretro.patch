@@ -507,9 +507,9 @@ index 45185748c..f3e338ec4 100644
  	check_variables(coreParam);
  
 +#if defined(IOS)
-+	// BRUM iOS: sideloaded IPA builds run without executable JIT memory.
-+	coreParam.cpuCore = CPUCore::INTERPRETER;
-+	g_Config.iCpuCore = (int)CPUCore::INTERPRETER;
++	// BRUM iOS: sideloaded IPA builds run without executable JIT memory; IR_JIT runs via pure IRInterpret.
++	coreParam.cpuCore = CPUCore::IR_JIT;
++	g_Config.iCpuCore = (int)CPUCore::IR_JIT;
 +	g_Config.bVertexDecoderJit = false;
 +#endif
 +

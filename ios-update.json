@@ -1,11 +1,11 @@
 {
-  "version": "0.29.0",
-  "build": 62,
+  "version": "0.30.0",
+  "build": 63,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.29.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.30.0",
   "notes": [
-    "Corrige tela preta na execução nativa do PSP (PPSSPP) com atualização explícita de FBO/alvo OpenGL ES 3 e estado de leitura.",
-    "Corrige toque nativo e remoto no Nintendo DS e Nintendo 3DS com mapeamento fiel na tela inferior e liberação limpa ao desconectar.",
-    "Mantém compatibilidade do MYbrumCONTROL, pesquisa no Gaming Mode, Pokédex Universal e atualização via SideStore."
+    "Otimiza a execucao nativa do PSP (PPSSPP) no iOS com IR JIT seguro sem memoria executavel e pulo automatico de quadros, evitando tela preta prolongada.",
+    "Garante leitura fiel de toques rapidos no Nintendo DS e Nintendo 3DS (nativo e controle remoto WebSocket) com retencao por quadro.",
+    "Aumenta o timeout do modo Gamepad para Wii, PSP, GameCube, 3DS e Wii U e evita disparos duplicados no servidor local."
   ]
 }

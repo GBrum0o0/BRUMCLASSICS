@@ -328,6 +328,7 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     int16_t _pointerX;
     int16_t _pointerY;
     BOOL _pointerPressed;
+    int _pointerLatchFrames;
     unsigned _frameWidth;
     unsigned _frameHeight;
     CADisplayLink *_displayLink;
@@ -920,8 +921,8 @@ static int16_t BrumInputState(unsigned port, unsigned device, unsigned index, un
         if (port != 0) return 0;
         if (identifier == BRUM_RETRO_DEVICE_ID_POINTER_X) return host->_pointerX;
         if (identifier == BRUM_RETRO_DEVICE_ID_POINTER_Y) return host->_pointerY;
-        if (identifier == BRUM_RETRO_DEVICE_ID_POINTER_PRESSED) return host->_pointerPressed ? 1 : 0;
-        if (identifier == BRUM_RETRO_DEVICE_ID_POINTER_COUNT) return host->_pointerPressed ? 1 : 0;
+        if (identifier == BRUM_RETRO_DEVICE_ID_POINTER_PRESSED) return (host->_pointerPressed || host->_pointerLatchFrames > 0) ? 1 : 0;
+        if (identifier == BRUM_RETRO_DEVICE_ID_POINTER_COUNT) return (host->_pointerPressed || host->_pointerLatchFrames > 0) ? 1 : 0;
         return 0;
     }
     if (device != BRUM_RETRO_DEVICE_JOYPAD || identifier > 15) return 0;
@@ -996,11 +997,11 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     } reportURL:report redactedPaths:@[_romURL.path, NSBundle.mainBundle.bundlePath, NSHomeDirectory()]];
     _variables = [NSMutableDictionary dictionary];
     // Exact option/value from pinned libretro PPSSPP. Sideloadly provides no JIT.
-    _variables[@"ppsspp_cpu_core"] = @"interpreter";
+    _variables[@"ppsspp_cpu_core"] = @"IR jit";
     _variables[@"ppsspp_internal_resolution"] = @"480x272";
     _variables[@"ppsspp_rendering_mode"] = @"buffered";
-    _variables[@"ppsspp_auto_frameskip"] = @"disabled";
-    _variables[@"ppsspp_frameskip"] = @"0";
+    _variables[@"ppsspp_auto_frameskip"] = @"enabled";
+    _variables[@"ppsspp_frameskip"] = @"1";
     _variables[@"ppsspp_gpu_hardware_transform"] = @"enabled";
     _variables[@"ppsspp_block_transfer_gpu"] = @"enabled";
     _variables[@"system_core_override"] = @"Automatic";
@@ -1012,6 +1013,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _variables[@"citra_layout_option"] = @"default";
     _variables[@"citra_resolution_factor"] = @"1";
     _variables[@"citra_enable_touch_touchscreen"] = @"enabled";
+    _variables[@"citra_enable_mouse_touchscreen"] = @"disabled";
     // Keep the pinned WonderSwan X/Y cursor mapping stable for its two
     // separate virtual directional clusters.
     _variables[@"wswan_rotate_keymap"] = @"disabled";
@@ -1420,6 +1422,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         [_rightVirtualStick reset];
         _rightVirtualStick.enabled = NO;
         _pointerPressed = NO;
+        _pointerLatchFrames = 0;
         _pointerX = 0;
         _pointerY = 0;
         _touchReticle.hidden = YES;
@@ -1930,6 +1933,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 - (void)screenTouch:(UILongPressGestureRecognizer *)gesture {
     if (_paused || !_frameWidth || !_frameHeight || !(self.capabilities & BrumBackendTouch)) {
         _pointerPressed = NO;
+        _pointerLatchFrames = 0;
         _pointerX = 0;
         _pointerY = 0;
         _touchReticle.hidden = YES;
@@ -1941,6 +1945,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         _pointerPressed = touch.pressed && touch.screenID == "secondary" &&
             (gesture.state == UIGestureRecognizerStateBegan || gesture.state == UIGestureRecognizerStateChanged);
         if (_pointerPressed) {
+            _pointerLatchFrames = 4;
             _pointerX = (int16_t)lrint((touch.atlas.x * 2 - 1) * 32767);
             _pointerY = (int16_t)lrint((touch.atlas.y * 2 - 1) * 32767);
             // Dual-screen cores treat Y == 0 on the lower half as pen-up or boundary.
@@ -1958,6 +1963,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _pointerPressed = local.has_value() &&
         (gesture.state == UIGestureRecognizerStateBegan || gesture.state == UIGestureRecognizerStateChanged);
     if (_pointerPressed) {
+        _pointerLatchFrames = 4;
         _pointerX = (int16_t)lrint((local->x * 2 - 1) * 32767);
         _pointerY = (int16_t)lrint((local->y * 2 - 1) * 32767);
         _touchReticle.center = point;
@@ -2068,6 +2074,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 
 - (void)layoutScreens {
     _pointerPressed = NO;
+    _pointerLatchFrames = 0;
     _pointerX = 0;
     _pointerY = 0;
     _touchReticle.hidden = YES;
@@ -2120,6 +2127,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
             self->_screenManager.layout = static_cast<brum::Layout>(i);
             self->_layoutManuallyChosen = YES;
             self->_pointerPressed = NO;
+            self->_pointerLatchFrames = 0;
             [self layoutScreens];
             if (!wasPaused) [self resume];
         }]];
@@ -2495,6 +2503,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     for (NSUInteger frame = 0; frame < frameCount; frame++) {
         _suppressVideo = frame + 1 < frameCount;
         _core.run();
+        if (!_pointerPressed && _pointerLatchFrames > 0) --_pointerLatchFrames;
         if (_raRuntime) _raRuntime->doFrame();
         if (_pokedexTracker) _pokedexTracker->doFrame();
         ++_sessionFrames;
@@ -2792,6 +2801,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [_primaryDPad reset];
     [_secondaryDPad reset];
     _pointerPressed = NO;
+    _pointerLatchFrames = 0;
     [self captureDiagnosticsMetrics];
     [_diagnostics markStopped];
     [_displayLink invalidate]; _displayLink = nil;

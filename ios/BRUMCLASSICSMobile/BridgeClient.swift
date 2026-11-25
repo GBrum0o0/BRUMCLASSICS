@@ -419,7 +419,7 @@ actor BridgeClient {
             "issuedAt": Int(Date().timeIntervalSince1970 * 1000),
             "payload": payload
         ])
-        let envelope: ServerEnvelope<GamepadLaunchResult> = try await request(path: "/v1/remote", method: "POST", body: body)
+        let envelope: ServerEnvelope<GamepadLaunchResult> = try await request(path: "/v1/remote", method: "POST", body: body, timeout: 45)
         guard let result = envelope.result, result.ok else {
             throw BridgeError.server(envelope.message ?? envelope.result?.message ?? "O launcher não abriu o jogo no modo Gamepad.")
         }
@@ -461,8 +461,8 @@ actor BridgeClient {
 
     func closeEvents() { socket?.cancel(with: .goingAway, reason: nil); socket = nil }
 
-    private func request<T: Decodable>(path: String, method: String = "GET", body: Data? = nil, authenticated: Bool = true, overrideHost: String? = nil, overridePort: Int? = nil) async throws -> T {
-        let data = try await dataRequest(path: path, method: method, body: body, authenticated: authenticated, overrideHost: overrideHost, overridePort: overridePort)
+    private func request<T: Decodable>(path: String, method: String = "GET", body: Data? = nil, authenticated: Bool = true, overrideHost: String? = nil, overridePort: Int? = nil, timeout: TimeInterval = 15) async throws -> T {
+        let data = try await dataRequest(path: path, method: method, body: body, authenticated: authenticated, overrideHost: overrideHost, overridePort: overridePort, timeout: timeout)
         do { return try JSONDecoder().decode(T.self, from: data) }
         catch let error as DecodingError {
             let context: DecodingError.Context
@@ -475,11 +475,12 @@ actor BridgeClient {
         }
     }
 
-    private func dataRequest(path: String, method: String = "GET", body: Data? = nil, authenticated: Bool = true, overrideHost: String? = nil, overridePort: Int? = nil, maximumBytes: Int = 24 * 1024 * 1024) async throws -> Data {
+    private func dataRequest(path: String, method: String = "GET", body: Data? = nil, authenticated: Bool = true, overrideHost: String? = nil, overridePort: Int? = nil, maximumBytes: Int = 24 * 1024 * 1024, timeout: TimeInterval = 15) async throws -> Data {
         let candidates = try pairedHosts(overrideHost: overrideHost)
         var lastNetworkError: Error?
+        let isRemoteLaunchPost = (method == "POST" && path == "/v1/remote")
         for candidate in candidates {
-          guard var request = try makeRequest(path: path, authenticated: authenticated, overrideHost: candidate, overridePort: overridePort) else { throw BridgeError.notPaired }
+          guard var request = try makeRequest(path: path, authenticated: authenticated, overrideHost: candidate, overridePort: overridePort, timeout: timeout) else { throw BridgeError.notPaired }
           request.httpMethod = method; request.httpBody = body
           if body != nil { request.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type") }
           do {
@@ -496,6 +497,9 @@ actor BridgeClient {
             return data
           } catch let error as BridgeError { throw error }
           catch let error as URLError where [.cannotConnectToHost, .timedOut, .networkConnectionLost, .notConnectedToInternet, .dnsLookupFailed, .cannotFindHost].contains(error.code) {
+            if error.code == .timedOut && isRemoteLaunchPost {
+                throw BridgeError.unreachable
+            }
             lastNetworkError = error
             continue
           } catch let error as URLError where error.code == .cancelled || error.code == .serverCertificateUntrusted { throw BridgeError.invalidCertificate }
@@ -513,13 +517,13 @@ actor BridgeClient {
         }
     }
 
-    private func makeRequest(path: String, authenticated: Bool, overrideHost: String? = nil, overridePort: Int? = nil, webSocket: Bool = false) throws -> URLRequest? {
+    private func makeRequest(path: String, authenticated: Bool, overrideHost: String? = nil, overridePort: Int? = nil, webSocket: Bool = false, timeout: TimeInterval = 15) throws -> URLRequest? {
         let host = overrideHost ?? activeHost ?? configuration?.host
         let port = overridePort ?? configuration?.port
         guard let host, let port else { return nil }
         let scheme = webSocket ? "wss" : "https"
         guard let url = URL(string: "\(scheme)://\(host):\(port)\(path)") else { throw BridgeError.invalidResponse("Endereço local inválido.") }
-        var request = URLRequest(url: url, timeoutInterval: 15)
+        var request = URLRequest(url: url, timeoutInterval: timeout)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("BRUMCLASSICS-MOVEL/0.15.1 iOS", forHTTPHeaderField: "User-Agent")
         if authenticated { guard !token.isEmpty else { throw BridgeError.notPaired }; request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }

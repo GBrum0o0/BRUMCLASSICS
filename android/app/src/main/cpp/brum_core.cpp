@@ -279,8 +279,8 @@ public:
             variables["system_nds_bios_enable"] = "ON";
             variables["ppsspp_internal_resolution"] = "480x272";
             variables["ppsspp_rendering_mode"] = "buffered";
-            variables["ppsspp_auto_frameskip"] = "disabled";
-            variables["ppsspp_frameskip"] = "0";
+            variables["ppsspp_auto_frameskip"] = "enabled";
+            variables["ppsspp_frameskip"] = "1";
             variables["ppsspp_gpu_hardware_transform"] = "enabled";
             variables["ppsspp_block_transfer_gpu"] = "enabled";
             variables["citra_graphics_api"] = "OpenGLES";
@@ -288,6 +288,7 @@ public:
             variables["citra_layout_option"] = "Top/Bottom";
             variables["citra_resolution_factor"] = "1";
             variables["citra_enable_touch_touchscreen"] = "enabled";
+            variables["citra_enable_mouse_touchscreen"] = "disabled";
             if (std::ifstream(systemDirectory + "/aes.zip").good()) variables["geolith_system_type"] = "aes";
             else if (std::ifstream(systemDirectory + "/neogeo.zip").good()) variables["geolith_system_type"] = "mvs";
             coreHandle = dlopen(corePath.c_str(), RTLD_NOW | RTLD_LOCAL);
@@ -367,6 +368,10 @@ public:
         for (int index = 0; index < count; index++) {
             suppressVideo = index + 1 < count;
             core.run();
+            if (!pointerPressed.load(std::memory_order_relaxed)) {
+                int latched = pointerLatchFrames.load(std::memory_order_relaxed);
+                if (latched > 0) pointerLatchFrames.store(latched - 1, std::memory_order_relaxed);
+            }
             ++framesRun;
             if (raRuntime) raRuntime->doFrame();
             if (pokedexTracker) pokedexTracker->doFrame();
@@ -379,6 +384,7 @@ public:
     void setPointer(int16_t x, int16_t y, bool pressed) {
         if (pressed && y == 0) y = 1;
         pointerX = x; pointerY = y; pointerPressed = pressed;
+        if (pressed) pointerLatchFrames.store(4, std::memory_order_relaxed);
     }
 
     void setAnalog(unsigned port, unsigned stick, unsigned axis, int16_t value) {
@@ -570,6 +576,7 @@ public:
     double frameRate = 60.0;
     std::atomic<int16_t> pointerX{0}, pointerY{0};
     std::atomic<bool> pointerPressed{false};
+    std::atomic<int> pointerLatchFrames{0};
     std::atomic<uint32_t> portMasks[4]{{0}, {0}, {0}, {0}};
     std::atomic<int16_t> portAnalogAxes[4][4]{};
     bool shutdownRequested = false;
@@ -794,7 +801,8 @@ private:
             if (id == BRUM_RETRO_DEVICE_ID_POINTER_X) return session->pointerX.load(std::memory_order_relaxed);
             if (id == BRUM_RETRO_DEVICE_ID_POINTER_Y) return session->pointerY.load(std::memory_order_relaxed);
             if (id == BRUM_RETRO_DEVICE_ID_POINTER_PRESSED || id == BRUM_RETRO_DEVICE_ID_POINTER_COUNT) {
-                return session->pointerPressed.load(std::memory_order_relaxed) ? 1 : 0;
+                return (session->pointerPressed.load(std::memory_order_relaxed)
+                        || session->pointerLatchFrames.load(std::memory_order_relaxed) > 0) ? 1 : 0;
             }
         }
         return 0;

@@ -451,6 +451,7 @@ final class MurbRemoteSession: ObservableObject {
     private var virtualStickY = 0
     private var lastSentSignature = ""
     private var isSendingInput = false
+    private var pendingTouchPressPayload: String?
     private var pendingInputPayload: String?
 
     init(target: MurbPairingPayload) {
@@ -545,7 +546,10 @@ final class MurbRemoteSession: ObservableObject {
         lastSentSignature = signature
         let text = "{\"type\":\"input\",\"buttons\":\(combinedButtons),\"touching\":\(virtualTouching ? "true" : "false"),\"x\":\(virtualTouchX),\"y\":\(virtualTouchY),\"stickX\":\(stickX),\"stickY\":\(stickY),\"rStickX\":\(rStickX),\"rStickY\":\(rStickY)}"
         if isSendingInput {
-            // Keep only the newest state while an in-flight WebSocket write is completing
+            // Preserve brief touch-down presses so an immediate touch-up doesn't coalesce them away before reaching the PC.
+            if virtualTouching && pendingTouchPressPayload == nil {
+                pendingTouchPressPayload = text
+            }
             pendingInputPayload = text
             return
         }
@@ -558,7 +562,15 @@ final class MurbRemoteSession: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.isSendingInput = false
-                if let queued = self.pendingInputPayload, let activeSocket = self.task, self.state == .connected {
+                guard let activeSocket = self.task, self.state == .connected else {
+                    self.pendingTouchPressPayload = nil
+                    self.pendingInputPayload = nil
+                    return
+                }
+                if let touchDown = self.pendingTouchPressPayload {
+                    self.pendingTouchPressPayload = nil
+                    self.sendInputNow(touchDown, via: activeSocket)
+                } else if let queued = self.pendingInputPayload {
                     self.pendingInputPayload = nil
                     self.sendInputNow(queued, via: activeSocket)
                 }
@@ -567,6 +579,7 @@ final class MurbRemoteSession: ObservableObject {
     }
 
     private func sendNeutralInput() {
+        pendingTouchPressPayload = nil
         pendingInputPayload = nil
         isSendingInput = false
         guard let task else { return }
@@ -577,6 +590,7 @@ final class MurbRemoteSession: ObservableObject {
     private func tearDownSocket() {
         receiveTask?.cancel(); receiveTask = nil
         pingTask?.cancel(); pingTask = nil
+        pendingTouchPressPayload = nil
         pendingInputPayload = nil
         isSendingInput = false
         task?.cancel(with: .normalClosure, reason: nil)

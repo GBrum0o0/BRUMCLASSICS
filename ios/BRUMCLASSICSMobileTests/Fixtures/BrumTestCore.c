@@ -36,7 +36,7 @@ bool retro_load_game(const brum_retro_game_info *game) {
     if (mode == 'I' || mode == 'P') {
         brum_retro_variable option = {"ppsspp_cpu_core", NULL};
         if (!environment(BRUM_RETRO_ENVIRONMENT_GET_VARIABLE, &option) ||
-            !option.value || strcmp(option.value, "interpreter") != 0) return false;
+            !option.value || strcmp(option.value, "IR jit") != 0) return false;
         brum_retro_variable citraJit = {"citra_use_cpu_jit", NULL};
         if (!environment(BRUM_RETRO_ENVIRONMENT_GET_VARIABLE, &citraJit) ||
             !citraJit.value || strcmp(citraJit.value, "disabled") != 0) return false;

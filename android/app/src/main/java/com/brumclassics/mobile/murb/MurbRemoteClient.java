@@ -127,6 +127,7 @@ public final class MurbRemoteClient {
     private Thread pingThread;
     private HandlerThread sendThread;
     private Handler sendHandler;
+    private final AtomicReference<String> pendingTouchDownJson = new AtomicReference<>(null);
     private final AtomicReference<String> pendingInputJson = new AtomicReference<>(null);
     private final AtomicBoolean inputFlushScheduled = new AtomicBoolean(false);
     private final AtomicReference<PendingFrame> pendingFrame = new AtomicReference<>(null);
@@ -135,6 +136,13 @@ public final class MurbRemoteClient {
     private final Runnable flushInputTask = new Runnable() {
         @Override public void run() {
             while (running.get() && connected.get()) {
+                String touchDown = pendingTouchDownJson.getAndSet(null);
+                if (touchDown != null) {
+                    try {
+                        sendText(touchDown);
+                    } catch (Exception ignored) {
+                    }
+                }
                 String next = pendingInputJson.getAndSet(null);
                 if (next != null) {
                     try {
@@ -143,7 +151,8 @@ public final class MurbRemoteClient {
                     }
                 }
                 inputFlushScheduled.set(false);
-                if (pendingInputJson.get() == null || !inputFlushScheduled.compareAndSet(false, true)) {
+                if ((pendingTouchDownJson.get() == null && pendingInputJson.get() == null)
+                        || !inputFlushScheduled.compareAndSet(false, true)) {
                     break;
                 }
             }
@@ -195,6 +204,7 @@ public final class MurbRemoteClient {
             }
         }
         connected.set(false);
+        pendingTouchDownJson.set(null);
         pendingInputJson.set(null);
         pendingFrame.set(null);
         inputFlushScheduled.set(false);
@@ -232,6 +242,9 @@ public final class MurbRemoteClient {
                 + ",\"rStickY\":" + rStickY + "}";
         Handler handler = sendHandler;
         if (handler != null) {
+            if (touching) {
+                pendingTouchDownJson.compareAndSet(null, json);
+            }
             pendingInputJson.set(json);
             if (inputFlushScheduled.compareAndSet(false, true)) {
                 handler.post(flushInputTask);
