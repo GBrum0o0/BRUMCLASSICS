@@ -676,6 +676,31 @@ public:
         return out;
     }
 
+    std::string diagnosticsJson() {
+        std::string lastLog;
+        {
+            std::lock_guard<std::mutex> guard(logMutex);
+            lastLog = lastCoreLog;
+        }
+        std::string escaped;
+        escaped.reserve(lastLog.size());
+        for (char ch : lastLog) {
+            if (ch == '"' || ch == '\\') { escaped.push_back('\\'); escaped.push_back(ch); }
+            else if (ch == '\n' || ch == '\r') { escaped.push_back(' '); }
+            else if (static_cast<unsigned char>(ch) >= 0x20) { escaped.push_back(ch); }
+        }
+        return std::string("{\"framesRun\":") + std::to_string(framesRun) +
+               ",\"videoCallbacks\":" + std::to_string(videoCallbackCount) +
+               ",\"videoNullFrames\":" + std::to_string(videoNullCount) +
+               ",\"nonBlackFrames\":" + std::to_string(nonBlackFrameCount) +
+               ",\"audioSamples\":" + std::to_string(audioSampleCount) +
+               ",\"hwReadbackErrors\":" + std::to_string(hwReadbackErrors) +
+               ",\"hwActive\":" + (hardware.active() ? "true" : "false") +
+               ",\"frameWidth\":" + std::to_string(frameWidth) +
+               ",\"frameHeight\":" + std::to_string(frameHeight) +
+               ",\"lastCoreLog\":\"" + escaped + "\"}";
+    }
+
 private:
     void *coreHandle{}; bool initialized = false, gameLoaded = false;
     std::string romPath, savePath; std::vector<uint8_t> rom;
@@ -870,31 +895,6 @@ private:
             std::lock_guard<std::mutex> guard(session->logMutex);
             session->lastCoreLog = buffer;
         }
-    }
-
-    std::string diagnosticsJson() {
-        std::string lastLog;
-        {
-            std::lock_guard<std::mutex> guard(logMutex);
-            lastLog = lastCoreLog;
-        }
-        std::string escaped;
-        escaped.reserve(lastLog.size());
-        for (char ch : lastLog) {
-            if (ch == '"' || ch == '\\') { escaped.push_back('\\'); escaped.push_back(ch); }
-            else if (ch == '\n' || ch == '\r') { escaped.push_back(' '); }
-            else if (static_cast<unsigned char>(ch) >= 0x20) { escaped.push_back(ch); }
-        }
-        return std::string("{\"framesRun\":") + std::to_string(framesRun) +
-               ",\"videoCallbacks\":" + std::to_string(videoCallbackCount) +
-               ",\"videoNullFrames\":" + std::to_string(videoNullCount) +
-               ",\"nonBlackFrames\":" + std::to_string(nonBlackFrameCount) +
-               ",\"audioSamples\":" + std::to_string(audioSampleCount) +
-               ",\"hwReadbackErrors\":" + std::to_string(hwReadbackErrors) +
-               ",\"hwActive\":" + (hardware.active() ? "true" : "false") +
-               ",\"frameWidth\":" + std::to_string(frameWidth) +
-               ",\"frameHeight\":" + std::to_string(frameHeight) +
-               ",\"lastCoreLog\":\"" + escaped + "\"}";
     }
 };
 
