@@ -805,7 +805,7 @@ static void BrumVideo(const void *data, unsigned width, unsigned height, size_t 
             }
         }
     }
-    NSString *activeFilter = host->_videoFilterMode ?: @"none";
+    NSString *activeFilter = host.videoFilterMode ?: @"none";
     if ([activeFilter isEqualToString:@"cas_sharpen"]) {
         brum_shaders::applyCasSharpen(target, (int)width, (int)height, 70);
     } else if ([activeFilter isEqualToString:@"edge_upscale_2x"] || [activeFilter isEqualToString:@"sharp_bilinear"]) {
