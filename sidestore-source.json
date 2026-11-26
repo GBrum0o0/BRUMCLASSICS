@@ -21,12 +21,22 @@
       "tintColor": "#10B981",
       "category": "games",
       "screenshotURLs": [],
-      "version": "0.30.0",
-      "versionDate": "2026-11-25T02:57:09Z",
-      "versionDescription": "# BRUMCLASSICS MÓVEL iOS 0.30.0 — Correções PSP Nativo, Toque DS/3DS e Modo Gamepad\n\n- **PSP nativo no iOS (`PPSSPP`):** muda a emulação CPU para `IR jit` (`CPUCore::IR_JIT` via interpretador IR seguro, sem precisar de JIT executável no iOS) com `ppsspp_auto_frameskip = enabled`, acelerando a inicialização e eliminando telas pretas longas.\n- **Toque no Nintendo DS e Nintendo 3DS:** retém toques rápidos por 4 quadros em execuções nativas (`BrumLibretroEngine`), desativa `citra_enable_mouse_touchscreen` e garante que o WebSocket remoto envie eventos `touching: true` antes de um `touching: false` subsequente.\n- **Modo Gamepad (Wii, PSP e Wii U):** amplia o timeout do comando `/v1/remote` para 45 segundos e evita repetição em hosts alternativos quando um lançamento está demorando no computador.\n\nAtualize via SideStore ou baixando o `.ipa` desta release preservando saves e biblioteca.",
-      "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.30.0/BRUMCLASSICS-MOVEL-IOS-0.30.0.ipa",
-      "size": 15647478,
+      "version": "0.31.0",
+      "versionDate": "2026-11-26T23:10:41Z",
+      "versionDescription": "# BRUMCLASSICS MÓVEL iOS 0.31.0 — Shaders de Resolução Eficientes\n\n- **Novos shaders de nitidez e upscaling no motor nativo iOS (`BrumLibretroEngine` + `brum_resolution_shaders.hpp`):**\n  - **Nitidez adaptativa (`cas_sharpen`):** realce local de bordas e texturas com proteção contra halos em cores `XRGB8888`, `RGB565`, `0RGB1555` e leitura OpenGL ES (`BrumHardwareFrameBuffer`).\n  - **Edge Upscale 2x (`edge_upscale_2x`):** dobramento inteiro EPX/Scale2x para jogos 2D até 640×480 (fallback CAS em resoluções superiores).\n  - **Sharp Bilinear (`sharp_bilinear`):** pré-escala 2x + filtro linear `kCAFilterLinear` aplicado também em layouts de duas telas (DS/3DS) para reduzir tremor de rolagem mantendo bordas nítidas.\n- **Configurações gráficas:** seletores atualizados no pacote de resolução para sistemas 2D, portáteis e 3D mantendo retorno seguro para o padrão original.\n\nAtualize via SideStore ou baixando o `.ipa` desta release preservando saves, biblioteca e configurações.",
+      "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.31.0/BRUMCLASSICS-MOVEL-IOS-0.31.0.ipa",
+      "size": 15812386,
       "versions": [
+        {
+          "version": "0.31.0",
+          "buildVersion": "64",
+          "date": "2026-11-26T23:10:41Z",
+          "localizedDescription": "# BRUMCLASSICS MÓVEL iOS 0.31.0 — Shaders de Resolução Eficientes\n\n- **Novos shaders de nitidez e upscaling no motor nativo iOS (`BrumLibretroEngine` + `brum_resolution_shaders.hpp`):**\n  - **Nitidez adaptativa (`cas_sharpen`):** realce local de bordas e texturas com proteção contra halos em cores `XRGB8888`, `RGB565`, `0RGB1555` e leitura OpenGL ES (`BrumHardwareFrameBuffer`).\n  - **Edge Upscale 2x (`edge_upscale_2x`):** dobramento inteiro EPX/Scale2x para jogos 2D até 640×480 (fallback CAS em resoluções superiores).\n  - **Sharp Bilinear (`sharp_bilinear`):** pré-escala 2x + filtro linear `kCAFilterLinear` aplicado também em layouts de duas telas (DS/3DS) para reduzir tremor de rolagem mantendo bordas nítidas.\n- **Configurações gráficas:** seletores atualizados no pacote de resolução para sistemas 2D, portáteis e 3D mantendo retorno seguro para o padrão original.\n\nAtualize via SideStore ou baixando o `.ipa` desta release preservando saves, biblioteca e configurações.",
+          "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.31.0/BRUMCLASSICS-MOVEL-IOS-0.31.0.ipa",
+          "size": 15812386,
+          "sha256": "a5940cac8a396537621bf99e4c3f169450f69ec29fe379e82df8c8724681d343",
+          "minOSVersion": "16.0"
+        },
         {
           "version": "0.30.0",
           "buildVersion": "63",
