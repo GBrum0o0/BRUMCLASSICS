@@ -24,6 +24,7 @@ import android.text.Editable;
 import android.text.InputType;
 import android.text.InputFilter;
 import android.text.TextWatcher;
+import android.text.format.Formatter;
 import android.view.Gravity;
 import android.view.InputDevice;
 import android.view.HapticFeedbackConstants;
@@ -34,6 +35,8 @@ import android.view.Window;
 import android.view.WindowInsets;
 import android.window.OnBackInvokedDispatcher;
 import android.view.animation.DecelerateInterpolator;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.BaseAdapter;
 import android.widget.EditText;
@@ -47,6 +50,7 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.Space;
+import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -58,6 +62,8 @@ import com.brumclassics.mobile.data.MomentRepository;
 import com.brumclassics.mobile.model.Game;
 import com.brumclassics.mobile.model.Moment;
 import com.brumclassics.mobile.model.PerformanceLiveState;
+import com.brumclassics.mobile.classics.ClassicDriveCloudRules;
+import com.brumclassics.mobile.classics.ClassicDriveCloudService;
 import com.brumclassics.mobile.classics.ClassicsRepository;
 import com.brumclassics.mobile.classics.ClassicsRules;
 import com.brumclassics.mobile.classics.CoreRegistry;
@@ -65,6 +71,8 @@ import com.brumclassics.mobile.classics.LocalClassic;
 import com.brumclassics.mobile.classics.LocalArtworkClient;
 import com.brumclassics.mobile.classics.RetroAchievementsClient;
 import com.brumclassics.mobile.emulation.BrumAchievementOverlay;
+import com.brumclassics.mobile.emulation.GraphicsResolutionPack;
+import com.brumclassics.mobile.emulation.GraphicsResolutionRules;
 import com.brumclassics.mobile.emulation.IntegratedEmulatorActivity;
 import com.brumclassics.mobile.murb.MurbRemoteClient;
 import com.brumclassics.mobile.murb.MurbRemoteGamepadActivity;
@@ -115,6 +123,7 @@ public final class MainActivity extends Activity {
     private GameRepository repository;
     private MomentRepository momentRepository;
     private ClassicsRepository classicsRepository;
+    private ClassicDriveCloudService driveCloudService;
     private RetroAchievementsClient retroAchievements;
     private LocalArtworkClient localArtwork;
     private BrumAchievementOverlay achievementOverlay;
@@ -195,6 +204,7 @@ public final class MainActivity extends Activity {
         repository = new GameRepository(this);
         momentRepository = new MomentRepository(this);
         classicsRepository = new ClassicsRepository(this);
+        driveCloudService = new ClassicDriveCloudService(this, classicsRepository);
         retroAchievements = new RetroAchievementsClient();
         localArtwork = new LocalArtworkClient(this);
         pokedexStore = new com.brumclassics.mobile.extensions.PokedexUniversalStore(this, "primary");
@@ -1348,6 +1358,27 @@ public final class MainActivity extends Activity {
             showGamingRetroAccount();
         }), margins(-1, 2, -1, 8, 44));
 
+        ClassicDriveCloudRules.ScanCheckpoint driveCp = driveCloudService.getCheckpoint();
+        String freeSpaceText = Formatter.formatFileSize(this, driveCloudService.getAvailableFreeSpaceBytes());
+        panel.addView(text("Biblioteca em nuvem — Google Drive", 18, TEXT, true), margins(-1, 10, -1, 0));
+        panel.addView(text(driveCp.rootFolderId.isEmpty()
+                ? "Acesse e baixe seus clássicos direto do Drive · Espaço livre: " + freeSpaceText
+                : driveCp.itemsById.size() + " jogo(s) catalogados · Espaço livre: " + freeSpaceText,
+                13, Color.rgb(173, 180, 190), false), margins(-1, 5, -1, 6));
+        panel.addView(gamingAction("Configurar Google Drive", false, v -> {
+            dialog.dismiss();
+            showGamingDriveDialog();
+        }), margins(-1, 2, -1, 8, 44));
+
+        GraphicsResolutionRules.Settings gfxSettings = GraphicsResolutionPack.load(this);
+        panel.addView(text("Pacote de Melhoria de Resolução", 18, TEXT, true), margins(-1, 10, -1, 0));
+        panel.addView(text("Perfil ativo: " + gfxSettings.profile + " · escala inteira 2D, filtros e multiplicador 3D.",
+                13, Color.rgb(173, 180, 190), false), margins(-1, 5, -1, 6));
+        panel.addView(gamingAction("Configurar resolução e filtros", false, v -> {
+            dialog.dismiss();
+            showGamingGraphicsDialog();
+        }), margins(-1, 2, -1, 8, 44));
+
         Switch haptics = new Switch(this);
         haptics.setText("Vibração tátil nos botões virtuais");
         haptics.setTextColor(TEXT);
@@ -1376,6 +1407,292 @@ public final class MainActivity extends Activity {
         autoSaveSync.setOnCheckedChangeListener((button, checked) -> prefs.edit().putBoolean("auto_save_sync", checked).apply());
         panel.addView(autoSaveSync, margins(-1, 6, -1, 8));
 
+        dialog.show();
+    }
+
+    private void showGamingDriveDialog() {
+        LinearLayout panel = gamingDialogPanel();
+        ClassicDriveCloudRules.ScanCheckpoint cp = driveCloudService.getCheckpoint();
+        String freeStr = Formatter.formatFileSize(this, driveCloudService.getAvailableFreeSpaceBytes());
+        TextView infoLabel = text("Pasta de destino: " + driveCloudService.getStorageDirectory().getAbsolutePath()
+                + "\nEspaço livre no aparelho: " + freeStr, 11, MUTED, false);
+        panel.addView(infoLabel, margins(-1, 0, -1, 8));
+
+        EditText linkField = pairingField("Link da pasta do Google Drive (HTTPS)", cp.rootUrl);
+        panel.addView(linkField, margins(-1, 0, -1, 8, 48));
+
+        EditText tokenField = pairingField("Token OAuth opcional (pastas privadas)", "");
+        tokenField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        panel.addView(tokenField, margins(-1, 0, -1, 8, 48));
+
+        final java.io.File internalDir = new java.io.File(getFilesDir(), "drive-roms");
+        final java.io.File externalDir = getExternalFilesDir("drive-roms");
+        Spinner storageSpinner = new Spinner(this);
+        List<String> storageLabels = new ArrayList<>();
+        final List<java.io.File> storageDirs = new ArrayList<>();
+        storageLabels.add("Armazenamento privado do app (" + Formatter.formatFileSize(this, internalDir.getUsableSpace()) + " livres)");
+        storageDirs.add(internalDir);
+        if (externalDir != null) {
+            storageLabels.add("Pasta externa do app (" + Formatter.formatFileSize(this, externalDir.getUsableSpace()) + " livres)");
+            storageDirs.add(externalDir);
+        }
+        storageSpinner.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, storageLabels));
+        panel.addView(storageSpinner, margins(-1, 0, -1, 8, 44));
+
+        TextView statusText = text(cp.lastError != null && !cp.lastError.isEmpty()
+                ? cp.lastError
+                : (cp.rootFolderId.isEmpty() ? "Informe um link público/autorizado para iniciar." : cp.itemsById.size() + " jogo(s) no catálogo em nuvem."),
+                11, MUTED, false);
+        panel.addView(statusText, margins(-1, 0, -1, 8));
+
+        LinearLayout listBox = column();
+        ScrollView scroll = new ScrollView(this);
+        panel.addView(listBox, margins(-1, 6, -1, 6));
+        scroll.addView(panel);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Biblioteca em nuvem — Google Drive")
+                .setView(scroll)
+                .setNegativeButton("Fechar", null)
+                .create();
+
+        Runnable[] rebuildListHolder = new Runnable[1];
+        rebuildListHolder[0] = () -> {
+            listBox.removeAllViews();
+            ClassicDriveCloudRules.ScanCheckpoint latest = driveCloudService.getCheckpoint();
+            for (ClassicDriveCloudRules.CloudGameEntry item : latest.sortedItems()) {
+                LinearLayout row = column();
+                row.setPadding(dp(10), dp(8), dp(10), dp(8));
+                row.setBackground(background(SURFACE, 8, LINE, 1));
+                boolean isLocal = ClassicDriveCloudRules.isAvailabilityPlayableLocally(item.downloadedLocalPath);
+                boolean isDownloading = "downloading".equals(item.downloadStatus);
+                String stateLabel = isDownloading ? GamingModeRules.LABEL_DOWNLOADING
+                        : (isLocal ? GamingModeRules.LABEL_AVAILABLE : GamingModeRules.LABEL_IN_CLOUD);
+                row.addView(text(item.title, 13, TEXT, true));
+                row.addView(text((item.systemHint.isEmpty() ? "Clássico" : item.systemHint.toUpperCase(Locale.ROOT)) + " · " + stateLabel, 11, MUTED, false), margins(-1, 2, -1, 6));
+                if (item.downloadError != null && !item.downloadError.isEmpty()) {
+                    row.addView(text(item.downloadError, 10, Color.rgb(255, 120, 120), false), margins(-1, 0, -1, 4));
+                }
+                if (isDownloading) {
+                    row.addView(gamingAction("Cancelar download", false, v -> {
+                        driveCloudService.cancelDownload(item.id);
+                        rebuildListHolder[0].run();
+                    }), margins(-1, 0, -1, 0, 38));
+                } else if (isLocal) {
+                    row.addView(gamingAction("Jogar offline", true, v -> {
+                        LocalClassic local = classicsRepository.find("drive:" + item.id);
+                        if (local == null) {
+                            Toast.makeText(this, "Jogo disponível na biblioteca do Gaming Mode.", Toast.LENGTH_SHORT).show();
+                            dialog.dismiss();
+                            verifiedGamingClassics = null;
+                            openGamingMode();
+                            return;
+                        }
+                        dialog.dismiss();
+                        launchLocalClassic(local);
+                    }), margins(-1, 0, -1, 0, 38));
+                } else {
+                    row.addView(gamingAction("Baixar para jogar offline", true, v -> {
+                        statusText.setText("Baixando " + item.title + "…");
+                        modelExecutor.execute(() -> {
+                            try {
+                                driveCloudService.downloadGameSync(item.id, (id, recv, total, st) -> handler.post(() -> {
+                                    if (total > 0) statusText.setText("Baixando " + item.title + ": " + (recv * 100 / total) + "%");
+                                    else statusText.setText("Baixando " + item.title + ": " + Formatter.formatFileSize(this, recv));
+                                }));
+                                verifiedGamingClassics = null;
+                                handler.post(() -> {
+                                    statusText.setText(item.title + " pronto para jogar offline!");
+                                    Toast.makeText(this, item.title + " baixado com sucesso.", Toast.LENGTH_SHORT).show();
+                                    rebuildListHolder[0].run();
+                                });
+                            } catch (Exception err) {
+                                handler.post(() -> {
+                                    statusText.setText("Falha no download: " + err.getMessage());
+                                    rebuildListHolder[0].run();
+                                });
+                            }
+                        });
+                    }), margins(-1, 0, -1, 0, 38));
+                }
+                listBox.addView(row, margins(-1, 4, -1, 4));
+            }
+        };
+
+        Button scanBtn = gamingAction("Validar e atualizar catálogo", true, v -> {
+            int chosenIdx = storageSpinner.getSelectedItemPosition();
+            if (chosenIdx >= 0 && chosenIdx < storageDirs.size()) {
+                driveCloudService.setStorageDirectory(storageDirs.get(chosenIdx));
+            }
+            String token = tokenField.getText().toString().trim();
+            if (!token.isEmpty()) {
+                try { driveCloudService.setBearerToken(token); tokenField.setText(""); } catch (Exception ignored) {}
+            }
+            String url = linkField.getText().toString().trim();
+            statusText.setText("Lendo pasta do Google Drive…");
+            modelExecutor.execute(() -> {
+                try {
+                    ClassicDriveCloudRules.ScanCheckpoint next = driveCloudService.startOrRefreshScan(url);
+                    handler.post(() -> {
+                        statusText.setText(next.completed
+                                ? "Varredura concluída: " + next.itemsById.size() + " jogo(s) no catálogo."
+                                : "Lote salvo: " + next.totalFoldersRead + " pastas lidas, " + next.pendingFolders.size() + " pendentes.");
+                        rebuildListHolder[0].run();
+                    });
+                } catch (Exception err) {
+                    handler.post(() -> {
+                        statusText.setText("Erro: " + err.getMessage());
+                        rebuildListHolder[0].run();
+                    });
+                }
+            });
+        });
+        panel.addView(scanBtn, margins(-1, 0, -1, 6, 44));
+
+        Button continueBtn = gamingAction("Continuar varredura pendente", false, v -> {
+            statusText.setText("Retomando lote pendente…");
+            modelExecutor.execute(() -> {
+                try {
+                    ClassicDriveCloudRules.ScanCheckpoint next = driveCloudService.continueScan();
+                    handler.post(() -> {
+                        statusText.setText(next.completed
+                                ? "Varredura concluída: " + next.itemsById.size() + " jogo(s)."
+                                : "Progresso: " + next.totalFoldersRead + " lidas, " + next.pendingFolders.size() + " pendentes.");
+                        rebuildListHolder[0].run();
+                    });
+                } catch (Exception err) {
+                    handler.post(() -> statusText.setText("Erro ao retomar: " + err.getMessage()));
+                }
+            });
+        });
+        panel.addView(continueBtn, margins(-1, 0, -1, 8, 44));
+
+        rebuildListHolder[0].run();
+        dialog.show();
+    }
+
+    private void showGamingGraphicsDialog() {
+        LinearLayout panel = gamingDialogPanel();
+        GraphicsResolutionRules.Settings settings = GraphicsResolutionPack.load(this);
+        List<GraphicsResolutionRules.CatalogEntry> catalog = GraphicsResolutionPack.catalog();
+
+        List<String> sysIds = new ArrayList<>();
+        List<String> sysLabels = new ArrayList<>();
+        sysIds.add("__global__");
+        sysLabels.add("Padrão global");
+        for (GraphicsResolutionRules.CatalogEntry entry : catalog) {
+            sysIds.add(entry.id);
+            sysLabels.add(entry.label + " (" + (entry.is3D ? "3D" : "2D") + ")");
+        }
+
+        final String[] profileKeys = {
+            GraphicsResolutionRules.PROFILE_AUTOMATIC,
+            GraphicsResolutionRules.PROFILE_ORIGINAL,
+            GraphicsResolutionRules.PROFILE_ENHANCED,
+            GraphicsResolutionRules.PROFILE_CUSTOM
+        };
+        final String[] profileLabels = {"Automática (recomendada)", "Original (nativa)", "Melhorada", "Personalizada"};
+        final String[] scaleKeys = {
+            GraphicsResolutionRules.SCALE_ORIGINAL,
+            GraphicsResolutionRules.SCALE_INTEGER,
+            GraphicsResolutionRules.SCALE_STRETCH
+        };
+        final String[] scaleLabels = {"Original (preservar proporção)", "Inteira (Pixel-Perfect 2D)", "Preencher tela"};
+        final String[] filterKeys = {
+            GraphicsResolutionRules.FILTER_NONE,
+            GraphicsResolutionRules.FILTER_CRT_SCANLINES,
+            GraphicsResolutionRules.FILTER_LCD_GRID,
+            GraphicsResolutionRules.FILTER_BILINEAR_SUBTLE
+        };
+        final String[] filterLabels = {"Nenhum (nítido)", "CRT Scanlines", "Grade LCD (portáteis)", "Bilinear sutil"};
+        final String[] multLabels = {"1x nativa", "2x interna", "3x interna", "4x interna"};
+
+        Spinner sysSpinner = new Spinner(this);
+        sysSpinner.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, sysLabels));
+        Spinner profileSpinner = new Spinner(this);
+        profileSpinner.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, profileLabels));
+        Spinner multSpinner = new Spinner(this);
+        multSpinner.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, multLabels));
+        Spinner scaleSpinner = new Spinner(this);
+        scaleSpinner.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, scaleLabels));
+        Spinner filterSpinner = new Spinner(this);
+        filterSpinner.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, filterLabels));
+
+        TextView previewLabel = text("", 11, MUTED, false);
+        Runnable syncUi = () -> {
+            String selSys = sysIds.get(Math.max(0, sysSpinner.getSelectedItemPosition()));
+            boolean isGlobal = "__global__".equals(selSys);
+            String targetPreview = isGlobal ? "psp" : selSys;
+            GraphicsResolutionRules.ResolvedConfig resolved = GraphicsResolutionRules.resolve(settings, targetPreview, GraphicsResolutionPack.detectHardwareTier(this));
+            multSpinner.setEnabled(isGlobal || resolved.is3D);
+            previewLabel.setText((isGlobal ? "Prévia PSP: " : resolved.systemId.toUpperCase(Locale.ROOT) + ": ")
+                    + (resolved.is3D ? resolved.internalMultiplier + "x interno real" : "2D escala inteira / nítida")
+                    + " · Escala: " + resolved.scaleMode + " · Filtro: " + resolved.videoFilterMode
+                    + " · Tier: " + resolved.hardwareTier);
+        };
+
+        for (int i = 0; i < profileKeys.length; i++) {
+            if (profileKeys[i].equals(settings.profile)) profileSpinner.setSelection(i);
+        }
+        multSpinner.setSelection(Math.max(0, Math.min(3, settings.globalMultiplier - 1)));
+        for (int i = 0; i < scaleKeys.length; i++) {
+            if (scaleKeys[i].equals(settings.globalScaleMode)) scaleSpinner.setSelection(i);
+        }
+        for (int i = 0; i < filterKeys.length; i++) {
+            if (filterKeys[i].equals(settings.globalVideoFilter)) filterSpinner.setSelection(i);
+        }
+
+        sysSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) { syncUi.run(); }
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
+
+        panel.addView(text("Console", 12, TEXT, true));
+        panel.addView(sysSpinner, margins(-1, 2, -1, 8, 44));
+        panel.addView(text("Perfil gráfico", 12, TEXT, true));
+        panel.addView(profileSpinner, margins(-1, 2, -1, 8, 44));
+        panel.addView(text("Multiplicador interno 3D", 12, TEXT, true));
+        panel.addView(multSpinner, margins(-1, 2, -1, 8, 44));
+        panel.addView(text("Proporção / Escala", 12, TEXT, true));
+        panel.addView(scaleSpinner, margins(-1, 2, -1, 8, 44));
+        panel.addView(text("Filtro gráfico", 12, TEXT, true));
+        panel.addView(filterSpinner, margins(-1, 2, -1, 8, 44));
+        panel.addView(previewLabel, margins(-1, 4, -1, 10));
+        syncUi.run();
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(panel);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Pacote de Melhoria de Resolução")
+                .setView(scroll)
+                .setNegativeButton("Cancelar", null)
+                .setNeutralButton("Restaurar original", (d, w) -> {
+                    GraphicsResolutionPack.reset(this, "");
+                    Toast.makeText(this, "Resolução restaurada para o padrão original/automático.", Toast.LENGTH_SHORT).show();
+                })
+                .setPositiveButton("Salvar", (d, w) -> {
+                    String selSys = sysIds.get(Math.max(0, sysSpinner.getSelectedItemPosition()));
+                    String chosenProf = profileKeys[Math.max(0, profileSpinner.getSelectedItemPosition())];
+                    int chosenMult = Math.max(1, multSpinner.getSelectedItemPosition() + 1);
+                    String chosenScale = scaleKeys[Math.max(0, scaleSpinner.getSelectedItemPosition())];
+                    String chosenFilter = filterKeys[Math.max(0, filterSpinner.getSelectedItemPosition())];
+                    if ("__global__".equals(selSys)) {
+                        settings.profile = chosenProf;
+                        settings.globalMultiplier = chosenMult;
+                        settings.globalScaleMode = chosenScale;
+                        settings.globalVideoFilter = chosenFilter;
+                    } else {
+                        GraphicsResolutionRules.SystemOverride ov = new GraphicsResolutionRules.SystemOverride();
+                        ov.profile = chosenProf;
+                        ov.multiplier = chosenMult;
+                        ov.scaleMode = chosenScale;
+                        ov.videoFilter = chosenFilter;
+                        settings.systems.put(selSys, ov);
+                    }
+                    GraphicsResolutionPack.save(this, settings);
+                    Toast.makeText(this, "Melhoria de resolução salva para as próximas sessões.", Toast.LENGTH_SHORT).show();
+                })
+                .create();
         dialog.show();
     }
 

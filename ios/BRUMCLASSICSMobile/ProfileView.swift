@@ -75,6 +75,8 @@ struct MobileSettingsView: View {
                     .disabled(!pocket.romFolderConfigured)
                 Text("Escolha Downloads, iCloud Drive ou outra pasta disponível no app Arquivos. GB, GBC, GBA, Nintendo DS e cartuchos Neo Geo .neo abrem diretamente no BRUM Core, sem importação. Sistemas ainda não integrados continuam usando o RetroArch como compatibilidade.").font(.caption).foregroundStyle(BrumTheme.muted)
                 if !pocket.romFolderStatus.isEmpty { Text(pocket.romFolderStatus).font(.caption).foregroundStyle(BrumTheme.muted) }
+                NavigationLink("Biblioteca em nuvem — Google Drive") { ClassicDriveCloudSettingsView() }
+                NavigationLink("Pacote de Melhoria de Resolução") { GraphicsResolutionSettingsView() }
                 NavigationLink("RetroArch e RetroAchievements") { PocketSetupView() }
             }
             Section("B-CARD · CLASSICS") {
