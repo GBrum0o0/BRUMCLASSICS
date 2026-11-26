@@ -29,6 +29,9 @@ final class BrumCoreView extends View implements Runnable {
     };
     private int virtualPadPort = 0;
     private final int[] pixels = new int[2048 * 2048];
+    private int[] shaderScratch;
+    private int shaderOutWidth;
+    private int shaderOutHeight;
     private final short[] audioSamples = new short[16 * 1024];
     private final Object bitmapLock = new Object();
     private final Paint paint = new Paint();
@@ -61,9 +64,172 @@ final class BrumCoreView extends View implements Runnable {
     void setGraphicsPresentation(boolean integerScaling, String filterMode) {
         this.integerScaling = integerScaling;
         this.videoFilterMode = filterMode == null ? "none" : filterMode;
-        boolean linear = "bilinear_subtle".equals(this.videoFilterMode);
+        boolean linear = "bilinear_subtle".equals(this.videoFilterMode) || "sharp_bilinear".equals(this.videoFilterMode);
         paint.setFilterBitmap(linear);
         postInvalidateOnAnimation();
+    }
+
+    private int[] ensureShaderScratch() {
+        if (shaderScratch == null) {
+            shaderScratch = new int[2048 * 2048];
+        }
+        return shaderScratch;
+    }
+
+    private int[] prepareFilteredFrame(int[] src, int width, int height) {
+        shaderOutWidth = width;
+        shaderOutHeight = height;
+        String mode = videoFilterMode;
+        if ("cas_sharpen".equals(mode)) {
+            int[] dst = ensureShaderScratch();
+            applyCasSharpenJava(src, dst, width, height, 70);
+            return dst;
+        }
+        if ("edge_upscale_2x".equals(mode)) {
+            if (width > 2 && height > 2 && width <= 640 && height <= 480 && (long) (width * 2) * (height * 2) <= 2048L * 2048L) {
+                int[] dst = ensureShaderScratch();
+                applyEdgeUpscale2xJava(src, dst, width, height);
+                shaderOutWidth = width * 2;
+                shaderOutHeight = height * 2;
+                return dst;
+            }
+            int[] dst = ensureShaderScratch();
+            applyCasSharpenJava(src, dst, width, height, 65);
+            return dst;
+        }
+        if ("sharp_bilinear".equals(mode)) {
+            if (width <= 640 && height <= 480 && (long) (width * 2) * (height * 2) <= 2048L * 2048L) {
+                int[] dst = ensureShaderScratch();
+                applySharpBilinearPrescaleJava(src, dst, width, height);
+                shaderOutWidth = width * 2;
+                shaderOutHeight = height * 2;
+                return dst;
+            }
+            int[] dst = ensureShaderScratch();
+            applyCasSharpenJava(src, dst, width, height, 35);
+            return dst;
+        }
+        return src;
+    }
+
+    private static int channelDiffSum(int a, int b) {
+        int dr = ((a >> 16) & 0xff) - ((b >> 16) & 0xff);
+        int dg = ((a >> 8) & 0xff) - ((b >> 8) & 0xff);
+        int db = (a & 0xff) - (b & 0xff);
+        return (dr < 0 ? -dr : dr) + (dg < 0 ? -dg : dg) + (db < 0 ? -db : db);
+    }
+
+    private static int blend50(int a, int b) {
+        int r = (((a >> 16) & 0xff) + ((b >> 16) & 0xff) + 1) >>> 1;
+        int g = (((a >> 8) & 0xff) + ((b >> 8) & 0xff) + 1) >>> 1;
+        int bl = ((a & 0xff) + (b & 0xff) + 1) >>> 1;
+        return 0xff000000 | (r << 16) | (g << 8) | bl;
+    }
+
+    private static void applyCasSharpenJava(int[] src, int[] dst, int width, int height, int strengthPct) {
+        if (width <= 2 || height <= 2) {
+            System.arraycopy(src, 0, dst, 0, width * height);
+            return;
+        }
+        int strength = Math.max(0, Math.min(120, strengthPct));
+        for (int y = 0; y < height; y++) {
+            int yUp = y > 0 ? y - 1 : 0;
+            int yDn = y + 1 < height ? y + 1 : height - 1;
+            int row = y * width;
+            int rowUp = yUp * width;
+            int rowDn = yDn * width;
+            for (int x = 0; x < width; x++) {
+                int xLt = x > 0 ? x - 1 : 0;
+                int xRt = x + 1 < width ? x + 1 : width - 1;
+                int c = src[row + x];
+                int n = src[rowUp + x];
+                int s = src[rowDn + x];
+                int w = src[row + xLt];
+                int e = src[row + xRt];
+                if (c == n && c == s && c == w && c == e) {
+                    dst[row + x] = 0xff000000 | (c & 0x00ffffff);
+                    continue;
+                }
+                int out = 0xff000000;
+                for (int shift = 16; shift >= 0; shift -= 8) {
+                    int vc = (c >> shift) & 0xff;
+                    int vn = (n >> shift) & 0xff;
+                    int vs = (s >> shift) & 0xff;
+                    int vw = (w >> shift) & 0xff;
+                    int ve = (e >> shift) & 0xff;
+                    int mn = Math.min(vc, Math.min(Math.min(vn, vs), Math.min(vw, ve)));
+                    int mx = Math.max(vc, Math.max(Math.max(vn, vs), Math.max(vw, ve)));
+                    int avg = (vn + vs + vw + ve) >> 2;
+                    int cand = vc + (((vc - avg) * strength) / 100);
+                    if (cand < mn) cand = mn;
+                    else if (cand > mx) cand = mx;
+                    out |= (cand << shift);
+                }
+                dst[row + x] = out;
+            }
+        }
+    }
+
+    private static void applyEdgeUpscale2xJava(int[] src, int[] dst, int width, int height) {
+        int dstW = width * 2;
+        final int tol = 12;
+        for (int y = 0; y < height; y++) {
+            int yUp = y > 0 ? y - 1 : 0;
+            int yDn = y + 1 < height ? y + 1 : height - 1;
+            int row = y * width;
+            int rowUp = yUp * width;
+            int rowDn = yDn * width;
+            int outTop = (y * 2) * dstW;
+            int outBot = outTop + dstW;
+            for (int x = 0; x < width; x++) {
+                int xLt = x > 0 ? x - 1 : 0;
+                int xRt = x + 1 < width ? x + 1 : width - 1;
+                int p = src[row + x] | 0xff000000;
+                int a = src[rowUp + x] | 0xff000000;
+                int d = src[rowDn + x] | 0xff000000;
+                int c = src[row + xLt] | 0xff000000;
+                int b = src[row + xRt] | 0xff000000;
+                int p0 = p, p1 = p, p2 = p, p3 = p;
+                boolean diffAB = channelDiffSum(a, b) > tol;
+                boolean diffCD = channelDiffSum(c, d) > tol;
+                if (channelDiffSum(a, d) > tol && channelDiffSum(c, b) > tol) {
+                    if (channelDiffSum(c, a) <= tol && channelDiffSum(c, d) > tol && diffAB) {
+                        p0 = (c == a) ? a : blend50(c, a);
+                    }
+                    if (channelDiffSum(a, b) <= tol && channelDiffSum(a, c) > tol && channelDiffSum(b, d) > tol) {
+                        p1 = (a == b) ? b : blend50(a, b);
+                    }
+                    if (channelDiffSum(d, c) <= tol && channelDiffSum(d, b) > tol && channelDiffSum(c, a) > tol) {
+                        p2 = (d == c) ? c : blend50(d, c);
+                    }
+                    if (channelDiffSum(b, d) <= tol && diffAB && diffCD) {
+                        p3 = (b == d) ? d : blend50(b, d);
+                    }
+                }
+                int ox = x * 2;
+                dst[outTop + ox] = p0;
+                dst[outTop + ox + 1] = p1;
+                dst[outBot + ox] = p2;
+                dst[outBot + ox + 1] = p3;
+            }
+        }
+    }
+
+    private static void applySharpBilinearPrescaleJava(int[] src, int[] dst, int width, int height) {
+        int dstW = width * 2;
+        for (int y = 0; y < height; y++) {
+            int sRow = y * width;
+            int dTop = (y * 2) * dstW;
+            int dBot = dTop + dstW;
+            for (int x = 0; x < width; x++) {
+                int px = src[sRow + x] | 0xff000000;
+                int ox = x * 2;
+                dst[dTop + ox] = px;
+                dst[dTop + ox + 1] = px;
+                dst[dBot + ox] = px;
+                dst[dBot + ox + 1] = px;
+            }
+        }
     }
 
     private void clearTouchPointer() {
@@ -231,13 +397,16 @@ final class BrumCoreView extends View implements Runnable {
                 int width = (int) (dimensions >>> 32); int height = (int) dimensions;
                 if (width > 0 && height > 0 && (long) width * height <= pixels.length) {
                     anyFramePresented = true;
+                    int[] uploadPixels = prepareFilteredFrame(pixels, width, height);
+                    int uploadWidth = shaderOutWidth;
+                    int uploadHeight = shaderOutHeight;
                     synchronized (bitmapLock) {
-                        if (bitmap == null || bitmap.getWidth() != width || bitmap.getHeight() != height) {
+                        if (bitmap == null || bitmap.getWidth() != uploadWidth || bitmap.getHeight() != uploadHeight) {
                             if (bitmap != null) bitmap.recycle();
-                            bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                            bitmap = Bitmap.createBitmap(uploadWidth, uploadHeight, Bitmap.Config.ARGB_8888);
                             bitmap.setHasAlpha(false);
                         }
-                        bitmap.setPixels(pixels, 0, width, 0, 0, width, height);
+                        bitmap.setPixels(uploadPixels, 0, uploadWidth, 0, 0, uploadWidth, uploadHeight);
                     }
                     postInvalidateOnAnimation();
                 } else if (!anyFramePresented && !pspWarned && runLoops >= 120

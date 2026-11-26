@@ -129,6 +129,9 @@ struct GraphicsResolutionSettingsView: View {
 
                 Picker("Filtro gráfico", selection: activeFilterBinding) {
                     Text("Nenhum (nítido)").tag(GraphicsVideoFilter.none)
+                    Text("Nitidez adaptativa (CAS)").tag(GraphicsVideoFilter.casSharpen)
+                    Text("Sharp Bilinear (anti-tremor)").tag(GraphicsVideoFilter.sharpBilinear)
+                    Text("Edge Upscale 2x (EPX 2D)").tag(GraphicsVideoFilter.edgeUpscale2x)
                     Text("CRT Scanlines").tag(GraphicsVideoFilter.crtScanlines)
                     Text("Grade LCD (portáteis)").tag(GraphicsVideoFilter.lcdGrid)
                     Text("Bilinear sutil").tag(GraphicsVideoFilter.bilinearSubtle)

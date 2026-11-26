@@ -1,8 +1,8 @@
 {
-  "version": "0.30.0",
-  "build": 63,
+  "version": "0.31.0",
+  "build": 64,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.30.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.31.0",
   "notes": [
     "Otimiza a execucao nativa do PSP (PPSSPP) no iOS com IR JIT seguro sem memoria executavel e pulo automatico de quadros, evitando tela preta prolongada.",
     "Garante leitura fiel de toques rapidos no Nintendo DS e Nintendo 3DS (nativo e controle remoto WebSocket) com retencao por quadro.",

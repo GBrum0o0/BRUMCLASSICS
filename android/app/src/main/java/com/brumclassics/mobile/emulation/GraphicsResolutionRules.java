@@ -24,6 +24,9 @@ public final class GraphicsResolutionRules {
     public static final String FILTER_CRT_SCANLINES = "crt_scanlines";
     public static final String FILTER_LCD_GRID = "lcd_grid";
     public static final String FILTER_BILINEAR_SUBTLE = "bilinear_subtle";
+    public static final String FILTER_CAS_SHARPEN = "cas_sharpen";
+    public static final String FILTER_SHARP_BILINEAR = "sharp_bilinear";
+    public static final String FILTER_EDGE_UPSCALE_2X = "edge_upscale_2x";
 
     public static final String TIER_LOW = "low";
     public static final String TIER_MEDIUM = "medium";
@@ -104,9 +107,12 @@ public final class GraphicsResolutionRules {
     private static final Map<String, String> ALIASES = new HashMap<>();
 
     static {
-        List<String> consoleFilters = Arrays.asList(FILTER_NONE, FILTER_CRT_SCANLINES, FILTER_BILINEAR_SUBTLE);
-        List<String> handheldFilters = Arrays.asList(FILTER_NONE, FILTER_LCD_GRID, FILTER_BILINEAR_SUBTLE);
-        List<String> allFilters = Arrays.asList(FILTER_NONE, FILTER_CRT_SCANLINES, FILTER_LCD_GRID, FILTER_BILINEAR_SUBTLE);
+        List<String> consoleFilters = Arrays.asList(
+                FILTER_NONE, FILTER_CRT_SCANLINES, FILTER_SHARP_BILINEAR, FILTER_EDGE_UPSCALE_2X, FILTER_CAS_SHARPEN, FILTER_BILINEAR_SUBTLE);
+        List<String> handheldFilters = Arrays.asList(
+                FILTER_NONE, FILTER_LCD_GRID, FILTER_SHARP_BILINEAR, FILTER_EDGE_UPSCALE_2X, FILTER_CAS_SHARPEN, FILTER_BILINEAR_SUBTLE);
+        List<String> allFilters = Arrays.asList(
+                FILTER_NONE, FILTER_CRT_SCANLINES, FILTER_LCD_GRID, FILTER_SHARP_BILINEAR, FILTER_EDGE_UPSCALE_2X, FILTER_CAS_SHARPEN, FILTER_BILINEAR_SUBTLE);
 
         addEntry("atari2600", "Atari 2600", false, false, false, "4:3", 1, consoleFilters);
         addEntry("atari5200", "Atari 5200", false, false, false, "4:3", 1, consoleFilters);
@@ -202,7 +208,7 @@ public final class GraphicsResolutionRules {
         CatalogEntry entry = CATALOG_MAP.get(canonical);
         if (entry == null) {
             entry = new CatalogEntry(canonical, canonical.toUpperCase(Locale.ROOT), false, false, false, "4:3", 1,
-                Arrays.asList(FILTER_NONE, FILTER_CRT_SCANLINES, FILTER_BILINEAR_SUBTLE));
+                Arrays.asList(FILTER_NONE, FILTER_CRT_SCANLINES, FILTER_SHARP_BILINEAR, FILTER_EDGE_UPSCALE_2X, FILTER_CAS_SHARPEN, FILTER_BILINEAR_SUBTLE));
         }
         String tier = hardwareTier == null || hardwareTier.isEmpty() ? TIER_MEDIUM : hardwareTier;
         SystemOverride ov = s.systems.get(canonical);
@@ -309,7 +315,8 @@ public final class GraphicsResolutionRules {
     }
 
     public static String normalizeFilter(String raw) {
-        if (FILTER_CRT_SCANLINES.equals(raw) || FILTER_LCD_GRID.equals(raw) || FILTER_BILINEAR_SUBTLE.equals(raw)) {
+        if (FILTER_CRT_SCANLINES.equals(raw) || FILTER_LCD_GRID.equals(raw) || FILTER_BILINEAR_SUBTLE.equals(raw)
+                || FILTER_CAS_SHARPEN.equals(raw) || FILTER_SHARP_BILINEAR.equals(raw) || FILTER_EDGE_UPSCALE_2X.equals(raw)) {
             return raw;
         }
         return FILTER_NONE;

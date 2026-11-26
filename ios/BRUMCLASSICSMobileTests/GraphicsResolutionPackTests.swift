@@ -38,5 +38,14 @@ final class GraphicsResolutionPackTests: XCTestCase {
         let resetOrig = pack.resolve(systemID: "psp", settings: GraphicsResolutionSettings(profile: .original), hardwareTier: .high)
         XCTAssertEqual(resetOrig.internalMultiplier, 1)
         XCTAssertEqual(resetOrig.coreVariables["ppsspp_internal_resolution"], "480x272")
+
+        for shader in [GraphicsVideoFilter.casSharpen, .sharpBilinear, .edgeUpscale2x] {
+            var shaderSettings = GraphicsResolutionSettings(profile: .custom)
+            shaderSettings.globalVideoFilter = shader
+            let resolved2D = pack.resolve(systemID: "gba", settings: shaderSettings, hardwareTier: .high)
+            XCTAssertEqual(resolved2D.videoFilterMode, shader.rawValue)
+            let resolved3D = pack.resolve(systemID: "psp", settings: shaderSettings, hardwareTier: .high)
+            XCTAssertEqual(resolved3D.videoFilterMode, shader.rawValue)
+        }
     }
 }

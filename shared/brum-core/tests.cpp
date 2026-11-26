@@ -6,6 +6,7 @@
 #include "FrameCadence.hpp"
 #include "ContentValidation.hpp"
 #include "AchievementDeduplicator.hpp"
+#include "brum_resolution_shaders.hpp"
 #include "../../ios/BRUMCLASSICSMobile/Libretro/BrumScreenProfiles.hpp"
 #include <cstdlib>
 #include <iostream>
@@ -266,5 +267,29 @@ int main() {
     check(dedup.markIfNew("", 777, "105", "Fourth"));
     // Capacity=3 evicted ra:777:102 cleanly.
     check(dedup.markIfNew("ra:777:102", 777, "102", "First"));
+
+    {
+        // CAS sharpen strengthens a contrast step while preserving local [min,max] clamp.
+        std::vector<uint32_t> img(25, 0xff202020u);
+        img[12] = 0xff808080u;
+        brum_shaders::applyCasSharpen(img.data(), 5, 5, 80);
+        check((img[12] & 0xffu) >= 0x80u);
+        check((img[11] & 0xffu) >= 0x20u && (img[11] & 0xffu) <= 0x80u);
+
+        // EPX/Scale2x doubles dimensions cleanly on small 2D frames and smooths diagonals.
+        std::vector<uint32_t> edgeSrc = {
+            0xffffffffu, 0xff000000u, 0xff000000u, 0xff000000u,
+            0xff000000u, 0xffffffffu, 0xff000000u, 0xff000000u,
+            0xff000000u, 0xff000000u, 0xffffffffu, 0xff000000u,
+            0xff000000u, 0xff000000u, 0xff000000u, 0xffffffffu
+        };
+        std::vector<uint32_t> out;
+        int outW = 0, outH = 0;
+        brum_shaders::applyEdgeUpscale2x(edgeSrc.data(), 4, 4, out, outW, outH);
+        check(outW == 8 && outH == 8 && out.size() == 64);
+        brum_shaders::applySharpBilinearPrescale(edgeSrc.data(), 4, 4, out, outW, outH);
+        check(outW == 8 && outH == 8 && out.size() == 64 && out[0] == 0xffffffffu);
+    }
+
     std::cout << "BRUM screen/input: " << checks << " checks passed\n";
 }

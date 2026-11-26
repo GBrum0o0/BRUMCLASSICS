@@ -10,6 +10,7 @@
 #include "../../../shared/brum-core/ContentValidation.hpp"
 #include "../../../shared/brum-core/RetroAchievementsRuntime.hpp"
 #include "../../../shared/brum-core/PokemonFireRedAdapter.hpp"
+#include "../../../shared/brum-core/brum_resolution_shaders.hpp"
 #include <memory>
 
 #import <AudioToolbox/AudioToolbox.h>
@@ -804,6 +805,24 @@ static void BrumVideo(const void *data, unsigned width, unsigned height, size_t 
             }
         }
     }
+    NSString *activeFilter = host->_videoFilterMode ?: @"none";
+    if ([activeFilter isEqualToString:@"cas_sharpen"]) {
+        brum_shaders::applyCasSharpen(target, (int)width, (int)height, 70);
+    } else if ([activeFilter isEqualToString:@"edge_upscale_2x"] || [activeFilter isEqualToString:@"sharp_bilinear"]) {
+        thread_local std::vector<uint32_t> shaderOut;
+        int outW = 0;
+        int outH = 0;
+        if ([activeFilter isEqualToString:@"edge_upscale_2x"]) {
+            brum_shaders::applyEdgeUpscale2x(target, (int)width, (int)height, shaderOut, outW, outH);
+        } else {
+            brum_shaders::applySharpBilinearPrescale(target, (int)width, (int)height, shaderOut, outW, outH);
+        }
+        if (outW > 0 && outH > 0 && shaderOut.size() == (size_t)outW * (size_t)outH) {
+            pixels = [NSData dataWithBytes:shaderOut.data() length:(NSUInteger)outW * (NSUInteger)outH * 4];
+            width = (unsigned)outW;
+            height = (unsigned)outH;
+        }
+    }
     CGColorSpaceRef ownedSpace = host->_rgbColorSpace ? NULL : CGColorSpaceCreateDeviceRGB();
     CGColorSpaceRef colorSpace = host->_rgbColorSpace ?: ownedSpace;
     CGDataProviderRef provider = CGDataProviderCreateWithCFData((__bridge CFDataRef)pixels);
@@ -1529,7 +1548,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [_screen addGestureRecognizer:touch];
     [self.view addSubview:_screen];
     _singleScreenLayer = [CALayer layer];
-    NSString *magFilter = [_videoFilterMode isEqualToString:@"bilinear_subtle"] ? kCAFilterLinear : kCAFilterNearest;
+    NSString *magFilter = ([_videoFilterMode isEqualToString:@"bilinear_subtle"] || [_videoFilterMode isEqualToString:@"sharp_bilinear"]) ? kCAFilterLinear : kCAFilterNearest;
     _screen.layer.magnificationFilter = magFilter;
     _singleScreenLayer.magnificationFilter = magFilter;
     _singleScreenLayer.contentsGravity = kCAGravityResize;
@@ -2113,7 +2132,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     BOOL addedLayers = NO;
     while (_screenLayers.count < _screenManager.screens.size()) {
         CALayer *layer = [CALayer layer];
-        layer.magnificationFilter = kCAFilterNearest;
+        layer.magnificationFilter = ([_videoFilterMode isEqualToString:@"bilinear_subtle"] || [_videoFilterMode isEqualToString:@"sharp_bilinear"]) ? kCAFilterLinear : kCAFilterNearest;
         layer.contentsGravity = kCAGravityResize;
         [_screen.layer addSublayer:layer];
         [_screenLayers addObject:layer];

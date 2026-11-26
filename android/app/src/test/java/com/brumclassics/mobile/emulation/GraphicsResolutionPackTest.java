@@ -58,6 +58,24 @@ public final class GraphicsResolutionPackTest {
             throw new AssertionError("GBA custom não pode fingir resolução 3D interna");
         }
 
+        for (String shader : new String[] {
+            GraphicsResolutionRules.FILTER_CAS_SHARPEN,
+            GraphicsResolutionRules.FILTER_SHARP_BILINEAR,
+            GraphicsResolutionRules.FILTER_EDGE_UPSCALE_2X
+        }) {
+            GraphicsResolutionRules.Settings shaderSettings = new GraphicsResolutionRules.Settings();
+            shaderSettings.profile = GraphicsResolutionRules.PROFILE_CUSTOM;
+            shaderSettings.globalVideoFilter = shader;
+            GraphicsResolutionRules.ResolvedConfig snesShader = GraphicsResolutionRules.resolve(shaderSettings, "snes", GraphicsResolutionRules.TIER_HIGH);
+            if (!shader.equals(snesShader.videoFilterMode)) {
+                throw new AssertionError("Shader eficiente 2D não preservado: " + shader);
+            }
+            GraphicsResolutionRules.ResolvedConfig pspShader = GraphicsResolutionRules.resolve(shaderSettings, "psp", GraphicsResolutionRules.TIER_HIGH);
+            if (!shader.equals(pspShader.videoFilterMode)) {
+                throw new AssertionError("Shader eficiente 3D não preservado: " + shader);
+            }
+        }
+
         if (!GraphicsResolutionRules.TIER_HIGH.equals(GraphicsResolutionRules.detectHardwareTier(8L * 1024 * 1024 * 1024, 8))) {
             throw new AssertionError("Tier alto não reconhecido");
         }

@@ -338,7 +338,7 @@ public final class URLSessionDriveTransport: ClassicDriveHTTPTransport, @uncheck
             throw ClassicDriveError.disallowedHost
         }
         var request = URLRequest(url: url, timeoutInterval: 20)
-        request.setValue("BRUMCLASSICSMobile/0.30.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("BRUMCLASSICSMobile/0.31.0", forHTTPHeaderField: "User-Agent")
         if let token = bearerToken, !token.isEmpty {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
@@ -360,7 +360,7 @@ public final class URLSessionDriveTransport: ClassicDriveHTTPTransport, @uncheck
             throw ClassicDriveError.disallowedHost
         }
         var request = URLRequest(url: url, timeoutInterval: 60)
-        request.setValue("BRUMCLASSICSMobile/0.30.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("BRUMCLASSICSMobile/0.31.0", forHTTPHeaderField: "User-Agent")
         if let token = bearerToken, !token.isEmpty {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }

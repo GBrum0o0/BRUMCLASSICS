@@ -1600,11 +1600,22 @@ public final class MainActivity extends Activity {
         final String[] scaleLabels = {"Original (preservar proporção)", "Inteira (Pixel-Perfect 2D)", "Preencher tela"};
         final String[] filterKeys = {
             GraphicsResolutionRules.FILTER_NONE,
+            GraphicsResolutionRules.FILTER_CAS_SHARPEN,
+            GraphicsResolutionRules.FILTER_SHARP_BILINEAR,
+            GraphicsResolutionRules.FILTER_EDGE_UPSCALE_2X,
             GraphicsResolutionRules.FILTER_CRT_SCANLINES,
             GraphicsResolutionRules.FILTER_LCD_GRID,
             GraphicsResolutionRules.FILTER_BILINEAR_SUBTLE
         };
-        final String[] filterLabels = {"Nenhum (nítido)", "CRT Scanlines", "Grade LCD (portáteis)", "Bilinear sutil"};
+        final String[] filterLabels = {
+            "Nenhum (nítido)",
+            "Nitidez adaptativa (CAS)",
+            "Sharp Bilinear (anti-tremor)",
+            "Edge Upscale 2x (EPX 2D)",
+            "CRT Scanlines",
+            "Grade LCD (portáteis)",
+            "Bilinear sutil"
+        };
         final String[] multLabels = {"1x nativa", "2x interna", "3x interna", "4x interna"};
 
         Spinner sysSpinner = new Spinner(this);

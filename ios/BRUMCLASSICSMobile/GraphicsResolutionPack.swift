@@ -18,6 +18,9 @@ public enum GraphicsVideoFilter: String, Codable, CaseIterable, Sendable {
     case crtScanlines = "crt_scanlines"
     case lcdGrid = "lcd_grid"
     case bilinearSubtle = "bilinear_subtle"
+    case casSharpen = "cas_sharpen"
+    case sharpBilinear = "sharp_bilinear"
+    case edgeUpscale2x = "edge_upscale_2x"
 }
 
 public enum GraphicsHardwareTier: String, Sendable {
@@ -176,7 +179,9 @@ public final class GraphicsResolutionPack {
             aspectRatio: aspect,
             maxMultiplier: 1,
             supportsIntegerScale: true,
-            supportedFilters: handheld ? [.none, .lcdGrid, .bilinearSubtle] : [.none, .crtScanlines, .bilinearSubtle]
+            supportedFilters: handheld
+                ? [.none, .lcdGrid, .sharpBilinear, .edgeUpscale2x, .casSharpen, .bilinearSubtle]
+                : [.none, .crtScanlines, .sharpBilinear, .edgeUpscale2x, .casSharpen, .bilinearSubtle]
         )
     }
 
@@ -190,7 +195,7 @@ public final class GraphicsResolutionPack {
             aspectRatio: aspect,
             maxMultiplier: maxMultiplier,
             supportsIntegerScale: true,
-            supportedFilters: [.none, .crtScanlines, .lcdGrid, .bilinearSubtle]
+            supportedFilters: [.none, .crtScanlines, .lcdGrid, .sharpBilinear, .edgeUpscale2x, .casSharpen, .bilinearSubtle]
         )
     }
 
