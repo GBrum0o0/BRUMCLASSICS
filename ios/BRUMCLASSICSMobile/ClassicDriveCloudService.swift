@@ -247,6 +247,11 @@ public enum ClassicDriveHtmlParser {
     public struct ParsedFolderPage: Equatable, Sendable {
         public let subfolders: [(id: String, name: String)]
         public let files: [(id: String, name: String, sizeBytes: Int64?)]
+
+        public static func == (lhs: ParsedFolderPage, rhs: ParsedFolderPage) -> Bool {
+            lhs.subfolders.elementsEqual(rhs.subfolders) { $0.id == $1.id && $0.name == $1.name } &&
+            lhs.files.elementsEqual(rhs.files) { $0.id == $1.id && $0.name == $1.name && $0.sizeBytes == $1.sizeBytes }
+        }
     }
 
     public static func parseFolderHTML(_ html: String) -> ParsedFolderPage {
