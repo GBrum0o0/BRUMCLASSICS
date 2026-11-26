@@ -81,6 +81,17 @@ public final class GamingModeRulesTest {
         if (!GamingModeRules.matchesFilter("ROM Sem Plataforma", "", "", "all"))
             throw new AssertionError("Cleared filter must keep unidentified");
 
-        System.out.println("GamingModeRulesTest: OK (Classics-only cache, stale links, platform matching, search & filters)");
+        if (GamingModeRules.resolveAvailability(true, true, true, false, true) != GamingModeRules.AvailabilityState.AVAILABLE)
+            throw new AssertionError("Local game must resolve to AVAILABLE");
+        if (GamingModeRules.resolveAvailability(true, false, true, false, true) != GamingModeRules.AvailabilityState.IN_CLOUD)
+            throw new AssertionError("Drive cloud game must resolve to IN_CLOUD");
+        if (GamingModeRules.resolveAvailability(true, false, true, true, true) != GamingModeRules.AvailabilityState.DOWNLOADING)
+            throw new AssertionError("Downloading game must resolve to DOWNLOADING");
+        if (GamingModeRules.resolveAvailability(true, false, false, false, true) != GamingModeRules.AvailabilityState.ON_COMPUTER)
+            throw new AssertionError("PC-only game must resolve to ON_COMPUTER");
+        if (GamingModeRules.resolveAvailability(true, false, true, false, false) != GamingModeRules.AvailabilityState.INCOMPATIBLE)
+            throw new AssertionError("Unsupported system must resolve to INCOMPATIBLE");
+
+        System.out.println("GamingModeRulesTest: OK (Classics-only cache, stale links, platform matching, search, filters & cloud availability)");
     }
 }

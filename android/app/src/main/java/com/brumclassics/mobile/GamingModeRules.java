@@ -8,6 +8,35 @@ import java.util.List;
 final class GamingModeRules {
     static final String LABEL_AVAILABLE = "Disponível";
     static final String LABEL_ON_COMPUTER = "No computador";
+    static final String LABEL_IN_CLOUD = "Na nuvem";
+    static final String LABEL_DOWNLOADING = "Baixando";
+    static final String LABEL_INCOMPATIBLE = "Incompatível";
+
+    public enum AvailabilityState {
+        AVAILABLE(LABEL_AVAILABLE, "green"),
+        ON_COMPUTER(LABEL_ON_COMPUTER, "gray"),
+        IN_CLOUD(LABEL_IN_CLOUD, "cloud_blue"),
+        DOWNLOADING(LABEL_DOWNLOADING, "amber"),
+        INCOMPATIBLE(LABEL_INCOMPATIBLE, "muted_red");
+
+        public final String label;
+        public final String colorToken;
+
+        AvailabilityState(String label, String colorToken) {
+            this.label = label;
+            this.colorToken = colorToken;
+        }
+    }
+
+    static AvailabilityState resolveAvailability(boolean isClassic, boolean installedLocally,
+                                                 boolean availableInCloud, boolean downloading,
+                                                 boolean supportedOnMobile) {
+        if (!supportedOnMobile) return AvailabilityState.INCOMPATIBLE;
+        if (downloading) return AvailabilityState.DOWNLOADING;
+        if (installedLocally) return AvailabilityState.AVAILABLE;
+        if (isClassic && availableInCloud) return AvailabilityState.IN_CLOUD;
+        return AvailabilityState.ON_COMPUTER;
+    }
 
     private GamingModeRules() {}
 

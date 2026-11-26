@@ -49,7 +49,7 @@ index 5f8082b59..b48720b14 100644
  	file(GLOB IOSAssets ios/assets/*.png)
  	list(REMOVE_ITEM IOSAssets ${CMAKE_CURRENT_SOURCE_DIR}/ios/assets/Default-568h@2x.png)
 diff --git a/Common/MemArenaDarwin.cpp b/Common/MemArenaDarwin.cpp
-index 593bb14..a7a374d 100644
+index 593bb1495..a7a374d93 100644
 --- a/Common/MemArenaDarwin.cpp
 +++ b/Common/MemArenaDarwin.cpp
 @@ -36,7 +36,8 @@
@@ -114,7 +114,7 @@ index 519bfc6bd..23ca1b9c2 100644
  			(memProtFlags & MEM_PROT_READ) != 0, (memProtFlags & MEM_PROT_WRITE) != 0, (memProtFlags & MEM_PROT_EXEC) != 0);
  
 diff --git a/Core/MemMap.cpp b/Core/MemMap.cpp
-index 9c7a2cc..00a9640 100644
+index 9c7a2cce1..00a96403e 100644
 --- a/Core/MemMap.cpp
 +++ b/Core/MemMap.cpp
 @@ -117,7 +117,7 @@ static MemoryView views[] =
@@ -213,7 +213,7 @@ index 9c7a2cc..00a9640 100644
  	INFO_LOG(MEMMAP, "Memory system initialized. Base at %p (RAM at @ %p, uncached @ %p)",
  		base, m_pPhysicalRAM, m_pUncachedRAM);
 diff --git a/Core/MemMap.h b/Core/MemMap.h
-index 28c635c..4eb9b67 100644
+index 28c635c18..4eb9b6706 100644
 --- a/Core/MemMap.h
 +++ b/Core/MemMap.h
 @@ -84,7 +84,7 @@ extern u32 g_PSPModel;
@@ -294,21 +294,8 @@ index 2f272def8..536665286 100644
  }
  
  void TessellationDataTransferGLES::SendDataToShader(const SimpleVertex *const *points, int size_u, int size_v, u32 vertType, const Spline::Weight2D &weights) {
-diff --git a/libretro/CMakeLists.txt b/libretro/CMakeLists.txt
-index b590cc25d..e1b15f187 100644
---- a/libretro/CMakeLists.txt
-+++ b/libretro/CMakeLists.txt
-@@ -20,7 +20,7 @@ if(ANDROID)
- 	set_target_properties(ppsspp_libretro PROPERTIES SUFFIX "_android.so")
- endif()
- 
--if(NOT MSVC)
-+if(NOT MSVC AND NOT APPLE)
-    target_link_libraries(ppsspp_libretro "-Wl,-Bsymbolic")
- endif()
- target_link_libraries(ppsspp_libretro ${LinkCommon})
 diff --git a/ext/native/thin3d/GLQueueRunner.cpp b/ext/native/thin3d/GLQueueRunner.cpp
-index 2ea228f..1af08fe 100644
+index 2ea228fcd..5484cc6e4 100644
 --- a/ext/native/thin3d/GLQueueRunner.cpp
 +++ b/ext/native/thin3d/GLQueueRunner.cpp
 @@ -15,7 +15,7 @@
@@ -329,7 +316,7 @@ index 2ea228f..1af08fe 100644
  			glInvalidateFramebuffer(GL_FRAMEBUFFER, count, attachments);
  			CHECK_GL_ERROR_IF_DEBUG();
  			break;
-@@ -1543,7 +1543,7 @@ void GLQueueRunner::fbo_unbind() {
+@@ -1543,12 +1543,12 @@ void GLQueueRunner::fbo_unbind() {
  	glBindFramebuffer(GL_FRAMEBUFFER, g_defaultFBO);
  #endif
  
@@ -338,8 +325,28 @@ index 2ea228f..1af08fe 100644
  	bindDefaultFBO();
  #endif
  
+-	currentDrawHandle_ = 0;
+-	currentReadHandle_ = 0;
++	currentDrawHandle_ = g_defaultFBO;
++	currentReadHandle_ = g_defaultFBO;
+ 	CHECK_GL_ERROR_IF_DEBUG();
+ }
+ 
+diff --git a/libretro/CMakeLists.txt b/libretro/CMakeLists.txt
+index b590cc25d..e1b15f187 100644
+--- a/libretro/CMakeLists.txt
++++ b/libretro/CMakeLists.txt
+@@ -20,7 +20,7 @@ if(ANDROID)
+ 	set_target_properties(ppsspp_libretro PROPERTIES SUFFIX "_android.so")
+ endif()
+ 
+-if(NOT MSVC)
++if(NOT MSVC AND NOT APPLE)
+    target_link_libraries(ppsspp_libretro "-Wl,-Bsymbolic")
+ endif()
+ target_link_libraries(ppsspp_libretro ${LinkCommon})
 diff --git a/libretro/LibretroGLContext.cpp b/libretro/LibretroGLContext.cpp
-index c826065..b7ba432 100644
+index c8260650c..b7ba43298 100644
 --- a/libretro/LibretroGLContext.cpp
 +++ b/libretro/LibretroGLContext.cpp
 @@ -28,6 +28,7 @@ void LibretroGLContext::CreateDrawContext() {
@@ -351,10 +358,10 @@ index c826065..b7ba432 100644
  
  void LibretroGLContext::DestroyDrawContext() {
 diff --git a/libretro/LibretroGLContext.h b/libretro/LibretroGLContext.h
-index b85c8af..6757cf5 100644
+index b85c8affb..6757cf532 100644
 --- a/libretro/LibretroGLContext.h
 +++ b/libretro/LibretroGLContext.h
-@@ -27,7 +27,10 @@ public:
+@@ -27,7 +27,10 @@ class LibretroGLContext : public LibretroHWRenderContext {
  	}
  
  	void ThreadStart() override { renderManager_->ThreadStart(draw_); }
@@ -367,10 +374,18 @@ index b85c8af..6757cf5 100644
  	void StopThread() override {
  		renderManager_->WaitUntilQueueIdle();
 diff --git a/libretro/LibretroGraphicsContext.cpp b/libretro/LibretroGraphicsContext.cpp
-index 508353f..54f7cea 100644
+index 508353f6b..076012228 100644
 --- a/libretro/LibretroGraphicsContext.cpp
 +++ b/libretro/LibretroGraphicsContext.cpp
-@@ -47,6 +47,7 @@ void LibretroHWRenderContext::ContextReset() {
+@@ -7,6 +7,7 @@
+ #include "libretro/LibretroD3D11Context.h"
+ #endif
+ 
++#include "base/display.h"
+ #include "Common/Log.h"
+ #include "Core/Config.h"
+ #include "Core/System.h"
+@@ -47,6 +48,7 @@ void LibretroHWRenderContext::ContextReset() {
  		assert(success);
  	}
  
@@ -378,7 +393,7 @@ index 508353f..54f7cea 100644
  	GotBackbuffer();
  
  	if (gpu) {
-@@ -65,16 +66,23 @@ void LibretroHWRenderContext::ContextDestroy() {
+@@ -65,16 +67,25 @@ void LibretroHWRenderContext::ContextDestroy() {
  #endif
  	}
  
@@ -398,6 +413,8 @@ index 508353f..54f7cea 100644
 -void LibretroGraphicsContext::GotBackbuffer() { draw_->HandleEvent(Draw::Event::GOT_BACKBUFFER, PSP_CoreParameter().pixelWidth, PSP_CoreParameter().pixelHeight); }
 +void LibretroGraphicsContext::GotBackbuffer() {
 +	if (draw_) {
++		pixel_xres = dp_xres = PSP_CoreParameter().pixelWidth;
++		pixel_yres = dp_yres = PSP_CoreParameter().pixelHeight;
 +		draw_->SetTargetSize(PSP_CoreParameter().pixelWidth, PSP_CoreParameter().pixelHeight);
 +		draw_->HandleEvent(Draw::Event::GOT_BACKBUFFER, PSP_CoreParameter().pixelWidth, PSP_CoreParameter().pixelHeight);
 +	}
@@ -406,10 +423,10 @@ index 508353f..54f7cea 100644
  void LibretroGraphicsContext::LostBackbuffer() { draw_->HandleEvent(Draw::Event::LOST_BACKBUFFER, -1, -1); }
  
 diff --git a/libretro/libretro.cpp b/libretro/libretro.cpp
-index 45185748c..f3e338ec4 100644
+index 45185748c..4d9b687c1 100644
 --- a/libretro/libretro.cpp
 +++ b/libretro/libretro.cpp
-@@ -4,6 +4,9 @@
+@@ -4,7 +4,11 @@
  #include <thread>
  #include <atomic>
  #include <vector>
@@ -417,9 +434,11 @@ index 45185748c..f3e338ec4 100644
 +#include <pthread.h>
 +#endif
  
++#include "base/display.h"
  #include "base/timeutil.h"
  #include "Common/ChunkFile.h"
-@@ -284,15 +287,19 @@ static void check_variables(CoreParameter &coreParam) {
+ #include "Core/Config.h"
+@@ -284,15 +288,23 @@ static void check_variables(CoreParameter &coreParam) {
  		g_Config.iLanguage = get_language_auto();
  	}
  
@@ -436,9 +455,13 @@ index 45185748c..f3e338ec4 100644
 -			environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av_info);
 -			gpu->Resized();
 -		}
++		pixel_xres = dp_xres = coreParam.pixelWidth;
++		pixel_yres = dp_yres = coreParam.pixelHeight;
 +	} else if (resChanged && gpu) {
 +		coreParam.pixelWidth = coreParam.renderWidth = g_Config.iInternalResolution * 480;
 +		coreParam.pixelHeight = coreParam.renderHeight = g_Config.iInternalResolution * 272;
++		pixel_xres = dp_xres = coreParam.pixelWidth;
++		pixel_yres = dp_yres = coreParam.pixelHeight;
 +		retro_system_av_info av_info;
 +		retro_get_system_av_info(&av_info);
 +		environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av_info);
@@ -446,7 +469,7 @@ index 45185748c..f3e338ec4 100644
  	}
  
  	if (ppsspp_texture_scaling_type.Update(&g_Config.iTexScalingType) && gpu) {
-@@ -385,7 +392,17 @@ namespace Libretro {
+@@ -385,7 +397,17 @@ namespace Libretro {
  bool useEmuThread = false;
  std::atomic<EmuThreadState> emuThreadState(EmuThreadState::DISABLED);
  
@@ -464,7 +487,15 @@ index 45185748c..f3e338ec4 100644
  static void EmuFrame() {
  	ctx->SetRenderTarget();
  	if (ctx->GetDrawContext()) {
-@@ -436,12 +453,20 @@ void EmuThreadStart() {
+@@ -431,17 +453,28 @@ static void EmuThreadFunc() {
+ }
+ 
+ void EmuThreadStart() {
++	if (emuThreadState == EmuThreadState::START_REQUESTED || emuThreadState == EmuThreadState::RUNNING) {
++		return;
++	}
+ 	bool wasPaused = emuThreadState == EmuThreadState::PAUSED;
+ 	emuThreadState = EmuThreadState::START_REQUESTED;
  
  	if (!wasPaused) {
  		ctx->ThreadStart();
@@ -486,7 +517,7 @@ index 45185748c..f3e338ec4 100644
  		return;
  	}
  
-@@ -452,8 +477,15 @@ void EmuThreadStop() {
+@@ -452,8 +485,15 @@ void EmuThreadStop() {
  		continue;
  	}
  
@@ -502,7 +533,7 @@ index 45185748c..f3e338ec4 100644
  	ctx->ThreadEnd();
  }
  
-@@ -570,6 +602,13 @@ bool retro_load_game(const struct retro_game_info *game) {
+@@ -570,6 +610,14 @@ bool retro_load_game(const struct retro_game_info *game) {
  	coreParam.cpuCore = CPUCore::JIT;
  	check_variables(coreParam);
  
@@ -511,12 +542,22 @@ index 45185748c..f3e338ec4 100644
 +	coreParam.cpuCore = CPUCore::IR_JIT;
 +	g_Config.iCpuCore = (int)CPUCore::IR_JIT;
 +	g_Config.bVertexDecoderJit = false;
++	g_Config.bFastMemory = false;
 +#endif
 +
  #if 0
  	g_Config.bVertexDecoderJit = (coreParam.cpuCore == CPU_JIT) ? true : false;
  #endif
-@@ -716,6 +755,9 @@ struct SaveStart {
+@@ -686,7 +734,7 @@ void retro_run(void) {
+ 			return;
+ 		}
+ 
+-		if (emuThreadState != EmuThreadState::RUNNING) {
++		if (emuThreadState == EmuThreadState::DISABLED || emuThreadState == EmuThreadState::STOPPED || emuThreadState == EmuThreadState::PAUSED) {
+ 			EmuThreadStart();
+ 		}
+ 
+@@ -716,6 +764,9 @@ struct SaveStart {
  } // namespace SaveState
  
  size_t retro_serialize_size(void) {
@@ -526,7 +567,7 @@ index 45185748c..f3e338ec4 100644
  	// TODO: Libretro API extension to use the savestate queue
  	if (useEmuThread) {
  		EmuThreadPause();
-@@ -726,6 +768,9 @@ size_t retro_serialize_size(void) {
+@@ -726,6 +777,9 @@ size_t retro_serialize_size(void) {
  }
  
  bool retro_serialize(void *data, size_t size) {
@@ -536,7 +577,7 @@ index 45185748c..f3e338ec4 100644
  	// TODO: Libretro API extension to use the savestate queue
  	if (useEmuThread) {
  		EmuThreadPause(); // Does nothing if already paused
-@@ -744,6 +789,9 @@ bool retro_serialize(void *data, size_t size) {
+@@ -744,6 +798,9 @@ bool retro_serialize(void *data, size_t size) {
  }
  
  bool retro_unserialize(const void *data, size_t size) {

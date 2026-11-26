@@ -55,7 +55,12 @@ public final class ClassicsRepository {
     public synchronized LocalClassic find(String id) { for (LocalClassic game : games) if (game.id.equals(id)) return game; return null; }
 
     public boolean isAccessible(LocalClassic game) {
-        if (!romFolderConfigured() || game == null || game.uri == null || game.uri.isEmpty()) return false;
+        if (game == null || game.uri == null || game.uri.isEmpty()) return false;
+        File local = localFileFromUri(game.uri);
+        if (local != null) {
+            return local.isFile() && local.length() > 0;
+        }
+        if (!romFolderConfigured()) return false;
         try (Cursor cursor = resolver.query(
                 Uri.parse(game.uri),
                 new String[]{DocumentsContract.Document.COLUMN_SIZE},
@@ -69,17 +74,19 @@ public final class ClassicsRepository {
 
     public synchronized List<LocalClassic> accessibleForGaming() {
         List<LocalClassic> accessible = new ArrayList<>();
-        if (!romFolderConfigured()) return accessible;
+        boolean hasFolder = romFolderConfigured();
         boolean changed = false;
         String rootName = romFolderName();
         for (LocalClassic game : games) {
+            boolean isLocalDriveDownload = localFileFromUri(game.uri) != null;
+            if (!isLocalDriveDownload && !hasFolder) continue;
             if (!isAccessible(game)) continue;
             String ext = ClassicsRules.extension(game.filename);
             if ((game.systemId == null || game.systemId.isEmpty())
                     && ("iso".equals(ext) || "pbp".equals(ext) || "prx".equals(ext))) {
                 String pathHint = (rootName == null || rootName.isEmpty())
                         ? game.relativePath : rootName + "/" + game.relativePath;
-                try (InputStream input = resolver.openInputStream(Uri.parse(game.uri))) {
+                try (InputStream input = openClassicInputStream(game.uri)) {
                     if (input != null) {
                         String detected = EmulationIdentity.detectSystemFromStream(input, pathHint);
                         if (!detected.isEmpty()) {
@@ -228,14 +235,17 @@ public final class ClassicsRepository {
 
         String extension = ClassicsRules.extension(stored.filename);
         boolean directDocument = "ps2".equals(stored.systemId) || "neogeo".equals(stored.systemId);
+        File localDownloaded = localFileFromUri(stored.uri);
         File rom = null;
-        if (!directDocument) {
+        if (localDownloaded != null && localDownloaded.isFile()) {
+            rom = localDownloaded;
+        } else if (!directDocument) {
             File playDirectory = new File(context.getCacheDir(), "integrated-play");
             rom = new File(playDirectory, stored.contentSha256 + "." + extension);
             if (!playDirectory.isDirectory() && !playDirectory.mkdirs()) throw new IllegalStateException("Não foi possível preparar a área privada da ROM.");
             if (!rom.isFile() || rom.length() != stored.fileSize) {
                 File temporary = new File(playDirectory, stored.contentSha256 + ".tmp");
-                try (InputStream input = resolver.openInputStream(Uri.parse(stored.uri)); FileOutputStream output = new FileOutputStream(temporary)) {
+                try (InputStream input = openClassicInputStream(stored.uri); FileOutputStream output = new FileOutputStream(temporary)) {
                     if (input == null) throw new IllegalStateException("O Android não liberou a leitura desta ROM.");
                     byte[] buffer = new byte[1024 * 1024]; int read; long total = 0;
                     while ((read = input.read(buffer)) >= 0) {
@@ -332,10 +342,57 @@ public final class ClassicsRepository {
         return new SessionResult(game.id, added, "BRUM Core");
     }
 
+    public synchronized LocalClassic registerDownloadedClassic(File downloadedFile, String relativePath,
+                                                              String systemHint, String driveFileId) throws Exception {
+        if (downloadedFile == null || !downloadedFile.isFile() || downloadedFile.length() <= 0) {
+            throw new IllegalArgumentException("Arquivo baixado inválido ou ausente.");
+        }
+        String fileUri = Uri.fromFile(downloadedFile).toString();
+        String rel = (relativePath == null || relativePath.isEmpty()) ? downloadedFile.getName() : relativePath;
+        String id = (driveFileId != null && !driveFileId.isEmpty()) ? ("drive:" + driveFileId) : sha256(fileUri);
+        LocalClassic existing = find(id);
+        if (existing == null) {
+            existing = new LocalClassic(id, fileUri, rel, downloadedFile.getName(),
+                ClassicsRules.cleanTitle(downloadedFile.getName()), downloadedFile.length());
+            games.add(existing);
+        } else {
+            existing.uri = fileUri;
+            existing.relativePath = rel;
+            existing.filename = downloadedFile.getName();
+            existing.fileSize = downloadedFile.length();
+        }
+        if ((existing.systemId == null || existing.systemId.isEmpty()) && systemHint != null && !systemHint.isEmpty()) {
+            existing.systemId = systemHint;
+        }
+        ensureIdentity(existing);
+        save();
+        return existing;
+    }
+
+    private File localFileFromUri(String uriString) {
+        if (uriString == null || uriString.isEmpty()) return null;
+        if (uriString.startsWith("file://")) {
+            String path = Uri.parse(uriString).getPath();
+            return path == null || path.isEmpty() ? null : new File(path);
+        }
+        if (uriString.startsWith("/")) {
+            return new File(uriString);
+        }
+        return null;
+    }
+
+    private InputStream openClassicInputStream(String uriString) throws Exception {
+        File local = localFileFromUri(uriString);
+        if (local != null) {
+            return new FileInputStream(local);
+        }
+        return resolver.openInputStream(Uri.parse(uriString));
+    }
+
     private void ensureIdentity(LocalClassic stored) throws Exception {
         if (!stored.canonicalGameId.isEmpty() && !stored.contentSha256.isEmpty() && !stored.systemId.isEmpty()) return;
         EmulationIdentity identity;
-        try (InputStream input = resolver.openInputStream(Uri.parse(stored.uri))) {
+        try (InputStream input = openClassicInputStream(stored.uri)) {
             if (input == null) throw new IllegalStateException("O Android não liberou a leitura desta ROM.");
             identity = EmulationIdentity.inspect(input, stored.relativePath);
         }

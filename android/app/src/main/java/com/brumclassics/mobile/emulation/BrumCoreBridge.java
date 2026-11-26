@@ -28,9 +28,30 @@ public final class BrumCoreBridge implements AutoCloseable {
     private volatile RetroAchievementsListener raListener;
 
     public BrumCoreBridge(String corePath, String romPath, IntegratedEmulatorLaunch launch) {
-        handle = nativeCreate(corePath, romPath, launch.systemDirectory.getAbsolutePath(),
-            launch.saveFile.getParentFile().getAbsolutePath(), launch.saveFile.getAbsolutePath());
+        this(corePath, romPath, launch, null);
+    }
+
+    public BrumCoreBridge(String corePath, String romPath, IntegratedEmulatorLaunch launch, java.util.Map<String, String> coreVariables) {
+        if (coreVariables != null && !coreVariables.isEmpty()) {
+            String[] pairs = new String[coreVariables.size() * 2];
+            int idx = 0;
+            for (java.util.Map.Entry<String, String> entry : coreVariables.entrySet()) {
+                pairs[idx++] = entry.getKey() == null ? "" : entry.getKey();
+                pairs[idx++] = entry.getValue() == null ? "" : entry.getValue();
+            }
+            handle = nativeCreateWithOptions(corePath, romPath, launch.systemDirectory.getAbsolutePath(),
+                launch.saveFile.getParentFile().getAbsolutePath(), launch.saveFile.getAbsolutePath(), pairs);
+        } else {
+            handle = nativeCreate(corePath, romPath, launch.systemDirectory.getAbsolutePath(),
+                launch.saveFile.getParentFile().getAbsolutePath(), launch.saveFile.getAbsolutePath());
+        }
         if (handle == 0) throw new IllegalStateException("O BRUM Core não pôde iniciar esta ROM.");
+    }
+
+    public String diagnosticsJson() {
+        if (handle == 0) return "{}";
+        String raw = nativeDiagnostics(handle);
+        return raw == null ? "{}" : raw;
     }
 
     public void configureRetroAchievements(int consoleId, String username, String runtimeToken, RetroAchievementsListener listener) {
@@ -162,6 +183,8 @@ public final class BrumCoreBridge implements AutoCloseable {
     private void ensureOpen() { if (handle == 0) throw new IllegalStateException("A sessão de emulação já foi encerrada."); }
 
     private static native long nativeCreate(String corePath, String romPath, String systemDirectory, String saveDirectory, String savePath);
+    private static native long nativeCreateWithOptions(String corePath, String romPath, String systemDirectory, String saveDirectory, String savePath, String[] coreVarPairs);
+    private static native String nativeDiagnostics(long handle);
     private static native void nativeRunFrames(long handle, int count, int inputMask);
     private static native void nativeSetPortMask(long handle, int port, int mask);
     private static native void nativeSetPointer(long handle, int x, int y, boolean pressed);

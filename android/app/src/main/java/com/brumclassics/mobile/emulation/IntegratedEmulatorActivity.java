@@ -112,9 +112,12 @@ public final class IntegratedEmulatorActivity extends Activity {
                 if (romDescriptor == null) throw new IllegalStateException("O Android não liberou o arquivo do jogo.");
                 romPath = "/proc/self/fd/" + romDescriptor.getFd();
             }
-            BrumCoreBridge bridge = new BrumCoreBridge(corePath, romPath, launch);
+            GraphicsResolutionPack.ResolvedConfig graphicsConfig =
+                GraphicsResolutionPack.resolveForDevice(this, launch.systemId);
+            BrumCoreBridge bridge = new BrumCoreBridge(corePath, romPath, launch, graphicsConfig.coreVariables);
             emulatorView = new BrumCoreView(this, bridge, this::showRuntimeFailure);
             emulatorView.setSystemContext(launch.systemId, launch.coreLibraryName);
+            emulatorView.setGraphicsPresentation(graphicsConfig.integerScalingEnabled, graphicsConfig.videoFilterMode);
             virtualPadPort = Math.max(0, Math.min(3, getIntent().getIntExtra("virtualPadPort", 0)));
             emulatorView.setVirtualPadPort(virtualPadPort);
             com.brumclassics.mobile.extensions.PokedexUniversalStore localPokedexStore =
@@ -545,9 +548,17 @@ public final class IntegratedEmulatorActivity extends Activity {
 
     private void showRuntimeFailure(String message) {
         if (isFinishing() || isDestroyed()) return;
+        String detail = message == null ? "" : message;
+        if (emulatorView != null && !detail.contains("Diagnóstico:")) {
+            String diag = emulatorView.diagnosticsJson();
+            if (diag != null && diag.length() > 2 && !"{}".equals(diag)) {
+                String snippet = diag.length() > 280 ? diag.substring(0, 280) + "..." : diag;
+                detail = detail + "\n\nDiagnóstico: " + snippet;
+            }
+        }
         new AlertDialog.Builder(this)
             .setTitle("O JOGO FOI INTERROMPIDO")
-            .setMessage(message + "\n\nO BRUM Core manteve esta tela aberta para mostrar a causa, em vez de fechar silenciosamente.")
+            .setMessage(detail + "\n\nO BRUM Core manteve esta tela aberta para mostrar a causa, em vez de fechar silenciosamente.")
             .setCancelable(false)
             .setPositiveButton("Voltar", (dialog, which) -> closeEmulator())
             .show();

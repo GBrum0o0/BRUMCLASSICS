@@ -188,6 +188,10 @@ private struct BrumLibretroController: UIViewControllerRepresentable {
             onReady: onReady,
             onExit: onExit
         )
+        let graphics = GraphicsResolutionPack.shared.resolve(systemID: launch.identity.systemID.rawValue)
+        controller.initialCoreVariables = graphics.coreVariables
+        controller.integerScalingEnabled = graphics.integerScalingEnabled
+        controller.videoFilterMode = graphics.videoFilterMode
         controller.virtualPadPort = virtualPadPort
         return controller
     }

@@ -25,6 +25,9 @@ typedef void (^BrumEmulatorReadyHandler)(void);
 
 @property(nonatomic, readonly) NSString *diagnosticsReport;
 @property(nonatomic) NSInteger virtualPadPort;
+@property(nonatomic, copy, nullable) NSDictionary<NSString *, NSString *> *initialCoreVariables;
+@property(nonatomic) BOOL integerScalingEnabled;
+@property(nonatomic, copy) NSString *videoFilterMode;
 
 - (instancetype)initWithNibName:(nullable NSString *)nibNameOrNil
                           bundle:(nullable NSBundle *)nibBundleOrNil NS_UNAVAILABLE;

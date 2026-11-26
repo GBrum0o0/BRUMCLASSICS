@@ -44,6 +44,9 @@ final class BrumCoreView extends View implements Runnable {
     private final RectF touchTarget = new RectF();
     private final RectF displayTarget = new RectF();
     private final Paint reticlePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint overlayEffectPaint = new Paint();
+    private volatile boolean integerScaling;
+    private volatile String videoFilterMode = "none";
     private float touchScreenX;
     private float touchScreenY;
     private boolean touchActive;
@@ -53,6 +56,14 @@ final class BrumCoreView extends View implements Runnable {
     void setSystemContext(String systemId, String coreName) {
         this.systemId = systemId == null ? "" : systemId.toLowerCase(java.util.Locale.ROOT);
         this.coreName = coreName == null ? "" : coreName.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    void setGraphicsPresentation(boolean integerScaling, String filterMode) {
+        this.integerScaling = integerScaling;
+        this.videoFilterMode = filterMode == null ? "none" : filterMode;
+        boolean linear = "bilinear_subtle".equals(this.videoFilterMode);
+        paint.setFilterBitmap(linear);
+        postInvalidateOnAnimation();
     }
 
     private void clearTouchPointer() {
@@ -178,6 +189,14 @@ final class BrumCoreView extends View implements Runnable {
         return loaded;
     }
 
+    String diagnosticsJson() {
+        try {
+            return core.diagnosticsJson();
+        } catch (Throwable ignored) {
+            return "{}";
+        }
+    }
+
     @Override public void run() {
         // Respect the core's declared cadence rather than imposing 60 Hz on
         // 75 Hz and future systems. Rendering remains vsync-driven by Android.
@@ -186,9 +205,13 @@ final class BrumCoreView extends View implements Runnable {
         try {
             final long frameDuration = CoreTiming.frameDurationNanos(core.frameRate());
             int pokedexPollCounter = 0;
+            int runLoops = 0;
+            boolean anyFramePresented = false;
+            boolean pspWarned = false;
             while (running) {
                 for (int p = 0; p < 4; p++) core.setPortMask(p, portMasks[p].get());
                 core.runFrames(fastForward ? 5 : 1, 0);
+                ++runLoops;
                 if (++pokedexPollCounter >= 15) {
                     pokedexPollCounter = 0;
                     PokedexCaptureListener listener = this.pokedexListener;
@@ -207,6 +230,7 @@ final class BrumCoreView extends View implements Runnable {
                 long dimensions = core.copyFrame(pixels);
                 int width = (int) (dimensions >>> 32); int height = (int) dimensions;
                 if (width > 0 && height > 0 && (long) width * height <= pixels.length) {
+                    anyFramePresented = true;
                     synchronized (bitmapLock) {
                         if (bitmap == null || bitmap.getWidth() != width || bitmap.getHeight() != height) {
                             if (bitmap != null) bitmap.recycle();
@@ -216,6 +240,11 @@ final class BrumCoreView extends View implements Runnable {
                         bitmap.setPixels(pixels, 0, width, 0, 0, width, height);
                     }
                     postInvalidateOnAnimation();
+                } else if (!anyFramePresented && !pspWarned && runLoops >= 120
+                        && ("psp".equals(systemId) || coreName.contains("ppsspp"))) {
+                    pspWarned = true;
+                    android.util.Log.w("BrumCoreView",
+                        "PSP 120 frames sem video visivel: " + diagnosticsJson());
                 }
                 if (!fastForward && audioTrack != null) {
                     int count;
@@ -239,7 +268,10 @@ final class BrumCoreView extends View implements Runnable {
             boolean unexpected = running;
             running = false;
             core.clearAudio();
-            String message = error.getMessage() == null ? "O núcleo encontrou uma falha durante a emulação." : error.getMessage();
+            String diag = diagnosticsJson();
+            android.util.Log.e("BrumCoreView", "Falha em brum-core-loop: " + diag, error);
+            String base = error.getMessage() == null ? "O núcleo encontrou uma falha durante a emulação." : error.getMessage();
+            String message = (diag != null && diag.length() > 2) ? (base + "\nDiagnóstico: " + diag) : base;
             if (unexpected) post(() -> errorListener.onRuntimeError(message));
         }
     }
@@ -253,6 +285,9 @@ final class BrumCoreView extends View implements Runnable {
             float scaleX = getWidth() / (float) bw;
             float scaleY = getHeight() / (float) bh;
             float scale = fillDisplay ? Math.max(scaleX, scaleY) : Math.min(scaleX, scaleY);
+            if (!fillDisplay && integerScaling && scale >= 1f) {
+                scale = (float) Math.floor(scale);
+            }
             float width = bw * scale;
             float height = bh * scale;
             sourceRect.set(0, 0, bw, bh);
@@ -260,6 +295,22 @@ final class BrumCoreView extends View implements Runnable {
                 (getWidth() + width) / 2f, (getHeight() + height) / 2f);
             displayTarget.set(targetRect);
             canvas.drawBitmap(bitmap, sourceRect, targetRect, paint);
+            if ("crt_scanlines".equals(videoFilterMode)) {
+                overlayEffectPaint.setColor(Color.argb(48, 0, 0, 0));
+                overlayEffectPaint.setStrokeWidth(1.5f);
+                for (float y = targetRect.top + 2f; y < targetRect.bottom; y += 4f) {
+                    canvas.drawLine(targetRect.left, y, targetRect.right, y, overlayEffectPaint);
+                }
+            } else if ("lcd_grid".equals(videoFilterMode)) {
+                overlayEffectPaint.setColor(Color.argb(34, 0, 0, 0));
+                overlayEffectPaint.setStrokeWidth(1f);
+                for (float y = targetRect.top + 3f; y < targetRect.bottom; y += 4f) {
+                    canvas.drawLine(targetRect.left, y, targetRect.right, y, overlayEffectPaint);
+                }
+                for (float x = targetRect.left + 3f; x < targetRect.right; x += 4f) {
+                    canvas.drawLine(x, targetRect.top, x, targetRect.bottom, overlayEffectPaint);
+                }
+            }
         }
         if (touchActive) {
             canvas.drawCircle(touchScreenX, touchScreenY, 24f, reticlePaint);

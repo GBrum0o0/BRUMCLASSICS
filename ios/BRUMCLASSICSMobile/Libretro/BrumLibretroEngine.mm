@@ -392,10 +392,15 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     GLsizei _hardwareSurfaceSize;
     BOOL _hardwarePending;
     BOOL _hardwareInitialized;
+    uint64_t _videoCallbackCount;
+    uint64_t _videoNullCount;
+    uint64_t _nonBlackFrameCount;
+    uint64_t _hwReadbackErrors;
     brum_retro_system_av_info _pendingAVInfo;
     BOOL _hasPendingAVInfo;
     CGColorSpaceRef _rgbColorSpace;
     std::vector<uint8_t> _hwReadbackRGBA;
+    CALayer *_scanlineOverlayLayer;
 }
 
 - (void)closeEmulator;
@@ -680,7 +685,12 @@ static bool BrumEnvironment(unsigned command, void *data) {
 
 static void BrumVideo(const void *data, unsigned width, unsigned height, size_t pitch) {
     BrumLibretroViewController *host = BrumCurrentHost;
-    if (!host || host->_suppressVideo || !data || !width || !height) return;
+    if (!host || host->_suppressVideo) return;
+    ++host->_videoCallbackCount;
+    if (!data || !width || !height) {
+        ++host->_videoNullCount;
+        return;
+    }
     const CFTimeInterval started = host->_performanceHUDEnabled ? CACurrentMediaTime() : 0;
     if (width > 4096 || height > 4096) return;
     const size_t bytesPerPixel = host->_pixelFormat == BRUM_RETRO_PIXEL_FORMAT_XRGB8888 ? 4 : 2;
@@ -741,9 +751,11 @@ static void BrumVideo(const void *data, unsigned width, unsigned height, size_t 
         }
         if (hadScissor) glEnable(GL_SCISSOR_TEST);
         if (readErr != GL_NO_ERROR) {
+            ++host->_hwReadbackErrors;
             NSLog(@"BRUM Core GL readback error=0x%X (%ux%u)", readErr, width, height);
             return;
         }
+        bool hasVisiblePixel = false;
         const uint8_t *source = host->_hwReadbackRGBA.data();
         for (unsigned y = 0; y < height; y++) {
             unsigned sourceY = host->_hardwareCallback.bottom_left_origin ? height - 1 - y : y;
@@ -751,10 +763,13 @@ static void BrumVideo(const void *data, unsigned width, unsigned height, size_t 
             uint32_t *dstRow = target + (size_t)y * width;
             for (unsigned x = 0; x < width; x++) {
                 const size_t offset = (size_t)x * 4;
-                dstRow[x] = ((uint32_t)srcRow[offset] << 16) |
+                const uint32_t px = ((uint32_t)srcRow[offset] << 16) |
                     ((uint32_t)srcRow[offset + 1] << 8) | srcRow[offset + 2];
+                dstRow[x] = px;
+                if (px != 0) hasVisiblePixel = true;
             }
         }
+        if (hasVisiblePixel) ++host->_nonBlackFrameCount;
     } else if (host->_pixelFormat == BRUM_RETRO_PIXEL_FORMAT_XRGB8888) {
         for (unsigned y = 0; y < height; y++) {
             const uint32_t *source = (const uint32_t *)((const uint8_t *)data + y * pitch);
@@ -1000,8 +1015,10 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _variables[@"ppsspp_cpu_core"] = @"IR jit";
     _variables[@"ppsspp_internal_resolution"] = @"480x272";
     _variables[@"ppsspp_rendering_mode"] = @"buffered";
-    _variables[@"ppsspp_auto_frameskip"] = @"enabled";
-    _variables[@"ppsspp_frameskip"] = @"1";
+    _variables[@"ppsspp_auto_frameskip"] = @"disabled";
+    _variables[@"ppsspp_frameskip"] = @"0";
+    _variables[@"ppsspp_fast_memory"] = @"disabled";
+    _variables[@"ppsspp_audio_latency"] = @"medium";
     _variables[@"ppsspp_gpu_hardware_transform"] = @"enabled";
     _variables[@"ppsspp_block_transfer_gpu"] = @"enabled";
     _variables[@"system_core_override"] = @"Automatic";
@@ -1017,6 +1034,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     // Keep the pinned WonderSwan X/Y cursor mapping stable for its two
     // separate virtual directional clusters.
     _variables[@"wswan_rotate_keymap"] = @"disabled";
+    _videoFilterMode = @"none";
     _screenLayers = [NSMutableArray array];
     _pixelFormat = BRUM_RETRO_PIXEL_FORMAT_0RGB1555;
     // FIT is the safe default; cropping is an explicit user choice.
@@ -1027,7 +1045,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _rgbColorSpace = CGColorSpaceCreateDeviceRGB();
     _audioCapacity = 262144;
     _audioRing = (int16_t *)calloc(_audioCapacity, sizeof(int16_t));
-    // PSP benefits from a 1024x1024 surface (supports up to 960x544 while saving GPU RAM on iPhone).
+    // PSP uses 1024 for 1x/2x (up to 960x544); loadCore scales up to 2048 if higher res is requested.
     _hardwareSurfaceSize = [_emulatedSystemID isEqualToString:@"psp"] ? 1024 : 2048;
     NSError *startupError = nil;
     if (![self prepareDirectories:&startupError]) {
@@ -1039,7 +1057,6 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         } else if ([manager fileExistsAtPath:[_systemDirectory stringByAppendingPathComponent:@"neogeo.zip"]]) {
             _variables[@"geolith_system_type"] = @"mvs";
         }
-        if (![self loadCore:&startupError]) _startupError = startupError;
     }
     if (_startupError) [_diagnostics recordFailure:_startupError.localizedDescription];
     return self;
@@ -1257,12 +1274,41 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _hardwareContext = nil;
 }
 
+- (void)applyInitialCoreVariablesAndSurfaceSize {
+    if (_initialCoreVariables.count > 0) {
+        for (NSString *key in _initialCoreVariables) {
+            NSString *val = _initialCoreVariables[key];
+            if (key.length && val.length) {
+                _variables[key] = val;
+            }
+        }
+    }
+    NSString *pspRes = _variables[@"ppsspp_internal_resolution"];
+    if (pspRes.length) {
+        NSArray<NSString *> *parts = [pspRes componentsSeparatedByString:@"x"];
+        if (parts.count == 2) {
+            NSInteger w = MAX(parts[0].integerValue, parts[1].integerValue);
+            if (w > 1024 && _hardwareSurfaceSize < 2048) _hardwareSurfaceSize = 2048;
+        }
+    }
+    NSString *citraFactor = _variables[@"citra_resolution_factor"];
+    if (citraFactor.integerValue > 2 && _hardwareSurfaceSize < 2048) {
+        _hardwareSurfaceSize = 2048;
+    }
+}
+
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.backgroundColor = UIColor.blackColor;
     [self buildInterface];
     _achievementOverlay = [[BrumAchievementOverlayPresenter alloc] initWithHostView:self.view];
+    if (!_startupError && !_coreHandle) {
+        [self applyInitialCoreVariablesAndSurfaceSize];
+        NSError *loadError = nil;
+        if (![self loadCore:&loadError]) _startupError = loadError;
+    }
     if (_startupError) {
+        [_diagnostics recordFailure:_startupError.localizedDescription];
         _statusLabel.text = _startupError.localizedDescription;
         _statusLabel.textColor = UIColor.systemRedColor;
         return;
@@ -1312,6 +1358,8 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     os_unfair_lock_unlock(&_audioLock);
     NSDictionary *metrics = @{
         @"emulatedFrames": @(_sessionFrames), @"presentedFrames": @(_presentedFrames),
+        @"videoCallbackCount": @(_videoCallbackCount), @"videoNullCount": @(_videoNullCount),
+        @"nonBlackFrameCount": @(_nonBlackFrameCount), @"hwReadbackErrors": @(_hwReadbackErrors),
         @"audioSamplesProduced": @(produced), @"audioSamplesConsumed": @(consumed),
         @"audioSamplesDropped": @(dropped), @"audioSamplesMissing": @(missing),
         @"audioBufferedSamples": @(buffered), @"audioQueueActive": @(_audioQueue != NULL),
@@ -1481,9 +1529,33 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [_screen addGestureRecognizer:touch];
     [self.view addSubview:_screen];
     _singleScreenLayer = [CALayer layer];
-    _singleScreenLayer.magnificationFilter = kCAFilterNearest;
+    NSString *magFilter = [_videoFilterMode isEqualToString:@"bilinear_subtle"] ? kCAFilterLinear : kCAFilterNearest;
+    _screen.layer.magnificationFilter = magFilter;
+    _singleScreenLayer.magnificationFilter = magFilter;
     _singleScreenLayer.contentsGravity = kCAGravityResize;
     [_screen.layer addSublayer:_singleScreenLayer];
+
+    if ([_videoFilterMode isEqualToString:@"crt_scanlines"] || [_videoFilterMode isEqualToString:@"lcd_grid"]) {
+        _scanlineOverlayLayer = [CALayer layer];
+        UIGraphicsBeginImageContextWithOptions(CGSizeMake(4, 4), NO, 1.0);
+        CGContextRef ctx = UIGraphicsGetCurrentContext();
+        if ([_videoFilterMode isEqualToString:@"crt_scanlines"]) {
+            [[UIColor colorWithWhite:0 alpha:0.22] setFill];
+            CGContextFillRect(ctx, CGRectMake(0, 1, 4, 1));
+            CGContextFillRect(ctx, CGRectMake(0, 3, 4, 1));
+        } else {
+            [[UIColor colorWithWhite:0 alpha:0.16] setFill];
+            CGContextFillRect(ctx, CGRectMake(0, 3, 4, 1));
+            CGContextFillRect(ctx, CGRectMake(3, 0, 1, 4));
+        }
+        UIImage *tile = UIGraphicsGetImageFromCurrentImageContext();
+        UIGraphicsEndImageContext();
+        if (tile) {
+            _scanlineOverlayLayer.backgroundColor = [UIColor colorWithPatternImage:tile].CGColor;
+            _scanlineOverlayLayer.zPosition = 2;
+            [_screen.layer addSublayer:_scanlineOverlayLayer];
+        }
+    }
 
     _touchReticle = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 30, 30)];
     _touchReticle.layer.cornerRadius = 15;
@@ -2090,6 +2162,10 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         _singleScreenLayer.hidden = !_singleViewport.valid();
         _singleScreenLayer.frame = CGRectMake(_singleViewport.frame.x, _singleViewport.frame.y,
                                                _singleViewport.frame.width, _singleViewport.frame.height);
+        if (_scanlineOverlayLayer) {
+            _scanlineOverlayLayer.hidden = _singleScreenLayer.hidden;
+            _scanlineOverlayLayer.frame = _singleScreenLayer.frame;
+        }
         [CATransaction commit];
         return;
     }
@@ -2515,6 +2591,16 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [self applyPendingAVInfo];
     if (_sessionFrames == 1 && _stateButton && !_stateButton.enabled) {
         _stateButton.enabled = (self.capabilities & BrumBackendSaveState) != 0;
+    }
+    if (_sessionFrames == 120 && _nonBlackFrameCount == 0 && [_emulatedSystemID isEqualToString:@"psp"]) {
+        os_unfair_lock_lock(&_audioLock);
+        const uint64_t producedNow = _audioSamplesProduced;
+        os_unfair_lock_unlock(&_audioLock);
+        if (producedNow == 0 || _presentedFrames == 0) {
+            [_diagnostics recordMessage:@"Aviso PPSSPP: 120 quadros sem vídeo visível ou áudio gerado." level:2];
+            [self captureDiagnosticsMetrics];
+            [_diagnostics checkpoint];
+        }
     }
     if (!_readyDelivered && _presentedFrames > 0) {
         _readyDelivered = YES;

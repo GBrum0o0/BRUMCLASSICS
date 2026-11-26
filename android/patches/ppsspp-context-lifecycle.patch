@@ -25,7 +25,7 @@ index f2513b99e..fe9cd14fd 100644
  #include <jni.h>
  
 diff --git a/ext/native/thin3d/GLQueueRunner.cpp b/ext/native/thin3d/GLQueueRunner.cpp
-index 2ea228f..9acd95f 100644
+index 2ea228fcd..29abf85af 100644
 --- a/ext/native/thin3d/GLQueueRunner.cpp
 +++ b/ext/native/thin3d/GLQueueRunner.cpp
 @@ -832,7 +832,7 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
@@ -37,8 +37,19 @@ index 2ea228f..9acd95f 100644
  			glInvalidateFramebuffer(GL_FRAMEBUFFER, count, attachments);
  			CHECK_GL_ERROR_IF_DEBUG();
  			break;
+@@ -1547,8 +1547,8 @@ void GLQueueRunner::fbo_unbind() {
+ 	bindDefaultFBO();
+ #endif
+ 
+-	currentDrawHandle_ = 0;
+-	currentReadHandle_ = 0;
++	currentDrawHandle_ = g_defaultFBO;
++	currentReadHandle_ = g_defaultFBO;
+ 	CHECK_GL_ERROR_IF_DEBUG();
+ }
+ 
 diff --git a/libretro/LibretroGLContext.cpp b/libretro/LibretroGLContext.cpp
-index c826065..b7ba432 100644
+index c8260650c..b7ba43298 100644
 --- a/libretro/LibretroGLContext.cpp
 +++ b/libretro/LibretroGLContext.cpp
 @@ -28,6 +28,7 @@ void LibretroGLContext::CreateDrawContext() {
@@ -50,10 +61,10 @@ index c826065..b7ba432 100644
  
  void LibretroGLContext::DestroyDrawContext() {
 diff --git a/libretro/LibretroGLContext.h b/libretro/LibretroGLContext.h
-index b85c8af..6757cf5 100644
+index b85c8affb..6757cf532 100644
 --- a/libretro/LibretroGLContext.h
 +++ b/libretro/LibretroGLContext.h
-@@ -27,7 +27,10 @@ public:
+@@ -27,7 +27,10 @@ class LibretroGLContext : public LibretroHWRenderContext {
  	}
  
  	void ThreadStart() override { renderManager_->ThreadStart(draw_); }
@@ -66,10 +77,18 @@ index b85c8af..6757cf5 100644
  	void StopThread() override {
  		renderManager_->WaitUntilQueueIdle();
 diff --git a/libretro/LibretroGraphicsContext.cpp b/libretro/LibretroGraphicsContext.cpp
-index 508353f..54f7cea 100644
+index 508353f6b..076012228 100644
 --- a/libretro/LibretroGraphicsContext.cpp
 +++ b/libretro/LibretroGraphicsContext.cpp
-@@ -47,6 +47,7 @@ void LibretroHWRenderContext::ContextReset() {
+@@ -7,6 +7,7 @@
+ #include "libretro/LibretroD3D11Context.h"
+ #endif
+ 
++#include "base/display.h"
+ #include "Common/Log.h"
+ #include "Core/Config.h"
+ #include "Core/System.h"
+@@ -47,6 +48,7 @@ void LibretroHWRenderContext::ContextReset() {
  		assert(success);
  	}
  
@@ -77,7 +96,7 @@ index 508353f..54f7cea 100644
  	GotBackbuffer();
  
  	if (gpu) {
-@@ -65,16 +66,23 @@ void LibretroHWRenderContext::ContextDestroy() {
+@@ -65,16 +67,25 @@ void LibretroHWRenderContext::ContextDestroy() {
  #endif
  	}
  
@@ -97,6 +116,8 @@ index 508353f..54f7cea 100644
 -void LibretroGraphicsContext::GotBackbuffer() { draw_->HandleEvent(Draw::Event::GOT_BACKBUFFER, PSP_CoreParameter().pixelWidth, PSP_CoreParameter().pixelHeight); }
 +void LibretroGraphicsContext::GotBackbuffer() {
 +	if (draw_) {
++		pixel_xres = dp_xres = PSP_CoreParameter().pixelWidth;
++		pixel_yres = dp_yres = PSP_CoreParameter().pixelHeight;
 +		draw_->SetTargetSize(PSP_CoreParameter().pixelWidth, PSP_CoreParameter().pixelHeight);
 +		draw_->HandleEvent(Draw::Event::GOT_BACKBUFFER, PSP_CoreParameter().pixelWidth, PSP_CoreParameter().pixelHeight);
 +	}
@@ -105,10 +126,18 @@ index 508353f..54f7cea 100644
  void LibretroGraphicsContext::LostBackbuffer() { draw_->HandleEvent(Draw::Event::LOST_BACKBUFFER, -1, -1); }
  
 diff --git a/libretro/libretro.cpp b/libretro/libretro.cpp
-index 45185748c..6293d657c 100644
+index 45185748c..b42953968 100644
 --- a/libretro/libretro.cpp
 +++ b/libretro/libretro.cpp
-@@ -284,15 +284,19 @@ static void check_variables(CoreParameter &coreParam) {
+@@ -5,6 +5,7 @@
+ #include <atomic>
+ #include <vector>
+ 
++#include "base/display.h"
+ #include "base/timeutil.h"
+ #include "Common/ChunkFile.h"
+ #include "Core/Config.h"
+@@ -284,15 +285,23 @@ static void check_variables(CoreParameter &coreParam) {
  		g_Config.iLanguage = get_language_auto();
  	}
  
@@ -125,9 +154,13 @@ index 45185748c..6293d657c 100644
 -			environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av_info);
 -			gpu->Resized();
 -		}
++		pixel_xres = dp_xres = coreParam.pixelWidth;
++		pixel_yres = dp_yres = coreParam.pixelHeight;
 +	} else if (resChanged && gpu) {
 +		coreParam.pixelWidth = coreParam.renderWidth = g_Config.iInternalResolution * 480;
 +		coreParam.pixelHeight = coreParam.renderHeight = g_Config.iInternalResolution * 272;
++		pixel_xres = dp_xres = coreParam.pixelWidth;
++		pixel_yres = dp_yres = coreParam.pixelHeight;
 +		retro_system_av_info av_info;
 +		retro_get_system_av_info(&av_info);
 +		environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av_info);
@@ -135,7 +168,44 @@ index 45185748c..6293d657c 100644
  	}
  
  	if (ppsspp_texture_scaling_type.Update(&g_Config.iTexScalingType) && gpu) {
-@@ -716,6 +720,9 @@ struct SaveStart {
+@@ -431,6 +440,9 @@ static void EmuThreadFunc() {
+ }
+ 
+ void EmuThreadStart() {
++	if (emuThreadState == EmuThreadState::START_REQUESTED || emuThreadState == EmuThreadState::RUNNING) {
++		return;
++	}
+ 	bool wasPaused = emuThreadState == EmuThreadState::PAUSED;
+ 	emuThreadState = EmuThreadState::START_REQUESTED;
+ 
+@@ -441,7 +453,7 @@ void EmuThreadStart() {
+ }
+ 
+ void EmuThreadStop() {
+-	if (emuThreadState != EmuThreadState::RUNNING) {
++	if (emuThreadState != EmuThreadState::RUNNING && emuThreadState != EmuThreadState::START_REQUESTED && emuThreadState != EmuThreadState::PAUSED) {
+ 		return;
+ 	}
+ 
+@@ -569,6 +581,8 @@ bool retro_load_game(const struct retro_game_info *game) {
+ 	coreParam.gpuCore = ctx->GetGPUCore();
+ 	coreParam.cpuCore = CPUCore::JIT;
+ 	check_variables(coreParam);
++	coreParam.cpuCore = (CPUCore)g_Config.iCpuCore;
++	g_Config.bVertexDecoderJit = (coreParam.cpuCore == CPUCore::JIT);
+ 
+ #if 0
+ 	g_Config.bVertexDecoderJit = (coreParam.cpuCore == CPU_JIT) ? true : false;
+@@ -686,7 +700,7 @@ void retro_run(void) {
+ 			return;
+ 		}
+ 
+-		if (emuThreadState != EmuThreadState::RUNNING) {
++		if (emuThreadState == EmuThreadState::DISABLED || emuThreadState == EmuThreadState::STOPPED || emuThreadState == EmuThreadState::PAUSED) {
+ 			EmuThreadStart();
+ 		}
+ 
+@@ -716,6 +730,9 @@ struct SaveStart {
  } // namespace SaveState
  
  size_t retro_serialize_size(void) {
@@ -145,7 +215,7 @@ index 45185748c..6293d657c 100644
  	// TODO: Libretro API extension to use the savestate queue
  	if (useEmuThread) {
  		EmuThreadPause();
-@@ -726,6 +733,9 @@ size_t retro_serialize_size(void) {
+@@ -726,6 +743,9 @@ size_t retro_serialize_size(void) {
  }
  
  bool retro_serialize(void *data, size_t size) {
@@ -155,7 +225,7 @@ index 45185748c..6293d657c 100644
  	// TODO: Libretro API extension to use the savestate queue
  	if (useEmuThread) {
  		EmuThreadPause(); // Does nothing if already paused
-@@ -744,6 +754,9 @@ bool retro_serialize(void *data, size_t size) {
+@@ -744,6 +764,9 @@ bool retro_serialize(void *data, size_t size) {
  }
  
  bool retro_unserialize(const void *data, size_t size) {
@@ -165,7 +235,7 @@ index 45185748c..6293d657c 100644
  	// TODO: Libretro API extension to use the savestate queue
  	if (useEmuThread) {
  		EmuThreadPause(); // Does nothing if already paused
-@@ -805,6 +818,7 @@ void NativeUpdate() {}
+@@ -806,6 +829,7 @@ void NativeUpdate() {}
  void NativeRender(GraphicsContext *graphicsContext) {}
  void NativeResized() {}
  bool System_InputBoxGetWString(const wchar_t *title, const std::wstring &defaultvalue, std::wstring &outvalue) { return false; }

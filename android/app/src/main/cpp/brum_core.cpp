@@ -154,8 +154,12 @@ public:
         if (initialized) eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
     }
 
-    void capture(unsigned width, unsigned height, std::vector<uint32_t> &target) {
-        if (!initialized || !hwFbo || !width || !height || width > surfaceSize || height > surfaceSize) return;
+    void capture(unsigned width, unsigned height, std::vector<uint32_t> &target, bool &hasNonBlackPixel, uint64_t &readbackErrors) {
+        hasNonBlackPixel = false;
+        if (!initialized || !hwFbo || !width || !height || width > surfaceSize || height > surfaceSize) {
+            ++readbackErrors;
+            return;
+        }
         const size_t pixelCount = static_cast<size_t>(width) * height;
         if (pixelCount > 16u * 1024u * 1024u) return;
         rgba.resize(pixelCount * 4);
@@ -190,28 +194,39 @@ public:
         glReadBuffer(static_cast<GLenum>(prevReadBuffer));
         glBindFramebuffer(GL_READ_FRAMEBUFFER, static_cast<GLuint>(prevReadFbo));
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, static_cast<GLuint>(prevDrawFbo));
-        if (err != GL_NO_ERROR) return;
+        if (err != GL_NO_ERROR) {
+            ++readbackErrors;
+            return;
+        }
         target.resize(pixelCount);
         for (unsigned y = 0; y < height; y++) {
             const unsigned sourceY = callback.bottom_left_origin ? height - 1 - y : y;
             for (unsigned x = 0; x < width; x++) {
                 size_t source = (static_cast<size_t>(sourceY) * width + x) * 4;
-                target[static_cast<size_t>(y) * width + x] = 0xFF000000u |
+                const uint32_t px = 0xFF000000u |
                     (static_cast<uint32_t>(rgba[source]) << 16) |
                     (static_cast<uint32_t>(rgba[source + 1]) << 8) |
                     static_cast<uint32_t>(rgba[source + 2]);
+                target[static_cast<size_t>(y) * width + x] = px;
+                if ((px & 0x00FFFFFFu) != 0) hasNonBlackPixel = true;
             }
         }
     }
 
-    void resetCore() {
+    void ensureResetOnEmulationThread() {
         if (!pending) return;
-        initialize();
+        if (!initialized) initialize();
         makeCurrent();
-        glBindFramebuffer(GL_FRAMEBUFFER, hwFbo);
-        if (callback.context_reset) callback.context_reset();
-        glBindFramebuffer(GL_FRAMEBUFFER, hwFbo);
-        coreReset = true;
+        if (!coreReset) {
+            glBindFramebuffer(GL_FRAMEBUFFER, hwFbo);
+            if (callback.context_reset) callback.context_reset();
+            glBindFramebuffer(GL_FRAMEBUFFER, hwFbo);
+            coreReset = true;
+        }
+    }
+
+    void resetCore() {
+        ensureResetOnEmulationThread();
         releaseCurrent();
     }
 
@@ -270,17 +285,21 @@ private:
 class CoreSession {
 public:
     CoreSession(const std::string &corePath, const std::string &romPath, const std::string &systemDirectory,
-                const std::string &saveDirectory, const std::string &savePath)
+                const std::string &saveDirectory, const std::string &savePath,
+                const std::unordered_map<std::string, std::string> &extraVars = {})
         : systemDirectory(systemDirectory), saveDirectory(saveDirectory), romPath(romPath), savePath(savePath) {
         try {
             variables["system_core_override"] = "Automatic";
             variables["system_gb_bios_enable"] = "ON";
             variables["system_gba_bios_enable"] = "ON";
             variables["system_nds_bios_enable"] = "ON";
+            variables["ppsspp_cpu_core"] = "jit";
             variables["ppsspp_internal_resolution"] = "480x272";
             variables["ppsspp_rendering_mode"] = "buffered";
-            variables["ppsspp_auto_frameskip"] = "enabled";
-            variables["ppsspp_frameskip"] = "1";
+            variables["ppsspp_auto_frameskip"] = "disabled";
+            variables["ppsspp_frameskip"] = "0";
+            variables["ppsspp_audio_latency"] = "medium";
+            variables["ppsspp_fast_memory"] = "enabled";
             variables["ppsspp_gpu_hardware_transform"] = "enabled";
             variables["ppsspp_block_transfer_gpu"] = "enabled";
             variables["citra_graphics_api"] = "OpenGLES";
@@ -291,6 +310,11 @@ public:
             variables["citra_enable_mouse_touchscreen"] = "disabled";
             if (std::ifstream(systemDirectory + "/aes.zip").good()) variables["geolith_system_type"] = "aes";
             else if (std::ifstream(systemDirectory + "/neogeo.zip").good()) variables["geolith_system_type"] = "mvs";
+            for (const auto &entry : extraVars) {
+                if (!entry.first.empty() && !entry.second.empty()) {
+                    variables[entry.first] = entry.second;
+                }
+            }
             coreHandle = dlopen(corePath.c_str(), RTLD_NOW | RTLD_LOCAL);
             if (!coreHandle) throw std::runtime_error("O núcleo integrado não pôde ser carregado.");
             loadSymbols();
@@ -319,7 +343,9 @@ public:
             brum_retro_game_info game{}; game.path = this->romPath.c_str();
             if (!info.need_fullpath) { game.data = rom.data(); game.size = rom.size(); }
             if (!core.loadGame(&game)) throw std::runtime_error("O núcleo integrado recusou este arquivo.");
-            gameLoaded = true; hardware.resetCore(); restoreSave();
+            // Defer hardware.resetCore() until the emulation thread (brum-core-loop) owns EGL,
+            // so GL context creation, context_reset(), core.run(), and glReadPixels share one thread.
+            gameLoaded = true; restoreSave();
             initPokedexCaptureSession();
             brum_retro_system_av_info av{}; core.getAVInfo(&av);
             const double reportedSampleRate = av.timing.sample_rate;
@@ -364,6 +390,7 @@ public:
     void runFrames(int count, uint32_t mask) {
         if (shutdownRequested) throw std::runtime_error("O núcleo encerrou a emulação. Verifique se a ROM e as BIOS exigidas são válidas.");
         inputMask = mask;
+        hardware.ensureResetOnEmulationThread();
         if (hardware.active()) hardware.makeCurrent();
         for (int index = 0; index < count; index++) {
             suppressVideo = index + 1 < count;
@@ -581,6 +608,13 @@ public:
     std::atomic<int16_t> portAnalogAxes[4][4]{};
     bool shutdownRequested = false;
     uint64_t framesRun = 0;
+    uint64_t videoCallbackCount = 0;
+    uint64_t videoNullCount = 0;
+    uint64_t nonBlackFrameCount = 0;
+    uint64_t audioSampleCount = 0;
+    uint64_t hwReadbackErrors = 0;
+    std::string lastCoreLog;
+    std::mutex logMutex;
     std::vector<brum_retro_memory_descriptor> memoryDescriptors;
     std::unique_ptr<brum::RetroAchievementsRuntime> raRuntime;
     std::unique_ptr<brum::pokedex::FireRedCaptureTracker> pokedexTracker;
@@ -754,33 +788,49 @@ private:
     }
 
     static void video(const void *data, unsigned width, unsigned height, size_t pitch) {
-        CoreSession *session = activeSession; if (!session || session->suppressVideo || !data || !width || !height) return;
+        CoreSession *session = activeSession; if (!session || session->suppressVideo) return;
+        ++session->videoCallbackCount;
+        if (!data || !width || !height) {
+            ++session->videoNullCount;
+            return;
+        }
         if (data == BRUM_RETRO_HW_FRAME_BUFFER_VALID) {
             session->frameWidth = width; session->frameHeight = height;
-            session->hardware.capture(width, height, session->frame);
+            bool hasNonBlack = false;
+            session->hardware.capture(width, height, session->frame, hasNonBlack, session->hwReadbackErrors);
+            if (hasNonBlack) ++session->nonBlackFrameCount;
             return;
         }
         session->frameWidth = width; session->frameHeight = height; session->frame.resize(static_cast<size_t>(width) * height);
+        bool hasNonBlack = false;
         for (unsigned y = 0; y < height; y++) {
             if (session->pixelFormat == BRUM_RETRO_PIXEL_FORMAT_XRGB8888) {
                 auto *source = reinterpret_cast<const uint32_t *>(static_cast<const uint8_t *>(data) + y * pitch);
-                for (unsigned x = 0; x < width; x++) session->frame[static_cast<size_t>(y) * width + x] = 0xFF000000u | (source[x] & 0x00FFFFFFu);
+                for (unsigned x = 0; x < width; x++) {
+                    const uint32_t px = 0xFF000000u | (source[x] & 0x00FFFFFFu);
+                    session->frame[static_cast<size_t>(y) * width + x] = px;
+                    if ((px & 0x00FFFFFFu) != 0) hasNonBlack = true;
+                }
             } else {
                 auto *source = reinterpret_cast<const uint16_t *>(static_cast<const uint8_t *>(data) + y * pitch);
                 for (unsigned x = 0; x < width; x++) {
                     uint16_t value = source[x]; unsigned red, green, blue;
                     if (session->pixelFormat == BRUM_RETRO_PIXEL_FORMAT_RGB565) { red = ((value >> 11) & 31) * 255 / 31; green = ((value >> 5) & 63) * 255 / 63; blue = (value & 31) * 255 / 31; }
                     else { red = ((value >> 10) & 31) * 255 / 31; green = ((value >> 5) & 31) * 255 / 31; blue = (value & 31) * 255 / 31; }
-                    session->frame[static_cast<size_t>(y) * width + x] = 0xFF000000u | (red << 16) | (green << 8) | blue;
+                    const uint32_t px = 0xFF000000u | (red << 16) | (green << 8) | blue;
+                    session->frame[static_cast<size_t>(y) * width + x] = px;
+                    if ((px & 0x00FFFFFFu) != 0) hasNonBlack = true;
                 }
             }
         }
+        if (hasNonBlack) ++session->nonBlackFrameCount;
     }
 
     static void pushAudio(const int16_t *samples, size_t count) {
         CoreSession *session = activeSession; if (!session || !samples) return;
         constexpr size_t capacity = 262144;
         std::lock_guard<std::mutex> guard(session->audioMutex);
+        session->audioSampleCount += count;
         for (size_t index = 0; index < count; index++) { if (session->audio.size() >= capacity) session->audio.pop_front(); session->audio.push_back(samples[index]); }
     }
     static void audioSample(int16_t left, int16_t right) { int16_t pair[] = {left, right}; pushAudio(pair, 2); }
@@ -810,9 +860,41 @@ private:
 
     static void coreLog(int level, const char *format, ...) {
         int priority = level >= 3 ? ANDROID_LOG_ERROR : (level == 2 ? ANDROID_LOG_WARN : ANDROID_LOG_INFO);
+        char buffer[1024];
         va_list arguments; va_start(arguments, format);
-        __android_log_vprint(priority, "BRUMCore", format ? format : "", arguments);
+        vsnprintf(buffer, sizeof(buffer), format ? format : "", arguments);
         va_end(arguments);
+        __android_log_print(priority, "BRUMCore", "%s", buffer);
+        CoreSession *session = activeSession;
+        if (session && level >= 2) {
+            std::lock_guard<std::mutex> guard(session->logMutex);
+            session->lastCoreLog = buffer;
+        }
+    }
+
+    std::string diagnosticsJson() {
+        std::string lastLog;
+        {
+            std::lock_guard<std::mutex> guard(logMutex);
+            lastLog = lastCoreLog;
+        }
+        std::string escaped;
+        escaped.reserve(lastLog.size());
+        for (char ch : lastLog) {
+            if (ch == '"' || ch == '\\') { escaped.push_back('\\'); escaped.push_back(ch); }
+            else if (ch == '\n' || ch == '\r') { escaped.push_back(' '); }
+            else if (static_cast<unsigned char>(ch) >= 0x20) { escaped.push_back(ch); }
+        }
+        return std::string("{\"framesRun\":") + std::to_string(framesRun) +
+               ",\"videoCallbacks\":" + std::to_string(videoCallbackCount) +
+               ",\"videoNullFrames\":" + std::to_string(videoNullCount) +
+               ",\"nonBlackFrames\":" + std::to_string(nonBlackFrameCount) +
+               ",\"audioSamples\":" + std::to_string(audioSampleCount) +
+               ",\"hwReadbackErrors\":" + std::to_string(hwReadbackErrors) +
+               ",\"hwActive\":" + (hardware.active() ? "true" : "false") +
+               ",\"frameWidth\":" + std::to_string(frameWidth) +
+               ",\"frameHeight\":" + std::to_string(frameHeight) +
+               ",\"lastCoreLog\":\"" + escaped + "\"}";
     }
 };
 
@@ -826,11 +908,45 @@ static void throwJava(JNIEnv *env, const std::exception &error) {
     jclass type = env->FindClass("java/lang/IllegalStateException"); if (type) env->ThrowNew(type, error.what());
 }
 
+static std::unordered_map<std::string, std::string> parseCoreVarPairs(JNIEnv *env, jobjectArray pairs) {
+    std::unordered_map<std::string, std::string> result;
+    if (!pairs) return result;
+    const jsize count = env->GetArrayLength(pairs);
+    for (jsize i = 0; i + 1 < count; i += 2) {
+        auto jKey = reinterpret_cast<jstring>(env->GetObjectArrayElement(pairs, i));
+        auto jVal = reinterpret_cast<jstring>(env->GetObjectArrayElement(pairs, i + 1));
+        std::string key = jstringValue(env, jKey);
+        std::string val = jstringValue(env, jVal);
+        if (jKey) env->DeleteLocalRef(jKey);
+        if (jVal) env->DeleteLocalRef(jVal);
+        if (!key.empty() && !val.empty()) result[key] = val;
+    }
+    return result;
+}
+
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeCreate(JNIEnv *env, jclass, jstring corePath, jstring romPath,
                                                                    jstring systemDirectory, jstring saveDirectory, jstring savePath) {
     try { return reinterpret_cast<jlong>(new CoreSession(jstringValue(env, corePath), jstringValue(env, romPath), jstringValue(env, systemDirectory), jstringValue(env, saveDirectory), jstringValue(env, savePath))); }
     catch (const std::exception &error) { throwJava(env, error); return 0; }
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeCreateWithOptions(JNIEnv *env, jclass, jstring corePath, jstring romPath,
+                                                                              jstring systemDirectory, jstring saveDirectory, jstring savePath,
+                                                                              jobjectArray coreVarPairs) {
+    try {
+        auto extra = parseCoreVarPairs(env, coreVarPairs);
+        return reinterpret_cast<jlong>(new CoreSession(jstringValue(env, corePath), jstringValue(env, romPath), jstringValue(env, systemDirectory), jstringValue(env, saveDirectory), jstringValue(env, savePath), extra));
+    } catch (const std::exception &error) { throwJava(env, error); return 0; }
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_brumclassics_mobile_emulation_BrumCoreBridge_nativeDiagnostics(JNIEnv *env, jclass, jlong handle) {
+    auto *session = reinterpret_cast<CoreSession *>(handle);
+    if (!session) return env->NewStringUTF("{}");
+    std::string json = session->diagnosticsJson();
+    return env->NewStringUTF(json.c_str());
 }
 
 extern "C" JNIEXPORT void JNICALL
