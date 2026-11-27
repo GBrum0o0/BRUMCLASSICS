@@ -8,12 +8,17 @@ struct GamingModeView: View {
     @Binding var selection: Int
     @State private var selectedGame: Game?
     @State private var selectedROM: ROMFolderGame?
+    @State private var selectedDriveItem: ClassicDriveGameItem?
     @State private var quickRemoteTarget: MurbRemoteLaunchTarget?
     private enum GamingSection: String { case recent, library, extensions, myBrumControl }
     @State private var activeSection: GamingSection = .recent
     @AppStorage("gaming-mode-favorites-v1") private var favoritesJSON = "[]"
 
     @State private var catalogSnapshot = GamingCatalogSnapshot.empty
+    @State private var driveItems: [ClassicDriveGameItem] = []
+    @State private var downloadingDriveIDs: Set<String> = []
+    @State private var driveProgressByID: [String: Double] = [:]
+    @State private var driveActionError = ""
     @State private var searchQuery = ""
     @State private var selectedConsole = "all"
     private let columns = [GridItem(.adaptive(minimum: 135), spacing: 16)]
@@ -26,7 +31,8 @@ struct GamingModeView: View {
         let romPart = pocket.romFolderGames.map { "\($0.id)" }.joined(separator: ",")
         let recPart = pocket.games.map { "\($0.filename):\($0.launcherGameID):\($0.lastPlayedAt?.timeIntervalSince1970 ?? 0)" }.joined(separator: ",")
         let pcPart = GamingModeCatalog.computerFingerprint(store.snapshot.games)
-        return "\(romPart)|\(recPart)|\(pcPart)|\(favoritesJSON)"
+        let drivePart = driveItems.map { "\($0.id):\($0.downloadStatus):\($0.downloadedLocalPath ?? "")" }.joined(separator: ",")
+        return "\(romPart)|\(recPart)|\(pcPart)|\(drivePart)|\(favoritesJSON)"
     }
     private var libraryEntries: [GamingCatalogEntry] { catalogSnapshot.library }
     private var recentEntries: [GamingCatalogEntry] { catalogSnapshot.recent }
@@ -48,11 +54,20 @@ struct GamingModeView: View {
             local: pocket.romFolderGames,
             records: pocket.games,
             computer: store.snapshot.games,
+            cloud: driveItems,
             favorites: favoriteIDs
         )
         let validKeys = Set(consoleOptions.map(\.id))
         if selectedConsole != "all" && !validKeys.contains(selectedConsole) {
             selectedConsole = "all"
+        }
+    }
+
+    private func reloadDriveItems() async {
+        let checkpoint = await ClassicDriveCloudService.shared.currentCheckpoint()
+        await MainActor.run {
+            driveItems = checkpoint.items
+            refreshCatalog()
         }
     }
 
@@ -113,10 +128,31 @@ struct GamingModeView: View {
                         }
                     } else {
                         gamingSearchAndFilterBar
+                        if !driveActionError.isEmpty {
+                            Text(driveActionError).font(.caption).foregroundStyle(.orange)
+                        }
                         if let featured = filteredEntries.first {
+                            let driveOption = featuredDriveItem(for: featured)
                             GamingHero(title: featured.title, platform: platform(for: featured), artwork: artwork(for: featured)) {
-                                Button("VER DETALHES") { open(featured) }
-                                    .buttonStyle(PrimaryButtonStyle()).frame(maxWidth: 180)
+                                HStack(spacing: 10) {
+                                    Button("VER DETALHES") { open(featured) }
+                                        .buttonStyle(PrimaryButtonStyle()).frame(maxWidth: 180)
+                                    if let driveOption {
+                                        let busy = downloadingDriveIDs.contains(driveOption.id)
+                                        Button {
+                                            startOrCancelDriveDownload(driveOption)
+                                        } label: {
+                                            Label(busy ? "BAIXANDO…" : "BAIXAR", systemImage: busy ? "xmark.circle.fill" : "arrow.down.circle.fill")
+                                                .font(.caption.bold())
+                                                .padding(.horizontal, 14)
+                                                .frame(minHeight: 44)
+                                        }
+                                        .buttonStyle(.borderedProminent)
+                                        .tint(busy ? .orange : .cyan)
+                                        .foregroundStyle(.black)
+                                        .accessibilityIdentifier("gaming-hero-drive-download")
+                                    }
+                                }
                             }
                             let title = (activeSection == .library || recentEntries.isEmpty) ? "Biblioteca" : "Jogos recentes e favoritos"
                             gameSection(title: title) { ForEach(filteredEntries) { entryTile($0) } }
@@ -149,13 +185,22 @@ struct GamingModeView: View {
         .task {
             GamingOrientation.request(.landscape)
             await pocket.refreshROMFolder()
+            await reloadDriveItems()
             refreshCatalog()
         }
         .task(id: catalogFingerprint) {
             refreshCatalog()
         }
-        .fullScreenCover(item: $selectedGame) { GamingGameView(game: $0) }
+        .onReceive(NotificationCenter.default.publisher(for: .classicDriveCatalogDidChange)) { _ in
+            Task { await reloadDriveItems() }
+        }
+        .fullScreenCover(item: $selectedGame) { game in
+            GamingGameView(game: game, driveItem: catalogSnapshot.matchedDriveByPCID[game.id])
+        }
         .fullScreenCover(item: $selectedROM) { GamingROMDetailView(rom: $0) }
+        .fullScreenCover(item: $selectedDriveItem) { item in
+            GamingDriveDetailView(item: item, matchedPC: catalogSnapshot.matchedPCByDriveID[item.id])
+        }
         .fullScreenCover(item: $quickRemoteTarget) { target in
             MurbRemoteGamepadView(target: target.payload, gameTitle: target.gameTitle, playerNumber: target.playerNumber, p2Payload: target.p2Payload)
         }
@@ -245,6 +290,8 @@ struct GamingModeView: View {
         case .computer(let game):
             guard let current = store.snapshot.games.first(where: { $0.id == game.id && GamingModeCatalog.isEligibleComputerClassic($0) }) else { return }
             selectedGame = current
+        case .cloud(let item):
+            selectedDriveItem = item
         }
     }
 
@@ -252,6 +299,7 @@ struct GamingModeView: View {
         switch entry {
         case .local(let rom, _): return IntegratedEmulatorSupport.system(for: rom)?.rawValue.uppercased() ?? "CLASSICS"
         case .computer(let game): return game.platform
+        case .cloud(let item): return item.systemHint.isEmpty ? "DRIVE" : item.systemHint.uppercased()
         }
     }
 
@@ -265,6 +313,59 @@ struct GamingModeView: View {
         case .local(let rom, _):
             return GamingArtwork(game: matchedComputerGame(for: rom), rom: rom)
         case .computer(let game): return GamingArtwork(game: game)
+        case .cloud(let item):
+            return GamingArtwork(game: catalogSnapshot.matchedPCByDriveID[item.id], rom: nil)
+        }
+    }
+
+    private func featuredDriveItem(for entry: GamingCatalogEntry) -> ClassicDriveGameItem? {
+        switch entry {
+        case .local: return nil
+        case .computer(let game): return catalogSnapshot.matchedDriveByPCID[game.id]
+        case .cloud(let item): return item
+        }
+    }
+
+    private func startOrCancelDriveDownload(_ item: ClassicDriveGameItem) {
+        if downloadingDriveIDs.contains(item.id) {
+            Task {
+                await ClassicDriveCloudService.shared.cancelDownload(fileID: item.id)
+                await MainActor.run {
+                    downloadingDriveIDs.remove(item.id)
+                    driveProgressByID.removeValue(forKey: item.id)
+                }
+                await reloadDriveItems()
+            }
+            return
+        }
+        driveActionError = ""
+        downloadingDriveIDs.insert(item.id)
+        driveProgressByID[item.id] = 0
+        Task {
+            do {
+                _ = try await ClassicDriveCloudService.shared.downloadGame(fileID: item.id) { received, total in
+                    guard let total, total > 0 else { return }
+                    let pct = min(1, max(0, Double(received) / Double(total)))
+                    Task { @MainActor in
+                        driveProgressByID[item.id] = pct
+                    }
+                }
+                await pocket.refreshROMFolder()
+                await reloadDriveItems()
+                await MainActor.run {
+                    downloadingDriveIDs.remove(item.id)
+                    driveProgressByID.removeValue(forKey: item.id)
+                }
+            } catch {
+                await MainActor.run {
+                    downloadingDriveIDs.remove(item.id)
+                    driveProgressByID.removeValue(forKey: item.id)
+                    if !(error is CancellationError) {
+                        driveActionError = "Falha ao baixar \(item.title): \(error.localizedDescription)"
+                    }
+                }
+                await reloadDriveItems()
+            }
         }
     }
 
@@ -292,8 +393,27 @@ struct GamingModeView: View {
                     opensDetails: true
                 ) { selectedROM = rom }
             case .computer(let game):
-                Button { open(entry) } label: { GamingGameTile(game: game) }
-                    .buttonStyle(.plain)
+                GamingGameTile(
+                    game: game,
+                    driveItem: catalogSnapshot.matchedDriveByPCID[game.id],
+                    isDownloading: catalogSnapshot.matchedDriveByPCID[game.id].map { downloadingDriveIDs.contains($0.id) } ?? false,
+                    openDetails: { open(entry) },
+                    onDownload: {
+                        if let driveItem = catalogSnapshot.matchedDriveByPCID[game.id] {
+                            startOrCancelDriveDownload(driveItem)
+                        }
+                    }
+                )
+            case .cloud(let item):
+                GamingDriveTile(
+                    item: item,
+                    matchedPC: catalogSnapshot.matchedPCByDriveID[item.id],
+                    platformLabel: platform(for: entry),
+                    isDownloading: downloadingDriveIDs.contains(item.id) || item.downloadStatus == "downloading",
+                    progress: driveProgressByID[item.id],
+                    openDetails: { selectedDriveItem = item },
+                    onDownload: { startOrCancelDriveDownload(item) }
+                )
             }
             Button { toggleFavorite(entry.id) } label: {
                 Image(systemName: favoriteIDs.contains(entry.id) ? "star.fill" : "star")
@@ -316,23 +436,27 @@ struct GamingModeView: View {
 enum GamingCatalogEntry: Identifiable {
     case local(ROMFolderGame, Date?)
     case computer(Game)
+    case cloud(ClassicDriveGameItem)
 
     var id: String {
         switch self {
         case .local(let rom, _): return "local:\(rom.id)"
         case .computer(let game): return "pc:\(game.id)"
+        case .cloud(let item): return "drive:\(item.id)"
         }
     }
     var title: String {
         switch self {
         case .local(let rom, _): return rom.title
         case .computer(let game): return game.title
+        case .cloud(let item): return item.title
         }
     }
     var lastPlayedAt: Date? {
         switch self {
         case .local(_, let date): return date
         case .computer(let game): return GamingModeCatalog.date(game.lastPlayedAt)
+        case .cloud: return nil
         }
     }
 }
@@ -341,13 +465,23 @@ struct GamingCatalogSnapshot {
     let library: [GamingCatalogEntry]
     let recent: [GamingCatalogEntry]
     let matchedByROMID: [ROMFolderGame.ID: Game]
+    let matchedDriveByPCID: [Game.ID: ClassicDriveGameItem]
+    let matchedPCByDriveID: [String: Game]
 
-    static let empty = GamingCatalogSnapshot(library: [], recent: [], matchedByROMID: [:])
+    static let empty = GamingCatalogSnapshot(
+        library: [],
+        recent: [],
+        matchedByROMID: [:],
+        matchedDriveByPCID: [:],
+        matchedPCByDriveID: [:]
+    )
 }
 
 enum GamingModePresentation {
     static let localAvailabilityLabel = "Disponível"
     static let computerAvailabilityLabel = "No computador"
+    static let cloudAvailabilityLabel = "Na nuvem"
+    static let downloadingAvailabilityLabel = "Baixando…"
     static let unavailableOnPhoneLabel = "Indisponível neste aparelho"
 }
 
@@ -511,6 +645,7 @@ enum GamingModeCatalog {
         local: [ROMFolderGame],
         records: [PocketClassic],
         computer: [Game],
+        cloud: [ClassicDriveGameItem] = [],
         favorites: Set<String> = [],
         recentLimit: Int = 12
     ) -> GamingCatalogSnapshot {
@@ -542,12 +677,14 @@ enum GamingModeCatalog {
 
         var matchedPCIDs = Set<String>()
         var localTitleKeys = Set<String>()
+        var localFilenames = Set<String>()
         var matchedByROMID: [ROMFolderGame.ID: Game] = [:]
         matchedByROMID.reserveCapacity(local.count)
 
         var localEntries: [GamingCatalogEntry] = []
         localEntries.reserveCapacity(local.count)
         for rom in local {
+            localFilenames.insert(rom.filename.lowercased())
             let record = recordsByFilename[rom.filename.lowercased()]
             if let explicitID = record?.launcherGameID, !explicitID.isEmpty {
                 matchedPCIDs.insert(explicitID)
@@ -576,6 +713,7 @@ enum GamingModeCatalog {
 
         var seenPCKeys = Set<String>()
         var pcEntries: [GamingCatalogEntry] = []
+        var pcGamesByMatchKey: [String: [Game]] = [:]
         pcEntries.reserveCapacity(computer.count)
         for game in computer {
             guard isEligibleComputerClassic(game), !matchedPCIDs.contains(game.id) else { continue }
@@ -587,13 +725,61 @@ enum GamingModeCatalog {
             let dedupKey = gKey.isEmpty ? "id:\(game.id)" : "\(gKey)|\(pKey)"
             guard seenPCKeys.insert(dedupKey).inserted else { continue }
             pcEntries.append(GamingCatalogEntry.computer(game))
+            if !gKey.isEmpty {
+                pcGamesByMatchKey[gKey, default: []].append(game)
+            }
         }
 
-        let library = (localEntries + pcEntries).sorted {
+        var cloudEntries: [GamingCatalogEntry] = []
+        var matchedDriveByPCID: [Game.ID: ClassicDriveGameItem] = [:]
+        var matchedPCByDriveID: [String: Game] = [:]
+        var seenDriveIDs = Set<String>()
+        for item in cloud where seenDriveIDs.insert(item.id).inserted {
+            if let localPath = item.downloadedLocalPath,
+               !localPath.isEmpty,
+               FileManager.default.fileExists(atPath: localPath) {
+                continue
+            }
+            let filenameKey = (item.name as NSString).lastPathComponent.lowercased()
+            if !filenameKey.isEmpty, localFilenames.contains(filenameKey) {
+                continue
+            }
+            let titleKey = normalizedKey(item.title)
+            let hintPlatform = normalizedPlatform(item.systemHint)
+            if !titleKey.isEmpty && !hintPlatform.isEmpty && localTitleKeys.contains("\(titleKey)|\(hintPlatform)") {
+                continue
+            }
+
+            if !titleKey.isEmpty, let pcMatches = pcGamesByMatchKey[titleKey] {
+                let platformMatch = pcMatches.first { hintPlatform.isEmpty || normalizedPlatform($0.platform) == hintPlatform }
+                    ?? pcMatches.first
+                if let pcGame = platformMatch, matchedDriveByPCID[pcGame.id] == nil {
+                    matchedDriveByPCID[pcGame.id] = item
+                    continue
+                }
+            }
+
+            if !titleKey.isEmpty, let candidates = computerByTitleKey[titleKey] {
+                let artworkMatch = candidates.first { hintPlatform.isEmpty || normalizedPlatform($0.platform) == hintPlatform }
+                    ?? candidates.first
+                if let artworkMatch {
+                    matchedPCByDriveID[item.id] = artworkMatch
+                }
+            }
+            cloudEntries.append(.cloud(item))
+        }
+
+        let library = (localEntries + pcEntries + cloudEntries).sorted {
             $0.title.localizedStandardCompare($1.title) == .orderedAscending
         }
         let recentEntries = recent(library, favorites: favorites, limit: recentLimit, pcDates: pcDateByID)
-        return GamingCatalogSnapshot(library: library, recent: recentEntries, matchedByROMID: matchedByROMID)
+        return GamingCatalogSnapshot(
+            library: library,
+            recent: recentEntries,
+            matchedByROMID: matchedByROMID,
+            matchedDriveByPCID: matchedDriveByPCID,
+            matchedPCByDriveID: matchedPCByDriveID
+        )
     }
 
     static func library(local: [ROMFolderGame], records: [PocketClassic], computer: [Game]) -> [GamingCatalogEntry] {
@@ -626,6 +812,8 @@ enum GamingModeCatalog {
                 playedAt = date
             case .computer(let game):
                 playedAt = pcDates?[game.id] ?? date(game.lastPlayedAt)
+            case .cloud:
+                playedAt = nil
             }
             if let playedAt {
                 played.append((entry, playedAt))
@@ -673,6 +861,12 @@ enum GamingModeCatalog {
         case .computer(let game):
             let key = normalizedPlatform(game.platform)
             if ["", "unknown", "unidentified", "classic", "retro", "auto", "other", "outros"].contains(key) {
+                return "unidentified"
+            }
+            return key
+        case .cloud(let item):
+            let key = normalizedPlatform(item.systemHint)
+            if key.isEmpty || ["unknown", "unidentified", "classic", "retro", "auto", "other", "outros"].contains(key) {
                 return "unidentified"
             }
             return key
@@ -1022,6 +1216,324 @@ private struct GamingROMDetailView: View {
 
 private struct GamingGameTile: View {
     let game: Game
+    var driveItem: ClassicDriveGameItem? = nil
+    var isDownloading = false
+    let openDetails: () -> Void
+    let onDownload: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack(alignment: .bottomTrailing) {
+                Button(action: openDetails) {
+                    GameCoverView(game: game, cornerRadius: 11).aspectRatio(0.72, contentMode: .fit)
+                }
+                .buttonStyle(.plain)
+                if let driveItem {
+                    Button(action: onDownload) {
+                        ZStack {
+                            Circle().fill(BrumTheme.background.opacity(0.9))
+                            Circle().stroke((isDownloading ? Color.orange : Color.cyan).opacity(0.75), lineWidth: 1)
+                            if isDownloading {
+                                ProgressView().tint(.orange).controlSize(.small)
+                            } else {
+                                Image(systemName: "arrow.down.circle.fill")
+                                    .font(.system(size: 19, weight: .bold))
+                                    .foregroundStyle(Color.cyan)
+                            }
+                        }
+                        .frame(width: 34, height: 34)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(8)
+                    .accessibilityLabel(isDownloading ? "Baixando \(driveItem.title)" : "Baixar \(driveItem.title) do Google Drive")
+                    .accessibilityIdentifier("gaming-pc-drive-download-\(driveItem.id)")
+                }
+            }
+            Button(action: openDetails) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(game.platform.uppercased()).font(.caption2.bold()).tracking(1).foregroundStyle(BrumTheme.muted)
+                    Text(game.title).font(.subheadline.bold()).foregroundStyle(BrumTheme.text).lineLimit(2).multilineTextAlignment(.leading)
+                    Text(isDownloading
+                         ? GamingModePresentation.downloadingAvailabilityLabel
+                         : (driveItem != nil ? "\(GamingModePresentation.computerAvailabilityLabel) · Drive" : GamingModePresentation.computerAvailabilityLabel))
+                        .font(.caption2.bold())
+                        .foregroundStyle(isDownloading ? Color.orange : (driveItem != nil ? Color.cyan : BrumTheme.muted))
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+}
+
+private struct GamingDriveTile: View {
+    let item: ClassicDriveGameItem
+    let matchedPC: Game?
+    let platformLabel: String
+    let isDownloading: Bool
+    let progress: Double?
+    let openDetails: () -> Void
+    let onDownload: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack(alignment: .bottomTrailing) {
+                Button(action: openDetails) {
+                    if let matchedPC, !matchedPC.artworkPath.isEmpty {
+                        GameCoverView(game: matchedPC, cornerRadius: 11).aspectRatio(0.72, contentMode: .fit)
+                    } else {
+                        RoundedRectangle(cornerRadius: 11)
+                            .fill(BrumTheme.surface)
+                            .aspectRatio(0.72, contentMode: .fit)
+                            .overlay {
+                                VStack(spacing: 8) {
+                                    Image(systemName: "icloud.and.arrow.down.fill")
+                                        .font(.system(size: 30, weight: .semibold))
+                                        .foregroundStyle(Color.cyan)
+                                    Text(platformLabel)
+                                        .font(.caption2.bold())
+                                        .foregroundStyle(BrumTheme.muted)
+                                }
+                            }
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Ver detalhes de \(item.title)")
+
+                Button(action: onDownload) {
+                    ZStack {
+                        Circle().fill(BrumTheme.background.opacity(0.9))
+                        Circle().stroke((isDownloading ? Color.orange : Color.cyan).opacity(0.75), lineWidth: 1)
+                        if isDownloading {
+                            ProgressView().tint(.orange).controlSize(.small)
+                        } else {
+                            Image(systemName: "arrow.down.circle.fill")
+                                .font(.system(size: 19, weight: .bold))
+                                .foregroundStyle(Color.cyan)
+                        }
+                    }
+                    .frame(width: 34, height: 34)
+                }
+                .buttonStyle(.plain)
+                .padding(8)
+                .accessibilityLabel(isDownloading ? "Cancelar download de \(item.title)" : "Baixar \(item.title) do Google Drive")
+                .accessibilityIdentifier("gaming-drive-download-\(item.id)")
+            }
+
+            Button(action: openDetails) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(platformLabel).font(.caption2.bold()).tracking(1).foregroundStyle(BrumTheme.muted)
+                    Text(item.title).font(.subheadline.bold()).foregroundStyle(BrumTheme.text).lineLimit(2).multilineTextAlignment(.leading)
+                    if isDownloading {
+                        let pctText = progress.map { "\(Int(($0 * 100).rounded()))%" } ?? ""
+                        Text("Baixando… \(pctText)")
+                            .font(.caption2.bold())
+                            .foregroundStyle(.orange)
+                    } else {
+                        Text(GamingModePresentation.cloudAvailabilityLabel)
+                            .font(.caption2.bold())
+                            .foregroundStyle(.cyan)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+}
+
+private struct GamingDriveDetailView: View {
+    @EnvironmentObject private var pocket: PocketClassicsStore
+    @EnvironmentObject private var store: AppStore
+    @Environment(\.dismiss) private var dismiss
+    let item: ClassicDriveGameItem
+    let matchedPC: Game?
+
+    @State private var currentItem: ClassicDriveGameItem
+    @State private var downloading = false
+    @State private var progressFraction: Double?
+    @State private var receivedBytes: Int64 = 0
+    @State private var totalBytes: Int64?
+    @State private var statusMessage = ""
+    @State private var downloadedROM: ROMFolderGame?
+    @State private var launchIntegrated = false
+
+    init(item: ClassicDriveGameItem, matchedPC: Game?) {
+        self.item = item
+        self.matchedPC = matchedPC
+        _currentItem = State(initialValue: item)
+    }
+
+    private var resolvedPlatform: String {
+        if let rom = downloadedROM, let sys = IntegratedEmulatorSupport.system(for: rom) {
+            return MurbProtocol.displaySystemName(sys.rawValue)
+        }
+        return currentItem.systemHint.isEmpty ? "CLASSICS" : currentItem.systemHint.uppercased()
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            GamingHeader {
+                Button { dismiss() } label: { Label("Biblioteca", systemImage: "chevron.left") }
+                    .buttonStyle(.plain)
+            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    GamingHero(title: currentItem.title, platform: resolvedPlatform, artwork: GamingArtwork(game: matchedPC, rom: downloadedROM)) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            GamingAvailabilityBadge(kind: downloadedROM != nil ? .available : (downloading ? .downloading : .inCloud))
+                            if let rom = downloadedROM {
+                                Text("Salvo em \(rom.filename) para jogar offline.")
+                                    .font(.caption)
+                                    .foregroundStyle(BrumTheme.primary)
+                            }
+                        }
+                    }
+
+                    if let rom = downloadedROM {
+                        Button {
+                            launchIntegrated = true
+                        } label: {
+                            Label("JOGAR AGORA", systemImage: "play.fill")
+                                .font(.subheadline.bold())
+                                .frame(maxWidth: .infinity, minHeight: 52)
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                        .accessibilityIdentifier("gaming-drive-detail-play")
+                    } else if downloading {
+                        VStack(alignment: .leading, spacing: 10) {
+                            if let progressFraction {
+                                ProgressView(value: progressFraction).tint(.cyan)
+                            } else {
+                                ProgressView().tint(.cyan)
+                            }
+                            HStack {
+                                Text(progressSummary)
+                                    .font(.caption.bold())
+                                    .foregroundStyle(.orange)
+                                Spacer()
+                                Button("CANCELAR", role: .cancel) {
+                                    cancelDownload()
+                                }
+                                .font(.caption.bold())
+                            }
+                        }
+                        .padding(14)
+                        .background(BrumTheme.surface, in: RoundedRectangle(cornerRadius: 12))
+                    } else {
+                        Button {
+                            startDownload()
+                        } label: {
+                            Label("BAIXAR DO GOOGLE DRIVE", systemImage: "arrow.down.circle.fill")
+                                .font(.subheadline.bold())
+                                .frame(maxWidth: .infinity, minHeight: 52)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.cyan)
+                        .foregroundStyle(.black)
+                        .accessibilityIdentifier("gaming-drive-detail-download")
+                    }
+
+                    if !statusMessage.isEmpty {
+                        Text(statusMessage)
+                            .font(.caption)
+                            .foregroundStyle(statusMessage.lowercased().contains("falha") || statusMessage.lowercased().contains("erro") ? Color.orange : BrumTheme.primary)
+                    }
+
+                    GamingInfoCard(title: "Informações do jogo", items: [
+                        GamingInfoItem(label: "Sistema", value: resolvedPlatform),
+                        GamingInfoItem(label: "Origem", value: "Google Drive (Nuvem)"),
+                        GamingInfoItem(label: "Arquivo", value: currentItem.name),
+                        GamingInfoItem(label: "Pasta no Drive", value: currentItem.parentRelativePath.isEmpty ? "Raiz" : currentItem.parentRelativePath),
+                        GamingInfoItem(label: "Tamanho", value: (currentItem.sizeBytes ?? 0) > 0 ? ByteCountFormatter.string(fromByteCount: currentItem.sizeBytes ?? 0, countStyle: .file) : "Calculado ao baixar")
+                    ])
+                }.frame(maxWidth: 1000, alignment: .leading).padding(20).frame(maxWidth: .infinity)
+            }
+        }
+        .background(BrumTheme.background.ignoresSafeArea())
+        .onAppear {
+            GamingOrientation.request(.landscape)
+            refreshDownloadedROM()
+        }
+        .task {
+            let cp = await ClassicDriveCloudService.shared.currentCheckpoint()
+            if let updated = cp.items.first(where: { $0.id == currentItem.id }) {
+                currentItem = updated
+            }
+            refreshDownloadedROM()
+        }
+        .fullScreenCover(isPresented: $launchIntegrated) {
+            if let downloadedROM {
+                IntegratedEmulatorView(rom: downloadedROM, returnsToPortrait: false)
+            }
+        }
+    }
+
+    private var progressSummary: String {
+        if let progressFraction {
+            let pct = Int((progressFraction * 100).rounded())
+            return "Baixando do Google Drive… \(pct)%"
+        }
+        if receivedBytes > 0 {
+            return "Baixando… \(ByteCountFormatter.string(fromByteCount: receivedBytes, countStyle: .file))"
+        }
+        return "Conectando ao Google Drive…"
+    }
+
+    private func refreshDownloadedROM() {
+        let filename = (currentItem.downloadedLocalPath.map { URL(fileURLWithPath: $0).lastPathComponent }) ?? currentItem.name
+        downloadedROM = pocket.romFolderGames.first { $0.filename.caseInsensitiveCompare(filename) == .orderedSame }
+    }
+
+    private func startDownload() {
+        downloading = true
+        progressFraction = nil
+        receivedBytes = 0
+        totalBytes = nil
+        statusMessage = ""
+        Task {
+            do {
+                let savedURL = try await ClassicDriveCloudService.shared.downloadGame(fileID: currentItem.id) { rec, tot in
+                    Task { @MainActor in
+                        receivedBytes = rec
+                        totalBytes = tot
+                        if let tot, tot > 0 {
+                            progressFraction = min(1, max(0, Double(rec) / Double(tot)))
+                        }
+                    }
+                }
+                await pocket.refreshROMFolder()
+                let cp = await ClassicDriveCloudService.shared.currentCheckpoint()
+                await MainActor.run {
+                    if let updated = cp.items.first(where: { $0.id == currentItem.id }) {
+                        currentItem = updated
+                    }
+                    refreshDownloadedROM()
+                    downloading = false
+                    statusMessage = "Salvo offline em \(savedURL.lastPathComponent)."
+                }
+            } catch {
+                await MainActor.run {
+                    downloading = false
+                    if !(error is CancellationError) {
+                        statusMessage = "Falha ao baixar: \(error.localizedDescription)"
+                    }
+                }
+            }
+        }
+    }
+
+    private func cancelDownload() {
+        Task {
+            await ClassicDriveCloudService.shared.cancelDownload(fileID: currentItem.id)
+            await MainActor.run {
+                downloading = false
+                statusMessage = "Download cancelado."
+            }
+        }
+    }
+}
+
+private struct GamingGameTile: View {
+    let game: Game
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             GameCoverView(game: game, cornerRadius: 11).aspectRatio(0.72, contentMode: .fit)
@@ -1033,11 +1545,16 @@ private struct GamingGameTile: View {
 }
 
 private struct GamingGameView: View {
+    @EnvironmentObject private var pocket: PocketClassicsStore
     @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
     let initialGame: Game
+    let driveItem: ClassicDriveGameItem?
     private var game: Game { store.snapshot.games.first { $0.id == initialGame.id } ?? initialGame }
-    init(game: Game) { initialGame = game }
+    init(game: Game, driveItem: ClassicDriveGameItem? = nil) {
+        initialGame = game
+        self.driveItem = driveItem
+    }
     private var hasAchievementTotals: Bool { game.achievementsAvailable || game.allowsManualAchievements }
     private var achievementSource: String {
         if game.allowsManualAchievements { return game.achievementCatalogLabel }
@@ -1052,6 +1569,10 @@ private struct GamingGameView: View {
     @State private var showMurbRemote = false
     @State private var showLocalMultiplayer = false
     @State private var activeMurbTarget: MurbRemoteLaunchTarget?
+    @State private var downloadingDrive = false
+    @State private var driveProgress: Double?
+    @State private var downloadedROM: ROMFolderGame?
+    @State private var launchDownloadedROM = false
 
     private var streaming: StreamingStatus? { store.snapshot.experience?.streaming }
 
@@ -1087,6 +1608,45 @@ private struct GamingGameView: View {
                         Button(action: playOnPC) { Text("SOMENTE INICIAR NO COMPUTADOR").font(.caption.bold()).frame(maxWidth: .infinity).frame(height: 44) }
                             .buttonStyle(.bordered).tint(BrumTheme.primary).disabled(!canStartOnPC || launching).opacity(canStartOnPC ? 1 : 0.38)
                     }
+                    if let driveItem {
+                        if let downloadedROM {
+                            Button {
+                                launchDownloadedROM = true
+                            } label: {
+                                Label("JOGAR NO IPHONE (OFFLINE)", systemImage: "play.fill")
+                                    .font(.caption.bold())
+                                    .frame(maxWidth: .infinity, minHeight: 46)
+                            }
+                            .buttonStyle(PrimaryButtonStyle())
+                            .accessibilityIdentifier("gaming-pc-drive-play-local")
+                        } else if downloadingDrive {
+                            HStack(spacing: 10) {
+                                ProgressView(value: driveProgress ?? 0).tint(.cyan)
+                                Button("CANCELAR", role: .cancel) {
+                                    Task {
+                                        await ClassicDriveCloudService.shared.cancelDownload(fileID: driveItem.id)
+                                        await MainActor.run {
+                                            downloadingDrive = false
+                                            launchState = "Download cancelado."
+                                        }
+                                    }
+                                }
+                                .font(.caption.bold())
+                            }
+                        } else {
+                            Button {
+                                startMatchedDriveDownload(driveItem)
+                            } label: {
+                                Label("BAIXAR DO GOOGLE DRIVE PARA O IPHONE", systemImage: "arrow.down.circle.fill")
+                                    .font(.caption.bold())
+                                    .frame(maxWidth: .infinity, minHeight: 46)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.cyan)
+                            .foregroundStyle(.black)
+                            .accessibilityIdentifier("gaming-pc-drive-detail-download")
+                        }
+                    }
                     if !launchState.isEmpty { Text(launchState).font(.caption).foregroundStyle(launchState.contains("não") ? Color.orange : BrumTheme.primary) }
                     GamingInfoCard(title: "Informações do jogo", items: [
                         GamingInfoItem(label: "Plataforma", value: game.platform),
@@ -1120,6 +1680,11 @@ private struct GamingGameView: View {
         }
         .fullScreenCover(item: $activeMurbTarget) { target in
             MurbRemoteGamepadView(target: target.payload, gameTitle: target.gameTitle, playerNumber: target.playerNumber, p2Payload: target.p2Payload)
+        }
+        .fullScreenCover(isPresented: $launchDownloadedROM) {
+            if let downloadedROM {
+                IntegratedEmulatorView(rom: downloadedROM, returnsToPortrait: false)
+            }
         }
         .sheet(isPresented: $showLocalMultiplayer) {
             LocalMultiplayerSheet(
@@ -1221,6 +1786,35 @@ private struct GamingGameView: View {
             launchState = outcome.message
             if let target = outcome.target { activeMurbTarget = target }
             else if outcome.openManualSheet { showMurbRemote = true }
+        }
+    }
+
+    private func startMatchedDriveDownload(_ item: ClassicDriveGameItem) {
+        downloadingDrive = true
+        driveProgress = nil
+        launchState = "Baixando \(item.title) do Google Drive…"
+        Task {
+            do {
+                let savedURL = try await ClassicDriveCloudService.shared.downloadGame(fileID: item.id) { received, total in
+                    guard let total, total > 0 else { return }
+                    let pct = min(1, max(0, Double(received) / Double(total)))
+                    Task { @MainActor in driveProgress = pct }
+                }
+                await pocket.refreshROMFolder()
+                await MainActor.run {
+                    downloadingDrive = false
+                    let name = savedURL.lastPathComponent
+                    downloadedROM = pocket.romFolderGames.first { $0.filename.caseInsensitiveCompare(name) == .orderedSame }
+                    launchState = "Baixado em \(name). Pronto para jogar no iPhone!"
+                }
+            } catch {
+                await MainActor.run {
+                    downloadingDrive = false
+                    if !(error is CancellationError) {
+                        launchState = "Falha no download do Drive: \(error.localizedDescription)"
+                    }
+                }
+            }
         }
     }
 }

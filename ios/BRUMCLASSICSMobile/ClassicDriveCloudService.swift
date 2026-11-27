@@ -611,7 +611,12 @@ public final class ClassicDriveKeychainStore {
     }
 }
 
+public extension Notification.Name {
+    static let classicDriveCatalogDidChange = Notification.Name("BrumClassicDriveCatalogDidChange")
+}
+
 public actor ClassicDriveCloudService {
+    public static let shared = ClassicDriveCloudService()
     public static let batchFolderBudget = 100
     public static let maxBatchFiles = 5000
     public static let maxDepth = 12
@@ -716,6 +721,7 @@ public actor ClassicDriveCloudService {
             checkpoint.totalFoldersRead = 1
             checkpoint.updatedAt = Date()
             try persist()
+            notifyCatalogChanged()
             return checkpoint
         }
         checkpoint.pendingFolders = [ClassicDriveFolderTask(id: link.id, relativePath: "", depth: 0, resourceKey: link.resourceKey)]
@@ -829,6 +835,7 @@ public actor ClassicDriveCloudService {
         }
         checkpoint.updatedAt = Date()
         try persist()
+        notifyCatalogChanged()
         return checkpoint
     }
 
@@ -861,6 +868,7 @@ public actor ClassicDriveCloudService {
         checkpoint.items[index].downloadStatus = "downloading"
         checkpoint.items[index].downloadError = nil
         try? persist()
+        notifyCatalogChanged()
 
         let task = Task<URL, Error> {
             let downloadedSize = try await self.transport.downloadFile(url: url, to: dest, bearerToken: token) { received, total in
@@ -885,6 +893,7 @@ public actor ClassicDriveCloudService {
                 }
                 try? persist()
             }
+            notifyCatalogChanged()
             return finalURL
         } catch {
             activeDownloads.removeValue(forKey: fileID)
@@ -893,6 +902,7 @@ public actor ClassicDriveCloudService {
                 checkpoint.items[idx].downloadError = error.localizedDescription
                 try? persist()
             }
+            notifyCatalogChanged()
             throw error
         }
     }
@@ -904,6 +914,7 @@ public actor ClassicDriveCloudService {
             checkpoint.items[idx].downloadStatus = checkpoint.items[idx].downloadedLocalPath != nil ? "available" : "cloud"
             try? persist()
         }
+        notifyCatalogChanged()
     }
 
     public func availabilityState(for item: ClassicDriveGameItem, supportedOnDevice: Bool = true) -> ClassicAvailabilityState {
@@ -916,6 +927,12 @@ public actor ClassicDriveCloudService {
             isDownloading: downloading,
             supportedOnDevice: supportedOnDevice
         )
+    }
+
+    private func notifyCatalogChanged() {
+        Task { @MainActor in
+            NotificationCenter.default.post(name: .classicDriveCatalogDidChange, object: nil)
+        }
     }
 
     private func persist() throws {

@@ -1,11 +1,11 @@
 {
-  "version": "0.33.0",
-  "build": 66,
+  "version": "0.34.0",
+  "build": 67,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.33.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.34.0",
   "notes": [
-    "Atualiza a nomenclatura oficial do aplicativo movel para BRUMCLASSICS+ e do motor de emulacao para MURB Engine, preservando identificador, saves e configuracoes.",
-    "Enriquece as 809 especies da Pokedex Universal (tipos, altura, peso e habilidades) com redacao estrita enquanto nao descobertas.",
-    "Adiciona suporte compartilhado em brum-core ao adaptador nativo Gen 4 Pokemon Platinum (CPUE)."
+    "Exibe jogos disponíveis apenas no Google Drive diretamente na biblioteca do Gaming Mode com ícone para download direto e abertura imediata após baixar.",
+    "Mostra botão e ícone de download do Drive também nos detalhes e cartões de jogos sincronizados com o PC.",
+    "Mantém sincronização automática entre configurações do Google Drive e Gaming Mode preservando saves e biblioteca."
   ]
 }

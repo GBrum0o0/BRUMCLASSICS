@@ -184,6 +184,12 @@ private struct GamingSettingsPanel: View {
                 if !pocket.romFolderStatus.isEmpty { Text(pocket.romFolderStatus).font(.caption).foregroundStyle(.secondary) }
                 if let message = pocket.message, !message.isEmpty { Text(message).font(.caption).foregroundStyle(.orange) }
             }
+            Section("Biblioteca em nuvem") {
+                NavigationLink("Biblioteca em nuvem — Google Drive") {
+                    ClassicDriveCloudSettingsView()
+                }
+                .accessibilityIdentifier("gaming-mode-drive-settings")
+            }
             Section("RetroAchievements") {
                 Text(savedAccount.map { "Conta configurada · \($0)" } ?? "Nenhuma conta configurada")
                 TextField("Usuário RetroAchievements", text: $username)
@@ -370,12 +376,16 @@ struct GamingAvailabilityBadge: View {
     enum Kind: Equatable {
         case available
         case onComputer
+        case inCloud
+        case downloading
         case unavailable
 
         var title: String {
             switch self {
             case .available: return GamingModePresentation.localAvailabilityLabel
             case .onComputer: return GamingModePresentation.computerAvailabilityLabel
+            case .inCloud: return "Na nuvem (Google Drive)"
+            case .downloading: return GamingModePresentation.downloadingAvailabilityLabel
             case .unavailable: return GamingModePresentation.unavailableOnPhoneLabel
             }
         }
@@ -384,6 +394,8 @@ struct GamingAvailabilityBadge: View {
             switch self {
             case .available: return "checkmark.circle.fill"
             case .onComputer: return "desktopcomputer"
+            case .inCloud: return "icloud.and.arrow.down"
+            case .downloading: return "arrow.down.circle.fill"
             case .unavailable: return "exclamationmark.circle"
             }
         }
@@ -392,6 +404,8 @@ struct GamingAvailabilityBadge: View {
             switch self {
             case .available: return BrumTheme.primary
             case .onComputer: return BrumTheme.muted
+            case .inCloud: return .cyan
+            case .downloading: return .orange
             case .unavailable: return .orange
             }
         }

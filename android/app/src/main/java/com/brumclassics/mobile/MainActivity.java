@@ -140,6 +140,8 @@ public final class MainActivity extends Activity {
     private boolean pokedexSyncing = false;
     private String gamingSearchQuery = "";
     private String gamingConsoleFilter = "all";
+    private final java.util.Set<String> activeDriveDownloadIds = new java.util.HashSet<>();
+    private final java.util.Map<String, Integer> driveDownloadPercentById = new java.util.HashMap<>();
     private String myBrumControlStatus = "";
     private String myBrumControlError = "";
     private List<Game> games = new ArrayList<>();
@@ -2084,7 +2086,44 @@ public final class MainActivity extends Activity {
         }
         installedGames.sort((left, right) -> left.title.compareToIgnoreCase(right.title));
 
-        if (!localGames.isEmpty() || !installedGames.isEmpty()) {
+        ClassicDriveCloudRules.ScanCheckpoint driveCp = driveCloudService.getCheckpoint();
+        List<ClassicDriveCloudRules.CloudGameEntry> cloudOnlyGames = new ArrayList<>();
+        java.util.Map<String, ClassicDriveCloudRules.CloudGameEntry> driveByPcId = new java.util.HashMap<>();
+        java.util.Map<String, Game> matchedPcByDriveId = new java.util.HashMap<>();
+        for (ClassicDriveCloudRules.CloudGameEntry entry : driveCp.sortedItems()) {
+            if (ClassicDriveCloudRules.isAvailabilityPlayableLocally(entry.downloadedLocalPath)) continue;
+            if (classicsRepository.find("drive:" + entry.id) != null) continue;
+            boolean duplicatedByLocal = false;
+            for (LocalClassic local : localGames) {
+                if (("drive:" + entry.id).equals(local.id)
+                        || ClassicsRules.sameClassicGame(local.title, local.systemId, entry.title, entry.systemHint)) {
+                    duplicatedByLocal = true;
+                    break;
+                }
+            }
+            if (duplicatedByLocal) continue;
+            Game matchedPc = null;
+            for (Game g : installedGames) {
+                if (ClassicsRules.sameClassicGame(entry.title, entry.systemHint, g.title, g.platform)) {
+                    matchedPc = g;
+                    if (!driveByPcId.containsKey(g.id)) driveByPcId.put(g.id, entry);
+                    break;
+                }
+            }
+            if (matchedPc != null && driveByPcId.get(matchedPc.id) == entry) continue;
+            if (matchedPc == null) {
+                for (Game g : games) {
+                    if (GamingModeRules.includes(g) && ClassicsRules.sameClassicGame(entry.title, entry.systemHint, g.title, g.platform)) {
+                        matchedPc = g;
+                        break;
+                    }
+                }
+            }
+            if (matchedPc != null) matchedPcByDriveId.put(entry.id, matchedPc);
+            cloudOnlyGames.add(entry);
+        }
+
+        if (!localGames.isEmpty() || !installedGames.isEmpty() || !cloudOnlyGames.isEmpty()) {
             java.util.Map<String, Integer> consoleCounts = new java.util.LinkedHashMap<>();
             for (LocalClassic local : localGames) {
                 String ck = GamingModeRules.canonicalConsoleKey(local.systemId);
@@ -2092,6 +2131,10 @@ public final class MainActivity extends Activity {
             }
             for (Game g : installedGames) {
                 String ck = GamingModeRules.canonicalConsoleKey(g.platform);
+                consoleCounts.put(ck, (consoleCounts.containsKey(ck) ? consoleCounts.get(ck) : 0) + 1);
+            }
+            for (ClassicDriveCloudRules.CloudGameEntry entry : cloudOnlyGames) {
+                String ck = GamingModeRules.canonicalConsoleKey(entry.systemHint);
                 consoleCounts.put(ck, (consoleCounts.containsKey(ck) ? consoleCounts.get(ck) : 0) + 1);
             }
             if (!"all".equals(gamingConsoleFilter) && !consoleCounts.containsKey(gamingConsoleFilter)) {
@@ -2148,10 +2191,16 @@ public final class MainActivity extends Activity {
                         filteredPc.add(game);
                     }
                 }
+                List<ClassicDriveCloudRules.CloudGameEntry> filteredCloud = new ArrayList<>();
+                for (ClassicDriveCloudRules.CloudGameEntry entry : cloudOnlyGames) {
+                    if (GamingModeRules.matchesFilter(entry.title, entry.systemHint, gamingSearchQuery, gamingConsoleFilter)) {
+                        filteredCloud.add(entry);
+                    }
+                }
                 boolean hasFilter = !gamingSearchQuery.trim().isEmpty() || !"all".equals(gamingConsoleFilter);
                 clearBtn.setVisibility(hasFilter ? View.VISIBLE : View.GONE);
 
-                if (filteredLocal.isEmpty() && filteredPc.isEmpty()) {
+                if (filteredLocal.isEmpty() && filteredPc.isEmpty() && filteredCloud.isEmpty()) {
                     LinearLayout empty = column();
                     empty.setPadding(dp(18), dp(20), dp(18), dp(20));
                     empty.setBackground(background(SURFACE, 10, LINE, 1));
@@ -2181,9 +2230,26 @@ public final class MainActivity extends Activity {
                     gamingCatalogContainer.addView(gamingHero(featured.title, classicPlatform(featured), linked, featured,
                             formatClassicTime(featured.creditedSeconds), null, open), margins(-1, 6, -1, 0));
                 } else if (recentComputer != null) {
-                    Button open = gamingAction("Detalhes", true, v -> showGamingGame(recentComputer));
+                    ClassicDriveCloudRules.CloudGameEntry linkedDrive = driveByPcId.get(recentComputer.id);
+                    Button open = linkedDrive != null
+                            ? gamingAction("↓ Baixar / Detalhes", true, v -> showGamingGame(recentComputer))
+                            : gamingAction("Detalhes", true, v -> showGamingGame(recentComputer));
                     gamingCatalogContainer.addView(gamingHero(recentComputer.title, recentComputer.platform, recentComputer, null,
                             recentComputer.playedLabel(), null, open), margins(-1, 6, -1, 0));
+                } else if (!filteredCloud.isEmpty()) {
+                    ClassicDriveCloudRules.CloudGameEntry featuredDrive = filteredCloud.get(0);
+                    Game matchedPc = matchedPcByDriveId.get(featuredDrive.id);
+                    boolean busy = isDriveDownloading(featuredDrive);
+                    Button open = gamingAction(busy ? "Baixando…" : "↓ Baixar do Drive", true, v -> {
+                        if (busy) {
+                            showGamingDriveGame(featuredDrive, matchedPc);
+                        } else {
+                            triggerGamingDriveDownload(featuredDrive, null, () -> showGamingMode(), null);
+                        }
+                    });
+                    String plat = featuredDrive.systemHint.isEmpty() ? "GOOGLE DRIVE" : featuredDrive.systemHint.toUpperCase(Locale.ROOT);
+                    gamingCatalogContainer.addView(gamingHero(featuredDrive.title, plat, matchedPc, null,
+                            "Na nuvem (Google Drive)", null, open), margins(-1, 6, -1, 0));
                 }
 
                 if (!filteredLocal.isEmpty()) {
@@ -2194,11 +2260,23 @@ public final class MainActivity extends Activity {
                     localScroll.addView(localShelf); gamingCatalogContainer.addView(localScroll);
                 }
 
+                if (!filteredCloud.isEmpty()) {
+                    gamingCatalogContainer.addView(sectionHeading("NA NUVEM · GOOGLE DRIVE", filteredCloud.size() + " JOGOS", null),
+                            margins(-1, filteredLocal.isEmpty() ? 20 : 24, -1, 10));
+                    HorizontalScrollView cloudScroll = new HorizontalScrollView(this); cloudScroll.setHorizontalScrollBarEnabled(false);
+                    LinearLayout cloudShelf = row();
+                    for (ClassicDriveCloudRules.CloudGameEntry item : filteredCloud) {
+                        cloudShelf.addView(gamingDriveCard(item, matchedPcByDriveId.get(item.id)), margins(138, 0, 12, 0));
+                    }
+                    cloudScroll.addView(cloudShelf); gamingCatalogContainer.addView(cloudScroll);
+                }
+
                 if (!filteredPc.isEmpty()) {
-                    gamingCatalogContainer.addView(sectionHeading("CLASSICS NO COMPUTADOR", filteredPc.size() + " JOGOS", null), margins(-1, filteredLocal.isEmpty() ? 20 : 24, -1, 10));
+                    gamingCatalogContainer.addView(sectionHeading("CLASSICS NO COMPUTADOR", filteredPc.size() + " JOGOS", null),
+                            margins(-1, (filteredLocal.isEmpty() && filteredCloud.isEmpty()) ? 20 : 24, -1, 10));
                     HorizontalScrollView pcScroll = new HorizontalScrollView(this); pcScroll.setHorizontalScrollBarEnabled(false);
                     LinearLayout pcShelf = row();
-                    for (Game game : filteredPc) pcShelf.addView(gamingGameCard(game), margins(138, 0, 12, 0));
+                    for (Game game : filteredPc) pcShelf.addView(gamingGameCard(game, driveByPcId.get(game.id)), margins(138, 0, 12, 0));
                     pcScroll.addView(pcShelf); gamingCatalogContainer.addView(pcScroll);
                 }
             };
@@ -2251,12 +2329,12 @@ public final class MainActivity extends Activity {
             renderCatalogHolder[0].run();
         }
 
-        if (localGames.isEmpty() && installedGames.isEmpty()) {
+        if (localGames.isEmpty() && installedGames.isEmpty() && cloudOnlyGames.isEmpty()) {
             LinearLayout empty = column(); empty.setPadding(dp(20), dp(24), dp(20), dp(24)); empty.setBackground(background(SURFACE, 8, LINE, 1));
             empty.addView(text(verifyingGamingClassics ? "VERIFICANDO JOGOS..." : "NENHUM JOGO PRONTO", 13, TEXT, true));
             empty.addView(text(verifyingGamingClassics
                     ? "Conferindo os arquivos disponíveis neste celular."
-                    : "Toque na engrenagem acima para selecionar uma pasta de ROMs ou sincronize os Classics do computador.", 10, MUTED, false), margins(-1, 8, -1, 0));
+                    : "Toque na engrenagem acima para selecionar uma pasta de ROMs, configurar o Google Drive ou sincronizar os Classics do computador.", 10, MUTED, false), margins(-1, 8, -1, 0));
             page.addView(empty, margins(-1, 28, -1, 0));
         }
         page.addView(space(22));
@@ -3044,12 +3122,244 @@ public final class MainActivity extends Activity {
         return dot > 0 ? clean.substring(0, dot) + " UTC" : clean;
     }
 
+    private boolean isDriveDownloading(ClassicDriveCloudRules.CloudGameEntry item) {
+        return item != null && (activeDriveDownloadIds.contains(item.id) || "downloading".equals(item.downloadStatus));
+    }
+
+    private ClassicDriveCloudRules.CloudGameEntry findMatchingCloudEntry(Game game) {
+        if (game == null || driveCloudService == null) return null;
+        for (ClassicDriveCloudRules.CloudGameEntry entry : driveCloudService.getCheckpoint().sortedItems()) {
+            if (ClassicDriveCloudRules.isAvailabilityPlayableLocally(entry.downloadedLocalPath)) continue;
+            if (classicsRepository.find("drive:" + entry.id) != null) continue;
+            if (ClassicsRules.sameClassicGame(entry.title, entry.systemHint, game.title, game.platform)) {
+                return entry;
+            }
+        }
+        return null;
+    }
+
+    private View createDriveDownloadBadge(ClassicDriveCloudRules.CloudGameEntry item, boolean compact) {
+        boolean busy = isDriveDownloading(item);
+        FrameLayout badge = new FrameLayout(this);
+        int size = dp(compact ? 36 : 42);
+        badge.setLayoutParams(new FrameLayout.LayoutParams(size, size, Gravity.BOTTOM | Gravity.END));
+        int accentCyan = Color.rgb(56, 189, 248);
+        int accentAmber = Color.rgb(251, 146, 60);
+        GradientDrawable circle = new GradientDrawable();
+        circle.setShape(GradientDrawable.OVAL);
+        circle.setColor(Color.argb(228, 12, 16, 22));
+        circle.setStroke(dp(1), busy ? accentAmber : accentCyan);
+        badge.setBackground(circle);
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(busy ? android.R.drawable.ic_menu_close_clear_cancel : android.R.drawable.stat_sys_download);
+        icon.setColorFilter(busy ? accentAmber : accentCyan);
+        int pad = dp(8);
+        icon.setPadding(pad, pad, pad, pad);
+        badge.addView(icon, new FrameLayout.LayoutParams(-1, -1));
+        badge.setContentDescription(busy ? "Cancelar download de " + item.title : "Baixar " + item.title + " do Google Drive");
+        badge.setOnClickListener(v -> {
+            if (busy) {
+                driveCloudService.cancelDownload(item.id);
+                activeDriveDownloadIds.remove(item.id);
+                driveDownloadPercentById.remove(item.id);
+                Toast.makeText(this, "Download cancelado: " + item.title, Toast.LENGTH_SHORT).show();
+                if ("gaming".equals(currentScreen)) showGamingMode();
+            } else {
+                triggerGamingDriveDownload(item, null, () -> {
+                    if ("gaming".equals(currentScreen)) showGamingMode();
+                }, null);
+                if ("gaming".equals(currentScreen)) showGamingMode();
+            }
+        });
+        return badge;
+    }
+
+    private void triggerGamingDriveDownload(ClassicDriveCloudRules.CloudGameEntry item,
+                                            TextView liveLabel,
+                                            Runnable onCompletedUi,
+                                            Runnable onErrorUi) {
+        if (item == null) return;
+        activeDriveDownloadIds.add(item.id);
+        driveDownloadPercentById.put(item.id, 0);
+        if (liveLabel != null) {
+            liveLabel.setText("BAIXANDO DO GOOGLE DRIVE…");
+            liveLabel.setTextColor(Color.rgb(251, 146, 60));
+        } else {
+            Toast.makeText(this, "Baixando " + item.title + "…", Toast.LENGTH_SHORT).show();
+        }
+        modelExecutor.execute(() -> {
+            try {
+                driveCloudService.downloadGameSync(item.id, (id, recv, total, st) -> {
+                    int pct = total > 0 ? (int) Math.min(100L, (recv * 100L) / total) : -1;
+                    handler.post(() -> {
+                        if (pct >= 0) driveDownloadPercentById.put(id, pct);
+                        if (liveLabel != null) {
+                            liveLabel.setText(pct >= 0
+                                    ? "BAIXANDO " + item.title.toUpperCase(Locale.ROOT) + " (" + pct + "%)"
+                                    : "BAIXANDO " + Formatter.formatFileSize(this, recv) + "…");
+                        }
+                    });
+                });
+                verifiedGamingClassics = null;
+                handler.post(() -> {
+                    activeDriveDownloadIds.remove(item.id);
+                    driveDownloadPercentById.remove(item.id);
+                    Toast.makeText(this, item.title + " pronto para jogar offline!", Toast.LENGTH_SHORT).show();
+                    if (onCompletedUi != null) onCompletedUi.run();
+                });
+            } catch (Exception err) {
+                handler.post(() -> {
+                    activeDriveDownloadIds.remove(item.id);
+                    driveDownloadPercentById.remove(item.id);
+                    String msg = err.getMessage() == null ? "Falha no download" : err.getMessage();
+                    if (liveLabel != null) {
+                        liveLabel.setText(msg);
+                        liveLabel.setTextColor(Color.rgb(255, 118, 118));
+                    } else {
+                        Toast.makeText(this, "Falha ao baixar " + item.title + ": " + msg, Toast.LENGTH_LONG).show();
+                    }
+                    if (onErrorUi != null) onErrorUi.run();
+                });
+            }
+        });
+    }
+
     private View gamingGameCard(Game game) {
-        LinearLayout card = column(); card.addView(cover(game, 138, 193));
+        return gamingGameCard(game, findMatchingCloudEntry(game));
+    }
+
+    private View gamingGameCard(Game game, ClassicDriveCloudRules.CloudGameEntry matchedDrive) {
+        LinearLayout card = column();
+        FrameLayout media = new FrameLayout(this);
+        media.addView(cover(game, 138, 193), new FrameLayout.LayoutParams(dp(138), dp(193)));
+        if (matchedDrive != null) {
+            FrameLayout.LayoutParams dlLp = new FrameLayout.LayoutParams(dp(36), dp(36), Gravity.BOTTOM | Gravity.END);
+            dlLp.rightMargin = dp(8);
+            dlLp.bottomMargin = dp(8);
+            media.addView(createDriveDownloadBadge(matchedDrive, true), dlLp);
+        }
+        card.addView(media, new LinearLayout.LayoutParams(dp(138), dp(193)));
         card.addView(text(game.platform.toUpperCase(Locale.ROOT), 7, Color.rgb(173, 180, 190), true), margins(-1, 9, -1, 3));
         TextView title = text(game.title, 11, TEXT, true); title.setMaxLines(2); card.addView(title);
-        card.addView(text(GamingModeRules.LABEL_ON_COMPUTER, 9, MUTED, true), margins(-1, 5, -1, 0));
+        if (matchedDrive != null) {
+            boolean busy = isDriveDownloading(matchedDrive);
+            Integer pct = driveDownloadPercentById.get(matchedDrive.id);
+            String label = busy
+                    ? (pct != null ? "Baixando " + pct + "%" : GamingModeRules.LABEL_DOWNLOADING)
+                    : GamingModeRules.LABEL_ON_COMPUTER + " · Drive";
+            card.addView(text(label, 9, busy ? Color.rgb(251, 146, 60) : Color.rgb(56, 189, 248), true), margins(-1, 5, -1, 0));
+        } else {
+            card.addView(text(GamingModeRules.LABEL_ON_COMPUTER, 9, MUTED, true), margins(-1, 5, -1, 0));
+        }
         card.setOnClickListener(v -> showGamingGame(game)); card.setFocusable(true); return card;
+    }
+
+    private View gamingDriveCard(ClassicDriveCloudRules.CloudGameEntry item, Game matchedPc) {
+        LinearLayout card = column();
+        FrameLayout media = new FrameLayout(this);
+        if (matchedPc != null) {
+            media.addView(cover(matchedPc, 138, 193), new FrameLayout.LayoutParams(dp(138), dp(193)));
+        } else {
+            FrameLayout placeholder = new FrameLayout(this);
+            placeholder.setBackground(background(Color.rgb(18, 28, 38), 5, Color.argb(95, 56, 189, 248), 1));
+            TextView fallback = text(item.title, 15, TEXT, true);
+            fallback.setGravity(Gravity.CENTER);
+            fallback.setPadding(dp(12), dp(12), dp(12), dp(12));
+            placeholder.addView(fallback, new FrameLayout.LayoutParams(-1, -1));
+            media.addView(placeholder, new FrameLayout.LayoutParams(dp(138), dp(193)));
+        }
+        FrameLayout.LayoutParams dlLp = new FrameLayout.LayoutParams(dp(36), dp(36), Gravity.BOTTOM | Gravity.END);
+        dlLp.rightMargin = dp(8);
+        dlLp.bottomMargin = dp(8);
+        media.addView(createDriveDownloadBadge(item, true), dlLp);
+        card.addView(media, new LinearLayout.LayoutParams(dp(138), dp(193)));
+
+        String sysLabel = item.systemHint.isEmpty() ? "DRIVE" : item.systemHint.toUpperCase(Locale.ROOT);
+        card.addView(text(sysLabel, 7, Color.rgb(173, 180, 190), true), margins(-1, 9, -1, 3));
+        TextView title = text(item.title, 11, TEXT, true); title.setMaxLines(2); card.addView(title);
+        boolean busy = isDriveDownloading(item);
+        Integer pct = driveDownloadPercentById.get(item.id);
+        String statusText = busy
+                ? (pct != null ? "Baixando " + pct + "%…" : GamingModeRules.LABEL_DOWNLOADING)
+                : GamingModeRules.LABEL_IN_CLOUD + " · Baixar";
+        card.addView(text(statusText, 9, busy ? Color.rgb(251, 146, 60) : Color.rgb(56, 189, 248), true), margins(-1, 5, -1, 0));
+        card.setOnClickListener(v -> showGamingDriveGame(item, matchedPc));
+        card.setFocusable(true);
+        return card;
+    }
+
+    private void showGamingDriveGame(ClassicDriveCloudRules.CloudGameEntry item, Game matchedPc) {
+        if (item == null) { showGamingMode(); return; }
+        LocalClassic existingLocal = classicsRepository.find("drive:" + item.id);
+        if (existingLocal != null && classicsRepository.isAccessible(existingLocal)) {
+            showGamingClassicGame(existingLocal);
+            return;
+        }
+        ScrollView scroll = scroll();
+        LinearLayout page = page();
+        scroll.addView(page);
+        page.addView(gamingHeader(true));
+        String plat = item.systemHint.isEmpty() ? "GOOGLE DRIVE" : item.systemHint.toUpperCase(Locale.ROOT);
+        page.addView(gamingHero(item.title, plat, matchedPc, null, "Na nuvem (Google Drive)", null, null),
+                margins(-1, 10, -1, 0));
+
+        TextView statusLabel = text(isDriveDownloading(item) ? "BAIXANDO DO GOOGLE DRIVE…" : "DISPONÍVEL PARA BAIXAR DO GOOGLE DRIVE",
+                10, isDriveDownloading(item) ? Color.rgb(251, 146, 60) : Color.rgb(56, 189, 248), true);
+        statusLabel.setGravity(Gravity.CENTER);
+        page.addView(statusLabel, margins(-1, 12, -1, 8));
+
+        LinearLayout actionBox = column();
+        page.addView(actionBox, margins(-1, 4, -1, 10));
+
+        Runnable[] rebuildAction = new Runnable[1];
+        rebuildAction[0] = () -> {
+            actionBox.removeAllViews();
+            LocalClassic downloaded = classicsRepository.find("drive:" + item.id);
+            if (downloaded != null && classicsRepository.isAccessible(downloaded)) {
+                Button playBtn = primaryButton("▶ JOGAR AGORA");
+                playBtn.setOnClickListener(v -> launchLocalClassic(downloaded));
+                actionBox.addView(playBtn, new LinearLayout.LayoutParams(-1, dp(50)));
+                return;
+            }
+            if (isDriveDownloading(item)) {
+                Button cancelBtn = gamingAction("✕ CANCELAR DOWNLOAD", false, v -> {
+                    driveCloudService.cancelDownload(item.id);
+                    activeDriveDownloadIds.remove(item.id);
+                    driveDownloadPercentById.remove(item.id);
+                    statusLabel.setText("Download cancelado.");
+                    statusLabel.setTextColor(MUTED);
+                    rebuildAction[0].run();
+                });
+                actionBox.addView(cancelBtn, new LinearLayout.LayoutParams(-1, dp(48)));
+                return;
+            }
+            LinearLayout dlBtn = row();
+            dlBtn.setGravity(Gravity.CENTER);
+            dlBtn.setBackground(background(Color.rgb(56, 189, 248), 8, Color.argb(60, 255, 255, 255), 1));
+            dlBtn.setPadding(dp(16), dp(12), dp(16), dp(12));
+            ImageView dlIcon = new ImageView(this);
+            dlIcon.setImageResource(android.R.drawable.stat_sys_download);
+            dlIcon.setColorFilter(BG);
+            dlBtn.addView(dlIcon, margins(22, 0, 10, 0, 22));
+            dlBtn.addView(text("BAIXAR DO GOOGLE DRIVE", 13, BG, true));
+            dlBtn.setOnClickListener(v -> {
+                triggerGamingDriveDownload(item, statusLabel, () -> {
+                    statusLabel.setText("Salvo offline e pronto para jogar!");
+                    statusLabel.setTextColor(ACCENT);
+                    rebuildAction[0].run();
+                }, () -> rebuildAction[0].run());
+                rebuildAction[0].run();
+            });
+            actionBox.addView(dlBtn, new LinearLayout.LayoutParams(-1, dp(50)));
+        };
+        rebuildAction[0].run();
+
+        String info = "Arquivo: " + item.name
+                + (item.parentRelativePath.isEmpty() ? "" : "\nPasta no Drive: " + item.parentRelativePath)
+                + (item.sizeBytes > 0 ? "\nTamanho: " + Formatter.formatFileSize(this, item.sizeBytes) : "");
+        page.addView(noteCard("INFORMAÇÕES DO JOGO · GOOGLE DRIVE", info), margins(-1, 10, -1, 20));
+        setScreen("gaming-drive-details", scroll);
     }
 
     private View gamingClassicCard(LocalClassic game) {
@@ -3211,6 +3521,53 @@ public final class MainActivity extends Activity {
                     @Override public void onError(String safeMessage) { launchState.setText(safeMessage.toUpperCase(Locale.ROOT)); launchState.setTextColor(Color.rgb(255, 118, 118)); pcOnly.setText("TENTAR NOVAMENTE"); pcOnly.setEnabled(true); }
                 });
             }); page.addView(pcOnly, margins(-1, 6, -1, 0, 46));
+        }
+        ClassicDriveCloudRules.CloudGameEntry matchedDrive = findMatchingCloudEntry(game);
+        if (matchedDrive != null) {
+            LinearLayout driveBox = column();
+            page.addView(driveBox, margins(-1, 8, -1, 0));
+            Runnable[] rebuildDriveBox = new Runnable[1];
+            rebuildDriveBox[0] = () -> {
+                driveBox.removeAllViews();
+                LocalClassic downloaded = classicsRepository.find("drive:" + matchedDrive.id);
+                if (downloaded != null) {
+                    Button playOffline = primaryButton("▶ JOGAR NO CELULAR (OFFLINE)");
+                    playOffline.setOnClickListener(v -> launchLocalClassic(downloaded));
+                    driveBox.addView(playOffline, new LinearLayout.LayoutParams(-1, dp(48)));
+                    return;
+                }
+                if (isDriveDownloading(matchedDrive)) {
+                    Button cancelBtn = gamingAction("✕ CANCELAR DOWNLOAD DO DRIVE", false, v -> {
+                        driveCloudService.cancelDownload(matchedDrive.id);
+                        activeDriveDownloadIds.remove(matchedDrive.id);
+                        driveDownloadPercentById.remove(matchedDrive.id);
+                        launchState.setText("Download cancelado.");
+                        launchState.setTextColor(MUTED);
+                        rebuildDriveBox[0].run();
+                    });
+                    driveBox.addView(cancelBtn, new LinearLayout.LayoutParams(-1, dp(46)));
+                    return;
+                }
+                LinearLayout dlBtn = row();
+                dlBtn.setGravity(Gravity.CENTER);
+                dlBtn.setBackground(background(Color.rgb(56, 189, 248), 8, Color.argb(60, 255, 255, 255), 1));
+                dlBtn.setPadding(dp(14), dp(10), dp(14), dp(10));
+                ImageView dlIcon = new ImageView(this);
+                dlIcon.setImageResource(android.R.drawable.stat_sys_download);
+                dlIcon.setColorFilter(BG);
+                dlBtn.addView(dlIcon, margins(20, 0, 8, 0, 20));
+                dlBtn.addView(text("BAIXAR DO GOOGLE DRIVE PARA O CELULAR", 11, BG, true));
+                dlBtn.setOnClickListener(v -> {
+                    triggerGamingDriveDownload(matchedDrive, launchState, () -> {
+                        launchState.setText("Pronto para jogar offline no celular!");
+                        launchState.setTextColor(ACCENT);
+                        rebuildDriveBox[0].run();
+                    }, () -> rebuildDriveBox[0].run());
+                    rebuildDriveBox[0].run();
+                });
+                driveBox.addView(dlBtn, new LinearLayout.LayoutParams(-1, dp(46)));
+            };
+            rebuildDriveBox[0].run();
         }
         page.addView(noteCard("INFORMAÇÕES DO JOGO · " + game.platform.toUpperCase(Locale.ROOT),
                 "Disponível somente no computador." + (game.genre.isEmpty() ? "" : "\nGênero: " + game.genre)),

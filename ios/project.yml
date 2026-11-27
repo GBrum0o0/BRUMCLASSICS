@@ -8,8 +8,8 @@ settings:
     SWIFT_VERSION: "5.9"
     SWIFT_OBJC_BRIDGING_HEADER: BRUMCLASSICSMobile/BRUMCLASSICSMobile-Bridging-Header.h
     CLANG_CXX_LANGUAGE_STANDARD: c++17
-    CURRENT_PROJECT_VERSION: 66
-    MARKETING_VERSION: 0.33.0
+    CURRENT_PROJECT_VERSION: 67
+    MARKETING_VERSION: 0.34.0
     HEADER_SEARCH_PATHS:
       - $(inherited)
       - ../third_party/rcheevos/include

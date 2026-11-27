@@ -161,7 +161,7 @@ struct GraphicsResolutionSettingsView: View {
 
 struct ClassicDriveCloudSettingsView: View {
     @EnvironmentObject private var pocket: PocketClassicsStore
-    private let driveService = ClassicDriveCloudService()
+    private let driveService = ClassicDriveCloudService.shared
 
     @State private var folderLink = ""
     @State private var oauthToken = ""

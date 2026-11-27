@@ -84,6 +84,43 @@ final class MobileExperienceTests: XCTestCase {
         XCTAssertNotNil(GamingModeCatalog.date("2026-10-08T08:00:00Z"))
     }
 
+    func testGamingModeCatalogSurfacesDriveOnlyGamesAndDeduplicatesLocalCopies() throws {
+        let localROM = ROMFolderGame(
+            relativePath: "GBA/Pokemon FireRed (USA).gba",
+            filename: "Pokemon FireRed (USA).gba",
+            title: "Pokemon FireRed",
+            fileSize: 1024,
+            detectedSystem: .gameBoyAdvance
+        )
+        let pcJSON = """
+        [
+          {"id":"pc-smc","title":"Super Mario Kart","description":"","category":"classic","platform":"Super Nintendo","store":"local","genre":"","collectionId":"","sizeBytes":0,"playtimeMinutes":15,"playtimeAvailable":true,"achievementsCollected":null,"achievementsTotal":null,"achievementsAvailable":false,"achievements":[],"storyCompleted":false,"favorite":false,"wantToPlay":false,"libraryStateRevision":0,"notes":{"whereStopped":"","objectives":"","tips":"","commands":"","revision":0,"updatedAt":""},"installed":true,"integrityStatus":"verified","lastPlayedAt":"","artworkPath":""}
+        ]
+        """.data(using: .utf8)!
+        let pcGames = try JSONDecoder().decode([Game].self, from: pcJSON)
+        let cloudItems = [
+            ClassicDriveGameItem(id: "drv-local", name: "Pokemon FireRed (USA).gba", title: "Pokemon FireRed", relativePath: "GBA/Pokemon FireRed (USA).gba", folderID: "f1", parentRelativePath: "GBA", systemHint: "gba", downloadURL: "https://drive.google.com/uc?id=drv-local&export=download"),
+            ClassicDriveGameItem(id: "drv-pc", name: "Super Mario Kart (USA).sfc", title: "Super Mario Kart", relativePath: "SNES/Super Mario Kart (USA).sfc", folderID: "f2", parentRelativePath: "SNES", systemHint: "sfc", downloadURL: "https://drive.google.com/uc?id=drv-pc&export=download"),
+            ClassicDriveGameItem(id: "drv-psp", name: "God of War.iso", title: "God of War", relativePath: "PSP/God of War.iso", folderID: "f3", parentRelativePath: "PSP", systemHint: "psp", downloadURL: "https://drive.google.com/uc?id=drv-psp&export=download")
+        ]
+
+        let snapshot = GamingModeCatalog.buildSnapshot(
+            local: [localROM],
+            records: [],
+            computer: pcGames,
+            cloud: cloudItems
+        )
+
+        XCTAssertEqual(snapshot.library.count, 3)
+        XCTAssertTrue(snapshot.library.contains { $0.id == "drive:drv-psp" })
+        XCTAssertFalse(snapshot.library.contains { $0.id == "drive:drv-local" })
+        XCTAssertFalse(snapshot.library.contains { $0.id == "drive:drv-pc" })
+        XCTAssertEqual(snapshot.matchedDriveByPCID["pc-smc"]?.id, "drv-pc")
+
+        let filteredPSP = GamingModeCatalog.filter(snapshot.library, query: "god", consoleKey: "psp")
+        XCTAssertEqual(filteredPSP.map(\.id), ["drive:drv-psp"])
+    }
+
     func testNativeSaveTransferClassifySyncAndRevisionTracking() throws {
         XCTAssertEqual(NativeSaveTransfer.classifySync(localRevision: nil, remoteRevision: nil, baseRevision: nil), .inSync)
         XCTAssertEqual(NativeSaveTransfer.classifySync(localRevision: "rev-1", remoteRevision: "rev-1", baseRevision: nil), .inSync)
