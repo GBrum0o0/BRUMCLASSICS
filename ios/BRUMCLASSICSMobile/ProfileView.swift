@@ -158,12 +158,6 @@ private struct PersonalUpdateCard: View {
     @EnvironmentObject private var store: AppStore
     @Environment(\.openURL) private var openURL
     @State private var showMigrationBackup = false
-    @State private var copiedSourceURL = false
-
-    private var sideStoreAvailable: Bool {
-        guard let schemeURL = URL(string: "sidestore://") else { return false }
-        return UIApplication.shared.canOpenURL(schemeURL)
-    }
 
     var body: some View {
         BrumCard {
@@ -196,58 +190,31 @@ private struct PersonalUpdateCard: View {
                         }
                     }
 
-                    if sideStoreAvailable {
-                        if let ipaURL = manifest.downloadURL, let installURL = SideStoreLinks.installIPAURL(ipaURL) {
-                            Button("Enviar IPA ao SideStore") { openURL(installURL) }
-                                .buttonStyle(PrimaryButtonStyle())
-                        }
-                        if let addSource = SideStoreLinks.addSourceURL() {
-                            Button("Abrir fonte oficial no SideStore") { openURL(addSource) }
-                                .font(.caption.bold())
-                                .foregroundStyle(BrumTheme.primary)
-                        }
-                        Text("O SideStore realiza o download e a assinatura no iPhone com o StosVPN ativo. Abrir o link apenas encaminha para o SideStore e não conclui a instalação automaticamente.")
-                            .font(.caption)
-                            .foregroundStyle(BrumTheme.muted)
-                    } else {
-                        Text("SideStore não detectado neste aparelho. Para atualizar sem computador depois da configuração inicial, instale o SideStore + StosVPN e adicione a fonte oficial do BRUMCLASSICS.")
-                            .font(.caption)
-                            .foregroundStyle(BrumTheme.muted)
-                    }
+                    Text("Atualize conectando o iPhone ao PC e usando o Brum iOS Bridge no BRUMCLASSICS Desktop.")
+                        .font(.caption)
+                        .foregroundStyle(BrumTheme.muted)
 
-                    Button("Baixar IPA no GitHub (Sideloadly)") { openURL(manifest.buildURL) }
-                        .font(.caption.bold())
-                        .foregroundStyle(BrumTheme.text)
+                    Button("Abrir release no GitHub") { openURL(manifest.buildURL) }
+                        .buttonStyle(PrimaryButtonStyle())
                 case .failed:
                     Text("A consulta falhou, mas sua biblioteca offline e o restante do app continuam disponíveis.")
                         .font(.caption)
                         .foregroundStyle(BrumTheme.muted)
                 default:
-                    Text("Consulta a fonte oficial do SideStore para iOS. Contas Apple gratuitas renovam a assinatura a cada 7 dias pelo SideStore com StosVPN ativo.")
+                    Text("Consulta a versão oficial do BRUMCLASSICS+ iOS. Instale e renove a assinatura de 7 dias pelo Brum iOS Bridge no PC.")
                         .font(.caption)
                         .foregroundStyle(BrumTheme.muted)
                 }
 
-                HStack(spacing: 14) {
-                    Button("Verificar atualização") {
-                        Task { await store.checkForPersonalUpdate(showCurrentMessage: true) }
-                    }
-                    .font(.caption.bold())
-                    .foregroundStyle(BrumTheme.primary)
-                    .disabled(store.personalUpdate == .checking)
-                    .accessibilityIdentifier("check-update-button")
-
-                    Spacer()
-
-                    Button(copiedSourceURL ? "Fonte copiada" : "Copiar fonte SideStore") {
-                        UIPasteboard.general.string = PersonalUpdateService.sideStoreSourceURL.absoluteString
-                        copiedSourceURL = true
-                    }
-                    .font(.caption.bold())
-                    .foregroundStyle(BrumTheme.muted)
+                Button("Verificar atualização") {
+                    Task { await store.checkForPersonalUpdate(showCurrentMessage: true) }
                 }
+                .font(.caption.bold())
+                .foregroundStyle(BrumTheme.primary)
+                .disabled(store.personalUpdate == .checking)
+                .accessibilityIdentifier("check-update-button")
 
-                Button("Backup de saves para migração (Sideloadly → SideStore)") {
+                Button("Backup e restauração de saves") {
                     showMigrationBackup = true
                 }
                 .font(.caption.bold())

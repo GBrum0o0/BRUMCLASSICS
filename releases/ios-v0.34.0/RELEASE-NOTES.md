@@ -5,4 +5,6 @@
   - Cartões (`GamingDriveTile` / `GamingGameTile`) e banner de destaque exibem **ícone de download direto (`arrow.down.circle.fill`)** para baixar no aparelho com progresso e opção de cancelar.
   - Tela de detalhes (`GamingDriveDetailView` e `GamingGameView`) oferece botão **BAIXAR DO GOOGLE DRIVE**, atualiza a biblioteca local automaticamente e libera **JOGAR AGORA** ao terminar.
 
-Atualize via **Brum iOS Bridge**, **SideStore** ou baixando o `.ipa` desta release preservando saves, biblioteca e configurações.
+- **Instalação e atualização exclusivas pelo Brum iOS Bridge:** remove a integração legada do SideStore/StosVPN no Perfil e no fluxo de publicação iOS.
+
+Atualize conectando o iPhone ao PC pelo **Brum iOS Bridge** no BRUMCLASSICS Desktop, preservando saves, biblioteca e configurações.

@@ -120,67 +120,38 @@ final class SnapshotTests: XCTestCase {
         XCTAssertFalse(PersonalUpdateService.isNewer(sameBuild, thanVersion: "0.1.1", build: 2))
     }
 
-    func testSideStoreSourceDecodingAndDeepLinks() throws {
+    func testPersonalUpdateManifestDecodingAndOfficialURLValidation() throws {
         let json = """
         {
-          "name": "BRUMCLASSICS Oficial (iOS)",
-          "identifier": "com.brumclassics.sidestore.source",
-          "sourceURL": "https://raw.githubusercontent.com/GBrum0o0/BRUMCLASSICS/sidestore-source/sidestore-source.json",
-          "apps": [
-            {
-              "name": "BRUMCLASSICS",
-              "bundleIdentifier": "com.brumclassics.mobile.ios",
-              "versions": [
-                {
-                  "version": "0.24.0",
-                  "buildVersion": "57",
-                  "date": "2026-11-22T09:23:00Z",
-                  "localizedDescription": "Versão anterior PSP",
-                  "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.24.0/BRUMCLASSICS-MOVEL-IOS-0.24.0.ipa",
-                  "size": 15024172,
-                  "minOSVersion": "16.0"
-                },
-                {
-                  "version": "0.25.0",
-                  "buildVersion": "58",
-                  "date": "2026-11-22T12:00:00Z",
-                  "localizedDescription": "- SideStore oficial\\n- Backup verificado de saves",
-                  "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.25.0/BRUMCLASSICS-MOVEL-IOS-0.25.0.ipa",
-                  "size": 15100000,
-                  "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-                  "minOSVersion": "16.0"
-                },
-                {
-                  "version": "9.9.9",
-                  "buildVersion": "999",
-                  "date": "2026-12-01T00:00:00Z",
-                  "localizedDescription": "Invalido latest",
-                  "downloadURL": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/latest/download/BRUMCLASSICS-OFICIAL.exe",
-                  "size": 100
-                }
-              ]
-            }
+          "version": "0.34.0",
+          "build": 67,
+          "minimumIos": "16.0",
+          "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.34.0",
+          "notes": [
+            "Download direto do Google Drive no Gaming Mode",
+            "Instalação exclusiva via Brum iOS Bridge"
           ]
         }
         """
-        let manifest = try SideStoreSourceParser.latestManifest(from: Data(json.utf8))
-        XCTAssertEqual(manifest.version, "0.25.0")
-        XCTAssertEqual(manifest.build, 58)
+        let manifest = try JSONDecoder().decode(PersonalUpdateManifest.self, from: Data(json.utf8))
+        XCTAssertEqual(manifest.version, "0.34.0")
+        XCTAssertEqual(manifest.build, 67)
         XCTAssertEqual(manifest.minimumIOS, "16.0")
-        XCTAssertEqual(manifest.notes, ["SideStore oficial", "Backup verificado de saves"])
-        XCTAssertEqual(manifest.buildURL.absoluteString, "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.25.0")
+        XCTAssertEqual(manifest.notes, [
+            "Download direto do Google Drive no Gaming Mode",
+            "Instalação exclusiva via Brum iOS Bridge"
+        ])
+        XCTAssertEqual(manifest.buildURL.absoluteString, "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.34.0")
+        XCTAssertTrue(PersonalUpdateService.isValidOfficialIOSReleaseURL(manifest.buildURL))
 
-        let sourceLink = try XCTUnwrap(SideStoreLinks.addSourceURL())
-        XCTAssertEqual(sourceLink.scheme, "sidestore")
-        XCTAssertEqual(sourceLink.host, "source")
-        XCTAssertTrue(sourceLink.absoluteString.contains("sidestore-source.json"))
-
-        let installLink = try XCTUnwrap(manifest.downloadURL.flatMap(SideStoreLinks.installIPAURL))
-        XCTAssertEqual(installLink.scheme, "sidestore")
-        XCTAssertEqual(installLink.host, "install")
+        let ipaURL = try XCTUnwrap(URL(string: "https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/ios-v0.34.0/BRUMCLASSICS-MOVEL-IOS-0.34.0.ipa"))
+        XCTAssertTrue(PersonalUpdateService.isValidOfficialIOSReleaseURL(ipaURL))
 
         let latestURL = try XCTUnwrap(URL(string: "https://github.com/GBrum0o0/BRUMCLASSICS/releases/latest/download/BRUMCLASSICS-OFICIAL.exe"))
-        XCTAssertNil(SideStoreLinks.installIPAURL(latestURL))
+        XCTAssertFalse(PersonalUpdateService.isValidOfficialIOSReleaseURL(latestURL))
+
+        let externalURL = try XCTUnwrap(URL(string: "https://example.com/BRUMCLASSICS-MOVEL-IOS-0.34.0.ipa"))
+        XCTAssertFalse(PersonalUpdateService.isValidOfficialIOSReleaseURL(externalURL))
     }
 
     func testSaveMigrationBackupExportVerifyAndRestorePreservesData() throws {

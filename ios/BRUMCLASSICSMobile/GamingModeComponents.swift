@@ -184,12 +184,6 @@ private struct GamingSettingsPanel: View {
                 if !pocket.romFolderStatus.isEmpty { Text(pocket.romFolderStatus).font(.caption).foregroundStyle(.secondary) }
                 if let message = pocket.message, !message.isEmpty { Text(message).font(.caption).foregroundStyle(.orange) }
             }
-            Section("Biblioteca em nuvem") {
-                NavigationLink("Biblioteca em nuvem — Google Drive") {
-                    ClassicDriveCloudSettingsView()
-                }
-                .accessibilityIdentifier("gaming-mode-drive-settings")
-            }
             Section("RetroAchievements") {
                 Text(savedAccount.map { "Conta configurada · \($0)" } ?? "Nenhuma conta configurada")
                 TextField("Usuário RetroAchievements", text: $username)
@@ -219,6 +213,12 @@ private struct GamingSettingsPanel: View {
                     Text(pocket.lastSaveSyncSummary).font(.caption).foregroundStyle(.secondary)
                 }
                 if !pocket.status.isEmpty { Text(pocket.status).font(.caption).foregroundStyle(.secondary) }
+            }
+            Section("Biblioteca em nuvem") {
+                NavigationLink("Biblioteca em nuvem — Google Drive") {
+                    ClassicDriveCloudSettingsView()
+                }
+                .accessibilityIdentifier("gaming-mode-drive-settings")
             }
         }
         .navigationTitle("Configurações")

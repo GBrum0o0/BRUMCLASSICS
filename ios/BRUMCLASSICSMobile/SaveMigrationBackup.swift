@@ -329,7 +329,7 @@ struct SaveMigrationBackupSheet: View {
                         pickingExportFolder = true
                     }
                     .disabled(summary.fileCount == 0)
-                    Text("Ao migrar do Sideloadly para o SideStore, um Bundle ID diferente ou mudança de conta Apple cria um container separado no iOS. Exporte para Arquivos ou iCloud Drive antes de remover o aplicativo antigo.")
+                    Text("Ao trocar de conta Apple ou reinstalar com outro Bundle ID no Brum iOS Bridge, o iOS cria um container separado. Exporte seus saves para Arquivos ou iCloud Drive antes de remover o aplicativo antigo.")
                         .font(.caption)
                         .foregroundStyle(BrumTheme.muted)
                 }

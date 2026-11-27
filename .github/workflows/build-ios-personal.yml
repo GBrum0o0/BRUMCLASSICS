@@ -78,7 +78,7 @@ jobs:
         working-directory: ios
         run: |
           node validate-ios-project.js
-          python3 -m unittest -v test_validate_ipa.py test_prepare_ppsspp_assets.py test_sidestore_source.py
+          python3 -m unittest -v test_validate_ipa.py test_prepare_ppsspp_assets.py
 
       - name: Instalar XcodeGen
         run: brew install xcodegen
@@ -448,39 +448,3 @@ jobs:
             gh release create "$TAG" --target "$GITHUB_SHA" --title "BRUMCLASSICS+ iOS ${VERSION}" --notes-file "releases/ios-v${VERSION}/RELEASE-NOTES.md" --latest=false
             gh release upload "$TAG" ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa.sha256 ios/build/IPA-VALIDATION.json
           fi
-          IPA_FILE="ios/build/BRUMCLASSICS-MOVEL-IOS-${VERSION}.ipa"
-          test -f "$IPA_FILE"
-          DOWNLOAD_URL="https://github.com/GBrum0o0/BRUMCLASSICS/releases/download/${TAG}/BRUMCLASSICS-MOVEL-IOS-${VERSION}.ipa"
-          EXISTING_ARG=()
-          rm -rf "$RUNNER_TEMP/sidestore-branch"
-          if git ls-remote --exit-code --heads origin sidestore-source >/dev/null 2>&1; then
-            git clone --depth 1 --branch sidestore-source https://github.com/GBrum0o0/BRUMCLASSICS.git "$RUNNER_TEMP/sidestore-branch"
-            if [ -f "$RUNNER_TEMP/sidestore-branch/sidestore-source.json" ]; then
-              cp "$RUNNER_TEMP/sidestore-branch/sidestore-source.json" "$RUNNER_TEMP/existing-sidestore-source.json"
-              EXISTING_ARG=(--existing-source "$RUNNER_TEMP/existing-sidestore-source.json")
-            fi
-          else
-            git init "$RUNNER_TEMP/sidestore-branch"
-            git -C "$RUNNER_TEMP/sidestore-branch" checkout --orphan sidestore-source
-            git -C "$RUNNER_TEMP/sidestore-branch" remote add origin https://github.com/GBrum0o0/BRUMCLASSICS.git
-          fi
-          RELEASE_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          python3 ios/generate_sidestore_source.py \
-            --ipa "$IPA_FILE" \
-            --validation-json ios/build/IPA-VALIDATION.json \
-            --download-url "$DOWNLOAD_URL" \
-            --notes-file "releases/ios-v${VERSION}/RELEASE-NOTES.md" \
-            --date "$RELEASE_DATE" \
-            "${EXISTING_ARG[@]}" \
-            --verify-remote \
-            --output "$RUNNER_TEMP/sidestore-source.json"
-          cp "$RUNNER_TEMP/sidestore-source.json" "$RUNNER_TEMP/sidestore-branch/sidestore-source.json"
-          git -C "$RUNNER_TEMP/sidestore-branch" config user.name "github-actions[bot]"
-          git -C "$RUNNER_TEMP/sidestore-branch" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git -C "$RUNNER_TEMP/sidestore-branch" add sidestore-source.json
-          if ! git -C "$RUNNER_TEMP/sidestore-branch" diff --cached --quiet; then
-            git -C "$RUNNER_TEMP/sidestore-branch" commit -m "sidestore: publish iOS ${VERSION}"
-            AUTH_B64=$(python3 -c 'import base64, os; print(base64.b64encode(("x-access-token:" + os.environ["GH_TOKEN"]).encode()).decode())')
-            git -C "$RUNNER_TEMP/sidestore-branch" -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${AUTH_B64}" push origin HEAD:refs/heads/sidestore-source
-          fi
-          rm -rf "$RUNNER_TEMP/sidestore-branch" "$RUNNER_TEMP/existing-sidestore-source.json"
