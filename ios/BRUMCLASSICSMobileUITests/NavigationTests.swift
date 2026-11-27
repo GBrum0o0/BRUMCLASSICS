@@ -21,6 +21,8 @@ final class NavigationTests: XCTestCase {
         app.buttons["gaming-mode-tab"].tap()
         XCTAssertTrue(app.buttons["gaming-mode-library"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["gaming-mode-extensions"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["gaming-mode-qr-control"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["gaming-mode-mybrumcontrol"].exists)
         app.buttons["gaming-mode-extensions"].tap()
         XCTAssertTrue(app.buttons["pokedex-open-device"].waitForExistence(timeout: 5))
         app.buttons["pokedex-open-device"].tap()

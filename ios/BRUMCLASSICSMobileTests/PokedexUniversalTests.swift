@@ -144,7 +144,12 @@ final class PokedexUniversalTests: XCTestCase {
         XCTAssertFalse(bulbasaur.discovered)
         XCTAssertTrue(bulbasaur.silhouetteOnly)
         XCTAssertEqual(bulbasaur.name, "???")
+        XCTAssertEqual(bulbasaur.genus, "???")
         XCTAssertEqual(bulbasaur.description, "???")
+        XCTAssertTrue(bulbasaur.types.isEmpty)
+        XCTAssertNil(bulbasaur.heightMeters)
+        XCTAssertNil(bulbasaur.weightKg)
+        XCTAssertTrue(bulbasaur.abilities.isEmpty)
         XCTAssertNil(bulbasaur.capture)
         XCTAssertNil(bulbasaur.spriteAsset.normalKey)
         XCTAssertEqual(bulbasaur.spriteAsset.activeKey, "pokedex/silhouette/001")
@@ -154,13 +159,72 @@ final class PokedexUniversalTests: XCTestCase {
         XCTAssertEqual(pikachuNormal.name, "Pikachu")
         XCTAssertEqual(pikachuNormal.capture?.firstCapturedGame, "Pokémon FireRed Version")
 
-        XCTAssertEqual(view.tabs.shinies.count, 1)
-        XCTAssertEqual(view.tabs.shinies[0].nationalDexNumber, 25)
-        XCTAssertTrue(view.tabs.shinies[0].isShiny)
+        // Verify independent Shiny tab: captured #025 Shiny is discovered, uncaptured #001 Shiny stays black silhouette + "???"
+        XCTAssertEqual(view.tabs.shinies.count, 151)
+        let pikachuShiny = try XCTUnwrap(view.tabs.shinies.first(where: { $0.nationalDexNumber == 25 }))
+        XCTAssertTrue(pikachuShiny.discovered)
+        XCTAssertTrue(pikachuShiny.isShiny)
+        XCTAssertFalse(pikachuShiny.silhouetteOnly)
 
-        // 5. Backup & restore verification with SHA-256
+        let bulbasaurShiny = try XCTUnwrap(view.tabs.shinies.first(where: { $0.nationalDexNumber == 1 }))
+        XCTAssertFalse(bulbasaurShiny.discovered)
+        XCTAssertTrue(bulbasaurShiny.silhouetteOnly)
+        XCTAssertTrue(bulbasaurShiny.isShiny)
+        XCTAssertEqual(bulbasaurShiny.name, "???")
+        XCTAssertEqual(bulbasaurShiny.description, "???")
+        XCTAssertTrue(bulbasaurShiny.types.isEmpty)
+        XCTAssertNil(bulbasaurShiny.capture)
+
+        // Independent Normal vs Shiny unlock rule: capturing Normal Charmander (#4) MUST NOT unlock Shiny Charmander
+        _ = try store.recordCapture(
+            ownerProfileId: "gusta",
+            nationalDexNumber: 4,
+            isShiny: false,
+            gameTitle: "Pokémon FireRed Version",
+            gameId: "firered-1",
+            systemId: "gba",
+            capturedAt: "2026-11-22T13:00:00Z",
+            captureLocation: "Pallet Town"
+        )
+        let afterNormalCharmander = try store.projectedView(profileID: "gusta", platform: "ios")
+        let charmanderNormal = try XCTUnwrap(afterNormalCharmander.tabs.pokemon.first(where: { $0.nationalDexNumber == 4 }))
+        let charmanderShiny = try XCTUnwrap(afterNormalCharmander.tabs.shinies.first(where: { $0.nationalDexNumber == 4 }))
+        XCTAssertTrue(charmanderNormal.discovered)
+        XCTAssertFalse(charmanderShiny.discovered)
+        XCTAssertTrue(charmanderShiny.silhouetteOnly)
+        XCTAssertEqual(charmanderShiny.name, "???")
+
+        // 5. Verify CoreGraphics silhouette pixel mask turns colored pixels pure black (0,0,0) while preserving transparency
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 4, height: 4))
+        let coloredTestSprite = renderer.image { ctx in
+            UIColor.yellow.setFill()
+            ctx.fill(CGRect(x: 1, y: 1, width: 2, height: 2))
+        }
+        let maskImage = PokedexPixelSprite.silhouette(coloredTestSprite)
+        let maskCG = try XCTUnwrap(maskImage.cgImage)
+        var rgba = [UInt8](repeating: 255, count: maskCG.width * maskCG.height * 4)
+        let checkCtx = CGContext(
+            data: &rgba,
+            width: maskCG.width,
+            height: maskCG.height,
+            bitsPerComponent: 8,
+            bytesPerRow: maskCG.width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )
+        checkCtx?.clear(CGRect(x: 0, y: 0, width: maskCG.width, height: maskCG.height))
+        checkCtx?.draw(maskCG, in: CGRect(x: 0, y: 0, width: maskCG.width, height: maskCG.height))
+        // Corner pixel (0,0) must stay transparent; center pixel must be pure black (0,0,0,255)
+        XCTAssertEqual(rgba[3], 0)
+        let midIndex = ((maskCG.height / 2) * maskCG.width + (maskCG.width / 2)) * 4
+        XCTAssertEqual(rgba[midIndex], 0)
+        XCTAssertEqual(rgba[midIndex + 1], 0)
+        XCTAssertEqual(rgba[midIndex + 2], 0)
+        XCTAssertEqual(rgba[midIndex + 3], 255)
+
+        // 6. Backup & restore verification with SHA-256
         let backup = try store.exportBackup(profileID: "gusta")
-        XCTAssertEqual(backup.recordCount, 2)
+        XCTAssertEqual(backup.recordCount, 3)
 
         let cleanRoot = FileManager.default.temporaryDirectory
             .appendingPathComponent("PokedexRestore-\(UUID().uuidString)", isDirectory: true)
@@ -168,10 +232,10 @@ final class PokedexUniversalTests: XCTestCase {
 
         let cleanStore = PokedexUniversalStore(registry: BrumExtensionRegistry(storageRoot: cleanRoot))
         let restored = try cleanStore.restoreBackup(profileID: "gusta", bundle: backup)
-        XCTAssertEqual(restored.totalRecords, 2)
+        XCTAssertEqual(restored.totalRecords, 3)
         XCTAssertEqual(restored.contentSha256, backup.contentSha256)
 
-        // 6. Verify full 809-species offline catalog (Gen 1..7 #001..#809) and fractional timestamp ordering
+        // 7. Verify full 809-species offline catalog (Gen 1..7 #001..#809) and fractional timestamp ordering
         let allView = try cleanStore.projectedView(profileID: "gusta", platform: "ios", scope: "all")
         XCTAssertEqual(allView.tabs.pokemon.count, 809)
         XCTAssertEqual(allView.tabs.pokemon.last?.formattedNumber, "809")

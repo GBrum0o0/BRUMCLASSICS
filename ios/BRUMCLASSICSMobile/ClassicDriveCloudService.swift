@@ -232,29 +232,100 @@ public enum ClassicDriveLinkParser {
     }
 
     public static func detectSystemHint(relativePath: String, filename: String) -> String {
-        let lower = (relativePath + "/" + filename).lowercased().replacingOccurrences(of: "\\", with: "/")
+        let combined = (relativePath.isEmpty ? "" : relativePath + "/") + filename
+        let parts = combined
+            .lowercased()
+            .replacingOccurrences(of: "\\", with: "/")
+            .split(separator: "/")
+            .dropLast()
+            .map(String.init)
         let ext = (filename as NSString).pathExtension.lowercased()
-        if lower.contains("ppsspp") || lower.contains("/psp/") || lower.hasPrefix("psp/") || lower.contains("/playstation portable/") || lower.contains("/sony psp/") || ext == "cso" { return "psp" }
-        if lower.contains("/nds/") || ext == "nds" { return "nds" }
-        if lower.contains("/3ds/") || ["3ds", "3dsx", "z3dsx", "cci", "zcci", "cxi", "zcxi"].contains(ext) { return "3ds" }
-        if lower.contains("/gba/") || ext == "gba" { return "gba" }
-        if lower.contains("/gbc/") || ext == "gbc" { return "gbc" }
-        if lower.contains("/gb/") || ext == "gb" { return "gb" }
-        if lower.contains("/snes/") || ext == "sfc" || ext == "smc" { return "snes" }
-        if lower.contains("/nes/") || ext == "nes" { return "nes" }
-        if lower.contains("/n64/") || ["z64", "n64", "v64"].contains(ext) { return "n64" }
-        if lower.contains("/ps1/") || lower.contains("/psx/") { return "ps1" }
-        if lower.contains("/gamecube/") || ["rvz", "gcz", "ciso", "gcm"].contains(ext) { return "gamecube" }
-        if lower.contains("/dreamcast/") || ext == "cdi" || ext == "gdi" { return "dreamcast" }
-        if lower.contains("/genesis/") || lower.contains("/megadrive/") || ["md", "gen", "smd"].contains(ext) { return "genesis" }
-        if lower.contains("/sms/") || ext == "sms" { return "sms" }
-        if lower.contains("/gg/") || ext == "gg" { return "gg" }
-        if lower.contains("/pce/") || ext == "pce" { return "pce" }
-        if lower.contains("/neogeo/") || ext == "neo" { return "neogeo" }
-        if lower.contains("/ws/") || ext == "ws" { return "ws" }
-        if lower.contains("/wsc/") || ext == "wsc" { return "wsc" }
-        if lower.contains("/atari2600/") || ext == "a26" { return "a2600" }
-        return ""
+
+        // Nearest recognized console folder wins (mirrors IntegratedEmulatorSupport).
+        for folder in parts.reversed() {
+            switch folder {
+            case "psp", "ppsspp", "playstation portable", "sony psp":
+                return "psp"
+            case "ps2", "playstation 2", "sony playstation 2":
+                return "ps2"
+            case "ps1", "psx", "playstation", "playstation 1", "sony playstation":
+                return "psx"
+            case "nds", "ds", "nintendo ds":
+                return "nds"
+            case "3ds", "n3ds", "nintendo 3ds":
+                return "3ds"
+            case "gba", "game boy advance", "gameboy advance":
+                return "gba"
+            case "gbc", "game boy color", "gameboy color":
+                return "gbc"
+            case "gb", "game boy", "gameboy":
+                return "gb"
+            case "snes", "sfc", "super nintendo", "super famicom":
+                return "sfc"
+            case "nes", "famicom", "nintendo", "nintendo entertainment system":
+                return "nes"
+            case "n64", "nintendo 64":
+                return "n64"
+            case "gamecube", "gc", "nintendo gamecube":
+                return "gamecube"
+            case "wii", "nintendo wii":
+                return "wii"
+            case "wiiu", "wii u", "nintendo wii u":
+                return "wiiu"
+            case "dreamcast", "sega dreamcast":
+                return "dreamcast"
+            case "saturn", "sega saturn":
+                return "saturn"
+            case "segacd", "sega cd", "megacd", "mega cd":
+                return "segacd"
+            case "32x", "sega 32x":
+                return "32x"
+            case "genesis", "megadrive", "mega drive", "sega genesis", "md":
+                return "md"
+            case "sms", "master system", "sega master system":
+                return "sms"
+            case "gg", "game gear", "sega game gear":
+                return "gg"
+            case "pce", "pc engine", "turbografx-16", "turbografx 16":
+                return "pce"
+            case "neogeo", "neo geo", "neo-geo":
+                return "neogeo"
+            case "ws", "wonderswan":
+                return "ws"
+            case "wsc", "wonderswan color":
+                return "wsc"
+            case "atari2600", "a2600", "atari 2600":
+                return "atari2600"
+            case "arcade", "mame", "fbneo":
+                return "arcade"
+            default:
+                continue
+            }
+        }
+
+        switch ext {
+        case "cso": return "psp"
+        case "nds": return "nds"
+        case "3ds", "3dsx", "z3dsx", "cci", "zcci", "cxi", "zcxi": return "3ds"
+        case "gba": return "gba"
+        case "gbc": return "gbc"
+        case "gb": return "gb"
+        case "sfc", "smc": return "sfc"
+        case "nes": return "nes"
+        case "z64", "n64", "v64": return "n64"
+        case "rvz", "gcz", "ciso", "gcm": return "gamecube"
+        case "cdi", "gdi": return "dreamcast"
+        case "md", "gen", "smd": return "md"
+        case "32x": return "32x"
+        case "sms": return "sms"
+        case "gg": return "gg"
+        case "pce": return "pce"
+        case "neo": return "neogeo"
+        case "ws": return "ws"
+        case "wsc": return "wsc"
+        case "a26": return "atari2600"
+        default: return ""
+        }
     }
 
     public static func directDownloadURL(fileID: String, resourceKey: String? = nil) -> URL {

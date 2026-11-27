@@ -16,7 +16,57 @@ struct PokedexSpeciesDefinition: Codable, Equatable, Identifiable {
     let name: String
     let genus: String
     let description: String
+    let types: [String]
+    let heightMeters: Double?
+    let weightKg: Double?
+    let abilities: [String]
     let spriteAsset: PokedexSpriteAsset
+
+    init(
+        nationalDexNumber: Int,
+        generation: Int,
+        slug: String,
+        name: String,
+        genus: String,
+        description: String,
+        types: [String] = [],
+        heightMeters: Double? = nil,
+        weightKg: Double? = nil,
+        abilities: [String] = [],
+        spriteAsset: PokedexSpriteAsset
+    ) {
+        self.nationalDexNumber = nationalDexNumber
+        self.generation = generation
+        self.slug = slug
+        self.name = name
+        self.genus = genus
+        self.description = description
+        self.types = types
+        self.heightMeters = heightMeters
+        self.weightKg = weightKg
+        self.abilities = abilities
+        self.spriteAsset = spriteAsset
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case nationalDexNumber, generation, slug, name, genus, description
+        case types, heightMeters, weightKg, abilities, spriteAsset
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        nationalDexNumber = try c.decode(Int.self, forKey: .nationalDexNumber)
+        generation = try c.decode(Int.self, forKey: .generation)
+        slug = try c.decode(String.self, forKey: .slug)
+        name = try c.decode(String.self, forKey: .name)
+        genus = try c.decode(String.self, forKey: .genus)
+        description = try c.decode(String.self, forKey: .description)
+        types = try c.decodeIfPresent([String].self, forKey: .types) ?? []
+        heightMeters = try c.decodeIfPresent(Double.self, forKey: .heightMeters)
+        weightKg = try c.decodeIfPresent(Double.self, forKey: .weightKg)
+        abilities = try c.decodeIfPresent([String].self, forKey: .abilities) ?? []
+        spriteAsset = try c.decode(PokedexSpriteAsset.self, forKey: .spriteAsset)
+    }
 
     var formattedNumber: String {
         String(format: "%03d", nationalDexNumber)
@@ -66,8 +116,74 @@ struct PokedexProjectedEntry: Codable, Equatable, Identifiable {
     let name: String
     let genus: String
     let description: String
+    let types: [String]
+    let heightMeters: Double?
+    let weightKg: Double?
+    let abilities: [String]
     let spriteAsset: PokedexSpriteAsset
     let capture: PokedexCaptureDetail?
+
+    init(
+        nationalDexNumber: Int,
+        formattedNumber: String,
+        generation: Int,
+        discovered: Bool,
+        silhouetteOnly: Bool,
+        category: String,
+        isShiny: Bool,
+        name: String,
+        genus: String,
+        description: String,
+        types: [String] = [],
+        heightMeters: Double? = nil,
+        weightKg: Double? = nil,
+        abilities: [String] = [],
+        spriteAsset: PokedexSpriteAsset,
+        capture: PokedexCaptureDetail?
+    ) {
+        self.nationalDexNumber = nationalDexNumber
+        self.formattedNumber = formattedNumber
+        self.generation = generation
+        self.discovered = discovered
+        self.silhouetteOnly = silhouetteOnly
+        self.category = category
+        self.isShiny = isShiny
+        self.name = name
+        self.genus = genus
+        self.description = description
+        self.types = types
+        self.heightMeters = heightMeters
+        self.weightKg = weightKg
+        self.abilities = abilities
+        self.spriteAsset = spriteAsset
+        self.capture = capture
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case nationalDexNumber, formattedNumber, generation, discovered, silhouetteOnly
+        case category, isShiny, name, genus, description
+        case types, heightMeters, weightKg, abilities, spriteAsset, capture
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        nationalDexNumber = try c.decode(Int.self, forKey: .nationalDexNumber)
+        formattedNumber = try c.decode(String.self, forKey: .formattedNumber)
+        generation = try c.decode(Int.self, forKey: .generation)
+        discovered = try c.decode(Bool.self, forKey: .discovered)
+        silhouetteOnly = try c.decode(Bool.self, forKey: .silhouetteOnly)
+        category = try c.decode(String.self, forKey: .category)
+        isShiny = try c.decode(Bool.self, forKey: .isShiny)
+        name = try c.decode(String.self, forKey: .name)
+        genus = try c.decode(String.self, forKey: .genus)
+        description = try c.decode(String.self, forKey: .description)
+        types = try c.decodeIfPresent([String].self, forKey: .types) ?? []
+        heightMeters = try c.decodeIfPresent(Double.self, forKey: .heightMeters)
+        weightKg = try c.decodeIfPresent(Double.self, forKey: .weightKg)
+        abilities = try c.decodeIfPresent([String].self, forKey: .abilities) ?? []
+        spriteAsset = try c.decode(PokedexSpriteAsset.self, forKey: .spriteAsset)
+        capture = try c.decodeIfPresent(PokedexCaptureDetail.self, forKey: .capture)
+    }
 }
 
 struct PokedexViewSummary: Codable, Equatable {
@@ -437,6 +553,10 @@ final class PokedexUniversalStore {
                         name: sp.name,
                         genus: sp.genus,
                         description: sp.description,
+                        types: sp.types,
+                        heightMeters: sp.heightMeters,
+                        weightKg: sp.weightKg,
+                        abilities: sp.abilities,
                         spriteAsset: PokedexSpriteAsset(
                             activeKey: sp.spriteAsset.normalKey,
                             normalKey: sp.spriteAsset.normalKey,
@@ -465,6 +585,10 @@ final class PokedexUniversalStore {
                         name: Self.unknownText,
                         genus: Self.unknownText,
                         description: Self.unknownText,
+                        types: [],
+                        heightMeters: nil,
+                        weightKg: nil,
+                        abilities: [],
                         spriteAsset: PokedexSpriteAsset(
                             activeKey: sp.spriteAsset.silhouetteKey,
                             normalKey: nil,
@@ -476,9 +600,12 @@ final class PokedexUniversalStore {
                 }
             }
 
-            if let shinyRec = byKey["\(sp.nationalDexNumber):shiny"] {
+            let shinyRec = byKey["\(sp.nationalDexNumber):shiny"]
+            if shinyRec != nil {
                 shinyDiscovered += 1
-                if requestedGen == nil || sp.generation == requestedGen {
+            }
+            if inScope {
+                if let shinyRec {
                     shiniesTab.append(PokedexProjectedEntry(
                         nationalDexNumber: sp.nationalDexNumber,
                         formattedNumber: sp.formattedNumber,
@@ -490,6 +617,10 @@ final class PokedexUniversalStore {
                         name: sp.name,
                         genus: sp.genus,
                         description: sp.description,
+                        types: sp.types,
+                        heightMeters: sp.heightMeters,
+                        weightKg: sp.weightKg,
+                        abilities: sp.abilities,
                         spriteAsset: PokedexSpriteAsset(
                             activeKey: sp.spriteAsset.shinyKey,
                             normalKey: nil,
@@ -505,6 +636,30 @@ final class PokedexUniversalStore {
                             captureLocation: shinyRec.captureLocation,
                             ownerProfileId: shinyRec.ownerProfileId
                         )
+                    ))
+                } else {
+                    shiniesTab.append(PokedexProjectedEntry(
+                        nationalDexNumber: sp.nationalDexNumber,
+                        formattedNumber: sp.formattedNumber,
+                        generation: sp.generation,
+                        discovered: false,
+                        silhouetteOnly: true,
+                        category: "shiny",
+                        isShiny: true,
+                        name: Self.unknownText,
+                        genus: Self.unknownText,
+                        description: Self.unknownText,
+                        types: [],
+                        heightMeters: nil,
+                        weightKg: nil,
+                        abilities: [],
+                        spriteAsset: PokedexSpriteAsset(
+                            activeKey: sp.spriteAsset.silhouetteKey,
+                            normalKey: nil,
+                            shinyKey: nil,
+                            silhouetteKey: sp.spriteAsset.silhouetteKey
+                        ),
+                        capture: nil
                     ))
                 }
             }

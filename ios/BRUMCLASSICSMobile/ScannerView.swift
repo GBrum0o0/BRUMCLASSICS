@@ -22,6 +22,7 @@ final class ScannerController: UIViewController, AVCaptureMetadataOutputObjectsD
     var onError: ((String) -> Void)?
     private let session = AVCaptureSession()
     private var preview: AVCaptureVideoPreviewLayer?
+    private var overlayFrameLayer: CAShapeLayer?
     private var completed = false
 
     override func viewDidLoad() {
@@ -38,11 +39,41 @@ final class ScannerController: UIViewController, AVCaptureMetadataOutputObjectsD
         guard session.canAddOutput(output) else { onError?("Leitor de QR Code indisponível."); return }
         session.addOutput(output); output.setMetadataObjectsDelegate(self, queue: .main); output.metadataObjectTypes = [.qr]
         let layer = AVCaptureVideoPreviewLayer(session: session); layer.videoGravity = .resizeAspectFill; view.layer.addSublayer(layer); preview = layer
-        let frame = CAShapeLayer(); frame.borderColor = UIColor(red: 0.616, green: 1, blue: 0.231, alpha: 1).cgColor; frame.borderWidth = 3; frame.cornerRadius = 18; frame.frame = CGRect(x: 48, y: 150, width: view.bounds.width - 96, height: view.bounds.width - 96); view.layer.addSublayer(frame)
+        let frame = CAShapeLayer()
+        frame.borderColor = UIColor(red: 0.616, green: 1, blue: 0.231, alpha: 1).cgColor
+        frame.borderWidth = 3
+        frame.cornerRadius = 18
+        view.layer.addSublayer(frame)
+        overlayFrameLayer = frame
+        layoutScannerLayers()
         DispatchQueue.global(qos: .userInitiated).async { self.session.startRunning() }
     }
 
-    override func viewDidLayoutSubviews() { super.viewDidLayoutSubviews(); preview?.frame = view.bounds }
+    private func layoutScannerLayers() {
+        let bounds = view.bounds
+        preview?.frame = bounds
+        if let connection = preview?.connection, connection.isVideoOrientationSupported {
+            let interfaceOrientation = view.window?.windowScene?.interfaceOrientation
+            switch interfaceOrientation {
+            case .landscapeLeft: connection.videoOrientation = .landscapeLeft
+            case .landscapeRight: connection.videoOrientation = .landscapeRight
+            case .portraitUpsideDown: connection.videoOrientation = .portraitUpsideDown
+            default: connection.videoOrientation = .portrait
+            }
+        }
+        let side = max(140, min(bounds.width, bounds.height) * 0.62)
+        overlayFrameLayer?.frame = CGRect(
+            x: (bounds.width - side) / 2,
+            y: (bounds.height - side) / 2,
+            width: side,
+            height: side
+        )
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        layoutScannerLayers()
+    }
     override func viewWillDisappear(_ animated: Bool) { super.viewWillDisappear(animated); if session.isRunning { session.stopRunning() } }
 
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {

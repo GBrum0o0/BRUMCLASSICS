@@ -201,4 +201,105 @@ final class MobileExperienceTests: XCTestCase {
         XCTAssertNil(MurbPairingPayload.parseUserInput("brumclassics://pair?host=192.168.1.5&code=123456"))
         XCTAssertNil(MurbPairingPayload.parseUserInput("murb://ds?ip=127.0.0.1&port=8089&token=AB34CD"))
     }
+
+    private func makeClassicGame(id: String, title: String, platform: String, lastPlayedAt: String = "") throws -> Game {
+        let json = """
+        {"id":"\(id)","title":"\(title)","description":"","category":"classic","platform":"\(platform)","store":"local","genre":"","collectionId":"","sizeBytes":0,"playtimeMinutes":42,"playtimeAvailable":true,"achievementsCollected":null,"achievementsTotal":null,"achievementsAvailable":false,"achievements":[],"storyCompleted":false,"favorite":false,"wantToPlay":false,"libraryStateRevision":0,"notes":{"whereStopped":"","objectives":"","tips":"","commands":"","revision":0,"updatedAt":""},"installed":true,"integrityStatus":"verified","lastPlayedAt":"\(lastPlayedAt)","artworkPath":""}
+        """.data(using: .utf8)!
+        return try JSONDecoder().decode(Game.self, from: json)
+    }
+
+    func testGamingModeCanonicalUnificationAllTenScenarios() throws {
+        // Check Drive root folder hint normalization (e.g. PS1/Resident Evil 2.chd)
+        XCTAssertEqual(ClassicDriveLinkParser.detectSystemHint(relativePath: "PS1/Resident Evil 2 (USA).chd", filename: "Resident Evil 2 (USA).chd"), "psx")
+        XCTAssertEqual(ClassicDriveLinkParser.detectSystemHint(relativePath: "N64/Resident Evil 2 (USA).z64", filename: "Resident Evil 2 (USA).z64"), "n64")
+
+        let pcOnly = try makeClassicGame(id: "pc-sotn", title: "Castlevania: Symphony of the Night", platform: "PlayStation 1")
+        let driveOnly = ClassicDriveGameItem(
+            id: "drv-ff7-1", name: "Final Fantasy VII (USA) (Disc 1).chd", title: "Final Fantasy VII",
+            relativePath: "PS1/Final Fantasy VII (USA) (Disc 1).chd", folderID: "f-ps1", parentRelativePath: "PS1",
+            systemHint: "psx", downloadURL: "https://drive.google.com/uc?id=drv-ff7-1&export=download"
+        )
+        let driveOnlyDisc2 = ClassicDriveGameItem(
+            id: "drv-ff7-2", name: "Final Fantasy VII (USA) (Disc 2).chd", title: "Final Fantasy VII",
+            relativePath: "PS1/Final Fantasy VII (USA) (Disc 2).chd", folderID: "f-ps1", parentRelativePath: "PS1",
+            systemHint: "ps1", downloadURL: "https://drive.google.com/uc?id=drv-ff7-2&export=download"
+        )
+        let localOnly = ROMFolderGame(
+            relativePath: "GBA/Metroid Fusion (USA).gba", filename: "Metroid Fusion (USA).gba",
+            title: "Metroid Fusion", fileSize: 8_388_608, detectedSystem: .gameBoyAdvance
+        )
+
+        // Scenario 4: Same game on PC + Google Drive (Resident Evil 2 — PS1 multi-disc) -> 1 unified entry
+        let pcRE2PS1 = try makeClassicGame(id: "pc-re2-ps1", title: "Resident Evil 2 [SLUS-00748]", platform: "PlayStation")
+        let driveRE2D1 = ClassicDriveGameItem(
+            id: "drv-re2-d1", name: "Resident Evil 2 (USA) (Disc 1) [SLUS-00748].chd", title: "Resident Evil 2",
+            relativePath: "PS1/Resident Evil 2 (USA) (Disc 1) [SLUS-00748].chd", folderID: "f-ps1", parentRelativePath: "PS1",
+            systemHint: "psx", downloadURL: "https://drive.google.com/uc?id=drv-re2-d1&export=download"
+        )
+        let driveRE2D2 = ClassicDriveGameItem(
+            id: "drv-re2-d2", name: "Resident Evil 2 (USA) (Disc 2) [SLUS-00756].chd", title: "Resident Evil 2",
+            relativePath: "PS1/Resident Evil 2 (USA) (Disc 2) [SLUS-00756].chd", folderID: "f-ps1", parentRelativePath: "PS1",
+            systemHint: "psx", downloadURL: "https://drive.google.com/uc?id=drv-re2-d2&export=download"
+        )
+
+        // Scenario 10: Same title on different console (Resident Evil 2 — Nintendo 64) -> separate entry!
+        let pcRE2N64 = try makeClassicGame(id: "pc-re2-n64", title: "Resident Evil 2", platform: "Nintendo 64")
+
+        // Scenario 5: Same game in all 3 sources (Local + PC + Drive) -> 1 local entry
+        let localSMW = ROMFolderGame(relativePath: "SNES/Super Mario World (USA).sfc", filename: "Super Mario World (USA).sfc", title: "Super Mario World", fileSize: 524_288, detectedSystem: .superNintendo)
+        let pcSMW = try makeClassicGame(id: "pc-smw", title: "Super Mario World (Rev 1)", platform: "Super Nintendo")
+        let driveSMW = ClassicDriveGameItem(
+            id: "drv-smw", name: "Super Mario World (Europe) (Rev A).sfc", title: "Super Mario World",
+            relativePath: "SNES/Super Mario World (Europe) (Rev A).sfc", folderID: "f-snes", parentRelativePath: "SNES",
+            systemHint: "sfc", downloadURL: "https://drive.google.com/uc?id=drv-smw&export=download"
+        )
+
+        let snapBeforeDownload = GamingModeCatalog.buildSnapshot(
+            local: [localOnly, localSMW],
+            records: [],
+            computer: [pcOnly, pcRE2PS1, pcRE2N64, pcSMW],
+            cloud: [driveOnly, driveOnlyDisc2, driveRE2D1, driveRE2D2, driveSMW],
+            favorites: ["canon:psx|residentevil2"]
+        )
+
+        // Expected 6 unique entries: Castlevania SOTN (PC), FF7 (Cloud multi-disc), Metroid Fusion (Local), RE2 N64 (PC), RE2 PS1 (PC+Drive), SMW (Local+PC+Drive)
+        XCTAssertEqual(snapBeforeDownload.library.count, 6)
+        XCTAssertTrue(snapBeforeDownload.library.contains { $0.id == "pc:pc-sotn" })
+        XCTAssertTrue(snapBeforeDownload.library.contains { $0.id == "drive:drv-ff7-1" })
+        XCTAssertFalse(snapBeforeDownload.library.contains { $0.id == "drive:drv-ff7-2" })
+        XCTAssertEqual(snapBeforeDownload.sourcesByEntryID["drive:drv-ff7-1"]?.isMultiDisc, true)
+        XCTAssertEqual(snapBeforeDownload.sourcesByEntryID["pc:pc-re2-ps1"]?.hasCloud, true)
+        XCTAssertEqual(snapBeforeDownload.sourcesByEntryID["pc:pc-re2-ps1"]?.driveItems.count, 2)
+        XCTAssertTrue(snapBeforeDownload.library.contains { $0.id == "pc:pc-re2-n64" })
+        XCTAssertEqual(snapBeforeDownload.sourcesByEntryID["local:\(localSMW.id)"]?.hasComputer, true)
+        XCTAssertEqual(snapBeforeDownload.sourcesByEntryID["local:\(localSMW.id)"]?.hasCloud, true)
+        XCTAssertTrue(snapBeforeDownload.recent.contains { $0.id == "pc:pc-re2-ps1" })
+
+        // Scenarios 6 & 9: Download RE2 Disc 1 & Disc 2 locally -> stays 6 entries, upgrades RE2 PS1 to .local, keeps favorite pinned!
+        let localRE2D1 = ROMFolderGame(relativePath: "PS1/Resident Evil 2 (USA) (Disc 1) [SLUS-00748].chd", filename: "Resident Evil 2 (USA) (Disc 1) [SLUS-00748].chd", title: "Resident Evil 2", fileSize: 400_000_000, detectedSystem: .playStation)
+        let localRE2D2 = ROMFolderGame(relativePath: "PS1/Resident Evil 2 (USA) (Disc 2) [SLUS-00756].chd", filename: "Resident Evil 2 (USA) (Disc 2) [SLUS-00756].chd", title: "Resident Evil 2", fileSize: 420_000_000, detectedSystem: .playStation)
+        let snapAfterDownload = GamingModeCatalog.buildSnapshot(
+            local: [localOnly, localSMW, localRE2D1, localRE2D2],
+            records: [],
+            computer: [pcOnly, pcRE2PS1, pcRE2N64, pcSMW],
+            cloud: [driveOnly, driveOnlyDisc2, driveRE2D1, driveRE2D2, driveSMW],
+            favorites: ["canon:psx|residentevil2"]
+        )
+        XCTAssertEqual(snapAfterDownload.library.count, 6)
+        XCTAssertTrue(snapAfterDownload.library.contains { $0.id == "local:\(localRE2D1.id)" })
+        XCTAssertFalse(snapAfterDownload.library.contains { $0.id == "local:\(localRE2D2.id)" })
+        XCTAssertFalse(snapAfterDownload.library.contains { $0.id == "pc:pc-re2-ps1" })
+        XCTAssertEqual(snapAfterDownload.sourcesByEntryID["local:\(localRE2D1.id)"]?.localROMs.count, 2)
+        XCTAssertEqual(snapAfterDownload.sourcesByEntryID["local:\(localRE2D1.id)"]?.isMultiDisc, true)
+        XCTAssertEqual(snapAfterDownload.sourcesByEntryID["local:\(localRE2D1.id)"]?.computerGame?.id, "pc-re2-ps1")
+        XCTAssertTrue(snapAfterDownload.recent.contains { $0.id == "local:\(localRE2D1.id)" })
+
+        // Scenarios 7 & 8: Delete local copies of FF7/RE2 while keeping Drive copies -> no duplication, cloud copy restored cleanly
+        let downloadedFF7 = ROMFolderGame(relativePath: "__drive__/psx/Final Fantasy VII (USA) (Disc 1).chd", filename: "Final Fantasy VII (USA) (Disc 1).chd", title: "Final Fantasy VII", fileSize: 500_000_000, detectedSystem: .playStation)
+        let snapFF7Local = GamingModeCatalog.buildSnapshot(local: [downloadedFF7], records: [], computer: [], cloud: [driveOnly, driveOnlyDisc2])
+        XCTAssertEqual(snapFF7Local.library.map(\.id), ["local:\(downloadedFF7.id)"])
+        let snapFF7DeletedLocal = GamingModeCatalog.buildSnapshot(local: [], records: [], computer: [], cloud: [driveOnly, driveOnlyDisc2])
+        XCTAssertEqual(snapFF7DeletedLocal.library.map(\.id), ["drive:drv-ff7-1"])
+    }
 }

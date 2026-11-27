@@ -1,11 +1,11 @@
 {
-  "version": "0.34.0",
-  "build": 67,
+  "version": "0.35.0",
+  "build": 68,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.34.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.35.0",
   "notes": [
-    "Exibe jogos disponíveis apenas no Google Drive diretamente na biblioteca do Gaming Mode com ícone para download direto e abertura imediata após baixar.",
-    "Mostra botão e ícone de download do Drive também nos detalhes e cartões de jogos sincronizados com o PC.",
-    "Mantém sincronização automática entre configurações do Google Drive e Gaming Mode preservando saves e biblioteca."
+    "Reformula completamente a Pokédex Kanto G1 em carcaça física 3D articulada (fechada na aba Extensões e aberta horizontalmente), com silhuetas pretas puras e coleção Normal/Shiny independente.",
+    "Simplifica o MyBrumControl no Gaming Mode para um ícone direto de leitor QR Code ao lado das configurações.",
+    "Elimina jogos duplicados entre celular, computador e Google Drive por identificação canônica por console, serial e multidisco."
   ]
 }

@@ -10,7 +10,7 @@ struct GamingModeView: View {
     @State private var selectedROM: ROMFolderGame?
     @State private var selectedDriveItem: ClassicDriveGameItem?
     @State private var quickRemoteTarget: MurbRemoteLaunchTarget?
-    private enum GamingSection: String { case recent, library, extensions, myBrumControl }
+    private enum GamingSection: String { case recent, library, extensions }
     @State private var activeSection: GamingSection = .recent
     @AppStorage("gaming-mode-favorites-v1") private var favoritesJSON = "[]"
 
@@ -26,6 +26,14 @@ struct GamingModeView: View {
         guard let data = favoritesJSON.data(using: .utf8),
               let ids = try? JSONDecoder().decode([String].self, from: data) else { return [] }
         return Set(ids)
+    }
+    private func isFavorite(_ entry: GamingCatalogEntry) -> Bool {
+        if favoriteIDs.contains(entry.id) { return true }
+        if let cid = catalogSnapshot.canonicalIDByEntryID[entry.id],
+           favoriteIDs.contains("canon:\(cid)") || favoriteIDs.contains(cid) {
+            return true
+        }
+        return false
     }
     private var catalogFingerprint: String {
         let romPart = pocket.romFolderGames.map { "\($0.id)" }.joined(separator: ",")
@@ -90,8 +98,6 @@ struct GamingModeView: View {
                             .accessibilityIdentifier("gaming-mode-library")
                         libraryTab("EXTENSÕES", selected: activeSection == .extensions) { activeSection = .extensions }
                             .accessibilityIdentifier("gaming-mode-extensions")
-                        libraryTab("MYbrumCONTROL", selected: activeSection == .myBrumControl) { activeSection = .myBrumControl }
-                            .accessibilityIdentifier("gaming-mode-mybrumcontrol")
                     }
                     if let activeRemote = store.activeRemoteGamepadSession {
                         BrumCard {
@@ -116,8 +122,6 @@ struct GamingModeView: View {
                     }
                     if activeSection == .extensions {
                         PokedexGamingExtensionView()
-                    } else if activeSection == .myBrumControl {
-                        MyBrumControlView()
                     } else if activeBaseEntries.isEmpty {
                         BrumCard {
                             VStack(alignment: .leading, spacing: 8) {
@@ -196,10 +200,15 @@ struct GamingModeView: View {
         }
         .fullScreenCover(item: $selectedGame) { game in
             GamingGameView(game: game, driveItem: catalogSnapshot.matchedDriveByPCID[game.id])
+                .environment(\.gamingCatalogSnapshot, catalogSnapshot)
         }
-        .fullScreenCover(item: $selectedROM) { GamingROMDetailView(rom: $0) }
+        .fullScreenCover(item: $selectedROM) {
+            GamingROMDetailView(rom: $0)
+                .environment(\.gamingCatalogSnapshot, catalogSnapshot)
+        }
         .fullScreenCover(item: $selectedDriveItem) { item in
             GamingDriveDetailView(item: item, matchedPC: catalogSnapshot.matchedPCByDriveID[item.id])
+                .environment(\.gamingCatalogSnapshot, catalogSnapshot)
         }
         .fullScreenCover(item: $quickRemoteTarget) { target in
             MurbRemoteGamepadView(target: target.payload, gameTitle: target.gameTitle, playerNumber: target.playerNumber, p2Payload: target.p2Payload)
@@ -377,6 +386,7 @@ struct GamingModeView: View {
     }
 
     @ViewBuilder private func entryTile(_ entry: GamingCatalogEntry) -> some View {
+        let fav = isFavorite(entry)
         ZStack(alignment: .topTrailing) {
             switch entry {
             case .local(let rom, _):
@@ -415,19 +425,30 @@ struct GamingModeView: View {
                     onDownload: { startOrCancelDriveDownload(item) }
                 )
             }
-            Button { toggleFavorite(entry.id) } label: {
-                Image(systemName: favoriteIDs.contains(entry.id) ? "star.fill" : "star")
+            Button { toggleFavorite(entry) } label: {
+                Image(systemName: fav ? "star.fill" : "star")
                     .font(.headline).foregroundStyle(BrumTheme.primary)
                     .padding(9).background(BrumTheme.surface).clipShape(Circle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(favoriteIDs.contains(entry.id) ? "Remover \(entry.title) dos favoritos" : "Favoritar \(entry.title)")
+            .accessibilityLabel(fav ? "Remover \(entry.title) dos favoritos" : "Favoritar \(entry.title)")
         }
     }
 
-    private func toggleFavorite(_ id: String) {
+    private func toggleFavorite(_ entry: GamingCatalogEntry) {
         var next = favoriteIDs
-        if !next.insert(id).inserted { next.remove(id) }
+        let canonicalKey = catalogSnapshot.canonicalIDByEntryID[entry.id].map { "canon:\($0)" }
+        let currentlyFavorite = isFavorite(entry)
+        if currentlyFavorite {
+            next.remove(entry.id)
+            if let canonicalKey { next.remove(canonicalKey) }
+            if let cid = catalogSnapshot.canonicalIDByEntryID[entry.id] { next.remove(cid) }
+            if let sources = catalogSnapshot.sourcesByEntryID[entry.id] {
+                for id in sources.allEntryIDs { next.remove(id) }
+            }
+        } else {
+            next.insert(canonicalKey ?? entry.id)
+        }
         guard let data = try? JSONEncoder().encode(next.sorted()), let text = String(data: data, encoding: .utf8) else { return }
         favoritesJSON = text
     }
@@ -461,12 +482,100 @@ enum GamingCatalogEntry: Identifiable {
     }
 }
 
+enum GamingSourceKind: String, Equatable, Hashable, Sendable {
+    case local
+    case computer
+    case cloud
+}
+
+struct GamingGameVariant: Equatable, Hashable, Identifiable, Sendable {
+    let id: String
+    let source: GamingSourceKind
+    let filename: String
+    let label: String
+    let discNumber: Int?
+    let region: String?
+    let revision: String?
+    let serial: String?
+    let romHash: String?
+}
+
+struct GamingGameDescriptor: Equatable, Sendable {
+    let consoleKey: String
+    let canonicalTitle: String
+    let serial: String?
+    let discNumber: Int?
+    let region: String?
+    let revision: String?
+    let romHash: String?
+
+    var canonicalID: String {
+        let consolePart = consoleKey.isEmpty ? "unidentified" : consoleKey
+        return "\(consolePart)|\(canonicalTitle)"
+    }
+}
+
+struct GamingUnifiedSources: Equatable {
+    let canonicalID: String
+    let consoleKey: String
+    let localROMs: [ROMFolderGame]
+    let computerGame: Game?
+    let driveItems: [ClassicDriveGameItem]
+    let variants: [GamingGameVariant]
+
+    var primaryROM: ROMFolderGame? { localROMs.first }
+    var primaryDriveItem: ClassicDriveGameItem? { driveItems.first }
+    var hasLocal: Bool { !localROMs.isEmpty }
+    var hasComputer: Bool { computerGame != nil }
+    var hasCloud: Bool { !driveItems.isEmpty }
+    var isMultiDisc: Bool {
+        let distinctDiscs = Set(variants.compactMap(\.discNumber))
+        return distinctDiscs.count > 1 || localROMs.count > 1 || driveItems.count > 1
+    }
+    var allEntryIDs: [String] {
+        var ids: [String] = []
+        ids.append(contentsOf: localROMs.map { "local:\($0.id)" })
+        if let pc = computerGame { ids.append("pc:\(pc.id)") }
+        ids.append(contentsOf: driveItems.map { "drive:\($0.id)" })
+        return ids
+    }
+}
+
 struct GamingCatalogSnapshot {
     let library: [GamingCatalogEntry]
     let recent: [GamingCatalogEntry]
     let matchedByROMID: [ROMFolderGame.ID: Game]
     let matchedDriveByPCID: [Game.ID: ClassicDriveGameItem]
     let matchedPCByDriveID: [String: Game]
+    let sourcesByEntryID: [String: GamingUnifiedSources]
+    let canonicalIDByEntryID: [String: String]
+    let allDriveItemsByPCID: [Game.ID: [ClassicDriveGameItem]]
+    let allDriveItemsByROMID: [ROMFolderGame.ID: [ClassicDriveGameItem]]
+    let allLocalROMsByROMID: [ROMFolderGame.ID: [ROMFolderGame]]
+
+    init(
+        library: [GamingCatalogEntry],
+        recent: [GamingCatalogEntry],
+        matchedByROMID: [ROMFolderGame.ID: Game],
+        matchedDriveByPCID: [Game.ID: ClassicDriveGameItem],
+        matchedPCByDriveID: [String: Game],
+        sourcesByEntryID: [String: GamingUnifiedSources] = [:],
+        canonicalIDByEntryID: [String: String] = [:],
+        allDriveItemsByPCID: [Game.ID: [ClassicDriveGameItem]] = [:],
+        allDriveItemsByROMID: [ROMFolderGame.ID: [ClassicDriveGameItem]] = [:],
+        allLocalROMsByROMID: [ROMFolderGame.ID: [ROMFolderGame]] = [:]
+    ) {
+        self.library = library
+        self.recent = recent
+        self.matchedByROMID = matchedByROMID
+        self.matchedDriveByPCID = matchedDriveByPCID
+        self.matchedPCByDriveID = matchedPCByDriveID
+        self.sourcesByEntryID = sourcesByEntryID
+        self.canonicalIDByEntryID = canonicalIDByEntryID
+        self.allDriveItemsByPCID = allDriveItemsByPCID
+        self.allDriveItemsByROMID = allDriveItemsByROMID
+        self.allLocalROMsByROMID = allLocalROMsByROMID
+    }
 
     static let empty = GamingCatalogSnapshot(
         library: [],
@@ -475,6 +584,17 @@ struct GamingCatalogSnapshot {
         matchedDriveByPCID: [:],
         matchedPCByDriveID: [:]
     )
+}
+
+private struct GamingCatalogSnapshotKey: EnvironmentKey {
+    static let defaultValue = GamingCatalogSnapshot.empty
+}
+
+extension EnvironmentValues {
+    var gamingCatalogSnapshot: GamingCatalogSnapshot {
+        get { self[GamingCatalogSnapshotKey.self] }
+        set { self[GamingCatalogSnapshotKey.self] = newValue }
+    }
 }
 
 enum GamingModePresentation {
@@ -493,6 +613,10 @@ enum GamingModeCatalog {
         "xbox app", "xbox", "xbox one", "xbox series", "xbox series x",
         "xbox series s", "ps4", "ps5", "playstation 4", "playstation 5",
         "switch", "nintendo switch"
+    ]
+
+    private static let genericPlatformTokens: Set<String> = [
+        "", "unknown", "unidentified", "classic", "retro", "auto", "other", "outros"
     ]
 
     static func isNonClassicPlatform(_ platform: String) -> Bool {
@@ -537,24 +661,24 @@ enum GamingModeCatalog {
     static func normalizedPlatform(_ value: String) -> String {
         let lower = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         switch lower {
-        case "gb", "game boy": return "gb"
-        case "gbc", "game boy color": return "gbc"
-        case "gba", "game boy advance": return "gba"
+        case "gb", "game boy", "gameboy": return "gb"
+        case "gbc", "game boy color", "gameboy color": return "gbc"
+        case "gba", "game boy advance", "gameboy advance": return "gba"
         case "ds", "nds", "nintendo ds": return "nds"
         case "3ds", "n3ds", "nintendo 3ds": return "3ds"
         case "nes", "nintendo", "famicom", "nintendo entertainment system": return "nes"
-        case "sfc", "snes", "super nintendo", "super famicom": return "sfc"
+        case "sfc", "snes", "super nintendo", "super famicom", "super nintendo entertainment system": return "sfc"
         case "n64", "nintendo 64": return "n64"
         case "gc", "gamecube", "nintendo gamecube": return "gamecube"
         case "wii", "nintendo wii": return "wii"
         case "wiiu", "wii u", "nintendo wii u": return "wiiu"
-        case "psx", "ps1", "playstation", "playstation 1": return "psx"
-        case "ps2", "playstation 2": return "ps2"
-        case "psp", "playstation portable": return "psp"
-        case "md", "genesis", "mega drive", "sega genesis": return "md"
+        case "psx", "ps1", "playstation", "playstation 1", "sony playstation": return "psx"
+        case "ps2", "playstation 2", "sony playstation 2": return "ps2"
+        case "psp", "ppsspp", "playstation portable", "sony psp": return "psp"
+        case "md", "genesis", "mega drive", "megadrive", "sega genesis", "sega mega drive": return "md"
         case "sms", "master system", "sega master system": return "sms"
-        case "gg", "game gear": return "gg"
-        case "segacd", "sega cd", "mega cd": return "segacd"
+        case "gg", "game gear", "sega game gear": return "gg"
+        case "segacd", "sega cd", "mega cd", "megacd": return "segacd"
         case "32x", "sega 32x": return "32x"
         case "saturn", "sega saturn": return "saturn"
         case "dreamcast", "sega dreamcast": return "dreamcast"
@@ -577,6 +701,133 @@ enum GamingModeCatalog {
         return false
     }
 
+    private static let serialRegex = try? NSRegularExpression(
+        pattern: #"\b(SLUS|SCUS|SLES|SCES|SLPS|SLPM|SCPS|ULUS|ULES|UCUS|NPJH|NPUH|NPUG|NTR|TWL|CTR|AGB|CGB|DMG)[-_ ]?([A-Z0-9]{4,5})\b"#,
+        options: [.caseInsensitive]
+    )
+    private static let discRegex = try? NSRegularExpression(
+        pattern: #"(?:^|[\s(\[_-])(?:disc|disk|cd|gd)[-_.\s]*([1-9])(?:\b|[\s)\]_.-]|$)"#,
+        options: [.caseInsensitive]
+    )
+    private static let sideRegex = try? NSRegularExpression(
+        pattern: #"(?:^|[\s(\[_-])side[-_.\s]*([ab])(?:\b|[\s)\]_.-]|$)"#,
+        options: [.caseInsensitive]
+    )
+    private static let bracketRegex = try? NSRegularExpression(
+        pattern: #"\(([^)]+)\)|\[([^\]]+)\]"#
+    )
+
+    static func describe(
+        title: String,
+        filename: String = "",
+        relativePath: String = "",
+        platform: String = "",
+        romHash: String? = nil
+    ) -> GamingGameDescriptor {
+        var resolvedConsole = normalizedPlatform(platform)
+        if genericPlatformTokens.contains(resolvedConsole) {
+            let hinted = ClassicDriveLinkParser.detectSystemHint(relativePath: relativePath, filename: filename)
+            let normalizedHint = normalizedPlatform(hinted)
+            resolvedConsole = genericPlatformTokens.contains(normalizedHint) ? "" : normalizedHint
+        }
+
+        let inspectionText = [title, filename, relativePath].filter { !$0.isEmpty }.joined(separator: " ")
+        var serial: String? = nil
+        if let serialRegex {
+            let ns = inspectionText as NSString
+            if let match = serialRegex.firstMatch(in: inspectionText, range: NSRange(location: 0, length: ns.length)),
+               match.numberOfRanges >= 3 {
+                let p = ns.substring(with: match.range(at: 1)).uppercased()
+                let code = ns.substring(with: match.range(at: 2)).uppercased()
+                serial = p + code
+            }
+        }
+
+        let nameSurface = [filename, title].filter { !$0.isEmpty }.joined(separator: " ")
+        var discNumber: Int? = nil
+        if let discRegex {
+            let ns = nameSurface as NSString
+            if let match = discRegex.firstMatch(in: nameSurface, range: NSRange(location: 0, length: ns.length)),
+               match.numberOfRanges >= 2,
+               let num = Int(ns.substring(with: match.range(at: 1))) {
+                discNumber = num
+            }
+        }
+        if discNumber == nil, let sideRegex {
+            let ns = nameSurface as NSString
+            if let match = sideRegex.firstMatch(in: nameSurface, range: NSRange(location: 0, length: ns.length)),
+               match.numberOfRanges >= 2 {
+                let side = ns.substring(with: match.range(at: 1)).uppercased()
+                discNumber = side == "A" ? 1 : (side == "B" ? 2 : nil)
+            }
+        }
+
+        var region: String? = nil
+        var revision: String? = nil
+        if let bracketRegex {
+            let ns = nameSurface as NSString
+            for match in bracketRegex.matches(in: nameSurface, range: NSRange(location: 0, length: ns.length)) {
+                let tokenRange = match.range(at: 1).location != NSNotFound ? match.range(at: 1) : match.range(at: 2)
+                guard tokenRange.location != NSNotFound else { continue }
+                let rawTag = ns.substring(with: tokenRange).trimmingCharacters(in: .whitespacesAndNewlines)
+                let lower = rawTag.lowercased()
+                if lower.hasPrefix("disc ") || lower.hasPrefix("disk ") || lower.hasPrefix("cd ") || lower.hasPrefix("side ") {
+                    continue
+                }
+                if region == nil {
+                    switch lower {
+                    case "u", "usa": region = "USA"
+                    case "e", "eur", "europe": region = "Europe"
+                    case "j", "jpn", "japan": region = "Japan"
+                    case "world": region = "World"
+                    case "br", "brazil", "pt-br": region = "Brazil"
+                    default:
+                        if lower.contains("usa") || lower.contains("europe") || lower.contains("japan") || lower.contains("brazil") {
+                            region = rawTag
+                        }
+                    }
+                }
+                if revision == nil,
+                   lower.range(of: #"^(?:rev(?:\s+|ision\s*)?[a-z0-9]+|v\d+(?:\.\d+)*|dualshock\s+ver\.?|alt(?:\s*\d*)?|beta.*|proto.*)$"#, options: .regularExpression) != nil {
+                    revision = rawTag
+                }
+            }
+        }
+
+        let rawTitle = !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? title
+            : filename
+        var cleaned = rawTitle
+            .replacingOccurrences(of: #"\.[a-z0-9]{2,5}$"#, with: "", options: [.regularExpression, .caseInsensitive])
+            .replacingOccurrences(of: #"^\s*\d{1,6}\s*(?:[-_.:]\s*)+"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"\[[^\]]*\]|\([^)]*\)"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"\b(?:SLUS|SCUS|SLES|SCES|SLPS|SLPM|SCPS|ULUS|ULES|UCUS|NPJH|NPUH|NPUG|NTR|TWL|CTR|AGB|CGB|DMG)[-_ ]?[A-Z0-9]{4,5}\b"#, with: " ", options: [.regularExpression, .caseInsensitive])
+            .replacingOccurrences(of: #"\s*(?:[-–:|]\s*)?\b(?:disc|disk|cd|gd)[-_.\s]*[1-9]\b"#, with: " ", options: [.regularExpression, .caseInsensitive])
+            .replacingOccurrences(of: #"\s*(?:[-–:|]\s*)?\bside[-_.\s]*[ab]\b"#, with: " ", options: [.regularExpression, .caseInsensitive])
+            .replacingOccurrences(of: #"\bdualshock\s+ver(?:sion|\.)?\b"#, with: " ", options: [.regularExpression, .caseInsensitive])
+            .replacingOccurrences(of: #"\b(?:rev(?:ision)?\s*[a-z0-9]+|v\d+(?:\.\d+)+)\b"#, with: " ", options: [.regularExpression, .caseInsensitive])
+            .replacingOccurrences(of: #"(?:\s*-\s*|\s+)version\s*$"#, with: "", options: [.regularExpression, .caseInsensitive])
+            .replacingOccurrences(of: #"([a-zà-öø-ÿ])([A-Z])"#, with: "$1 $2", options: .regularExpression)
+            .replacingOccurrences(of: "_", with: " ")
+        cleaned = RetroArchLibraryRules.normalizedTitle(cleaned)
+        if cleaned.isEmpty {
+            cleaned = RetroArchLibraryRules.normalizedTitle(
+                filename.replacingOccurrences(of: #"\.[a-z0-9]{2,5}$"#, with: "", options: [.regularExpression, .caseInsensitive])
+            )
+        }
+
+        let cleanHash = romHash?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return GamingGameDescriptor(
+            consoleKey: resolvedConsole,
+            canonicalTitle: cleaned,
+            serial: serial,
+            discNumber: discNumber,
+            region: region,
+            revision: revision,
+            romHash: (cleanHash?.isEmpty == false) ? cleanHash : nil
+        )
+    }
+
     private static let dateLock = NSLock()
     private static let isoFractionalFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
@@ -591,54 +842,81 @@ enum GamingModeCatalog {
             return exact
         }
         let system = IntegratedEmulatorSupport.system(for: rom)
-        let titleKey = normalizedKey(rom.title)
-        let fileKey = normalizedKey(rom.filename)
+        let titleDesc = describe(title: rom.title, filename: rom.filename, relativePath: rom.relativePath, platform: system?.rawValue ?? "")
+        let fileKey = describe(title: rom.filename, filename: rom.filename, relativePath: rom.relativePath, platform: system?.rawValue ?? "").canonicalTitle
         let candidates = computer.filter { game in
             guard isEligibleClassicCategory(game) else { return false }
-            let gKey = normalizedKey(game.title)
-            guard !gKey.isEmpty else { return false }
-            return gKey == titleKey || (!fileKey.isEmpty && gKey == fileKey)
+            let gDesc = describe(title: game.title, filename: "", relativePath: "", platform: game.platform)
+            guard !gDesc.canonicalTitle.isEmpty else { return false }
+            return gDesc.canonicalTitle == titleDesc.canonicalTitle || (!fileKey.isEmpty && gDesc.canonicalTitle == fileKey)
         }
         if candidates.isEmpty { return nil }
         let platformFiltered = candidates.filter { platformMatches(system, pcPlatform: $0.platform) }
-        let pool = platformFiltered.isEmpty ? candidates : platformFiltered
-        if let installedMatch = pool.first(where: \.installed) { return installedMatch }
-        return pool.first
+        if !platformFiltered.isEmpty {
+            return platformFiltered.first(where: \.installed) ?? platformFiltered.first
+        }
+        if system != nil {
+            let genericOnly = candidates.filter { genericPlatformTokens.contains(normalizedPlatform($0.platform)) }
+            return genericOnly.first(where: \.installed) ?? genericOnly.first
+        }
+        return candidates.first(where: \.installed) ?? candidates.first
     }
 
-    private static func matchedComputerGame(
-        for rom: ROMFolderGame,
-        system: EmulatedSystemID?,
-        record: PocketClassic?,
-        computerByID: [String: Game],
-        computerByTitleKey: [String: [Game]]
-    ) -> Game? {
-        if let linkedID = record?.launcherGameID, !linkedID.isEmpty,
-           let exact = computerByID[linkedID], isEligibleClassicCategory(exact) {
-            return exact
+    private final class MutableUnifiedGroup {
+        var consoleKey: String
+        var canonicalTitle: String
+        var serials: Set<String> = []
+        var romHashes: Set<String> = []
+        var explicitPCIDs: Set<String> = []
+        var localROMs: [ROMFolderGame] = []
+        var localFilenamesLower: Set<String> = []
+        var dates: [Date] = []
+        var computerGames: [Game] = []
+        var computerGameIDs: Set<String> = []
+        var driveItems: [ClassicDriveGameItem] = []
+        var driveItemIDs: Set<String> = []
+        var variants: [GamingGameVariant] = []
+
+        init(consoleKey: String, canonicalTitle: String) {
+            self.consoleKey = consoleKey
+            self.canonicalTitle = canonicalTitle
         }
-        let titleKey = normalizedKey(rom.title)
-        let fileKey = normalizedKey(rom.filename)
-        var candidates: [Game] = []
-        var seenIDs = Set<String>()
-        func appendCandidates(for key: String) {
-            guard !key.isEmpty, let bucket = computerByTitleKey[key] else { return }
-            for game in bucket {
-                guard isEligibleClassicCategory(game) else { continue }
-                if seenIDs.insert(game.id).inserted {
-                    candidates.append(game)
-                }
+
+        var canonicalID: String {
+            let c = consoleKey.isEmpty ? "unidentified" : consoleKey
+            return "\(c)|\(canonicalTitle)"
+        }
+
+        func consolesCompatible(with otherConsole: String) -> Bool {
+            consoleKey.isEmpty || otherConsole.isEmpty || consoleKey == otherConsole
+        }
+    }
+
+    private static func variantLabel(for descriptor: GamingGameDescriptor, fallbackName: String, source: GamingSourceKind) -> String {
+        var parts: [String] = []
+        if let disc = descriptor.discNumber { parts.append("Disco \(disc)") }
+        if let region = descriptor.region { parts.append(region) }
+        if let revision = descriptor.revision { parts.append(revision) }
+        if let serial = descriptor.serial { parts.append(serial) }
+        if parts.isEmpty {
+            switch source {
+            case .local: return fallbackName.isEmpty ? "No aparelho" : fallbackName
+            case .computer: return "Biblioteca PC"
+            case .cloud: return fallbackName.isEmpty ? "Google Drive" : fallbackName
             }
         }
-        appendCandidates(for: titleKey)
-        if fileKey != titleKey {
-            appendCandidates(for: fileKey)
+        return parts.joined(separator: " · ")
+    }
+
+    private static func romPriorityRank(_ rom: ROMFolderGame) -> Int {
+        switch (rom.filename as NSString).pathExtension.lowercased() {
+        case "m3u": return 0
+        case "cue": return 1
+        case "chd": return 2
+        case "pbp": return 3
+        case "iso": return 4
+        default: return 5
         }
-        if candidates.isEmpty { return nil }
-        let platformFiltered = candidates.filter { platformMatches(system, pcPlatform: $0.platform) }
-        let pool = platformFiltered.isEmpty ? candidates : platformFiltered
-        if let installedMatch = pool.first(where: \.installed) { return installedMatch }
-        return pool.first
     }
 
     static func buildSnapshot(
@@ -659,126 +937,288 @@ enum GamingModeCatalog {
         }
 
         var computerByID: [String: Game] = [:]
-        var computerByTitleKey: [String: [Game]] = [:]
         var pcDateByID: [String: Date] = [:]
+        var allEligiblePC: [(game: Game, descriptor: GamingGameDescriptor)] = []
         computerByID.reserveCapacity(computer.count)
-        computerByTitleKey.reserveCapacity(computer.count)
+        allEligiblePC.reserveCapacity(computer.count)
         for game in computer {
             guard isEligibleClassicCategory(game) else { continue }
             computerByID[game.id] = game
-            let gKey = normalizedKey(game.title)
-            if !gKey.isEmpty {
-                computerByTitleKey[gKey, default: []].append(game)
-            }
             if let parsed = date(game.lastPlayedAt) {
                 pcDateByID[game.id] = parsed
             }
+            allEligiblePC.append((game, describe(title: game.title, platform: game.platform)))
         }
 
-        var matchedPCIDs = Set<String>()
-        var localTitleKeys = Set<String>()
-        var localFilenames = Set<String>()
-        var matchedByROMID: [ROMFolderGame.ID: Game] = [:]
-        matchedByROMID.reserveCapacity(local.count)
+        var groups: [MutableUnifiedGroup] = []
+        groups.reserveCapacity(local.count + computer.count + cloud.count)
 
-        var localEntries: [GamingCatalogEntry] = []
-        localEntries.reserveCapacity(local.count)
+        func addDescriptorKeys(_ d: GamingGameDescriptor, to group: MutableUnifiedGroup) {
+            if group.consoleKey.isEmpty, !d.consoleKey.isEmpty {
+                group.consoleKey = d.consoleKey
+            }
+            if group.canonicalTitle.isEmpty, !d.canonicalTitle.isEmpty {
+                group.canonicalTitle = d.canonicalTitle
+            }
+            if let s = d.serial, !s.isEmpty { group.serials.insert(s) }
+            if let h = d.romHash, !h.isEmpty { group.romHashes.insert(h) }
+        }
+
+        func findGroup(
+            explicitPCID: String? = nil,
+            filenameLower: String? = nil,
+            descriptor d: GamingGameDescriptor
+        ) -> MutableUnifiedGroup? {
+            if let explicitPCID, !explicitPCID.isEmpty,
+               let byExplicit = groups.first(where: { $0.explicitPCIDs.contains(explicitPCID) || $0.computerGameIDs.contains(explicitPCID) }),
+               byExplicit.consolesCompatible(with: d.consoleKey) {
+                return byExplicit
+            }
+            if let h = d.romHash, !h.isEmpty,
+               let byHash = groups.first(where: { $0.romHashes.contains(h) && $0.consolesCompatible(with: d.consoleKey) }) {
+                return byHash
+            }
+            if let s = d.serial, !s.isEmpty,
+               let bySerial = groups.first(where: { $0.serials.contains(s) && $0.consolesCompatible(with: d.consoleKey) }) {
+                return bySerial
+            }
+            if !d.consoleKey.isEmpty && !d.canonicalTitle.isEmpty {
+                if let exact = groups.first(where: { $0.consoleKey == d.consoleKey && $0.canonicalTitle == d.canonicalTitle }) {
+                    return exact
+                }
+            }
+            if let filenameLower, !filenameLower.isEmpty {
+                let exactFilenameMatches = groups.filter {
+                    ($0.localFilenamesLower.contains(filenameLower) || $0.driveItems.contains { $0.name.lowercased() == filenameLower })
+                        && $0.consolesCompatible(with: d.consoleKey)
+                }
+                if exactFilenameMatches.count == 1 {
+                    return exactFilenameMatches[0]
+                }
+            }
+            if !d.canonicalTitle.isEmpty {
+                if d.consoleKey.isEmpty {
+                    let sameTitle = groups.filter { $0.canonicalTitle == d.canonicalTitle }
+                    if sameTitle.count == 1 {
+                        return sameTitle[0]
+                    }
+                } else {
+                    let unidentifiedMatches = groups.filter { $0.consoleKey.isEmpty && $0.canonicalTitle == d.canonicalTitle }
+                    if unidentifiedMatches.count == 1 {
+                        return unidentifiedMatches[0]
+                    }
+                }
+            }
+            return nil
+        }
+
+        // 1. Group local ROMs (collapses multi-disc sets and identical titles within the same console).
         for rom in local {
-            localFilenames.insert(rom.filename.lowercased())
-            let record = recordsByFilename[rom.filename.lowercased()]
-            if let explicitID = record?.launcherGameID, !explicitID.isEmpty {
-                matchedPCIDs.insert(explicitID)
+            let filenameLower = rom.filename.lowercased()
+            let record = recordsByFilename[filenameLower]
+            let explicitID = record?.launcherGameID
+            let explicitPC = explicitID.flatMap { computerByID[$0] }
+            let romSys = IntegratedEmulatorSupport.system(for: rom)?.rawValue ?? explicitPC?.platform ?? ""
+            let d = describe(title: rom.title, filename: rom.filename, relativePath: rom.relativePath, platform: romSys)
+
+            let group: MutableUnifiedGroup
+            if let existing = findGroup(explicitPCID: explicitPC?.id, filenameLower: filenameLower, descriptor: d) {
+                group = existing
+            } else {
+                group = MutableUnifiedGroup(consoleKey: d.consoleKey, canonicalTitle: d.canonicalTitle)
+                groups.append(group)
             }
-            let system = IntegratedEmulatorSupport.system(for: rom)
-            let matchedPC = matchedComputerGame(
-                for: rom,
-                system: system,
-                record: record,
-                computerByID: computerByID,
-                computerByTitleKey: computerByTitleKey
-            )
-            if let matchedPC {
-                matchedPCIDs.insert(matchedPC.id)
-                matchedByROMID[rom.id] = matchedPC
+
+            addDescriptorKeys(d, to: group)
+            if let explicitPC { group.explicitPCIDs.insert(explicitPC.id) }
+            if !group.localROMs.contains(where: { $0.id == rom.id }) {
+                group.localROMs.append(rom)
             }
-            let sysKey = system?.rawValue ?? ""
-            let tKey = normalizedKey(rom.title)
-            if !tKey.isEmpty {
-                localTitleKeys.insert("\(tKey)|\(sysKey)")
-            }
-            let pcDate = matchedPC.flatMap { pcDateByID[$0.id] }
-            let latestDate = [record?.lastPlayedAt, pcDate].compactMap { $0 }.max()
-            localEntries.append(GamingCatalogEntry.local(rom, latestDate))
+            group.localFilenamesLower.insert(filenameLower)
+            if let rDate = record?.lastPlayedAt { group.dates.append(rDate) }
+            if let explicitPC, let pcDate = pcDateByID[explicitPC.id] { group.dates.append(pcDate) }
+            group.variants.append(GamingGameVariant(
+                id: "local:\(rom.id)",
+                source: .local,
+                filename: rom.filename,
+                label: variantLabel(for: d, fallbackName: rom.filename, source: .local),
+                discNumber: d.discNumber,
+                region: d.region,
+                revision: d.revision,
+                serial: d.serial,
+                romHash: d.romHash
+            ))
         }
 
-        var seenPCKeys = Set<String>()
-        var pcEntries: [GamingCatalogEntry] = []
-        var pcGamesByMatchKey: [String: [Game]] = [:]
-        pcEntries.reserveCapacity(computer.count)
-        for game in computer {
-            guard isEligibleComputerClassic(game), !matchedPCIDs.contains(game.id) else { continue }
-            let gKey = normalizedKey(game.title)
-            let pKey = normalizedPlatform(game.platform)
-            if !gKey.isEmpty && isEligibleClassicCategory(game) && localTitleKeys.contains("\(gKey)|\(pKey)") {
-                continue
+        // 2. Attach eligible installed computer games to existing groups or create PC groups.
+        for game in computer where isEligibleComputerClassic(game) {
+            let d = describe(title: game.title, platform: game.platform)
+            let group: MutableUnifiedGroup
+            if let existing = findGroup(explicitPCID: game.id, descriptor: d) {
+                group = existing
+            } else {
+                group = MutableUnifiedGroup(consoleKey: d.consoleKey, canonicalTitle: d.canonicalTitle)
+                groups.append(group)
             }
-            let dedupKey = gKey.isEmpty ? "id:\(game.id)" : "\(gKey)|\(pKey)"
-            guard seenPCKeys.insert(dedupKey).inserted else { continue }
-            pcEntries.append(GamingCatalogEntry.computer(game))
-            if !gKey.isEmpty {
-                pcGamesByMatchKey[gKey, default: []].append(game)
+
+            addDescriptorKeys(d, to: group)
+            if group.computerGameIDs.insert(game.id).inserted {
+                group.computerGames.append(game)
             }
+            if let pcDate = pcDateByID[game.id] { group.dates.append(pcDate) }
+            group.variants.append(GamingGameVariant(
+                id: "pc:\(game.id)",
+                source: .computer,
+                filename: game.title,
+                label: variantLabel(for: d, fallbackName: game.platform, source: .computer),
+                discNumber: d.discNumber,
+                region: d.region,
+                revision: d.revision,
+                serial: d.serial,
+                romHash: d.romHash
+            ))
         }
 
-        var cloudEntries: [GamingCatalogEntry] = []
-        var matchedDriveByPCID: [Game.ID: ClassicDriveGameItem] = [:]
-        var matchedPCByDriveID: [String: Game] = [:]
+        // 3. Attach Google Drive games (including multi-disc entries) to matching local/PC/Drive groups.
         var seenDriveIDs = Set<String>()
         for item in cloud where seenDriveIDs.insert(item.id).inserted {
-            if let localPath = item.downloadedLocalPath,
-               !localPath.isEmpty,
-               FileManager.default.fileExists(atPath: localPath) {
-                continue
-            }
-            let filenameKey = (item.name as NSString).lastPathComponent.lowercased()
-            if !filenameKey.isEmpty, localFilenames.contains(filenameKey) {
-                continue
-            }
-            let titleKey = normalizedKey(item.title)
-            let hintPlatform = normalizedPlatform(item.systemHint)
-            if !titleKey.isEmpty && !hintPlatform.isEmpty && localTitleKeys.contains("\(titleKey)|\(hintPlatform)") {
-                continue
+            let pathForHint = item.relativePath.isEmpty ? item.parentRelativePath : item.relativePath
+            let d = describe(title: item.title, filename: item.name, relativePath: pathForHint, platform: item.systemHint)
+            let nameLower = (item.name as NSString).lastPathComponent.lowercased()
+            let group: MutableUnifiedGroup
+            if let existing = findGroup(filenameLower: nameLower, descriptor: d) {
+                group = existing
+            } else {
+                group = MutableUnifiedGroup(consoleKey: d.consoleKey, canonicalTitle: d.canonicalTitle)
+                groups.append(group)
             }
 
-            if !titleKey.isEmpty, let pcMatches = pcGamesByMatchKey[titleKey] {
-                let platformMatch = pcMatches.first { hintPlatform.isEmpty || normalizedPlatform($0.platform) == hintPlatform }
-                    ?? pcMatches.first
-                if let pcGame = platformMatch, matchedDriveByPCID[pcGame.id] == nil {
-                    matchedDriveByPCID[pcGame.id] = item
-                    continue
-                }
+            addDescriptorKeys(d, to: group)
+            if group.driveItemIDs.insert(item.id).inserted {
+                group.driveItems.append(item)
             }
-
-            if !titleKey.isEmpty, let candidates = computerByTitleKey[titleKey] {
-                let artworkMatch = candidates.first { hintPlatform.isEmpty || normalizedPlatform($0.platform) == hintPlatform }
-                    ?? candidates.first
-                if let artworkMatch {
-                    matchedPCByDriveID[item.id] = artworkMatch
-                }
-            }
-            cloudEntries.append(.cloud(item))
+            group.variants.append(GamingGameVariant(
+                id: "drive:\(item.id)",
+                source: .cloud,
+                filename: item.name,
+                label: variantLabel(for: d, fallbackName: item.name, source: .cloud),
+                discNumber: d.discNumber,
+                region: d.region,
+                revision: d.revision,
+                serial: d.serial,
+                romHash: d.romHash
+            ))
         }
 
-        let library = (localEntries + pcEntries + cloudEntries).sorted {
+        // 4. Emit ONE unified GamingCatalogEntry per group (priority: Local > PC > Cloud).
+        var entries: [GamingCatalogEntry] = []
+        entries.reserveCapacity(groups.count)
+        var matchedByROMID: [ROMFolderGame.ID: Game] = [:]
+        var matchedDriveByPCID: [Game.ID: ClassicDriveGameItem] = [:]
+        var matchedPCByDriveID: [String: Game] = [:]
+        var sourcesByEntryID: [String: GamingUnifiedSources] = [:]
+        var canonicalIDByEntryID: [String: String] = [:]
+        var allDriveItemsByPCID: [Game.ID: [ClassicDriveGameItem]] = [:]
+        var allDriveItemsByROMID: [ROMFolderGame.ID: [ClassicDriveGameItem]] = [:]
+        var allLocalROMsByROMID: [ROMFolderGame.ID: [ROMFolderGame]] = [:]
+        var candidateFavoriteIDsByEntryID: [String: Set<String>] = [:]
+
+        for group in groups {
+            let sortedROMs = group.localROMs.sorted { lhs, rhs in
+                let dL = describe(title: lhs.title, filename: lhs.filename, relativePath: lhs.relativePath).discNumber ?? 99
+                let dR = describe(title: rhs.title, filename: rhs.filename, relativePath: rhs.relativePath).discNumber ?? 99
+                if dL != dR { return dL < dR }
+                let rL = romPriorityRank(lhs)
+                let rR = romPriorityRank(rhs)
+                if rL != rR { return rL < rR }
+                return lhs.filename.localizedStandardCompare(rhs.filename) == .orderedAscending
+            }
+            let sortedDrive = group.driveItems.sorted { lhs, rhs in
+                let dL = describe(title: lhs.title, filename: lhs.name, relativePath: lhs.relativePath, platform: lhs.systemHint).discNumber ?? 99
+                let dR = describe(title: rhs.title, filename: rhs.name, relativePath: rhs.relativePath, platform: rhs.systemHint).discNumber ?? 99
+                if dL != dR { return dL < dR }
+                return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+            }
+            let primaryPC = group.computerGames.first
+                ?? sortedROMs.first.flatMap { matchedComputerGame(for: $0, records: records, computer: computer) }
+                ?? allEligiblePC.first(where: { cand in
+                    !group.canonicalTitle.isEmpty
+                        && cand.descriptor.canonicalTitle == group.canonicalTitle
+                        && (group.consoleKey.isEmpty || cand.descriptor.consoleKey.isEmpty || cand.descriptor.consoleKey == group.consoleKey)
+                })?.game
+
+            let entry: GamingCatalogEntry
+            if let primaryROM = sortedROMs.first {
+                if let primaryPC {
+                    matchedByROMID[primaryROM.id] = primaryPC
+                }
+                for rom in sortedROMs {
+                    if let primaryPC, matchedByROMID[rom.id] == nil {
+                        matchedByROMID[rom.id] = primaryPC
+                    }
+                    allLocalROMsByROMID[rom.id] = sortedROMs
+                    if !sortedDrive.isEmpty {
+                        allDriveItemsByROMID[rom.id] = sortedDrive
+                    }
+                }
+                entry = .local(primaryROM, group.dates.max())
+            } else if let primaryPC = group.computerGames.first {
+                if let firstDrive = sortedDrive.first {
+                    matchedDriveByPCID[primaryPC.id] = firstDrive
+                }
+                if !sortedDrive.isEmpty {
+                    allDriveItemsByPCID[primaryPC.id] = sortedDrive
+                }
+                entry = .computer(primaryPC)
+            } else if let primaryDrive = sortedDrive.first {
+                if let primaryPC {
+                    matchedPCByDriveID[primaryDrive.id] = primaryPC
+                }
+                entry = .cloud(primaryDrive)
+            } else {
+                continue
+            }
+
+            let unifiedSources = GamingUnifiedSources(
+                canonicalID: group.canonicalID,
+                consoleKey: group.consoleKey,
+                localROMs: sortedROMs,
+                computerGame: primaryPC,
+                driveItems: sortedDrive,
+                variants: group.variants
+            )
+            sourcesByEntryID[entry.id] = unifiedSources
+            canonicalIDByEntryID[entry.id] = group.canonicalID
+
+            var favCandidates = Set(unifiedSources.allEntryIDs)
+            favCandidates.insert(entry.id)
+            favCandidates.insert(group.canonicalID)
+            favCandidates.insert("canon:\(group.canonicalID)")
+            candidateFavoriteIDsByEntryID[entry.id] = favCandidates
+            entries.append(entry)
+        }
+
+        let library = entries.sorted {
             $0.title.localizedStandardCompare($1.title) == .orderedAscending
         }
-        let recentEntries = recent(library, favorites: favorites, limit: recentLimit, pcDates: pcDateByID)
+        let recentEntries = recent(
+            library,
+            favorites: favorites,
+            limit: recentLimit,
+            pcDates: pcDateByID,
+            candidateFavoriteIDsByEntryID: candidateFavoriteIDsByEntryID
+        )
         return GamingCatalogSnapshot(
             library: library,
             recent: recentEntries,
             matchedByROMID: matchedByROMID,
             matchedDriveByPCID: matchedDriveByPCID,
-            matchedPCByDriveID: matchedPCByDriveID
+            matchedPCByDriveID: matchedPCByDriveID,
+            sourcesByEntryID: sourcesByEntryID,
+            canonicalIDByEntryID: canonicalIDByEntryID,
+            allDriveItemsByPCID: allDriveItemsByPCID,
+            allDriveItemsByROMID: allDriveItemsByROMID,
+            allLocalROMsByROMID: allLocalROMsByROMID
         )
     }
 
@@ -788,21 +1228,23 @@ enum GamingModeCatalog {
     }
 
     static func recent(_ entries: [GamingCatalogEntry], favorites: Set<String>, limit: Int = 12) -> [GamingCatalogEntry] {
-        recent(entries, favorites: favorites, limit: limit, pcDates: nil)
+        recent(entries, favorites: favorites, limit: limit, pcDates: nil, candidateFavoriteIDsByEntryID: [:])
     }
 
     private static func recent(
         _ entries: [GamingCatalogEntry],
         favorites: Set<String>,
         limit: Int,
-        pcDates: [String: Date]?
+        pcDates: [String: Date]?,
+        candidateFavoriteIDsByEntryID: [String: Set<String>] = [:]
     ) -> [GamingCatalogEntry] {
         let cap = max(0, limit)
         guard cap > 0 else { return [] }
         var pinned: [GamingCatalogEntry] = []
         var played: [(entry: GamingCatalogEntry, date: Date)] = []
         for entry in entries {
-            if favorites.contains(entry.id) {
+            let favKeys = candidateFavoriteIDsByEntryID[entry.id] ?? [entry.id]
+            if !favorites.isDisjoint(with: favKeys) {
                 pinned.append(entry)
                 continue
             }
@@ -941,8 +1383,11 @@ enum GamingModeCatalog {
 private struct GamingROMDetailView: View {
     @EnvironmentObject private var pocket: PocketClassicsStore
     @EnvironmentObject private var store: AppStore
+    @Environment(\.gamingCatalogSnapshot) private var catalogSnapshot
     @Environment(\.dismiss) private var dismiss
     let rom: ROMFolderGame
+    @State private var selectedDiscROM: ROMFolderGame?
+    @State private var downloadingDriveFileID: String?
     @State private var launchIntegrated = false
     @State private var launchIntegratedVirtualP2 = false
     @State private var launchingOnPC = false
@@ -956,8 +1401,25 @@ private struct GamingROMDetailView: View {
     @State private var actionMessage = ""
     @State private var associationTarget: PocketClassic?
 
+    private var activeROM: ROMFolderGame { selectedDiscROM ?? rom }
+    private var unifiedSources: GamingUnifiedSources? { catalogSnapshot.sourcesByEntryID["local:\(rom.id)"] }
+    private var availableLocalDiscs: [ROMFolderGame] {
+        let list = unifiedSources?.localROMs ?? []
+        return list.isEmpty ? [rom] : list
+    }
+    private var missingDriveItems: [ClassicDriveGameItem] {
+        let localNames = Set(availableLocalDiscs.map { $0.filename.lowercased() })
+        return (unifiedSources?.driveItems ?? []).filter { !localNames.contains($0.name.lowercased()) }
+    }
+    private var linkedSourcesSummary: String {
+        var labels = [GamingModePresentation.localAvailabilityLabel]
+        if linkedPCGame != nil { labels.append(GamingModePresentation.computerAvailabilityLabel) }
+        if !(unifiedSources?.driveItems.isEmpty ?? true) { labels.append(GamingModePresentation.cloudAvailabilityLabel) }
+        return labels.joined(separator: " · ")
+    }
+
     private var record: PocketClassic? {
-        pocket.games.first { $0.filename.caseInsensitiveCompare(rom.filename) == .orderedSame }
+        pocket.games.first { $0.filename.caseInsensitiveCompare(activeROM.filename) == .orderedSame }
     }
     private var localTime: String {
         guard let record, let runtime = pocket.runtimeRecords.first(where: { $0.id == record.id }) else {
@@ -973,19 +1435,22 @@ private struct GamingROMDetailView: View {
         return progress
     }
 
-    private var installedCore: CoreDescriptor? { IntegratedEmulatorSupport.core(for: rom) }
-    private var system: EmulatedSystemID? { IntegratedEmulatorSupport.system(for: rom) }
+    private var installedCore: CoreDescriptor? { IntegratedEmulatorSupport.core(for: activeROM) }
+    private var system: EmulatedSystemID? { IntegratedEmulatorSupport.system(for: activeROM) }
     private var isAvailableOnPhone: Bool { installedCore != nil || canUseRetroArch }
     private var pcNativeSaveCompatible: Bool { installedCore != nil }
     private var canUseRetroArch: Bool {
-        GamingModeCatalog.canOfferRetroArch(for: rom, imported: pocket.isImportedIntoRetroArch(rom))
+        GamingModeCatalog.canOfferRetroArch(for: activeROM, imported: pocket.isImportedIntoRetroArch(activeROM))
     }
     private var linkedPCGame: Game? {
+        if let unifiedPC = unifiedSources?.computerGame {
+            return unifiedPC
+        }
         if let link = record, !link.launcherGameID.isEmpty,
            let explicit = store.snapshot.games.first(where: { GamingModeCatalog.isEligibleComputerClassic($0) && $0.id == link.launcherGameID }) {
             return explicit
         }
-        if let matched = GamingModeCatalog.matchedComputerGame(for: rom, records: pocket.games, computer: store.snapshot.games),
+        if let matched = GamingModeCatalog.matchedComputerGame(for: activeROM, records: pocket.games, computer: store.snapshot.games),
            matched.installed {
             return matched
         }
@@ -1000,8 +1465,8 @@ private struct GamingROMDetailView: View {
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    GamingHero(title: rom.title, platform: system?.rawValue.uppercased() ?? "CLASSICS",
-                               artwork: GamingArtwork(game: pocket.launcherGame(for: rom, launcher: store), rom: rom)) {
+                    GamingHero(title: activeROM.title, platform: system?.rawValue.uppercased() ?? "CLASSICS",
+                               artwork: GamingArtwork(game: pocket.launcherGame(for: activeROM, launcher: store) ?? linkedPCGame, rom: activeROM)) {
                         VStack(alignment: .leading, spacing: 10) {
                             GamingAvailabilityBadge(kind: isAvailableOnPhone ? .available : (linkedPCGame != nil ? .onComputer : .unavailable))
                             GamingMetrics(time: localTime, timeLabel: "Tempo neste iPhone", earned: progress?.unlocked,
@@ -1018,6 +1483,7 @@ private struct GamingROMDetailView: View {
                             if installedCore != nil {
                                 launchIntegrated = true
                             } else if canUseRetroArch {
+                                let rom = activeROM
                                 Task { await pocket.launchROM(rom, launcher: store) }
                             } else if let game = linkedPCGame {
                                 launchingOnPC = true
@@ -1031,12 +1497,57 @@ private struct GamingROMDetailView: View {
                         onGamepad: launchGamepadFromROM,
                         onLocalMultiplayer: { showLocalMultiplayer = true }
                     )
+                    if availableLocalDiscs.count > 1 || !missingDriveItems.isEmpty {
+                        BrumCard {
+                            VStack(alignment: .leading, spacing: 10) {
+                                BrumSectionLabel(text: "DISCOS E FONTES VINCULADAS")
+                                if availableLocalDiscs.count > 1 {
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        HStack(spacing: 8) {
+                                            ForEach(availableLocalDiscs) { disc in
+                                                let selected = disc.id == activeROM.id
+                                                let d = GamingModeCatalog.describe(title: disc.title, filename: disc.filename, relativePath: disc.relativePath)
+                                                let label = d.discNumber.map { "Disco \($0)" } ?? disc.filename
+                                                Button(label) { selectedDiscROM = disc }
+                                                    .font(.caption.bold())
+                                                    .padding(.horizontal, 12).frame(minHeight: 34)
+                                                    .background(selected ? BrumTheme.primary : BrumTheme.elevated, in: Capsule())
+                                                    .foregroundStyle(selected ? Color.black : BrumTheme.text)
+                                                    .buttonStyle(.plain)
+                                            }
+                                        }
+                                    }
+                                }
+                                ForEach(missingDriveItems) { cloudDisc in
+                                    HStack {
+                                        Text(cloudDisc.name).font(.caption).foregroundStyle(BrumTheme.muted).lineLimit(1)
+                                        Spacer()
+                                        if downloadingDriveFileID == cloudDisc.id {
+                                            ProgressView().tint(.cyan).controlSize(.small)
+                                        } else {
+                                            Button("BAIXAR DO DRIVE") {
+                                                downloadingDriveFileID = cloudDisc.id
+                                                Task {
+                                                    _ = try? await ClassicDriveCloudService.shared.downloadGame(fileID: cloudDisc.id)
+                                                    await pocket.refreshROMFolder()
+                                                    await MainActor.run { downloadingDriveFileID = nil }
+                                                }
+                                            }
+                                            .font(.caption2.bold())
+                                            .tint(.cyan)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     if !actionMessage.isEmpty { Text(actionMessage).font(.caption).foregroundStyle(BrumTheme.primary) }
                     GamingInfoCard(title: "Informações do jogo", items: [
                         GamingInfoItem(label: "Sistema", value: system.map { MurbProtocol.displaySystemName($0.rawValue) } ?? "Não identificado"),
                         GamingInfoItem(label: "Disponibilidade", value: isAvailableOnPhone ? GamingModePresentation.localAvailabilityLabel : (linkedPCGame != nil ? GamingModePresentation.computerAvailabilityLabel : GamingModePresentation.unavailableOnPhoneLabel)),
-                        GamingInfoItem(label: "Arquivo", value: rom.filename),
-                        GamingInfoItem(label: "Tamanho", value: ByteCountFormatter.string(fromByteCount: rom.fileSize, countStyle: .file)),
+                        GamingInfoItem(label: "Fontes vinculadas", value: linkedSourcesSummary),
+                        GamingInfoItem(label: "Arquivo", value: activeROM.filename),
+                        GamingInfoItem(label: "Tamanho", value: ByteCountFormatter.string(fromByteCount: activeROM.fileSize, countStyle: .file)),
                         GamingInfoItem(label: "RetroAchievements", value: Int(record?.retroAchievementID ?? "").map { "ID \($0)" } ?? "Não vinculado"),
                         GamingInfoItem(label: "Biblioteca PC", value: linkedPCGame?.title ?? "Não vinculado")
                     ])
@@ -1080,7 +1591,7 @@ private struct GamingROMDetailView: View {
                         if let record {
                             associationTarget = record
                         } else {
-                            Task { associationTarget = await pocket.ensureClassicRecord(for: rom) }
+                            Task { associationTarget = await pocket.ensureClassicRecord(for: activeROM) }
                         }
                     }.font(.subheadline.weight(.semibold)).tint(BrumTheme.primary)
                     if !actionMessage.isEmpty { Text(actionMessage).font(.caption).foregroundStyle(BrumTheme.muted) }
@@ -1101,8 +1612,14 @@ private struct GamingROMDetailView: View {
                 Task { await pocket.finishROMShare(ticket, completed: completed, error: error) }
             }
         }
-        .fullScreenCover(isPresented: $launchIntegrated) { IntegratedEmulatorView(rom: rom, returnsToPortrait: false) }
-        .fullScreenCover(isPresented: $launchIntegratedVirtualP2) { IntegratedEmulatorView(rom: rom, returnsToPortrait: false, virtualPadPort: 1) }
+        .fullScreenCover(isPresented: $launchIntegrated) {
+            let rom = activeROM
+            IntegratedEmulatorView(rom: rom, returnsToPortrait: false)
+        }
+        .fullScreenCover(isPresented: $launchIntegratedVirtualP2) {
+            let rom = activeROM
+            IntegratedEmulatorView(rom: rom, returnsToPortrait: false, virtualPadPort: 1)
+        }
         .fullScreenCover(item: $activeMurbTarget) { target in
             MurbRemoteGamepadView(target: target.payload, gameTitle: target.gameTitle, playerNumber: target.playerNumber, p2Payload: target.p2Payload)
         }
@@ -1154,7 +1671,7 @@ private struct GamingROMDetailView: View {
 
     private func performDirectSaveSync(choice: DirectSaveConflictChoice?) async {
         do {
-            let outcome = try await pocket.syncNativeSaveDirectly(rom, launcher: store, conflictChoice: choice)
+            let outcome = try await pocket.syncNativeSaveDirectly(activeROM, launcher: store, conflictChoice: choice)
             switch outcome {
             case .synced(let text), .upToDate(let text), .quarantined(let text):
                 actionMessage = text
@@ -1185,14 +1702,14 @@ private struct GamingROMDetailView: View {
             return
         }
         launchingGamepad = true
-        actionMessage = "Iniciando \(rom.title) no computador e abrindo joystick virtual…"
-        let resolvedGameID = linkedPCGame?.id ?? pocket.launcherGame(for: rom, launcher: store)?.id
+        actionMessage = "Iniciando \(activeROM.title) no computador e abrindo joystick virtual…"
+        let resolvedGameID = linkedPCGame?.id ?? pocket.launcherGame(for: activeROM, launcher: store)?.id
         Task {
             let outcome = await GamingGamepadLaunch.start(
                 store: store,
                 gameID: resolvedGameID,
-                filename: rom.filename,
-                title: rom.title,
+                filename: activeROM.filename,
+                title: activeROM.title,
                 players: players,
                 hybridMode: hybridMode,
                 myPlayerNumber: myPlayerNumber
@@ -1343,6 +1860,7 @@ private struct GamingDriveTile: View {
 private struct GamingDriveDetailView: View {
     @EnvironmentObject private var pocket: PocketClassicsStore
     @EnvironmentObject private var store: AppStore
+    @Environment(\.gamingCatalogSnapshot) private var catalogSnapshot
     @Environment(\.dismiss) private var dismiss
     let item: ClassicDriveGameItem
     let matchedPC: Game?
@@ -1362,11 +1880,16 @@ private struct GamingDriveDetailView: View {
         _currentItem = State(initialValue: item)
     }
 
+    private var driveDiscs: [ClassicDriveGameItem] {
+        let list = catalogSnapshot.sourcesByEntryID["drive:\(item.id)"]?.driveItems ?? []
+        return list.isEmpty ? [currentItem] : list
+    }
+
     private var resolvedPlatform: String {
         if let rom = downloadedROM, let sys = IntegratedEmulatorSupport.system(for: rom) {
             return MurbProtocol.displaySystemName(sys.rawValue)
         }
-        return currentItem.systemHint.isEmpty ? "CLASSICS" : currentItem.systemHint.uppercased()
+        return currentItem.systemHint.isEmpty ? "CLASSICS" : GamingModeCatalog.consoleLabel(for: GamingModeCatalog.normalizedPlatform(currentItem.systemHint))
     }
 
     var body: some View {
@@ -1384,6 +1907,29 @@ private struct GamingDriveDetailView: View {
                                 Text("Salvo em \(rom.filename) para jogar offline.")
                                     .font(.caption)
                                     .foregroundStyle(BrumTheme.primary)
+                            }
+                        }
+                    }
+
+                    if driveDiscs.count > 1 {
+                        VStack(alignment: .leading, spacing: 8) {
+                            BrumSectionLabel(text: "DISCOS DISPONÍVEIS NO GOOGLE DRIVE")
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(driveDiscs) { disc in
+                                        let selected = disc.id == currentItem.id
+                                        let d = GamingModeCatalog.describe(title: disc.title, filename: disc.name, relativePath: disc.relativePath, platform: disc.systemHint)
+                                        Button(d.discNumber.map { "Disco \($0)" } ?? disc.name) {
+                                            currentItem = disc
+                                            refreshDownloadedROM()
+                                        }
+                                        .font(.caption.bold())
+                                        .padding(.horizontal, 12).frame(minHeight: 34)
+                                        .background(selected ? Color.cyan : BrumTheme.surface, in: Capsule())
+                                        .foregroundStyle(selected ? Color.black : BrumTheme.text)
+                                        .buttonStyle(.plain)
+                                    }
+                                }
                             }
                         }
                     }
@@ -1440,7 +1986,7 @@ private struct GamingDriveDetailView: View {
 
                     GamingInfoCard(title: "Informações do jogo", items: [
                         GamingInfoItem(label: "Sistema", value: resolvedPlatform),
-                        GamingInfoItem(label: "Origem", value: "Google Drive (Nuvem)"),
+                        GamingInfoItem(label: "Fontes vinculadas", value: matchedPC != nil ? "Google Drive · Computador" : "Google Drive (Nuvem)"),
                         GamingInfoItem(label: "Arquivo", value: currentItem.name),
                         GamingInfoItem(label: "Pasta no Drive", value: currentItem.parentRelativePath.isEmpty ? "Raiz" : currentItem.parentRelativePath),
                         GamingInfoItem(label: "Tamanho", value: (currentItem.sizeBytes ?? 0) > 0 ? ByteCountFormatter.string(fromByteCount: currentItem.sizeBytes ?? 0, countStyle: .file) : "Calculado ao baixar")
@@ -1535,6 +2081,7 @@ private struct GamingDriveDetailView: View {
 private struct GamingGameView: View {
     @EnvironmentObject private var pocket: PocketClassicsStore
     @EnvironmentObject private var store: AppStore
+    @Environment(\.gamingCatalogSnapshot) private var catalogSnapshot
     @Environment(\.dismiss) private var dismiss
     let initialGame: Game
     let driveItem: ClassicDriveGameItem?
@@ -1542,6 +2089,24 @@ private struct GamingGameView: View {
     init(game: Game, driveItem: ClassicDriveGameItem? = nil) {
         initialGame = game
         self.driveItem = driveItem
+    }
+    private var allDriveItems: [ClassicDriveGameItem] {
+        let list = catalogSnapshot.allDriveItemsByPCID[game.id] ?? []
+        if !list.isEmpty { return list }
+        return driveItem.map { [$0] } ?? []
+    }
+    @State private var selectedDriveDiscID: String?
+    private var activeDriveItem: ClassicDriveGameItem? {
+        if let selectedDriveDiscID, let match = allDriveItems.first(where: { $0.id == selectedDriveDiscID }) {
+            return match
+        }
+        return allDriveItems.first ?? driveItem
+    }
+    private var linkedSourcesLabel: String {
+        var list = [GamingModePresentation.computerAvailabilityLabel]
+        if !allDriveItems.isEmpty { list.append(GamingModePresentation.cloudAvailabilityLabel) }
+        if downloadedROM != nil { list.insert(GamingModePresentation.localAvailabilityLabel, at: 0) }
+        return list.joined(separator: " · ")
     }
     private var hasAchievementTotals: Bool { game.achievementsAvailable || game.allowsManualAchievements }
     private var achievementSource: String {
@@ -1596,7 +2161,26 @@ private struct GamingGameView: View {
                         Button(action: playOnPC) { Text("SOMENTE INICIAR NO COMPUTADOR").font(.caption.bold()).frame(maxWidth: .infinity).frame(height: 44) }
                             .buttonStyle(.bordered).tint(BrumTheme.primary).disabled(!canStartOnPC || launching).opacity(canStartOnPC ? 1 : 0.38)
                     }
-                    if let driveItem {
+                    if allDriveItems.count > 1 {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(allDriveItems) { disc in
+                                    let isSelected = disc.id == activeDriveItem?.id
+                                    let d = GamingModeCatalog.describe(title: disc.title, filename: disc.name, relativePath: disc.relativePath, platform: disc.systemHint)
+                                    Button(d.discNumber.map { "Disco \($0)" } ?? disc.name) {
+                                        selectedDriveDiscID = disc.id
+                                        downloadedROM = pocket.romFolderGames.first { $0.filename.caseInsensitiveCompare(disc.name) == .orderedSame }
+                                    }
+                                    .font(.caption.bold())
+                                    .padding(.horizontal, 12).frame(minHeight: 34)
+                                    .background(isSelected ? Color.cyan : BrumTheme.surface, in: Capsule())
+                                    .foregroundStyle(isSelected ? Color.black : BrumTheme.text)
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+                    if let driveItem = activeDriveItem {
                         if let downloadedROM {
                             Button {
                                 launchDownloadedROM = true
@@ -1640,6 +2224,7 @@ private struct GamingGameView: View {
                         GamingInfoItem(label: "Plataforma", value: game.platform),
                         GamingInfoItem(label: "Gênero", value: game.genre),
                         GamingInfoItem(label: "Origem", value: game.store),
+                        GamingInfoItem(label: "Fontes vinculadas", value: linkedSourcesLabel),
                         GamingInfoItem(label: "Status", value: game.statusLabel),
                         GamingInfoItem(label: "Tamanho", value: game.sizeBytes > 0 ? ByteCountFormatter.string(fromByteCount: game.sizeBytes, countStyle: .file) : ""),
                         GamingInfoItem(label: "Disponibilidade", value: GamingModePresentation.computerAvailabilityLabel)

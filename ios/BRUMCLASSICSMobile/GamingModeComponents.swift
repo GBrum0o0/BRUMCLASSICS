@@ -3,12 +3,20 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
+private struct QRControlTargetBox: Identifiable {
+    let payload: MurbPairingPayload
+    var id: String { "\(payload.host):\(payload.port):\(payload.token)" }
+}
+
 struct TopControlAndSettingsActions: View {
     @Environment(\.scenePhase) private var scenePhase
     let identifierPrefix: String
     @State private var controllers: [GCController] = []
     @State private var activePanel: Panel?
     @State private var showMurbRemote = false
+    @State private var showQRScanner = false
+    @State private var scannedRemoteTarget: MurbPairingPayload?
+    @State private var qrScanError = ""
 
     private enum Panel: String, Identifiable {
         case settings, controllers
@@ -20,6 +28,11 @@ struct TopControlAndSettingsActions: View {
             icon("gamecontroller", label: controllers.isEmpty ? "Controles" : "Controles conectados",
                  highlighted: !controllers.isEmpty) { activePanel = .controllers }
                 .accessibilityIdentifier("\(identifierPrefix)-controllers")
+            icon("qrcode.viewfinder", label: "Ler QR Code do MyBrumControl") {
+                qrScanError = ""
+                showQRScanner = true
+            }
+                .accessibilityIdentifier("\(identifierPrefix)-qr-control")
             icon("gearshape", label: "Configurações") { activePanel = .settings }
                 .accessibilityIdentifier("\(identifierPrefix)-settings")
         }
@@ -47,6 +60,64 @@ struct TopControlAndSettingsActions: View {
         .sheet(isPresented: $showMurbRemote) {
             MurbRemoteGamepadLauncherSheet()
                 .preferredColorScheme(.dark)
+        }
+        .fullScreenCover(isPresented: $showQRScanner) {
+            ZStack(alignment: .topTrailing) {
+                PairingScannerView(validator: { url in
+                    MurbPairingPayload.parse(url) != nil
+                }, onCode: { url in
+                    showQRScanner = false
+                    if var parsed = MurbPairingPayload.parse(url) {
+                        parsed.isExternalControl = true
+                        MyBrumControlStore().remember(parsed)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                            scannedRemoteTarget = parsed
+                        }
+                    } else {
+                        qrScanError = "QR Code recusado: utilize o QR murb:// gerado pelo PC de destino."
+                    }
+                }, onError: { detail in
+                    qrScanError = detail
+                })
+
+                if !qrScanError.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "qrcode.viewfinder")
+                            .font(.title2)
+                            .foregroundStyle(.orange)
+                        Text(qrScanError)
+                            .font(.subheadline)
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.white)
+                        Button("Fechar") { showQRScanner = false }
+                            .buttonStyle(.borderedProminent)
+                            .tint(BrumTheme.primary)
+                            .foregroundStyle(.black)
+                    }
+                    .padding(20)
+                    .background(.black.opacity(0.86), in: RoundedRectangle(cornerRadius: 14))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(24)
+                }
+
+                Button { showQRScanner = false } label: {
+                    Image(systemName: "xmark")
+                        .font(.headline)
+                        .padding(14)
+                        .background(.black.opacity(0.6))
+                        .clipShape(Circle())
+                }
+                .foregroundStyle(.white)
+                .padding()
+                .accessibilityLabel("Fechar leitor de QR Code")
+            }
+            .ignoresSafeArea()
+        }
+        .fullScreenCover(item: Binding(
+            get: { scannedRemoteTarget.map { QRControlTargetBox(payload: $0) } },
+            set: { scannedRemoteTarget = $0?.payload }
+        )) { box in
+            MurbRemoteGamepadView(target: box.payload)
         }
     }
 
