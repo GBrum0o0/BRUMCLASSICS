@@ -251,7 +251,7 @@ enum DirectSaveSyncOutcome: Sendable {
             retroArchGames = (try? await retroArchFiles.load()) ?? []
             romFolderConfigured = await romFolder.configured
             romFolderName = await romFolder.displayName
-            if romFolderConfigured { await refreshROMFolder() }
+            await refreshROMFolder()
             await reloadRuntime()
         }
         catch { status = "Não foi possível ler o catálogo local. Seus arquivos foram preservados." }
@@ -266,19 +266,17 @@ enum DirectSaveSyncOutcome: Sendable {
     }
     func refreshROMFolder() async {
         let hasBookmark = await romFolder.configured
-        guard romFolderConfigured || hasBookmark else {
-            romFolderConfigured = false
-            romFolderGames = []
-            romFolderStatus = "Selecione uma pasta de ROMs em Perfil → Configurações do app → CLASSICS."
-            return
-        }
+        romFolderConfigured = hasBookmark
+        romFolderName = await romFolder.displayName
         do {
-            romFolderConfigured = true
-            romFolderName = await romFolder.displayName
             try await applyROMFolderScan(try await romFolder.scan())
         } catch {
             romFolderGames = []
-            romFolderStatus = "A pasta precisa ser autorizada novamente em Perfil → Configurações do app → CLASSICS. Seus dados foram preservados."
+            if !hasBookmark {
+                romFolderStatus = "Selecione uma pasta de ROMs em Perfil → Configurações do app → CLASSICS."
+            } else {
+                romFolderStatus = "A pasta precisa ser autorizada novamente em Perfil → Configurações do app → CLASSICS. Seus dados foram preservados."
+            }
         }
     }
     private func applyROMFolderScan(_ scan: ROMFolderScan) async throws {

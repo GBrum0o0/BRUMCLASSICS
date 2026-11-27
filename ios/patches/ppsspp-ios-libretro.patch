@@ -225,6 +225,57 @@ index 28c635c18..4eb9b6706 100644
  #define MASKED_PSP_MEMORY
  #endif
  
+diff --git a/Core/PSPLoaders.cpp b/Core/PSPLoaders.cpp
+--- a/Core/PSPLoaders.cpp
++++ b/Core/PSPLoaders.cpp
+@@ -291,6 +291,24 @@ bool Load_PSP_ISO(FileLoader *fileLoader, std::string *error_string) {
+ 	// Note: this thread reads the game binary, loads caches, and links HLE while UI spins.
+ 	// To do something deterministically when the game starts, disabling this thread won't be enough.
+ 	// Instead: Use Core_ListenLifecycle() or watch coreState.
++#if defined(IOS)
++	{
++		PSP_LoadingLock guard;
++		if (coreState != CORE_POWERUP)
++			return false;
++		PSP_SetLoading("Loading executable...");
++		bool success = __KernelLoadExec(bootpath.c_str(), 0, &PSP_CoreParameter().errorString);
++		if (success && coreState == CORE_POWERUP) {
++			coreState = PSP_CoreParameter().startBreak ? CORE_STEPPING : CORE_RUNNING;
++		} else {
++			coreState = CORE_ERROR;
++			if (error_string && error_string->empty() && !PSP_CoreParameter().errorString.empty())
++				*error_string = PSP_CoreParameter().errorString;
++			PSP_CoreParameter().fileToStart = "";
++		}
++		return success;
++	}
++#endif
+ 	loadingThread = std::thread([bootpath] {
+ 		setCurrentThreadName("ExecLoader");
+ 		PSP_LoadingLock guard;
+@@ -424,5 +442,22 @@ bool Load_PSP_ELF_PBP(FileLoader *fileLoader, std::string *error_string) {
+ 	PSPLoaders_Shutdown();
+ 	// Note: See Load_PSP_ISO for notes about this thread.
++#if defined(IOS)
++	{
++		PSP_LoadingLock guard;
++		if (coreState != CORE_POWERUP)
++			return false;
++		bool success = __KernelLoadExec(finalName.c_str(), 0, &PSP_CoreParameter().errorString);
++		if (success && coreState == CORE_POWERUP) {
++			coreState = PSP_CoreParameter().startBreak ? CORE_STEPPING : CORE_RUNNING;
++		} else {
++			coreState = CORE_ERROR;
++			if (error_string && error_string->empty() && !PSP_CoreParameter().errorString.empty())
++				*error_string = PSP_CoreParameter().errorString;
++			PSP_CoreParameter().fileToStart = "";
++		}
++		return success;
++	}
++#endif
+ 	loadingThread = std::thread([finalName] {
+ 		setCurrentThreadName("ExecLoader");
+ 		PSP_LoadingLock guard;
 diff --git a/Core/System.cpp b/Core/System.cpp
 index eff04fbea..b09cb92cf 100644
 --- a/Core/System.cpp
@@ -307,6 +358,44 @@ index 2ea228fcd..5484cc6e4 100644
  extern void bindDefaultFBO();
  #endif
  
+@@ -33,7 +33,7 @@ void GLQueueRunner::CreateDeviceObjects() {
+ 		maxAnisotropyLevel_ = 0.0f;
+ 	}
+ 
+-	if (gl_extensions.ARB_vertex_array_object) {
++	if (gl_extensions.ARB_vertex_array_object || (gl_extensions.IsGLES && gl_extensions.GLES3)) {
+ 		glGenVertexArrays(1, &globalVAO_);
+ 	}
+ 
+@@ -64,7 +64,7 @@ void GLQueueRunner::DestroyDeviceObjects() {
+ 		glDeleteTextures((GLsizei)nameCache_.size(), &nameCache_[0]);
+ 		nameCache_.clear();
+ 	}
+-	if (gl_extensions.ARB_vertex_array_object) {
++	if (gl_extensions.ARB_vertex_array_object || (gl_extensions.IsGLES && gl_extensions.GLES3)) {
+ 		glDeleteVertexArrays(1, &globalVAO_);
+ 	}
+ 	delete[] readbackBuffer_;
+@@ -619,8 +619,8 @@ void GLQueueRunner::PerformBlit(const GLRStep &step) {
+ 	CHECK_GL_ERROR_IF_DEBUG();
+ 	// Without FBO_ARB / GLES3, this will collide with bind_for_read, but there's nothing
+ 	// in ES 2.0 that actually separate them anyway of course, so doesn't matter.
+-	fbo_bind_fb_target(false, step.blit.dst->handle);
+-	fbo_bind_fb_target(true, step.blit.src->handle);
++	fbo_bind_fb_target(false, (step.blit.dst && step.blit.dst->handle) ? step.blit.dst->handle : g_defaultFBO);
++	fbo_bind_fb_target(true, (step.blit.src && step.blit.src->handle) ? step.blit.src->handle : g_defaultFBO);
+ 
+ 	int srcX1 = step.blit.srcRect.x;
+ 	int srcY1 = step.blit.srcRect.y;
+@@ -678,7 +678,7 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
+ #endif
+ 	*/
+ 
+-	if (gl_extensions.ARB_vertex_array_object) {
++	if (gl_extensions.ARB_vertex_array_object || (gl_extensions.IsGLES && gl_extensions.GLES3)) {
+ 		glBindVertexArray(globalVAO_);
+ 	}
+ 
 @@ -832,7 +832,7 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
  			if (c.clear.clearMask & GL_DEPTH_BUFFER_BIT)
  				attachments[count++] = GL_DEPTH_ATTACHMENT;
@@ -316,6 +405,24 @@ index 2ea228fcd..5484cc6e4 100644
  			glInvalidateFramebuffer(GL_FRAMEBUFFER, count, attachments);
  			CHECK_GL_ERROR_IF_DEBUG();
  			break;
+@@ -1175,7 +1175,7 @@ void GLQueueRunner::PerformRenderPass(const GLRStep &step) {
+ 	// Wipe out the current state.
+ 	glBindBuffer(GL_ARRAY_BUFFER, 0);
+ 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+-	if (gl_extensions.ARB_vertex_array_object) {
++	if (gl_extensions.ARB_vertex_array_object || (gl_extensions.IsGLES && gl_extensions.GLES3)) {
+ 		glBindVertexArray(0);
+ 	}
+ 	glDisable(GL_SCISSOR_TEST);
+@@ -1259,7 +1259,7 @@ void GLQueueRunner::PerformReadback(const GLRStep &pass) {
+ 
+ 	GLRFramebuffer *fb = pass.readback.src;
+ 
+-	fbo_bind_fb_target(true, fb ? fb->handle : 0);
++	fbo_bind_fb_target(true, (fb && fb->handle) ? fb->handle : g_defaultFBO);
+ 
+ 	// Reads from the "bound for read" framebuffer. Note that if there's no fb, it's not valid to call this.
+ 	if (fb && (gl_extensions.GLES3 || !gl_extensions.IsGLES))
 @@ -1543,12 +1543,12 @@ void GLQueueRunner::fbo_unbind() {
  	glBindFramebuffer(GL_FRAMEBUFFER, g_defaultFBO);
  #endif
@@ -469,7 +576,19 @@ index 45185748c..4d9b687c1 100644
  	}
  
  	if (ppsspp_texture_scaling_type.Update(&g_Config.iTexScalingType) && gpu) {
-@@ -385,7 +397,17 @@ namespace Libretro {
+@@ -301,5 +313,11 @@ static void check_variables(CoreParameter &coreParam) {
+ 
+ 	if (ppsspp_texture_scaling_level.Update(&g_Config.iTexScalingLevel) && gpu) {
+ 		gpu->ClearCacheNextFrame();
+ 	}
++#if defined(IOS)
++	coreParam.cpuCore = CPUCore::IR_JIT;
++	g_Config.iCpuCore = (int)CPUCore::IR_JIT;
++	g_Config.bVertexDecoderJit = false;
++	g_Config.bFastMemory = false;
++#endif
+ }
+@@ -385,7 +403,17 @@ namespace Libretro {
  bool useEmuThread = false;
  std::atomic<EmuThreadState> emuThreadState(EmuThreadState::DISABLED);
  

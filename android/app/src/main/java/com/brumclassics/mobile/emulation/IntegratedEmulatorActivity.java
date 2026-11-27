@@ -28,6 +28,8 @@ import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -59,10 +61,12 @@ public final class IntegratedEmulatorActivity extends Activity {
     private final List<View> padOverlayViews = new ArrayList<>();
     private VirtualDPadView dpadView;
     private VirtualAnalogView analogView;
-    private Button controlsToggleButton;
+    private ImageButton brumMenuButton;
     private Button padModeButton;
     private boolean manualControlsHidden;
     private boolean autoHideWithController;
+    private boolean currentIntegerScaling;
+    private String currentVideoFilterMode = "none";
     private boolean virtualHapticsEnabled = true;
     private boolean useAnalogStick;
     private int virtualPadPort;
@@ -114,10 +118,12 @@ public final class IntegratedEmulatorActivity extends Activity {
             }
             GraphicsResolutionPack.ResolvedConfig graphicsConfig =
                 GraphicsResolutionPack.resolveForDevice(this, launch.systemId);
+            currentIntegerScaling = graphicsConfig.integerScalingEnabled;
+            currentVideoFilterMode = graphicsConfig.videoFilterMode == null ? "none" : graphicsConfig.videoFilterMode;
             BrumCoreBridge bridge = new BrumCoreBridge(corePath, romPath, launch, graphicsConfig.coreVariables);
             emulatorView = new BrumCoreView(this, bridge, this::showRuntimeFailure);
             emulatorView.setSystemContext(launch.systemId, launch.coreLibraryName);
-            emulatorView.setGraphicsPresentation(graphicsConfig.integerScalingEnabled, graphicsConfig.videoFilterMode);
+            emulatorView.setGraphicsPresentation(currentIntegerScaling, currentVideoFilterMode);
             virtualPadPort = Math.max(0, Math.min(3, getIntent().getIntExtra("virtualPadPort", 0)));
             emulatorView.setVirtualPadPort(virtualPadPort);
             com.brumclassics.mobile.extensions.PokedexUniversalStore localPokedexStore =
@@ -276,32 +282,24 @@ public final class IntegratedEmulatorActivity extends Activity {
     private FrameLayout buildInterface() {
         padOverlayViews.clear();
         FrameLayout root = new FrameLayout(this); root.setBackgroundColor(Color.BLACK);
+        root.setClipChildren(false);
         root.addView(emulatorView, new FrameLayout.LayoutParams(-1, -1));
 
-        Button exit = control("←  SAIR");
-        exit.setOnClickListener(v -> closeEmulator());
-        FrameLayout.LayoutParams exitParams = frame(104, 44, Gravity.TOP | Gravity.START); exitParams.setMargins(dp(14), dp(12), 0, 0); root.addView(exit, exitParams);
-
-        TextView title = label(launch.title, 13, Color.WHITE, true); title.setSingleLine(true); title.setGravity(Gravity.CENTER);
-        FrameLayout.LayoutParams titleParams = frame(240, 42, Gravity.TOP | Gravity.CENTER_HORIZONTAL); titleParams.topMargin = dp(13); root.addView(title, titleParams);
-
-        LinearLayout tools = new LinearLayout(this); tools.setOrientation(LinearLayout.HORIZONTAL); tools.setGravity(Gravity.CENTER); tools.setPadding(0, 0, 0, 0);
-        controlsToggleButton = control("PAD");
-        Button states = control("SLOTS");
-        Button display = control(emulatorView.fillsDisplay() ? "CORTAR" : "INTEIRA");
-        Button fast = control("≫  5×");
-        controlsToggleButton.setOnClickListener(v -> {
-            manualControlsHidden = !manualControlsHidden;
-            syncControllerOverlay(false);
-        });
-        states.setOnClickListener(v -> showStateMenu());
-        display.setOnClickListener(v -> { emulatorView.toggleFillDisplay(); display.setText(emulatorView.fillsDisplay() ? "CORTAR" : "INTEIRA"); });
-        fast.setOnClickListener(v -> { emulatorView.setFastForward(!emulatorView.isFastForward()); fast.setTextColor(emulatorView.isFastForward() ? Color.BLACK : Color.WHITE); fast.setBackground(controlBackground(emulatorView.isFastForward())); });
-        tools.addView(controlsToggleButton, new LinearLayout.LayoutParams(dp(56), dp(44)));
-        LinearLayout.LayoutParams stateParams = new LinearLayout.LayoutParams(dp(64), dp(44)); stateParams.leftMargin = dp(6); tools.addView(states, stateParams);
-        LinearLayout.LayoutParams displayParams = new LinearLayout.LayoutParams(dp(86), dp(44)); displayParams.leftMargin = dp(6); tools.addView(display, displayParams);
-        LinearLayout.LayoutParams fastParams = new LinearLayout.LayoutParams(dp(74), dp(44)); fastParams.leftMargin = dp(6); tools.addView(fast, fastParams);
-        FrameLayout.LayoutParams toolsParams = frame(304, 44, Gravity.TOP | Gravity.END); toolsParams.setMargins(0, dp(12), dp(14), 0); root.addView(tools, toolsParams);
+        brumMenuButton = new ImageButton(this);
+        brumMenuButton.setImageResource(com.brumclassics.mobile.R.drawable.ic_launcher);
+        brumMenuButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        brumMenuButton.setPadding(dp(7), dp(7), dp(7), dp(7));
+        brumMenuButton.setAlpha(0.50f);
+        GradientDrawable logoBg = new GradientDrawable();
+        logoBg.setShape(GradientDrawable.OVAL);
+        logoBg.setColor(Color.argb(170, 14, 16, 20));
+        logoBg.setStroke(dp(1), Color.argb(72, 255, 255, 255));
+        brumMenuButton.setBackground(logoBg);
+        brumMenuButton.setContentDescription("Menu rápido BRUMCLASSICS");
+        brumMenuButton.setOnClickListener(v -> showBrumQuickMenu());
+        FrameLayout.LayoutParams menuParams = frame(46, 46, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        menuParams.topMargin = dp(8);
+        root.addView(brumMenuButton, menuParams);
 
         String sys = launch.systemId == null ? "" : launch.systemId.toLowerCase(Locale.ROOT);
         boolean isAnalog = "ps2".equals(sys) || "psp".equals(sys) || "3ds".equals(sys);
@@ -335,8 +333,10 @@ public final class IntegratedEmulatorActivity extends Activity {
             launch.coreDisplayName, launch.systemId, launch.retroAchievementsGameId, "", isMissing3dsKeys()
         );
         statusBanner = label(bannerText, 9, ACCENT, true);
+        statusBanner.setVisibility(View.GONE);
         FrameLayout.LayoutParams statusParams = frame(280, 28, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL); statusParams.bottomMargin = dp(65); root.addView(statusBanner, statusParams);
         achievementOverlay = new BrumAchievementOverlay(this, root);
+        applyVirtualControlsStyle();
         return root;
     }
 
@@ -438,18 +438,192 @@ public final class IntegratedEmulatorActivity extends Activity {
             view.setVisibility(hidden ? View.GONE : View.VISIBLE);
         }
         updateAnalogPadVisibility(hidden);
+        applyVirtualControlsStyle();
         if (hidden && emulatorView != null) {
             for (int id = 0; id < 16; id++) emulatorView.setButton(id, false);
             emulatorView.setAnalog(0, 0, 0f);
             emulatorView.setAnalog(0, 1, 0f);
         }
-        if (controlsToggleButton != null) {
-            controlsToggleButton.setTextColor(hidden ? Color.BLACK : (hasPhysical ? ACCENT : Color.WHITE));
-            controlsToggleButton.setBackground(controlBackground(hidden));
-        }
         if (notify) {
             Toast.makeText(this, hasPhysical ? "Controle físico conectado." : "Controle desconectado · modo tátil ativo.", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void applyVirtualControlsStyle() {
+        SharedPreferences prefs = getSharedPreferences("brum_mobile_prefs", MODE_PRIVATE);
+        float alpha = Math.max(0.25f, Math.min(1.0f, prefs.getFloat("virtual_pad_opacity", 0.78f)));
+        float scale = Math.max(0.80f, Math.min(1.25f, prefs.getFloat("virtual_pad_scale", 1.0f)));
+        for (View view : padOverlayViews) {
+            view.setAlpha(alpha);
+            view.setScaleX(scale);
+            view.setScaleY(scale);
+        }
+    }
+
+    private void showBrumQuickMenu() {
+        if (closing || emulatorView == null) return;
+        emulatorView.pauseEmulation();
+        final boolean[] keepPaused = {false};
+        final List<String> titles = new ArrayList<>();
+        final List<Runnable> actions = new ArrayList<>();
+
+        titles.add(manualControlsHidden ? "Mostrar controles na tela" : "Ocultar controles na tela");
+        actions.add(() -> {
+            manualControlsHidden = !manualControlsHidden;
+            syncControllerOverlay(false);
+        });
+
+        if (analogView != null) {
+            titles.add(useAnalogStick ? "Controle esquerdo: Alternar para D-Pad" : "Controle esquerdo: Alternar para Analógico");
+            actions.add(this::toggleAnalogPadMode);
+        }
+
+        titles.add("Ajuste de controles (opacidade e tamanho)");
+        actions.add(() -> {
+            keepPaused[0] = true;
+            showControlsAdjustmentDialog();
+        });
+
+        titles.add("Estados rápidos (Slots)");
+        actions.add(() -> {
+            keepPaused[0] = true;
+            showStateMenu();
+        });
+
+        titles.add(emulatorView.fillsDisplay()
+            ? "Dimensão de tela: Mostrar imagem inteira"
+            : "Dimensão de tela: Preencher tela");
+        actions.add(() -> emulatorView.toggleFillDisplay());
+
+        titles.add("Gráficos e filtros (ao vivo)");
+        actions.add(() -> {
+            keepPaused[0] = true;
+            showVideoFilterDialog();
+        });
+
+        titles.add(emulatorView.isFastForward() ? "Avanço rápido (5×): Desativar" : "Avanço rápido (5×): Ativar");
+        actions.add(() -> {
+            boolean next = !emulatorView.isFastForward();
+            emulatorView.setFastForward(next);
+            Toast.makeText(this, next ? "Avanço rápido 5× ativado." : "Avanço rápido desativado.", Toast.LENGTH_SHORT).show();
+        });
+
+        titles.add("Diagnóstico da sessão");
+        actions.add(() -> {
+            keepPaused[0] = true;
+            showSessionDiagnosticsDialog();
+        });
+
+        titles.add("Sair do jogo");
+        actions.add(() -> {
+            keepPaused[0] = true;
+            closeEmulator();
+        });
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+            .setTitle(launch != null && launch.title != null && !launch.title.isEmpty() ? launch.title : "BRUMCLASSICS")
+            .setItems(titles.toArray(new String[0]), (d, which) -> {
+                if (which >= 0 && which < actions.size()) {
+                    actions.get(which).run();
+                }
+            })
+            .setNegativeButton("Voltar ao jogo", null)
+            .create();
+        dialog.setOnDismissListener(d -> {
+            hideSystemUI();
+            if (!keepPaused[0] && !closing && emulatorView != null) {
+                emulatorView.resumeEmulation();
+            }
+        });
+        dialog.show();
+    }
+
+    private void showControlsAdjustmentDialog() {
+        SharedPreferences prefs = getSharedPreferences("brum_mobile_prefs", MODE_PRIVATE);
+        final String[] options = {
+            "Opacidade 25% (bem discreta)",
+            "Opacidade 45% (equilibrada)",
+            "Opacidade 70%",
+            "Opacidade 90%",
+            "Tamanho compacto (85%)",
+            "Tamanho padrão (100%)",
+            "Tamanho ampliado (115%)"
+        };
+        AlertDialog dialog = new AlertDialog.Builder(this)
+            .setTitle("AJUSTE DE CONTROLES")
+            .setItems(options, (d, which) -> {
+                SharedPreferences.Editor editor = prefs.edit();
+                if (which == 0) editor.putFloat("virtual_pad_opacity", 0.25f);
+                else if (which == 1) editor.putFloat("virtual_pad_opacity", 0.45f);
+                else if (which == 2) editor.putFloat("virtual_pad_opacity", 0.70f);
+                else if (which == 3) editor.putFloat("virtual_pad_opacity", 0.90f);
+                else if (which == 4) editor.putFloat("virtual_pad_scale", 0.85f);
+                else if (which == 5) editor.putFloat("virtual_pad_scale", 1.00f);
+                else if (which == 6) editor.putFloat("virtual_pad_scale", 1.15f);
+                editor.apply();
+                applyVirtualControlsStyle();
+                Toast.makeText(this, "Ajuste aplicado: " + options[which], Toast.LENGTH_SHORT).show();
+            })
+            .setNegativeButton("Voltar", null)
+            .create();
+        dialog.setOnDismissListener(d -> {
+            hideSystemUI();
+            if (!closing && emulatorView != null) emulatorView.resumeEmulation();
+        });
+        dialog.show();
+    }
+
+    private void showVideoFilterDialog() {
+        final String[] labels = {
+            "Original (Pixel nítido)",
+            "Sharp Bilinear (Nitidez equilibrada)",
+            "Bilinear sutil (Suave)",
+            "CAS Sharpen (Realce fino)",
+            "Edge Upscale 2×",
+            "Scanlines CRT",
+            "Grade LCD portátil"
+        };
+        final String[] modes = {
+            "none", "sharp_bilinear", "bilinear_subtle", "cas_sharpen", "edge_upscale_2x", "crt_scanlines", "lcd_grid"
+        };
+        for (int i = 0; i < modes.length; i++) {
+            if (modes[i].equals(currentVideoFilterMode)) {
+                labels[i] = "✓ " + labels[i];
+            }
+        }
+        AlertDialog dialog = new AlertDialog.Builder(this)
+            .setTitle("GRÁFICOS E FILTROS (AO VIVO)")
+            .setItems(labels, (d, which) -> {
+                if (which >= 0 && which < modes.length && emulatorView != null) {
+                    currentVideoFilterMode = modes[which];
+                    emulatorView.setGraphicsPresentation(currentIntegerScaling, currentVideoFilterMode);
+                    Toast.makeText(this, "Filtro: " + labels[which].replace("✓ ", ""), Toast.LENGTH_SHORT).show();
+                }
+            })
+            .setNegativeButton("Voltar", null)
+            .create();
+        dialog.setOnDismissListener(d -> {
+            hideSystemUI();
+            if (!closing && emulatorView != null) emulatorView.resumeEmulation();
+        });
+        dialog.show();
+    }
+
+    private void showSessionDiagnosticsDialog() {
+        String diag = emulatorView == null ? "{}" : emulatorView.diagnosticsJson();
+        if (diag == null || diag.isEmpty()) diag = "{}";
+        AlertDialog dialog = new AlertDialog.Builder(this)
+            .setTitle("DIAGNÓSTICO DA SESSÃO")
+            .setMessage("Núcleo: " + (launch != null ? launch.coreDisplayName : "") +
+                "\nSistema: " + (launch != null ? launch.systemId : "") +
+                "\n\n" + diag)
+            .setPositiveButton("Fechar", null)
+            .create();
+        dialog.setOnDismissListener(d -> {
+            hideSystemUI();
+            if (!closing && emulatorView != null) emulatorView.resumeEmulation();
+        });
+        dialog.show();
     }
 
     private void showStateMenu() {
@@ -459,15 +633,20 @@ public final class IntegratedEmulatorActivity extends Activity {
             choices[(slot - 1) * 2] = "Salvar no slot " + slot;
             choices[(slot - 1) * 2 + 1] = "Carregar slot " + slot + (QuickStateStore.isCompatible(launch, slot, state) ? "" : " (vazio ou incompatível)");
         }
-        new AlertDialog.Builder(this)
+        AlertDialog dialog = new AlertDialog.Builder(this)
             .setTitle("ESTADOS RÁPIDOS")
             .setMessage("O save normal continua separado. Escolha um dos três slots locais.")
-            .setItems(choices, (dialog, which) -> {
+            .setItems(choices, (d, which) -> {
                 int slot = which / 2 + 1;
                 if ((which & 1) == 0) saveQuickState(slot); else loadQuickState(slot);
             })
             .setNegativeButton("Cancelar", null)
-            .show();
+            .create();
+        dialog.setOnDismissListener(d -> {
+            hideSystemUI();
+            if (!closing && emulatorView != null) emulatorView.resumeEmulation();
+        });
+        dialog.show();
     }
 
     private void saveQuickState(int slot) {

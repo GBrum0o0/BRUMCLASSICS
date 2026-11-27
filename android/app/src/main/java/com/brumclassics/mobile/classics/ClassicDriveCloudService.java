@@ -167,12 +167,50 @@ public final class ClassicDriveCloudService {
         String safeName = new File(target.name).getName();
         File finalFile = new File(dir, target.id + "_" + safeName);
         File tempFile = new File(dir, target.id + "_" + safeName + ".part");
+        try {
+            long received = executeDownloadAttempt(target, target.downloadUrl, tempFile, cancelled, listener, true);
+            if (finalFile.exists() && !finalFile.delete()) {
+                throw new IOException("Não foi possível atualizar o arquivo local.");
+            }
+            if (!tempFile.renameTo(finalFile)) {
+                throw new IOException("Não foi possível finalizar o arquivo baixado.");
+            }
+
+            if (repository != null) {
+                repository.registerDownloadedClassic(finalFile, target.relativePath, target.systemHint, target.id);
+            }
+            synchronized (this) {
+                target.downloadedLocalPath = finalFile.getAbsolutePath();
+                target.downloadedBytes = received;
+                target.downloadStatus = "available";
+                target.downloadError = "";
+                saveCheckpointQuietly();
+            }
+            if (listener != null) listener.onProgress(target.id, received, received, "available");
+            return finalFile;
+        } catch (Exception err) {
+            tempFile.delete();
+            synchronized (this) {
+                target.downloadStatus = "cloud";
+                target.downloadError = err.getMessage() == null ? "Falha no download" : err.getMessage();
+                saveCheckpointQuietly();
+            }
+            throw err;
+        }
+    }
+
+    private long executeDownloadAttempt(CloudGameEntry target, String requestUrl, File tempFile,
+                                        AtomicBoolean cancelled, DownloadProgressListener listener,
+                                        boolean allowConfirmRetry) throws Exception {
+        if (!ClassicDriveCloudRules.isAllowedUrl(requestUrl)) {
+            throw new SecurityException("Origem de download não permitida.");
+        }
         HttpURLConnection conn = null;
         try {
-            conn = (HttpURLConnection) new URL(target.downloadUrl).openConnection();
+            conn = (HttpURLConnection) new URL(requestUrl).openConnection();
             conn.setConnectTimeout(20000);
-            conn.setReadTimeout(30000);
-            conn.setRequestProperty("User-Agent", "BRUMCLASSICSAndroid/0.39.0");
+            conn.setReadTimeout(60000);
+            conn.setRequestProperty("User-Agent", "BRUMCLASSICS");
             String token = getBearerToken();
             if (token != null && !token.isEmpty()) conn.setRequestProperty("Authorization", "Bearer " + token);
 
@@ -181,11 +219,20 @@ public final class ClassicDriveCloudService {
                 throw new IOException("Download recusado (HTTP " + code + ")");
             }
             String contentType = conn.getContentType();
-            if (contentType != null && contentType.toLowerCase(Locale.ROOT).contains("text/html")) {
-                throw new IllegalStateException("O Google Drive retornou uma página HTML em vez do arquivo ROM.");
+            boolean mimeIsHtml = contentType != null && contentType.toLowerCase(Locale.ROOT).contains("text/html");
+            long total = conn.getContentLengthLong();
+
+            if (mimeIsHtml) {
+                String html = readSmallHtml(conn.getInputStream());
+                if (allowConfirmRetry) {
+                    String confirmed = extractConfirmDownloadUrl(html, requestUrl);
+                    if (confirmed != null) {
+                        return executeDownloadAttempt(target, confirmed, tempFile, cancelled, listener, false);
+                    }
+                }
+                throw new IllegalStateException("O Google Drive não liberou o arquivo. Confira o compartilhamento ou a cota.");
             }
 
-            long total = conn.getContentLengthLong();
             long freeBytes = getAvailableFreeSpaceBytes();
             if (total > 0 && freeBytes > 0 && freeBytes < total) {
                 throw new IllegalStateException("Espaço livre insuficiente no armazenamento escolhido.");
@@ -216,36 +263,51 @@ public final class ClassicDriveCloudService {
             if (received <= 0 || (total > 0 && received < total)) {
                 throw new IOException("Download incompleto (" + received + "/" + total + " bytes).");
             }
-            if (finalFile.exists() && !finalFile.delete()) {
-                throw new IOException("Não foi possível atualizar o arquivo local.");
-            }
-            if (!tempFile.renameTo(finalFile)) {
-                throw new IOException("Não foi possível finalizar o arquivo baixado.");
-            }
-
-            if (repository != null) {
-                repository.registerDownloadedClassic(finalFile, target.relativePath, target.systemHint, target.id);
-            }
-            synchronized (this) {
-                target.downloadedLocalPath = finalFile.getAbsolutePath();
-                target.downloadedBytes = received;
-                target.downloadStatus = "available";
-                target.downloadError = "";
-                saveCheckpointQuietly();
-            }
-            if (listener != null) listener.onProgress(target.id, received, total, "available");
-            return finalFile;
-        } catch (Exception err) {
-            tempFile.delete();
-            synchronized (this) {
-                target.downloadStatus = "cloud";
-                target.downloadError = err.getMessage() == null ? "Falha no download" : err.getMessage();
-                saveCheckpointQuietly();
-            }
-            throw err;
+            return received;
         } finally {
             if (conn != null) conn.disconnect();
         }
+    }
+
+    private static String readSmallHtml(InputStream in) throws IOException {
+        if (in == null) return "";
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int n;
+        int total = 0;
+        while ((n = in.read(buf)) >= 0 && total < 512 * 1024) {
+            total += n;
+            out.write(buf, 0, n);
+        }
+        return out.toString(StandardCharsets.UTF_8.name());
+    }
+
+    private static String extractConfirmDownloadUrl(String html, String baseUrl) {
+        if (html == null || html.isEmpty()) return null;
+        java.util.regex.Matcher form = java.util.regex.Pattern.compile(
+            "<form[^>]*action=[\"']([^\"']+)[\"'][^>]*>([\\s\\S]*?)</form>",
+            java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.DOTALL
+        ).matcher(html);
+        if (!form.find()) return null;
+        String action = ClassicDriveCloudRules.unescapeHtml(form.group(1));
+        String body = form.group(2);
+        StringBuilder url = new StringBuilder(action.startsWith("https://") ? action : baseUrl);
+        java.util.regex.Matcher inputs = java.util.regex.Pattern.compile(
+            "<input[^>]*name=[\"']([^\"']+)[\"'][^>]*value=[\"']([^\"']*)[\"']",
+            java.util.regex.Pattern.CASE_INSENSITIVE
+        ).matcher(body);
+        char sep = url.indexOf("?") >= 0 ? '&' : '?';
+        while (inputs.find()) {
+            try {
+                url.append(sep)
+                   .append(java.net.URLEncoder.encode(inputs.group(1), "UTF-8"))
+                   .append('=')
+                   .append(java.net.URLEncoder.encode(ClassicDriveCloudRules.unescapeHtml(inputs.group(2)), "UTF-8"));
+                sep = '&';
+            } catch (Exception ignored) {}
+        }
+        String candidate = url.toString();
+        return ClassicDriveCloudRules.isAllowedUrl(candidate) ? candidate : null;
     }
 
     public static JSONObject serializeCheckpoint(ScanCheckpoint state) throws Exception {
@@ -263,6 +325,7 @@ public final class ClassicDriveCloudService {
             obj.put("id", t.id);
             obj.put("relativePath", t.relativePath);
             obj.put("depth", t.depth);
+            obj.put("resourceKey", t.resourceKey);
             pending.put(obj);
         }
         root.put("pendingFolders", pending);
@@ -312,7 +375,12 @@ public final class ClassicDriveCloudService {
             for (int i = 0; i < pending.length(); i++) {
                 JSONObject obj = pending.optJSONObject(i);
                 if (obj != null && !obj.optString("id").isEmpty()) {
-                    state.pendingFolders.add(new FolderTask(obj.optString("id"), obj.optString("relativePath"), obj.optInt("depth", 0)));
+                    state.pendingFolders.add(new FolderTask(
+                        obj.optString("id"),
+                        obj.optString("relativePath"),
+                        obj.optInt("depth", 0),
+                        obj.optString("resourceKey", "")
+                    ));
                 }
             }
         }
@@ -391,12 +459,25 @@ public final class ClassicDriveCloudService {
     private static final class AndroidHttpFetcher implements ClassicDriveCloudRules.HttpFetcher {
         @Override
         public FetchResult fetch(String folderId, String bearerToken) throws Exception {
-            String url = "https://drive.google.com/embeddedfolderview?id=" + folderId + "#list";
+            return fetch(folderId, "", bearerToken);
+        }
+
+        @Override
+        public FetchResult fetch(String folderId, String resourceKey, String bearerToken) throws Exception {
+            StringBuilder urlBuilder = new StringBuilder("https://drive.google.com/embeddedfolderview?id=")
+                .append(java.net.URLEncoder.encode(folderId, StandardCharsets.UTF_8.name()));
+            if (resourceKey != null && !resourceKey.isEmpty()) {
+                urlBuilder.append("&resourcekey=").append(java.net.URLEncoder.encode(resourceKey, StandardCharsets.UTF_8.name()));
+            }
+            urlBuilder.append("#list");
+            String url = urlBuilder.toString();
             if (!ClassicDriveCloudRules.isAllowedUrl(url)) throw new SecurityException("Host não permitido.");
             HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(20000);
-            conn.setRequestProperty("User-Agent", "BRUMCLASSICSAndroid/0.39.0");
+            conn.setInstanceFollowRedirects(true);
+            conn.setRequestProperty("User-Agent", "BRUMCLASSICS");
+            conn.setRequestProperty("Accept", "text/html,application/xhtml+xml");
             if (bearerToken != null && !bearerToken.isEmpty()) conn.setRequestProperty("Authorization", "Bearer " + bearerToken);
             try {
                 int code = conn.getResponseCode();

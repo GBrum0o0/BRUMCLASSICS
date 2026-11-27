@@ -32,16 +32,21 @@ public final class ClassicDriveCloudRules {
         "dmg", "pkg", "app", "deb", "rpm", "appimage", "sh", "dll", "so"
     ));
     private static final Pattern RAW_ID_PATTERN = Pattern.compile("^[A-Za-z0-9_-]{10,128}$");
+    private static final Pattern RESOURCE_KEY_PATTERN = Pattern.compile("^[A-Za-z0-9_-]{1,200}$");
     private static final Pattern FOLDER_URL_PATTERN = Pattern.compile("/folders/([A-Za-z0-9_-]{10,128})");
+    private static final Pattern FILE_URL_PATTERN = Pattern.compile("/file/d/([A-Za-z0-9_-]{10,128})");
     private static final Pattern QUERY_ID_PATTERN = Pattern.compile("[?&]id=([A-Za-z0-9_-]{10,128})");
-    private static final Pattern HTML_FOLDER_LINK = Pattern.compile(
-        "href=\"https://drive\\.google\\.com/drive(?:/u/\\d+)?/folders/([A-Za-z0-9_-]{10,128})[^\"]*\"[^>]*>([^<]{1,180})</a>",
-        Pattern.CASE_INSENSITIVE
+    private static final Pattern QUERY_RK_PATTERN = Pattern.compile("[?&]resourcekey=([A-Za-z0-9_-]{1,200})", Pattern.CASE_INSENSITIVE);
+    private static final Pattern HTML_ANCHOR_PATTERN = Pattern.compile(
+        "<a\\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>([\\s\\S]*?)</a>",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
-    private static final Pattern HTML_FILE_LINK = Pattern.compile(
-        "href=\"https://drive\\.google\\.com/file/d/([A-Za-z0-9_-]{10,128})/[^\"]*\"[^>]*>([^<]{1,220})</a>",
-        Pattern.CASE_INSENSITIVE
+    private static final Pattern FLIP_TITLE_PATTERN = Pattern.compile(
+        "class=[\"'][^\"']*flip-entry-title[^\"']*[\"'][^>]*>([\\s\\S]*?)</div>",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
+    private static final Pattern HTML_TAG_PATTERN = Pattern.compile("<[^>]*>");
+    private static final Pattern HTML_ENTITY_PATTERN = Pattern.compile("&#x([0-9a-fA-F]+);|&#(\\d+);|&(amp|quot|apos|lt|gt|nbsp);", Pattern.CASE_INSENSITIVE);
     private static final Pattern HTML_DATA_ID = Pattern.compile(
         "data-id=\"([A-Za-z0-9_-]{10,128})\"[^>]*?(?:data-target=\"([^\"]*)\")?[^>]*?>[\\s\\S]{0,600}?(?:aria-label|data-tooltip)=\"([^\"]{1,220})\"",
         Pattern.CASE_INSENSITIVE
@@ -49,6 +54,10 @@ public final class ClassicDriveCloudRules {
 
     public interface HttpFetcher {
         FetchResult fetch(String folderId, String bearerToken) throws Exception;
+
+        default FetchResult fetch(String folderId, String resourceKey, String bearerToken) throws Exception {
+            return fetch(folderId, bearerToken);
+        }
     }
 
     public static final class FetchResult {
@@ -65,11 +74,17 @@ public final class ClassicDriveCloudRules {
         public final String id;
         public final String relativePath;
         public final int depth;
+        public final String resourceKey;
 
         public FolderTask(String id, String relativePath, int depth) {
+            this(id, relativePath, depth, "");
+        }
+
+        public FolderTask(String id, String relativePath, int depth, String resourceKey) {
             this.id = id;
             this.relativePath = relativePath == null ? "" : relativePath;
             this.depth = depth;
+            this.resourceKey = resourceKey == null ? "" : resourceKey;
         }
     }
 
@@ -133,6 +148,7 @@ public final class ClassicDriveCloudRules {
         try {
             URI uri = URI.create(rawUrl.trim());
             if (!"https".equalsIgnoreCase(uri.getScheme())) return false;
+            if (uri.getRawUserInfo() != null || uri.getPort() != -1) return false;
             String host = uri.getHost();
             if (host == null || host.isEmpty()) return false;
             String lower = host.toLowerCase(Locale.ROOT);
@@ -142,16 +158,52 @@ public final class ClassicDriveCloudRules {
         }
     }
 
-    public static String parseDriveFolderId(String rawInput) {
-        if (rawInput == null) return "";
+    public static final class ParsedLink {
+        public final String id;
+        public final boolean folder;
+        public final String resourceKey;
+
+        public ParsedLink(String id, boolean folder, String resourceKey) {
+            this.id = id;
+            this.folder = folder;
+            this.resourceKey = resourceKey == null ? "" : resourceKey;
+        }
+    }
+
+    public static ParsedLink parseDriveLink(String rawInput) {
+        if (rawInput == null) return null;
         String trimmed = rawInput.trim();
-        if (RAW_ID_PATTERN.matcher(trimmed).matches()) return trimmed;
-        if (!isAllowedUrl(trimmed)) return "";
+        if (RAW_ID_PATTERN.matcher(trimmed).matches()) {
+            return new ParsedLink(trimmed, true, "");
+        }
+        if (!isAllowedUrl(trimmed)) return null;
+        String resourceKey = "";
+        Matcher rkMatcher = QUERY_RK_PATTERN.matcher(trimmed);
+        if (rkMatcher.find()) {
+            String candidate = rkMatcher.group(1);
+            if (candidate != null && RESOURCE_KEY_PATTERN.matcher(candidate).matches()) {
+                resourceKey = candidate;
+            }
+        }
         Matcher folderMatcher = FOLDER_URL_PATTERN.matcher(trimmed);
-        if (folderMatcher.find()) return folderMatcher.group(1);
+        if (folderMatcher.find()) {
+            return new ParsedLink(folderMatcher.group(1), true, resourceKey);
+        }
+        Matcher fileMatcher = FILE_URL_PATTERN.matcher(trimmed);
+        if (fileMatcher.find()) {
+            return new ParsedLink(fileMatcher.group(1), false, resourceKey);
+        }
         Matcher queryMatcher = QUERY_ID_PATTERN.matcher(trimmed);
-        if (queryMatcher.find()) return queryMatcher.group(1);
-        return "";
+        if (queryMatcher.find()) {
+            boolean isFolder = trimmed.toLowerCase(Locale.ROOT).contains("folder");
+            return new ParsedLink(queryMatcher.group(1), isFolder, resourceKey);
+        }
+        return null;
+    }
+
+    public static String parseDriveFolderId(String rawInput) {
+        ParsedLink link = parseDriveLink(rawInput);
+        return link == null ? "" : link.id;
     }
 
     public static boolean isExcludedPcFile(String filename) {
@@ -166,63 +218,100 @@ public final class ClassicDriveCloudRules {
     }
 
     public static String directDownloadUrl(String fileId) {
-        return "https://drive.usercontent.google.com/download?id=" + fileId + "&export=download&confirm=t";
+        return directDownloadUrl(fileId, "");
+    }
+
+    public static String directDownloadUrl(String fileId, String resourceKey) {
+        String base = "https://drive.usercontent.google.com/download?id=" + fileId + "&export=download&confirm=t";
+        if (resourceKey != null && !resourceKey.isEmpty()) {
+            return base + "&resourcekey=" + resourceKey;
+        }
+        return base;
     }
 
     public static String detectSystemHint(String relativePath, String filename) {
-        String joined = ((relativePath == null ? "" : relativePath) + "/" + (filename == null ? "" : filename)).toLowerCase(Locale.ROOT);
-        if (joined.contains("ppsspp") || joined.contains("/psp/") || joined.endsWith(".cso")) return "psp";
-        if (joined.contains("/nds/") || joined.endsWith(".nds")) return "nds";
-        if (joined.contains("/3ds/") || joined.endsWith(".3ds") || joined.endsWith(".3dsx")) return "3ds";
-        if (joined.contains("/gba/") || joined.endsWith(".gba")) return "gba";
-        if (joined.contains("/gbc/") || joined.endsWith(".gbc")) return "gbc";
-        if (joined.contains("/gb/") || joined.endsWith(".gb")) return "gb";
-        if (joined.contains("/snes/") || joined.endsWith(".sfc") || joined.endsWith(".smc")) return "snes";
-        if (joined.contains("/nes/") || joined.endsWith(".nes")) return "nes";
-        if (joined.contains("/n64/") || joined.endsWith(".z64") || joined.endsWith(".n64")) return "n64";
+        String joined = ((relativePath == null ? "" : relativePath) + "/" + (filename == null ? "" : filename))
+            .toLowerCase(Locale.ROOT).replace('\\', '/');
+        String ext = ClassicsRules.extension(filename);
+        if (joined.contains("ppsspp") || joined.contains("/psp/") || joined.contains("/playstation portable/") || joined.contains("/sony psp/") || "cso".equals(ext)) return "psp";
+        if (joined.contains("/nds/") || "nds".equals(ext)) return "nds";
+        if (joined.contains("/3ds/") || "3ds".equals(ext) || "3dsx".equals(ext) || "cci".equals(ext) || "cxi".equals(ext)) return "3ds";
+        if (joined.contains("/gba/") || "gba".equals(ext)) return "gba";
+        if (joined.contains("/gbc/") || "gbc".equals(ext)) return "gbc";
+        if (joined.contains("/gb/") || "gb".equals(ext)) return "gb";
+        if (joined.contains("/snes/") || "sfc".equals(ext) || "smc".equals(ext)) return "snes";
+        if (joined.contains("/nes/") || "nes".equals(ext)) return "nes";
+        if (joined.contains("/n64/") || "z64".equals(ext) || "n64".equals(ext) || "v64".equals(ext)) return "n64";
         if (joined.contains("/ps1/") || joined.contains("/psx/")) return "ps1";
-        if (joined.contains("/ps2/") || joined.endsWith(".isz")) return "ps2";
-        if (joined.contains("/dreamcast/") || joined.endsWith(".gdi")) return "dreamcast";
-        if (joined.contains("/genesis/") || joined.contains("/megadrive/") || joined.endsWith(".md")) return "megadrive";
+        if (joined.contains("/ps2/") || "isz".equals(ext)) return "ps2";
+        if (joined.contains("/dreamcast/") || "gdi".equals(ext)) return "dreamcast";
+        if (joined.contains("/genesis/") || joined.contains("/megadrive/") || "md".equals(ext) || "gen".equals(ext)) return "megadrive";
+        if (joined.contains("/sms/") || "sms".equals(ext)) return "sms";
+        if (joined.contains("/gg/") || "gg".equals(ext)) return "gg";
+        if (joined.contains("/pce/") || "pce".equals(ext)) return "pce";
+        if (joined.contains("/neogeo/") || "neo".equals(ext)) return "neogeo";
+        if (joined.contains("/ws/") || "ws".equals(ext)) return "ws";
+        if (joined.contains("/wsc/") || "wsc".equals(ext)) return "wsc";
         return "";
     }
 
     public static ParsedFolderPage parseFolderHtml(String html, String parentRelativePath, String folderId, int nextDepth) {
         ParsedFolderPage page = new ParsedFolderPage();
         if (html == null || html.isEmpty()) return page;
-        Map<String, String> folders = new LinkedHashMap<>();
-        Map<String, String> files = new LinkedHashMap<>();
+        Map<String, FolderTask> folders = new LinkedHashMap<>();
+        Map<String, ParsedLink> files = new LinkedHashMap<>();
+        Map<String, String> fileNames = new LinkedHashMap<>();
+        String prefix = parentRelativePath == null ? "" : parentRelativePath;
 
-        Matcher mFolder = HTML_FOLDER_LINK.matcher(html);
-        while (mFolder.find()) {
-            folders.putIfAbsent(mFolder.group(1), unescapeHtml(mFolder.group(2).trim()));
+        Matcher anchorMatcher = HTML_ANCHOR_PATTERN.matcher(html);
+        while (anchorMatcher.find()) {
+            String rawHref = unescapeHtml(anchorMatcher.group(1)).trim();
+            ParsedLink link = parseDriveLink(rawHref);
+            if (link == null) continue;
+            String inner = anchorMatcher.group(2);
+            String extracted = "";
+            Matcher titleMatcher = FLIP_TITLE_PATTERN.matcher(inner);
+            if (titleMatcher.find()) {
+                extracted = stripTagsAndDecode(titleMatcher.group(1));
+            }
+            if (extracted.isEmpty()) {
+                extracted = stripTagsAndDecode(inner);
+            }
+            if (extracted.length() > 300) extracted = extracted.substring(0, 300);
+            extracted = extracted.trim();
+            if (extracted.isEmpty()) continue;
+
+            if (link.folder) {
+                String rel = prefix.isEmpty() ? extracted : prefix + "/" + extracted;
+                folders.putIfAbsent(link.id, new FolderTask(link.id, rel, nextDepth, link.resourceKey));
+            } else {
+                files.putIfAbsent(link.id, link);
+                fileNames.putIfAbsent(link.id, extracted);
+            }
         }
-        Matcher mFile = HTML_FILE_LINK.matcher(html);
-        while (mFile.find()) {
-            files.putIfAbsent(mFile.group(1), unescapeHtml(mFile.group(2).trim()));
-        }
+
         Matcher mData = HTML_DATA_ID.matcher(html);
         while (mData.find()) {
             String id = mData.group(1);
             String target = mData.group(2) == null ? "" : mData.group(2).toLowerCase(Locale.ROOT);
-            String name = unescapeHtml(mData.group(3).trim());
+            String name = stripTagsAndDecode(mData.group(3));
             if (name.isEmpty()) continue;
             if ("folder".equals(target) || (!name.contains(".") && !isAcceptedClassicFile(name))) {
-                folders.putIfAbsent(id, name);
+                String rel = prefix.isEmpty() ? name : prefix + "/" + name;
+                folders.putIfAbsent(id, new FolderTask(id, rel, nextDepth, ""));
             } else {
-                files.putIfAbsent(id, name);
+                files.putIfAbsent(id, new ParsedLink(id, false, ""));
+                fileNames.putIfAbsent(id, name);
             }
         }
 
-        String prefix = parentRelativePath == null ? "" : parentRelativePath;
-        for (Map.Entry<String, String> entry : folders.entrySet()) {
-            String rel = prefix.isEmpty() ? entry.getValue() : prefix + "/" + entry.getValue();
-            page.subfolders.add(new FolderTask(entry.getKey(), rel, nextDepth));
-        }
-        for (Map.Entry<String, String> entry : files.entrySet()) {
+        page.subfolders.addAll(folders.values());
+        for (Map.Entry<String, String> entry : fileNames.entrySet()) {
             String name = entry.getValue();
             if (!isAcceptedClassicFile(name)) continue;
             String rel = prefix.isEmpty() ? name : prefix + "/" + name;
+            ParsedLink link = files.get(entry.getKey());
+            String rk = link == null ? "" : link.resourceKey;
             page.files.add(new CloudGameEntry(
                 entry.getKey(),
                 name,
@@ -232,10 +321,21 @@ public final class ClassicDriveCloudRules {
                 prefix,
                 -1L,
                 detectSystemHint(rel, name),
-                directDownloadUrl(entry.getKey())
+                directDownloadUrl(entry.getKey(), rk)
             ));
         }
         return page;
+    }
+
+    public static boolean isServiceLoginHtml(String html) {
+        return html != null && html.toLowerCase(Locale.ROOT).contains("accounts.google.com/servicelogin");
+    }
+
+    public static String extractSingleFileTitle(String html) {
+        if (html == null) return "";
+        Matcher m = Pattern.compile("<title[^>]*>([\\s\\S]*?)</title>", Pattern.CASE_INSENSITIVE).matcher(html);
+        if (!m.find()) return "";
+        return stripTagsAndDecode(m.group(1)).replaceFirst("(?i)\\s*[-–]\\s*Google Drive\\s*$", "").trim();
     }
 
     public static boolean looksLikeHtmlPayload(byte[] headerBytes, int length) {
@@ -254,20 +354,47 @@ public final class ClassicDriveCloudRules {
                                               boolean refresh, String folderUrlInput) throws Exception {
         ScanCheckpoint state = checkpoint == null ? new ScanCheckpoint() : checkpoint;
         if (refresh) {
-            String folderId = parseDriveFolderId(folderUrlInput);
-            if (folderId.isEmpty()) throw new IllegalArgumentException("Link de pasta do Google Drive inválido (use HTTPS).");
+            ParsedLink rootLink = parseDriveLink(folderUrlInput);
+            if (rootLink == null || rootLink.id.isEmpty()) {
+                throw new IllegalArgumentException("Link de pasta do Google Drive inválido (use HTTPS).");
+            }
             Map<String, CloudGameEntry> preservedLocal = new LinkedHashMap<>(state.itemsById);
             state.rootUrl = folderUrlInput.trim();
-            state.rootFolderId = folderId;
+            state.rootFolderId = rootLink.id;
             state.pendingFolders.clear();
             state.visitedFolderIds.clear();
             state.seenFileIds.clear();
-            state.pendingFolders.add(new FolderTask(folderId, "", 0));
             state.completed = false;
             state.totalFoldersRead = 0;
             state.lastError = "";
             state.itemsById.clear();
             state.itemsById.putAll(preservedLocal);
+            if (!rootLink.folder) {
+                FetchResult singleResp = fetcher.fetch(rootLink.id, rootLink.resourceKey, bearerToken);
+                if (singleResp.statusCode == 401 || singleResp.statusCode == 403 || isServiceLoginHtml(singleResp.body)) {
+                    throw new IllegalStateException("Pasta privada ou sem permissão no Google Drive.");
+                }
+                String name = extractSingleFileTitle(singleResp.body);
+                if (!isAcceptedClassicFile(name)) {
+                    throw new IllegalArgumentException("O link não aponta para um jogo clássico compatível.");
+                }
+                CloudGameEntry entry = new CloudGameEntry(
+                    rootLink.id, name, ClassicsRules.cleanTitle(name), name, rootLink.id, "", -1L,
+                    detectSystemHint(name, name), directDownloadUrl(rootLink.id, rootLink.resourceKey)
+                );
+                CloudGameEntry prev = state.itemsById.get(rootLink.id);
+                if (prev != null && isAvailabilityPlayableLocally(prev.downloadedLocalPath)) {
+                    entry.downloadedLocalPath = prev.downloadedLocalPath;
+                    entry.downloadedBytes = prev.downloadedBytes;
+                    entry.downloadStatus = "available";
+                }
+                state.itemsById.put(rootLink.id, entry);
+                state.completed = true;
+                state.totalFoldersRead = 1;
+                state.updatedAtMs = System.currentTimeMillis();
+                return state;
+            }
+            state.pendingFolders.add(new FolderTask(rootLink.id, "", 0, rootLink.resourceKey));
         } else if (state.rootFolderId.isEmpty()) {
             throw new IllegalStateException("Nenhuma varredura do Google Drive configurada.");
         }
@@ -283,7 +410,7 @@ public final class ClassicDriveCloudRules {
             }
             FetchResult response;
             try {
-                response = fetcher.fetch(current.id, bearerToken);
+                response = fetcher.fetch(current.id, current.resourceKey, bearerToken);
             } catch (Exception netErr) {
                 state.pendingFolders.add(0, current);
                 state.lastError = "Falha de rede (progresso preservado): " + netErr.getMessage();
@@ -309,11 +436,18 @@ public final class ClassicDriveCloudRules {
                 throw new IllegalStateException(state.lastError);
             }
 
+            ParsedFolderPage parsed = parseFolderHtml(response.body, current.relativePath, current.id, current.depth + 1);
+            if (isServiceLoginHtml(response.body) && parsed.subfolders.isEmpty() && parsed.files.isEmpty()) {
+                state.pendingFolders.add(0, current);
+                state.lastError = "Pasta privada ou restrita. Compartilhe como 'Qualquer pessoa com o link' ou informe um token OAuth.";
+                state.updatedAtMs = System.currentTimeMillis();
+                throw new IllegalStateException(state.lastError);
+            }
+
             state.visitedFolderIds.add(current.id);
             foldersThisBatch++;
             state.totalFoldersRead++;
 
-            ParsedFolderPage parsed = parseFolderHtml(response.body, current.relativePath, current.id, current.depth + 1);
             for (FolderTask sub : parsed.subfolders) {
                 if (!state.visitedFolderIds.contains(sub.id)) {
                     state.pendingFolders.add(sub);
@@ -348,8 +482,42 @@ public final class ClassicDriveCloudRules {
         return state;
     }
 
-    private static String unescapeHtml(String text) {
-        return text.replace("&amp;", "&").replace("&quot;", "\"").replace("&#39;", "'")
-            .replace("&lt;", "<").replace("&gt;", ">");
+    static String stripTagsAndDecode(String html) {
+        if (html == null) return "";
+        String stripped = HTML_TAG_PATTERN.matcher(html).replaceAll("");
+        return unescapeHtml(stripped).replaceAll("\\s+", " ").trim();
+    }
+
+    static String unescapeHtml(String text) {
+        if (text == null || text.isEmpty()) return "";
+        Matcher m = HTML_ENTITY_PATTERN.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        while (m.find()) {
+            String replacement = "";
+            if (m.group(1) != null) {
+                try {
+                    int cp = Integer.parseInt(m.group(1), 16);
+                    if (cp >= 0 && cp <= 0x10ffff) replacement = new String(Character.toChars(cp));
+                } catch (Exception ignored) {}
+            } else if (m.group(2) != null) {
+                try {
+                    int cp = Integer.parseInt(m.group(2));
+                    if (cp >= 0 && cp <= 0x10ffff) replacement = new String(Character.toChars(cp));
+                } catch (Exception ignored) {}
+            } else if (m.group(3) != null) {
+                switch (m.group(3).toLowerCase(Locale.ROOT)) {
+                    case "amp": replacement = "&"; break;
+                    case "quot": replacement = "\""; break;
+                    case "apos": replacement = "'"; break;
+                    case "lt": replacement = "<"; break;
+                    case "gt": replacement = ">"; break;
+                    case "nbsp": replacement = " "; break;
+                    default: replacement = ""; break;
+                }
+            }
+            m.appendReplacement(sb, Matcher.quoteReplacement(replacement));
+        }
+        m.appendTail(sb);
+        return sb.toString();
     }
 }

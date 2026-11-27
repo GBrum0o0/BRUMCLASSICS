@@ -24,6 +24,22 @@ public final class ClassicDriveCloudServiceTest {
             throw new AssertionError("Payload HTML de erro precisa ser rejeitado antes de salvar ROM");
         }
 
+        // Verify real nested Drive embeddedfolderview flip-entry HTML + HTML entities + resourcekey
+        String nestedHtml = "<title>PSP - Google Drive</title>"
+            + "<div class=\"flip-entry\"><a href=\"https://drive.google.com/file/d/pspFile_1234567890/view?usp=drive_web&amp;resourcekey=0-Rk1\">"
+            + "<div class=\"flip-entry-thumb\"></div>"
+            + "<div class=\"flip-entry-title\">Crisis Core &amp; Final Fantasy &#x28;USA&#x29;.cso</div></a></div>"
+            + "<a href=\"https://drive.google.com/drive/folders/subPsp_1234567890?usp=drive_web&amp;resourcekey=0-Rk2\">"
+            + "<div class=\"flip-entry-title\">PSP</div></a>";
+        ClassicDriveCloudRules.ParsedFolderPage parsedNested = ClassicDriveCloudRules.parseFolderHtml(nestedHtml, "", "root", 1);
+        if (parsedNested.files.size() != 1 || !"Crisis Core & Final Fantasy (USA).cso".equals(parsedNested.files.get(0).name)) {
+            throw new AssertionError("Falha ao interpretar flip-entry-title aninhado de arquivo no Drive");
+        }
+        if (parsedNested.subfolders.size() != 1 || !"PSP".equals(parsedNested.subfolders.get(0).relativePath)
+                || !"0-Rk2".equals(parsedNested.subfolders.get(0).resourceKey)) {
+            throw new AssertionError("Falha ao interpretar subpasta aninhada ou resourcekey no Drive");
+        }
+
         // Test batched resumable scan > 100 folders + cycle protection + network recovery
         final Map<String, Integer> calls = new HashMap<>();
         final boolean[] failFolder1 = {true};
@@ -32,10 +48,11 @@ public final class ClassicDriveCloudServiceTest {
             if ("rootFolder_123456".equals(folderId)) {
                 StringBuilder sb = new StringBuilder();
                 for (int i = 0; i < 105; i++) {
-                    sb.append("<a href=\"https://drive.google.com/drive/folders/subFolder_1000").append(i).append("\">Pasta ").append(i).append("</a>");
+                    sb.append("<a href=\"https://drive.google.com/drive/folders/subFolder_1000").append(i)
+                      .append("\"><div class=\"flip-entry-thumb\"></div><div class=\"flip-entry-title\">Pasta ").append(i).append("</div></a>");
                 }
-                sb.append("<a href=\"https://drive.google.com/file/d/fileId_GameGba_001/view\">Pokemon Emerald (U).gba</a>");
-                sb.append("<a href=\"https://drive.google.com/file/d/fileId_ExePc_001/view\">LauncherSetup.exe</a>");
+                sb.append("<a href=\"https://drive.google.com/file/d/fileId_GameGba_001/view\"><div class=\"flip-entry-title\">Pokemon Emerald (U).gba</div></a>");
+                sb.append("<a href=\"https://drive.google.com/file/d/fileId_ExePc_001/view\"><div class=\"flip-entry-title\">LauncherSetup.exe</div></a>");
                 return new ClassicDriveCloudRules.FetchResult(200, sb.toString());
             }
             if ("subFolder_10001".equals(folderId) && failFolder1[0]) {

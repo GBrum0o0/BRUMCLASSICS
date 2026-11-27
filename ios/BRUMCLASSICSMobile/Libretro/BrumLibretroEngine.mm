@@ -335,10 +335,10 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     CADisplayLink *_displayLink;
     UIImageView *_screen;
     UILabel *_statusLabel;
-    UIButton *_fastForwardButton;
-    UIButton *_displayModeButton;
-    UIButton *_stateButton;
-    UIButton *_controlsButton;
+    UIButton *_brumMenuButton;
+    UIButton *_exitFallbackButton;
+    UIImageView *_fastForwardBadge;
+    NSUInteger _statusToastToken;
     UIView *_touchReticle;
     NSMutableArray<UIView *> *_padOverlayViews;
     BOOL _controlsHidden;
@@ -408,6 +408,9 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
 - (void)stopCore;
 - (void)persistSaveRAM;
 - (void)updateDisplayModeButton;
+- (void)showBrumQuickMenu;
+- (void)refreshVideoFilterPresentation;
+- (void)applyVirtualControlsStyle;
 - (void)showStateMenu;
 - (void)saveStateAtSlot:(NSInteger)slot;
 - (void)loadStateAtSlot:(NSInteger)slot;
@@ -615,7 +618,7 @@ static bool BrumEnvironment(unsigned command, void *data) {
             [host->_diagnostics recordMessage:text level:message->level];
             if (message->target != 1) { // RETRO_MESSAGE_TARGET_LOG is not an OSD notification.
                 dispatch_async(dispatch_get_main_queue(), ^{
-                    if (!host->_stopped && !host->_shutdownRequested) host->_statusLabel.text = text;
+                    if (!host->_stopped && !host->_shutdownRequested) [host showStateStatus:text error:NO];
                 });
             }
             return true;
@@ -665,7 +668,7 @@ static bool BrumEnvironment(unsigned command, void *data) {
                 NSString *text = [NSString stringWithUTF8String:message->msg];
                 [host->_diagnostics recordMessage:text ?: @"Mensagem inválida do núcleo." level:2];
                 dispatch_async(dispatch_get_main_queue(), ^{
-                    if (!host->_stopped && !host->_shutdownRequested) host->_statusLabel.text = text;
+                    if (!host->_stopped && !host->_shutdownRequested && text.length) [host showStateStatus:text error:NO];
                 });
             }
             return true;
@@ -703,7 +706,13 @@ static void BrumVideo(const void *data, unsigned width, unsigned height, size_t 
     if (!target) return;
     NSData *pixels = [NSData dataWithBytesNoCopy:target length:byteCount freeWhenDone:YES];
     if (data == BrumHardwareFrameBuffer) {
-        if (!host->_hardwareInitialized || width > (unsigned)host->_hardwareSurfaceSize || height > (unsigned)host->_hardwareSurfaceSize) return;
+        if (!host->_hardwareInitialized) return;
+        if (width > (unsigned)host->_hardwareSurfaceSize || height > (unsigned)host->_hardwareSurfaceSize) {
+            if (host->_videoCallbackCount <= 3) {
+                [host->_diagnostics recordMessage:[NSString stringWithFormat:@"Quadro HW (%ux%u) excedeu a superfície GL (%dpx).", width, height, (int)host->_hardwareSurfaceSize] level:2];
+            }
+            return;
+        }
         while (glGetError() != GL_NO_ERROR) {}
         GLint prevFramebuffer = 0;
         GLint prevReadFramebuffer = 0, prevDrawFramebuffer = 0, prevReadBuffer = GL_COLOR_ATTACHMENT0;
@@ -1273,6 +1282,13 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     _hardwareInitialized = YES;
+    const char *glVendor = (const char *)glGetString(GL_VENDOR);
+    const char *glRenderer = (const char *)glGetString(GL_RENDERER);
+    const char *glVersion = (const char *)glGetString(GL_VERSION);
+    [_diagnostics recordMessage:[NSString stringWithFormat:@"GL HW pronto (%@, FBO %dpx): %s | %s | %s",
+        api == kEAGLRenderingAPIOpenGLES3 ? @"GLES3" : @"GLES2",
+        (int)_hardwareSurfaceSize,
+        glVendor ?: "?", glRenderer ?: "?", glVersion ?: "?"] level:0];
     if (_hardwareCallback.context_reset) _hardwareCallback.context_reset();
     glBindFramebuffer(GL_FRAMEBUFFER, _hardwareFramebuffer);
     return YES;
@@ -1328,8 +1344,11 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     }
     if (_startupError) {
         [_diagnostics recordFailure:_startupError.localizedDescription];
+        _exitFallbackButton.hidden = NO;
         _statusLabel.text = _startupError.localizedDescription;
         _statusLabel.textColor = UIColor.systemRedColor;
+        _statusLabel.hidden = NO;
+        _statusLabel.alpha = 1;
         return;
     }
     NSError *error = nil;
@@ -1337,8 +1356,11 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         _startupError = error ?: [NSError errorWithDomain:BrumLibretroErrorDomain code:13 userInfo:@{NSLocalizedDescriptionKey: @"Não foi possível iniciar o jogo."}];
         [_diagnostics recordFailure:_startupError.localizedDescription];
         [self stopCore];
+        _exitFallbackButton.hidden = NO;
         _statusLabel.text = error.localizedDescription ?: @"Não foi possível iniciar o jogo.";
         _statusLabel.textColor = UIColor.systemRedColor;
+        _statusLabel.hidden = NO;
+        _statusLabel.alpha = 1;
     } else {
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(applicationWillResignActive:)
@@ -1409,8 +1431,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         dispatch_async(dispatch_get_main_queue(), ^{ if (!wasPaused) [weakSelf resume]; });
     };
     if (share.popoverPresentationController) {
-        share.popoverPresentationController.sourceView = _statusLabel;
-        share.popoverPresentationController.sourceRect = _statusLabel.bounds;
+        UIView *anchor = _brumMenuButton ?: self.view;
+        share.popoverPresentationController.sourceView = anchor;
+        share.popoverPresentationController.sourceRect = anchor.bounds;
     }
     [self presentViewController:share animated:YES completion:nil];
 }
@@ -1524,6 +1547,57 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [self updatePauseState];
 }
 
+- (void)refreshVideoFilterPresentation {
+    if (!_screen || !_singleScreenLayer) return;
+    NSString *magFilter = ([_videoFilterMode isEqualToString:@"bilinear_subtle"] || [_videoFilterMode isEqualToString:@"sharp_bilinear"]) ? kCAFilterLinear : kCAFilterNearest;
+    _screen.layer.magnificationFilter = magFilter;
+    _singleScreenLayer.magnificationFilter = magFilter;
+    for (CALayer *layer in _screenLayers) layer.magnificationFilter = magFilter;
+    if (_scanlineOverlayLayer) {
+        [_scanlineOverlayLayer removeFromSuperlayer];
+        _scanlineOverlayLayer = nil;
+    }
+    if ([_videoFilterMode isEqualToString:@"crt_scanlines"] || [_videoFilterMode isEqualToString:@"lcd_grid"]) {
+        _scanlineOverlayLayer = [CALayer layer];
+        UIGraphicsBeginImageContextWithOptions(CGSizeMake(4, 4), NO, 1.0);
+        CGContextRef ctx = UIGraphicsGetCurrentContext();
+        if ([_videoFilterMode isEqualToString:@"crt_scanlines"]) {
+            [[UIColor colorWithWhite:0 alpha:0.22] setFill];
+            CGContextFillRect(ctx, CGRectMake(0, 1, 4, 1));
+            CGContextFillRect(ctx, CGRectMake(0, 3, 4, 1));
+        } else {
+            [[UIColor colorWithWhite:0 alpha:0.16] setFill];
+            CGContextFillRect(ctx, CGRectMake(0, 3, 4, 1));
+            CGContextFillRect(ctx, CGRectMake(3, 0, 1, 4));
+        }
+        UIImage *tile = UIGraphicsGetImageFromCurrentImageContext();
+        UIGraphicsEndImageContext();
+        if (tile) {
+            _scanlineOverlayLayer.backgroundColor = [UIColor colorWithPatternImage:tile].CGColor;
+            _scanlineOverlayLayer.zPosition = 2;
+            [_screen.layer addSublayer:_scanlineOverlayLayer];
+        }
+    }
+    [self layoutScreens];
+}
+
+- (void)applyVirtualControlsStyle {
+    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+    id opacityPref = [defaults objectForKey:@"BrumVirtualControlsOpacity"];
+    CGFloat alpha = opacityPref ? MIN(1.0, MAX(0.25, [defaults doubleForKey:@"BrumVirtualControlsOpacity"])) : 0.85;
+    id scalePref = [defaults objectForKey:@"BrumVirtualControlsScale"];
+    CGFloat scale = scalePref ? MIN(1.25, MAX(0.80, [defaults doubleForKey:@"BrumVirtualControlsScale"])) : 1.0;
+    for (UIView *view in _padOverlayViews) {
+        view.alpha = alpha;
+    }
+    if (_digitalPad) _digitalPad.alpha = alpha;
+    CGAffineTransform scaleTransform = CGAffineTransformMakeScale(scale, scale);
+    if (_directionControl) _directionControl.transform = scaleTransform;
+    if (_digitalPad) _digitalPad.transform = scaleTransform;
+    if (_actionControl) _actionControl.transform = scaleTransform;
+    if (_rightVirtualStick) _rightVirtualStick.transform = scaleTransform;
+}
+
 - (void)buildInterface {
     self.view.multipleTouchEnabled = YES;
     _virtualButtons = [NSMutableArray array];
@@ -1548,33 +1622,8 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [_screen addGestureRecognizer:touch];
     [self.view addSubview:_screen];
     _singleScreenLayer = [CALayer layer];
-    NSString *magFilter = ([_videoFilterMode isEqualToString:@"bilinear_subtle"] || [_videoFilterMode isEqualToString:@"sharp_bilinear"]) ? kCAFilterLinear : kCAFilterNearest;
-    _screen.layer.magnificationFilter = magFilter;
-    _singleScreenLayer.magnificationFilter = magFilter;
     _singleScreenLayer.contentsGravity = kCAGravityResize;
     [_screen.layer addSublayer:_singleScreenLayer];
-
-    if ([_videoFilterMode isEqualToString:@"crt_scanlines"] || [_videoFilterMode isEqualToString:@"lcd_grid"]) {
-        _scanlineOverlayLayer = [CALayer layer];
-        UIGraphicsBeginImageContextWithOptions(CGSizeMake(4, 4), NO, 1.0);
-        CGContextRef ctx = UIGraphicsGetCurrentContext();
-        if ([_videoFilterMode isEqualToString:@"crt_scanlines"]) {
-            [[UIColor colorWithWhite:0 alpha:0.22] setFill];
-            CGContextFillRect(ctx, CGRectMake(0, 1, 4, 1));
-            CGContextFillRect(ctx, CGRectMake(0, 3, 4, 1));
-        } else {
-            [[UIColor colorWithWhite:0 alpha:0.16] setFill];
-            CGContextFillRect(ctx, CGRectMake(0, 3, 4, 1));
-            CGContextFillRect(ctx, CGRectMake(3, 0, 1, 4));
-        }
-        UIImage *tile = UIGraphicsGetImageFromCurrentImageContext();
-        UIGraphicsEndImageContext();
-        if (tile) {
-            _scanlineOverlayLayer.backgroundColor = [UIColor colorWithPatternImage:tile].CGColor;
-            _scanlineOverlayLayer.zPosition = 2;
-            [_screen.layer addSublayer:_scanlineOverlayLayer];
-        }
-    }
 
     _touchReticle = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 30, 30)];
     _touchReticle.layer.cornerRadius = 15;
@@ -1585,58 +1634,54 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _touchReticle.hidden = YES;
     [_screen addSubview:_touchReticle];
 
-    UILabel *title = [[UILabel alloc] init];
-    title.translatesAutoresizingMaskIntoConstraints = NO;
-    title.text = _gameTitle;
-    title.textColor = UIColor.whiteColor;
-    title.font = [UIFont systemFontOfSize:14 weight:UIFontWeightBold];
-    title.lineBreakMode = NSLineBreakByTruncatingTail;
-    [self.view addSubview:title];
+    _exitFallbackButton = [self controlButton:@"←  SAIR" identifier:-1];
+    _exitFallbackButton.accessibilityIdentifier = @"brum-core-exit";
+    _exitFallbackButton.hidden = (_startupError == nil);
+    [_exitFallbackButton addTarget:self action:@selector(closeEmulator) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:_exitFallbackButton];
 
-    UIButton *close = [self controlButton:@"←  SAIR" identifier:-1];
-    close.accessibilityIdentifier = @"brum-core-exit";
-    [close addTarget:self action:@selector(closeEmulator) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:close];
+    _brumMenuButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    _brumMenuButton.translatesAutoresizingMaskIntoConstraints = NO;
+    _brumMenuButton.backgroundColor = [UIColor colorWithWhite:0.08 alpha:0.65];
+    _brumMenuButton.layer.cornerRadius = 22;
+    _brumMenuButton.layer.borderWidth = 1.0;
+    _brumMenuButton.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.26].CGColor;
+    _brumMenuButton.alpha = 0.50;
+    UIImage *logoImage = [UIImage imageNamed:@"BrumLogo"];
+    if (logoImage) {
+        [_brumMenuButton setImage:logoImage forState:UIControlStateNormal];
+        _brumMenuButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
+        _brumMenuButton.imageEdgeInsets = UIEdgeInsetsMake(6, 6, 6, 6);
+    } else {
+        [_brumMenuButton setImage:[UIImage systemImageNamed:@"gamecontroller.fill"] forState:UIControlStateNormal];
+        _brumMenuButton.tintColor = UIColor.whiteColor;
+    }
+    _brumMenuButton.accessibilityLabel = @"Menu rápido BRUMCLASSICS";
+    _brumMenuButton.accessibilityHint = @"Abre controles, ajustes, slots, dimensão de tela, gráficos, avanço rápido e saída.";
+    [_brumMenuButton addTarget:self action:@selector(showBrumQuickMenu) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:_brumMenuButton];
 
-    _fastForwardButton = [self controlButton:@"  5×" identifier:-1];
-    UIImageSymbolConfiguration *fastSymbol = [UIImageSymbolConfiguration configurationWithPointSize:13 weight:UIImageSymbolWeightBlack];
-    [_fastForwardButton setImage:[[UIImage systemImageNamed:@"forward.fill"] imageWithConfiguration:fastSymbol] forState:UIControlStateNormal];
-    _fastForwardButton.tintColor = UIColor.whiteColor;
-    _fastForwardButton.accessibilityLabel = @"Avanço rápido, cinco vezes";
-    _fastForwardButton.accessibilityValue = @"Desativado";
-    [_fastForwardButton addTarget:self action:@selector(toggleFastForward) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:_fastForwardButton];
-
-    _displayModeButton = [self controlButton:@"" identifier:-1];
-    UIImageSymbolConfiguration *displaySymbol = [UIImageSymbolConfiguration configurationWithPointSize:14 weight:UIImageSymbolWeightBlack];
-    [_displayModeButton setImage:[[UIImage systemImageNamed:@"arrow.up.left.and.arrow.down.right"] imageWithConfiguration:displaySymbol] forState:UIControlStateNormal];
-    _displayModeButton.accessibilityLabel = @"Modo de exibição";
-    [_displayModeButton addTarget:self action:@selector(toggleDisplayMode) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:_displayModeButton];
-    [self updateDisplayModeButton];
-
-    _stateButton = [self controlButton:@"SLOTS" identifier:-1];
-    _stateButton.accessibilityLabel = @"Estados rápidos";
-    [_stateButton addTarget:self action:@selector(showStateMenu) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:_stateButton];
-
-    _controlsButton = [self controlButton:@"" identifier:-1];
-    UIImageSymbolConfiguration *padSymbol = [UIImageSymbolConfiguration configurationWithPointSize:14 weight:UIImageSymbolWeightBold];
-    [_controlsButton setImage:[[UIImage systemImageNamed:@"gamecontroller.fill"] imageWithConfiguration:padSymbol] forState:UIControlStateNormal];
-    _controlsButton.accessibilityLabel = @"Mostrar ou ocultar controles na tela";
-    [_controlsButton addTarget:self action:@selector(toggleControlsVisibility) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:_controlsButton];
+    _fastForwardBadge = [[UIImageView alloc] initWithImage:[[UIImage systemImageNamed:@"forward.fill"] imageWithConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:11 weight:UIImageSymbolWeightBlack]]];
+    _fastForwardBadge.translatesAutoresizingMaskIntoConstraints = NO;
+    _fastForwardBadge.tintColor = [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:1];
+    _fastForwardBadge.hidden = YES;
+    _fastForwardBadge.accessibilityLabel = @"Avanço rápido ativo";
+    [self.view addSubview:_fastForwardBadge];
 
     _statusLabel = [[UILabel alloc] init];
     _statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
     _statusLabel.text = _retroAchievementsGameID > 0
-        ? [NSString stringWithFormat:@"BRUM CORE · %@ · RA ID %ld (PREPARAÇÃO)", _coreDisplayName, (long)_retroAchievementsGameID]
+        ? [NSString stringWithFormat:@"BRUM CORE · %@ · RA ID %ld", _coreDisplayName, (long)_retroAchievementsGameID]
         : [NSString stringWithFormat:@"BRUM CORE · %@", _coreDisplayName];
     _statusLabel.textColor = [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:1];
+    _statusLabel.backgroundColor = [UIColor colorWithWhite:0.06 alpha:0.78];
+    _statusLabel.layer.cornerRadius = 8;
+    _statusLabel.clipsToBounds = YES;
+    _statusLabel.textAlignment = NSTextAlignmentCenter;
     _statusLabel.font = [UIFont monospacedSystemFontOfSize:10 weight:UIFontWeightBold];
-    _statusLabel.userInteractionEnabled = YES;
-    _statusLabel.accessibilityHint = @"Toque para compartilhar o diagnóstico local desta sessão.";
-    [_statusLabel addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(shareDiagnostics)]];
+    _statusLabel.userInteractionEnabled = NO;
+    _statusLabel.hidden = !_performanceHUDEnabled;
+    _statusLabel.alpha = _performanceHUDEnabled ? 1 : 0;
     [self.view addSubview:_statusLabel];
 
     const char *systemID = _emulatedSystemID.UTF8String;
@@ -1651,13 +1696,12 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     UIView *up = hasAnalogPad ? [self analogPad] : [self directionPad];
     UIView *actions = profile ? [self profileActionPad:profile->face] : [UIView new];
     if (!profile) {
-        _statusLabel.text = @"CONTROLE VIRTUAL INDISPONÍVEL PARA ESTE SISTEMA";
-        _statusLabel.textColor = UIColor.systemRedColor;
+        [self showStateStatus:@"CONTROLE VIRTUAL INDISPONÍVEL PARA ESTE SISTEMA" error:YES];
         actions.translatesAutoresizingMaskIntoConstraints = NO;
         [actions.widthAnchor constraintEqualToConstant:1].active = YES;
         [actions.heightAnchor constraintEqualToConstant:1].active = YES;
     } else if (profile->face == brum::VirtualFace::arcadeSix) {
-        _statusLabel.text = [NSString stringWithFormat:@"BRUM CORE · %@ · ARCADE 6 BOTÕES (PADRÃO)", _coreDisplayName];
+        [self showStateStatus:[NSString stringWithFormat:@"BRUM CORE · %@ · ARCADE 6 BOTÕES", _coreDisplayName] error:NO];
     }
     _directionControl = up;
     _actionControl = actions;
@@ -1751,32 +1795,26 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 
     UILayoutGuide *safe = self.view.safeAreaLayoutGuide;
     [NSLayoutConstraint activateConstraints:@[
-        [close.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:16],
-        [close.topAnchor constraintEqualToAnchor:safe.topAnchor constant:10],
-        [close.widthAnchor constraintEqualToConstant:92],
-        [_fastForwardButton.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-16],
-        [_fastForwardButton.topAnchor constraintEqualToAnchor:safe.topAnchor constant:10],
-        [_fastForwardButton.widthAnchor constraintEqualToConstant:92],
-        [_displayModeButton.trailingAnchor constraintEqualToAnchor:_fastForwardButton.leadingAnchor constant:-10],
-        [_displayModeButton.centerYAnchor constraintEqualToAnchor:_fastForwardButton.centerYAnchor],
-        [_displayModeButton.widthAnchor constraintEqualToConstant:54],
-        [_stateButton.trailingAnchor constraintEqualToAnchor:_displayModeButton.leadingAnchor constant:-10],
-        [_stateButton.centerYAnchor constraintEqualToAnchor:_displayModeButton.centerYAnchor],
-        [_stateButton.widthAnchor constraintEqualToConstant:64],
-        [_controlsButton.trailingAnchor constraintEqualToAnchor:_stateButton.leadingAnchor constant:-10],
-        [_controlsButton.centerYAnchor constraintEqualToAnchor:_stateButton.centerYAnchor],
-        [_controlsButton.widthAnchor constraintEqualToConstant:54],
-        [title.centerXAnchor constraintEqualToAnchor:safe.centerXAnchor], [title.centerYAnchor constraintEqualToAnchor:close.centerYAnchor],
-        [title.leadingAnchor constraintGreaterThanOrEqualToAnchor:close.trailingAnchor constant:8],
-        [title.trailingAnchor constraintLessThanOrEqualToAnchor:_controlsButton.leadingAnchor constant:-8],
-        [_statusLabel.centerXAnchor constraintEqualToAnchor:safe.centerXAnchor], [_statusLabel.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:2],
+        [_exitFallbackButton.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:16],
+        [_exitFallbackButton.topAnchor constraintEqualToAnchor:safe.topAnchor constant:10],
+        [_exitFallbackButton.widthAnchor constraintEqualToConstant:92],
+        [_brumMenuButton.centerXAnchor constraintEqualToAnchor:safe.centerXAnchor],
+        [_brumMenuButton.topAnchor constraintEqualToAnchor:safe.topAnchor constant:8],
+        [_brumMenuButton.widthAnchor constraintEqualToConstant:44],
+        [_brumMenuButton.heightAnchor constraintEqualToConstant:44],
+        [_fastForwardBadge.leadingAnchor constraintEqualToAnchor:_brumMenuButton.trailingAnchor constant:8],
+        [_fastForwardBadge.centerYAnchor constraintEqualToAnchor:_brumMenuButton.centerYAnchor],
+        [_statusLabel.centerXAnchor constraintEqualToAnchor:safe.centerXAnchor],
+        [_statusLabel.topAnchor constraintEqualToAnchor:_brumMenuButton.bottomAnchor constant:6],
+        [_statusLabel.leadingAnchor constraintGreaterThanOrEqualToAnchor:safe.leadingAnchor constant:24],
+        [_statusLabel.trailingAnchor constraintLessThanOrEqualToAnchor:safe.trailingAnchor constant:-24],
         [_screen.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor], [_screen.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
         [_screen.topAnchor constraintEqualToAnchor:self.view.topAnchor], [_screen.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
         [up.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:26], [up.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-24],
         [actions.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-30], [actions.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-36],
         [menu.centerXAnchor constraintEqualToAnchor:safe.centerXAnchor], [menu.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-16],
-        [leftShoulder.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:18], [leftShoulder.topAnchor constraintEqualToAnchor:safe.topAnchor constant:66],
-        [rightShoulder.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-18], [rightShoulder.topAnchor constraintEqualToAnchor:safe.topAnchor constant:66]
+        [leftShoulder.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:18], [leftShoulder.topAnchor constraintEqualToAnchor:safe.topAnchor constant:44],
+        [rightShoulder.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-18], [rightShoulder.topAnchor constraintEqualToAnchor:safe.topAnchor constant:44]
     ]];
     if (hasAnalogPad) {
         [NSLayoutConstraint activateConstraints:@[
@@ -1788,6 +1826,8 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
             [_padModeButton.heightAnchor constraintEqualToConstant:32]
         ]];
     }
+    [self refreshVideoFilterPresentation];
+    [self applyVirtualControlsStyle];
   }
 
 - (UIButton *)controlButton:(NSString *)text identifier:(NSInteger)identifier {
@@ -2238,8 +2278,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         if (!wasPaused) [self resume];
     }]];
     [menu addAction:[UIAlertAction actionWithTitle:@"Voltar ao jogo" style:UIAlertActionStyleCancel handler:^(__unused UIAlertAction *action) { if (!wasPaused) [self resume]; }]];
-    menu.popoverPresentationController.sourceView = _displayModeButton;
-    menu.popoverPresentationController.sourceRect = _displayModeButton.bounds;
+    UIView *anchor = _brumMenuButton ?: self.view;
+    menu.popoverPresentationController.sourceView = anchor;
+    menu.popoverPresentationController.sourceRect = anchor.bounds;
     [self presentViewController:menu animated:YES completion:nil];
 }
 
@@ -2249,14 +2290,8 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     os_unfair_lock_lock(&_audioLock);
     _audioRead = 0; _audioWrite = 0; _audioCount = 0;
     os_unfair_lock_unlock(&_audioLock);
-    UIColor *accent = [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:1];
-    _fastForwardButton.backgroundColor = _fastForwardEnabled ? accent : [UIColor colorWithWhite:0.1 alpha:0.82];
-    [_fastForwardButton setTitleColor:_fastForwardEnabled ? UIColor.blackColor : UIColor.whiteColor forState:UIControlStateNormal];
-    _fastForwardButton.tintColor = _fastForwardEnabled ? UIColor.blackColor : UIColor.whiteColor;
-    _fastForwardButton.layer.borderColor = (_fastForwardEnabled ? accent : [UIColor colorWithWhite:1 alpha:0.16]).CGColor;
-    _fastForwardButton.accessibilityValue = _fastForwardEnabled ? @"Ativado" : @"Desativado";
-    _fastForwardButton.accessibilityTraits = _fastForwardEnabled ? UIAccessibilityTraitButton | UIAccessibilityTraitSelected : UIAccessibilityTraitButton;
-    _statusLabel.text = _fastForwardEnabled ? @"AVANÇO RÁPIDO · 5×" : [NSString stringWithFormat:@"BRUM CORE · %@", _coreDisplayName];
+    _fastForwardBadge.hidden = !_fastForwardEnabled;
+    [self showStateStatus:(_fastForwardEnabled ? @"AVANÇO RÁPIDO · 5×" : [NSString stringWithFormat:@"BRUM CORE · %@", _coreDisplayName]) error:NO];
 }
 
 - (void)toggleControlsVisibility {
@@ -2282,13 +2317,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     if (_digitalPad) _digitalPad.hidden = nextHidden || !_dpadMode;
     if (_padModeButton) _padModeButton.hidden = nextHidden;
     if (_virtualStick) _virtualStick.hidden = nextHidden || _dpadMode;
-
-    UIColor *accent = [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:1];
-    const BOOL controlsActive = !nextHidden;
-    _controlsButton.backgroundColor = controlsActive ? [UIColor colorWithWhite:0.1 alpha:0.82] : accent;
-    _controlsButton.tintColor = controlsActive ? (hasPhysical ? accent : UIColor.whiteColor) : UIColor.blackColor;
-    _controlsButton.layer.borderColor = (controlsActive ? (hasPhysical ? accent : [UIColor colorWithWhite:1 alpha:0.16]) : accent).CGColor;
-    _controlsButton.accessibilityValue = nextHidden ? @"Ocultos" : @"Visíveis";
+    [self applyVirtualControlsStyle];
     [self layoutScreens];
 }
 
@@ -2317,16 +2346,8 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 }
 
 - (void)updateDisplayModeButton {
-    UIColor *accent = [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:1];
     const BOOL multiScreen = _screenManager.screens.size() > 1;
-    UIImageSymbolConfiguration *displaySymbol = [UIImageSymbolConfiguration configurationWithPointSize:14 weight:UIImageSymbolWeightBlack];
-    [_displayModeButton setImage:[[UIImage systemImageNamed:(multiScreen ? @"rectangle.split.2x1" : @"arrow.up.left.and.arrow.down.right")] imageWithConfiguration:displaySymbol] forState:UIControlStateNormal];
-    _displayModeButton.backgroundColor = _screenFillsDisplay ? accent : [UIColor colorWithWhite:0.1 alpha:0.82];
-    _displayModeButton.tintColor = _screenFillsDisplay ? UIColor.blackColor : UIColor.whiteColor;
-    _displayModeButton.layer.borderColor = (_screenFillsDisplay ? accent : [UIColor colorWithWhite:1 alpha:0.16]).CGColor;
-    _displayModeButton.accessibilityLabel = multiScreen ? @"Layouts das duas telas" : @"Modo de exibição";
-    _displayModeButton.accessibilityValue = multiScreen ? @"Duas telas" : (_screenFillsDisplay ? @"Preencher tela" : @"Mostrar imagem inteira");
-    _displayModeButton.accessibilityTraits = _screenFillsDisplay ? UIAccessibilityTraitButton | UIAccessibilityTraitSelected : UIAccessibilityTraitButton;
+    _brumMenuButton.accessibilityValue = multiScreen ? @"Duas telas" : (_screenFillsDisplay ? @"Preencher tela" : @"Mostrar imagem inteira");
 }
 
 - (NSString *)statePathForSlot:(NSInteger)slot {
@@ -2354,8 +2375,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     }
     [menu addAction:[UIAlertAction actionWithTitle:@"Cancelar" style:UIAlertActionStyleCancel handler:^(__unused UIAlertAction *action) { if (!wasPaused) [self resume]; }]];
     if (menu.popoverPresentationController) {
-        menu.popoverPresentationController.sourceView = _stateButton;
-        menu.popoverPresentationController.sourceRect = _stateButton.bounds;
+        UIView *anchor = _brumMenuButton ?: self.view;
+        menu.popoverPresentationController.sourceView = anchor;
+        menu.popoverPresentationController.sourceRect = anchor.bounds;
     }
     [self presentViewController:menu animated:YES completion:nil];
 }
@@ -2400,15 +2422,174 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 }
 
 - (void)showStateStatus:(NSString *)text error:(BOOL)error {
-    _statusLabel.text = text;
+    _statusLabel.text = [NSString stringWithFormat:@"  %@  ", text ?: @""];
     _statusLabel.textColor = error ? UIColor.systemRedColor : [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:1];
+    _statusLabel.hidden = NO;
+    _statusLabel.alpha = 1;
+    const NSUInteger token = ++_statusToastToken;
     __weak BrumLibretroViewController *weakSelf = self;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         BrumLibretroViewController *strongSelf = weakSelf;
-        if (!strongSelf || strongSelf->_stopped) return;
-        strongSelf->_statusLabel.text = strongSelf->_fastForwardEnabled ? @"AVANÇO RÁPIDO · 5×" : [NSString stringWithFormat:@"BRUM CORE · %@", strongSelf->_coreDisplayName];
-        strongSelf->_statusLabel.textColor = [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:1];
+        if (!strongSelf || strongSelf->_stopped || strongSelf->_statusToastToken != token) return;
+        if (!strongSelf->_performanceHUDEnabled && !strongSelf->_startupError) {
+            strongSelf->_statusLabel.alpha = 0;
+            strongSelf->_statusLabel.hidden = YES;
+        }
     });
+}
+
+- (void)showBrumQuickMenu {
+    if (_stopped || self.presentedViewController) return;
+    const BOOL wasPaused = _explicitlyPaused;
+    [self pause];
+    NSString *title = _gameTitle.length ? _gameTitle : _coreDisplayName;
+    UIAlertController *menu = [UIAlertController alertControllerWithTitle:title
+                                                                   message:[NSString stringWithFormat:@"BRUM CORE · %@", _coreDisplayName]
+                                                            preferredStyle:UIAlertControllerStyleActionSheet];
+    NSString *padLabel = _manualControlsHidden ? @"Mostrar controles na tela" : @"Ocultar controles na tela";
+    [menu addAction:[UIAlertAction actionWithTitle:padLabel style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+        [self toggleControlsVisibility];
+        if (!wasPaused) [self resume];
+    }]];
+    if (_digitalPad) {
+        NSString *stickLabel = _dpadMode ? @"Controle esquerdo: Analógico" : @"Controle esquerdo: D-Pad";
+        [menu addAction:[UIAlertAction actionWithTitle:stickLabel style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+            [self toggleAnalogPadMode];
+            if (!wasPaused) [self resume];
+        }]];
+    }
+    [menu addAction:[UIAlertAction actionWithTitle:@"Ajuste de controles" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+        [self showControlsAdjustmentMenu:wasPaused];
+    }]];
+    UIAlertAction *slotsAction = [UIAlertAction actionWithTitle:@"Estados rápidos (Slots)" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+        if (!wasPaused) _explicitlyPaused = NO;
+        [self showStateMenu];
+    }];
+    slotsAction.enabled = _gameLoaded && (self.capabilities & BrumBackendSaveState) != 0;
+    [menu addAction:slotsAction];
+
+    if (_screenManager.screens.size() > 1) {
+        [menu addAction:[UIAlertAction actionWithTitle:@"Dimensão e layout das telas" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+            if (!wasPaused) _explicitlyPaused = NO;
+            [self showScreenMenu];
+        }]];
+    } else {
+        NSString *displayTitle = _screenFillsDisplay
+            ? @"Dimensão de tela: Mostrar imagem inteira"
+            : @"Dimensão de tela: Preencher tela";
+        [menu addAction:[UIAlertAction actionWithTitle:displayTitle style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+            if (self->_screenFillsDisplay) {
+                self->_screenFillsDisplay = NO;
+                [self updateDisplayModeButton];
+                [self layoutScreens];
+            } else {
+                [self toggleDisplayMode];
+            }
+            if (!wasPaused) [self resume];
+        }]];
+    }
+    [menu addAction:[UIAlertAction actionWithTitle:@"Gráficos e filtros (ao vivo)" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+        [self showVideoFilterMenu:wasPaused];
+    }]];
+    [menu addAction:[UIAlertAction actionWithTitle:(_fastForwardEnabled ? @"Avanço rápido (5×): Desativar" : @"Avanço rápido (5×): Ativar")
+                                             style:UIAlertActionStyleDefault
+                                           handler:^(__unused UIAlertAction *action) {
+        [self toggleFastForward];
+        if (!wasPaused) [self resume];
+    }]];
+    [menu addAction:[UIAlertAction actionWithTitle:@"Diagnóstico da sessão" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+        if (!wasPaused) _explicitlyPaused = NO;
+        [self shareDiagnostics];
+    }]];
+    [menu addAction:[UIAlertAction actionWithTitle:@"Sair do jogo" style:UIAlertActionStyleDestructive handler:^(__unused UIAlertAction *action) {
+        [self closeEmulator];
+    }]];
+    [menu addAction:[UIAlertAction actionWithTitle:@"Voltar ao jogo" style:UIAlertActionStyleCancel handler:^(__unused UIAlertAction *action) {
+        if (!wasPaused) [self resume];
+    }]];
+    if (menu.popoverPresentationController) {
+        UIView *anchor = _brumMenuButton ?: self.view;
+        menu.popoverPresentationController.sourceView = anchor;
+        menu.popoverPresentationController.sourceRect = anchor.bounds;
+    }
+    [self presentViewController:menu animated:YES completion:nil];
+}
+
+- (void)showControlsAdjustmentMenu:(BOOL)wasPaused {
+    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"AJUSTE DE CONTROLES"
+                                                                    message:@"Opacidade e escala aplicadas imediatamente na tela."
+                                                             preferredStyle:UIAlertControllerStyleActionSheet];
+    NSArray<NSDictionary *> *opacities = @[
+        @{@"label": @"Opacidade 25% (bem discreta)", @"val": @0.25},
+        @{@"label": @"Opacidade 45% (equilibrada)", @"val": @0.45},
+        @{@"label": @"Opacidade 70%", @"val": @0.70},
+        @{@"label": @"Opacidade 90%", @"val": @0.90}
+    ];
+    for (NSDictionary *item in opacities) {
+        double v = [item[@"val"] doubleValue];
+        [sheet addAction:[UIAlertAction actionWithTitle:item[@"label"] style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+            [defaults setDouble:v forKey:@"BrumVirtualControlsOpacity"];
+            [self applyVirtualControlsStyle];
+            if (!wasPaused) [self resume];
+        }]];
+    }
+    NSArray<NSDictionary *> *scales = @[
+        @{@"label": @"Tamanho compacto (85%)", @"val": @0.85},
+        @{@"label": @"Tamanho padrão (100%)", @"val": @1.00},
+        @{@"label": @"Tamanho ampliado (115%)", @"val": @1.15}
+    ];
+    for (NSDictionary *item in scales) {
+        double v = [item[@"val"] doubleValue];
+        [sheet addAction:[UIAlertAction actionWithTitle:item[@"label"] style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+            [defaults setDouble:v forKey:@"BrumVirtualControlsScale"];
+            [self applyVirtualControlsStyle];
+            if (!wasPaused) [self resume];
+        }]];
+    }
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Voltar" style:UIAlertActionStyleCancel handler:^(__unused UIAlertAction *action) {
+        if (!wasPaused) [self resume];
+    }]];
+    if (sheet.popoverPresentationController) {
+        UIView *anchor = _brumMenuButton ?: self.view;
+        sheet.popoverPresentationController.sourceView = anchor;
+        sheet.popoverPresentationController.sourceRect = anchor.bounds;
+    }
+    [self presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)showVideoFilterMenu:(BOOL)wasPaused {
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"GRÁFICOS E FILTROS"
+                                                                    message:@"Aplicado instantaneamente sem reiniciar o jogo."
+                                                             preferredStyle:UIAlertControllerStyleActionSheet];
+    NSArray<NSDictionary *> *filters = @[
+        @{@"title": @"Original (Pixel nítido)", @"mode": @"none"},
+        @{@"title": @"Sharp Bilinear (Nitidez equilibrada)", @"mode": @"sharp_bilinear"},
+        @{@"title": @"Bilinear sutil (Suave)", @"mode": @"bilinear_subtle"},
+        @{@"title": @"CAS Sharpen (Realce fino)", @"mode": @"cas_sharpen"},
+        @{@"title": @"Edge Upscale 2×", @"mode": @"edge_upscale_2x"},
+        @{@"title": @"Scanlines CRT", @"mode": @"crt_scanlines"},
+        @{@"title": @"Grade LCD portátil", @"mode": @"lcd_grid"}
+    ];
+    for (NSDictionary *entry in filters) {
+        NSString *mode = entry[@"mode"];
+        NSString *label = [_videoFilterMode isEqualToString:mode] ? [NSString stringWithFormat:@"✓ %@", entry[@"title"]] : entry[@"title"];
+        [sheet addAction:[UIAlertAction actionWithTitle:label style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+            self.videoFilterMode = mode;
+            [self refreshVideoFilterPresentation];
+            [self showStateStatus:[NSString stringWithFormat:@"FILTRO: %@", entry[@"title"]] error:NO];
+            if (!wasPaused) [self resume];
+        }]];
+    }
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Voltar" style:UIAlertActionStyleCancel handler:^(__unused UIAlertAction *action) {
+        if (!wasPaused) [self resume];
+    }]];
+    if (sheet.popoverPresentationController) {
+        UIView *anchor = _brumMenuButton ?: self.view;
+        sheet.popoverPresentationController.sourceView = anchor;
+        sheet.popoverPresentationController.sourceRect = anchor.bounds;
+    }
+    [self presentViewController:sheet animated:YES completion:nil];
 }
 
 - (BOOL)startCore:(NSError **)error {
@@ -2496,7 +2677,6 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     }
     _contentAspectRatio = avInfo.geometry.aspect_ratio;
     _screenManager.screens = brum::libretroScreens(_coreID.UTF8String, avInfo.geometry.base_width, avInfo.geometry.base_height);
-    _stateButton.enabled = NO;
     [_diagnostics enterStage:@"initialize_audio"];
     if (![self startAudio:avInfo.timing.sample_rate error:error]) return NO;
     [_diagnostics enterStage:@"first_frame"];
@@ -2608,15 +2788,13 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _suppressVideo = NO;
     if (_shutdownRequested) { [self handleCoreShutdown]; return; }
     [self applyPendingAVInfo];
-    if (_sessionFrames == 1 && _stateButton && !_stateButton.enabled) {
-        _stateButton.enabled = (self.capabilities & BrumBackendSaveState) != 0;
-    }
     if (_sessionFrames == 120 && _nonBlackFrameCount == 0 && [_emulatedSystemID isEqualToString:@"psp"]) {
         os_unfair_lock_lock(&_audioLock);
         const uint64_t producedNow = _audioSamplesProduced;
         os_unfair_lock_unlock(&_audioLock);
         if (producedNow == 0 || _presentedFrames == 0) {
             [_diagnostics recordMessage:@"Aviso PPSSPP: 120 quadros sem vídeo visível ou áudio gerado." level:2];
+            [self showStateStatus:@"PPSSPP sem vídeo — toque no logo para diagnóstico" error:YES];
             [self captureDiagnosticsMetrics];
             [_diagnostics checkpoint];
         }
@@ -2633,7 +2811,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         if (_metricsStartedAt == 0) _metricsStartedAt = now;
         const CFTimeInterval elapsed = now - _metricsStartedAt;
         if (elapsed >= 1.0) {
-            _statusLabel.text = [NSString stringWithFormat:@"BRUM CORE · %.1f FPS · core+host %.1f ms · vídeo %.1f ms · térmico %ld",
+            _statusLabel.hidden = NO;
+            _statusLabel.alpha = 1;
+            _statusLabel.text = [NSString stringWithFormat:@"  BRUM CORE · %.1f FPS · core+host %.1f ms · vídeo %.1f ms · térmico %ld  ",
                 _measuredFrames / elapsed, _measuredFrames ? 1000.0 * _coreRunSeconds / _measuredFrames : 0,
                 _measuredFrames ? 1000.0 * _hostVideoSeconds / _measuredFrames : 0,
                 (long)NSProcessInfo.processInfo.thermalState];
@@ -2890,8 +3070,11 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [self captureDiagnosticsMetrics];
     [_diagnostics recordFailure:_startupError.localizedDescription];
     [self stopCore];
+    _exitFallbackButton.hidden = NO;
     _statusLabel.text = @"O NÚCLEO INTERROMPEU O JOGO";
     _statusLabel.textColor = UIColor.systemRedColor;
+    _statusLabel.hidden = NO;
+    _statusLabel.alpha = 1;
     if (self.presentedViewController) {
         [self dismissViewControllerAnimated:YES completion:^{ [self showStartupFailure]; }];
     } else { [self showStartupFailure]; }

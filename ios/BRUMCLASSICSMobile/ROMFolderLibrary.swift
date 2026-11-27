@@ -181,6 +181,103 @@ enum ROMFolderScanner {
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
         return ROMFolderScan(games: games, duplicateFilenames: duplicateCount)
     }
+
+    static let drivePrefix = "__drive__/"
+
+    static func systemIDFromHint(_ hint: String) -> EmulatedSystemID? {
+        switch hint.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "gb": return .gameBoy
+        case "gbc": return .gameBoyColor
+        case "gba": return .gameBoyAdvance
+        case "nds": return .nintendoDS
+        case "neogeo": return .neoGeo
+        case "sms": return .masterSystem
+        case "gg": return .gameGear
+        case "nes": return .nintendoEntertainmentSystem
+        case "pce": return .pcEngine
+        case "snes", "sfc": return .superNintendo
+        case "ws": return .wonderSwan
+        case "wsc": return .wonderSwanColor
+        case "n64": return .nintendo64
+        case "genesis", "megadrive", "md": return .megaDrive
+        case "32x": return .sega32X
+        case "segacd": return .segaCD
+        case "ps1", "psx": return .playStation
+        case "saturn": return .saturn
+        case "a2600", "atari2600": return .atari2600
+        case "psp", "ppsspp": return .playStationPortable
+        case "dreamcast": return .dreamcast
+        case "3ds", "n3ds": return .nintendo3DS
+        case "gamecube": return .gameCube
+        case "ps2": return .playStation2
+        default: return nil
+        }
+    }
+
+    static func scanDriveDownloads(
+        _ driveRoot: URL,
+        checkpointURL: URL? = nil,
+        allowedExtensions: Set<String> = PocketRules.extensions
+    ) -> [ROMFolderGame] {
+        let manager = FileManager.default
+        let standardizedRoot = driveRoot.standardizedFileURL
+        guard manager.fileExists(atPath: standardizedRoot.path) else { return [] }
+
+        var hintByPath: [String: String] = [:]
+        var hintByID: [String: String] = [:]
+        if let cpURL = checkpointURL,
+           let data = try? Data(contentsOf: cpURL),
+           let cp = try? JSONDecoder().decode(ClassicDriveCheckpoint.self, from: data) {
+            for item in cp.items where !item.systemHint.isEmpty {
+                hintByID[item.id] = item.systemHint
+                if let local = item.downloadedLocalPath {
+                    hintByPath[URL(fileURLWithPath: local).standardizedFileURL.path] = item.systemHint
+                }
+            }
+        }
+
+        let keys: [URLResourceKey] = [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]
+        guard let enumerator = manager.enumerator(
+            at: standardizedRoot,
+            includingPropertiesForKeys: keys,
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else { return [] }
+
+        let rootPrefix = standardizedRoot.path.hasSuffix("/") ? standardizedRoot.path : standardizedRoot.path + "/"
+        var out: [ROMFolderGame] = []
+        for case let file as URL in enumerator {
+            guard let values = try? file.resourceValues(forKeys: Set(keys)),
+                  values.isRegularFile == true, values.isSymbolicLink != true,
+                  let size = values.fileSize, size > 0 else { continue }
+            let ext = file.pathExtension.lowercased()
+            guard allowedExtensions.contains(ext),
+                  !firmwareFilenames.contains(file.lastPathComponent.lowercased()) else { continue }
+            let standardized = file.standardizedFileURL
+            guard manager.isReadableFile(atPath: standardized.path),
+                  standardized.path.hasPrefix(rootPrefix) else { continue }
+            let rel = String(standardized.path.dropFirst(rootPrefix.count))
+            guard !rel.isEmpty, rel.count <= 1_000, PocketRules.safeFilename(standardized.lastPathComponent) else { continue }
+
+            var detected: EmulatedSystemID? = nil
+            if ["iso", "pbp", "cso"].contains(ext) {
+                detected = ROMContentInspector.detectDiscSystem(at: standardized, filename: standardized.lastPathComponent)
+            }
+            if detected == nil {
+                let firstComponent = rel.split(separator: "/").first.map(String.init) ?? ""
+                if let hint = hintByPath[standardized.path] ?? hintByID[firstComponent] {
+                    detected = systemIDFromHint(hint)
+                }
+            }
+            out.append(ROMFolderGame(
+                relativePath: drivePrefix + rel,
+                filename: standardized.lastPathComponent,
+                title: ROMTitleRules.clean(standardized.lastPathComponent),
+                fileSize: Int64(size),
+                detectedSystem: detected
+            ))
+        }
+        return out.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+    }
 }
 
 enum ROMExportStager {
@@ -325,6 +422,16 @@ actor ROMFolderAccess {
             .appendingPathComponent("IntegratedEmulator/System", isDirectory: true)
     }
 
+    private var driveDownloadsRoot: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("ClassicsEverywhere/DriveDownloads", isDirectory: true)
+    }
+
+    private var driveCheckpointURL: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("ClassicsDrive/checkpoint.json", isDirectory: false)
+    }
+
     var configured: Bool { UserDefaults.standard.data(forKey: bookmarkKey) != nil }
     var displayName: String { UserDefaults.standard.string(forKey: nameKey) ?? "Downloads" }
 
@@ -340,7 +447,11 @@ actor ROMFolderAccess {
     }
 
     func scan() throws -> ROMFolderScan {
+        let driveGames = ROMFolderScanner.scanDriveDownloads(driveDownloadsRoot, checkpointURL: driveCheckpointURL)
         guard let bookmark = UserDefaults.standard.data(forKey: bookmarkKey) else {
+            if !driveGames.isEmpty {
+                return ROMFolderScan(games: driveGames, duplicateFilenames: 0)
+            }
             throw PocketError.message("Selecione uma pasta de ROMs em Perfil → Configurações do app → CLASSICS.")
         }
         var stale = false
@@ -348,12 +459,18 @@ actor ROMFolderAccess {
         let accessing = folder.startAccessingSecurityScopedResource()
         defer { if accessing { folder.stopAccessingSecurityScopedResource() } }
         try installFirmware(in: folder)
-        let result = try ROMFolderScanner.scan(folder)
+        let folderScan = try ROMFolderScanner.scan(folder)
         if stale {
             let refreshed = try folder.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
             UserDefaults.standard.set(refreshed, forKey: bookmarkKey)
         }
-        return result
+        var combined = folderScan.games
+        let seenFilenames = Set(combined.map { $0.filename.lowercased() })
+        for d in driveGames where !seenFilenames.contains(d.filename.lowercased()) {
+            combined.append(d)
+        }
+        combined.sort { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+        return ROMFolderScan(games: combined, duplicateFilenames: folderScan.duplicateFilenames)
     }
 
     func beginShare(for game: ROMFolderGame) throws -> ROMShareTicket {
@@ -394,6 +511,20 @@ actor ROMFolderAccess {
     }
 
     func stageForIntegratedPlay(_ game: ROMFolderGame) throws -> URL {
+        if game.relativePath.hasPrefix(ROMFolderScanner.drivePrefix) {
+            let rel = String(game.relativePath.dropFirst(ROMFolderScanner.drivePrefix.count))
+            let driveRoot = driveDownloadsRoot.standardizedFileURL
+            let source = driveRoot.appendingPathComponent(rel).standardizedFileURL
+            let prefix = driveRoot.path.hasSuffix("/") ? driveRoot.path : driveRoot.path + "/"
+            guard source.path.hasPrefix(prefix), source.lastPathComponent == game.filename else {
+                throw PocketError.message("O caminho da ROM baixada do Google Drive é inválido.")
+            }
+            guard FileManager.default.isReadableFile(atPath: source.path) else {
+                throw PocketError.message("O arquivo baixado do Google Drive não foi encontrado neste aparelho.")
+            }
+            try validateRequiredFirmware(for: game)
+            return source
+        }
         guard let bookmark = UserDefaults.standard.data(forKey: bookmarkKey) else {
             throw PocketError.message("Selecione novamente a pasta de ROMs.")
         }
@@ -407,6 +538,20 @@ actor ROMFolderAccess {
             throw PocketError.message("O caminho da ROM não pertence mais à pasta autorizada.")
         }
         try installFirmware(in: root)
+        try validateRequiredFirmware(for: game)
+        try removeExpiredFiles(in: integratedRoot)
+        do {
+            if stale {
+                let refreshed = try root.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
+                UserDefaults.standard.set(refreshed, forKey: bookmarkKey)
+            }
+            return try Self.reuseOrStageIntegratedFile(source: source, game: game, root: integratedRoot)
+        } catch {
+            throw PocketError.message("Não foi possível preparar a ROM: \(error.localizedDescription). Se estiver no iCloud, baixe todos os arquivos do jogo; se necessário, reautorize a pasta em Configurações → CLASSICS.")
+        }
+    }
+
+    private func validateRequiredFirmware(for game: ROMFolderGame) throws {
         let system = IntegratedEmulatorSupport.system(for: game)
         if system == .neoGeo && !hasFirmware(["aes.zip", "neogeo.zip"]) {
             throw PocketError.message("Para iniciar Neo Geo, coloque aes.zip ou neogeo.zip na pasta de jogos. O BRUM Core copia somente a BIOS fornecida por você e não distribui arquivos protegidos.")
@@ -422,16 +567,6 @@ actor ROMFolderAccess {
         }
         if system == .saturn && !hasFirmware(["mpr-17933.bin", "sega_101.bin"]) {
             throw PocketError.message("Para iniciar Saturn, coloque mpr-17933.bin ou sega_101.bin na pasta de jogos.")
-        }
-        try removeExpiredFiles(in: integratedRoot)
-        do {
-            if stale {
-                let refreshed = try root.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
-                UserDefaults.standard.set(refreshed, forKey: bookmarkKey)
-            }
-            return try Self.reuseOrStageIntegratedFile(source: source, game: game, root: integratedRoot)
-        } catch {
-            throw PocketError.message("Não foi possível preparar a ROM: \(error.localizedDescription). Se estiver no iCloud, baixe todos os arquivos do jogo; se necessário, reautorize a pasta em Configurações → CLASSICS.")
         }
     }
 

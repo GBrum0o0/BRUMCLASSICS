@@ -1,11 +1,11 @@
 {
-  "version": "0.31.0",
-  "build": 64,
+  "version": "0.32.0",
+  "build": 65,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.31.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.32.0",
   "notes": [
-    "Otimiza a execucao nativa do PSP (PPSSPP) no iOS com IR JIT seguro sem memoria executavel e pulo automatico de quadros, evitando tela preta prolongada.",
-    "Garante leitura fiel de toques rapidos no Nintendo DS e Nintendo 3DS (nativo e controle remoto WebSocket) com retencao por quadro.",
-    "Aumenta o timeout do modo Gamepad para Wii, PSP, GameCube, 3DS e Wii U e evita disparos duplicados no servidor local."
+    "Corrige a varredura e o download pelo Google Drive no iOS e Android (parser de pastas aninhadas, resourcekey, links diretos e abertura imediata do jogo baixado).",
+    "Estabiliza o boot e a renderizacao GLES3/VAO do PSP (PPSSPP) no iOS com carregamento sincrono sem thread de 512 KB, FBO padrao corrigido e diagnostico GL.",
+    "Centraliza todos os atalhos de sessao (controles, opacidade/escala, slots, dimensao de tela, filtros ao vivo, 5x, diagnostico e sair) na logo translucida BRUMCLASSICS no topo da tela."
   ]
 }

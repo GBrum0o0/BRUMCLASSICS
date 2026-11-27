@@ -160,6 +160,7 @@ struct GraphicsResolutionSettingsView: View {
 }
 
 struct ClassicDriveCloudSettingsView: View {
+    @EnvironmentObject private var pocket: PocketClassicsStore
     private let driveService = ClassicDriveCloudService()
 
     @State private var folderLink = ""
@@ -168,6 +169,7 @@ struct ClassicDriveCloudSettingsView: View {
     @State private var busy = false
     @State private var feedback = ""
     @State private var freeSpaceLabel = "Calculando…"
+    @State private var playingROM: ROMFolderGame? = nil
 
     var body: some View {
         Form {
@@ -224,7 +226,13 @@ struct ClassicDriveCloudSettingsView: View {
                                 }
                                 .font(.caption.bold())
                             } else {
-                                Text("Disponível").font(.caption.bold()).foregroundStyle(BrumTheme.primary)
+                                Button("Jogar") {
+                                    launchDownloaded(item: item)
+                                }
+                                .font(.caption.bold())
+                                .buttonStyle(.borderedProminent)
+                                .tint(BrumTheme.primary)
+                                .foregroundStyle(.black)
                             }
                         }
                     }
@@ -235,6 +243,9 @@ struct ClassicDriveCloudSettingsView: View {
         .background(BrumTheme.background)
         .navigationTitle("Google Drive (Nuvem)")
         .task { await reloadState() }
+        .fullScreenCover(item: $playingROM) { rom in
+            IntegratedEmulatorView(rom: rom, returnsToPortrait: true)
+        }
     }
 
     private func reloadState() async {
@@ -271,10 +282,32 @@ struct ClassicDriveCloudSettingsView: View {
     private func download(item: ClassicDriveGameItem) async {
         do {
             let localURL = try await driveService.downloadGame(fileID: item.id)
+            await pocket.refreshROMFolder()
             feedback = "\(item.title) salvo em \(localURL.lastPathComponent) para jogar offline."
         } catch {
             feedback = error.localizedDescription
         }
         await reloadState()
+    }
+
+    private func launchDownloaded(item: ClassicDriveGameItem) {
+        guard let localPath = item.downloadedLocalPath, FileManager.default.fileExists(atPath: localPath) else {
+            feedback = "Arquivo offline não encontrado; tente baixar novamente."
+            return
+        }
+        let localURL = URL(fileURLWithPath: localPath).standardizedFileURL
+        let filename = localURL.lastPathComponent
+        if let existing = pocket.romFolderGames.first(where: { $0.filename.caseInsensitiveCompare(filename) == .orderedSame }) {
+            playingROM = existing
+            return
+        }
+        Task {
+            await pocket.refreshROMFolder()
+            if let reloaded = pocket.romFolderGames.first(where: { $0.filename.caseInsensitiveCompare(filename) == .orderedSame }) {
+                playingROM = reloaded
+            } else {
+                feedback = "Não foi possível carregar este jogo no catálogo local."
+            }
+        }
     }
 }

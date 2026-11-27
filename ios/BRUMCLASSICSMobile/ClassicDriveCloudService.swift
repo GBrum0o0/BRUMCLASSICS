@@ -55,11 +55,13 @@ public struct ClassicDriveFolderTask: Codable, Equatable, Sendable {
     public let id: String
     public let relativePath: String
     public let depth: Int
+    public let resourceKey: String?
 
-    public init(id: String, relativePath: String, depth: Int) {
+    public init(id: String, relativePath: String, depth: Int, resourceKey: String? = nil) {
         self.id = id
         self.relativePath = relativePath
         self.depth = depth
+        self.resourceKey = resourceKey
     }
 }
 
@@ -113,6 +115,7 @@ public struct ClassicDriveCheckpoint: Codable, Equatable, Sendable {
     public var version: Int = 1
     public var rootURL: String = ""
     public var rootFolderID: String = ""
+    public var rootResourceKey: String? = nil
     public var storageDirectoryPath: String = ""
     public var pendingFolders: [ClassicDriveFolderTask] = []
     public var visitedFolderIDs: [String] = []
@@ -169,33 +172,46 @@ public enum ClassicDriveLinkParser {
 
     public static func isAllowedURL(_ url: URL) -> Bool {
         guard url.scheme?.lowercased() == "https",
+              url.user == nil, url.password == nil, url.port == nil,
               let host = url.host?.lowercased(), !host.isEmpty else {
             return false
         }
         return allowedExactHosts.contains(host) || host.hasSuffix(".googleusercontent.com")
     }
 
-    public static func parseFolderID(from rawInput: String) -> String? {
+    public static func parseLink(from rawInput: String) -> (id: String, isFolder: Bool, resourceKey: String?)? {
         let trimmed = rawInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         let rawPattern = "^[A-Za-z0-9_-]{10,128}$"
         if trimmed.range(of: rawPattern, options: .regularExpression) != nil {
-            return trimmed
+            return (trimmed, true, nil)
         }
         guard let url = URL(string: trimmed), isAllowedURL(url) else {
             return nil
         }
-        if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-           let idQuery = components.queryItems?.first(where: { $0.name == "id" })?.value,
-           idQuery.range(of: rawPattern, options: .regularExpression) != nil {
-            return idQuery
-        }
+        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        let resourceKeyRaw = components?.queryItems?.first(where: { $0.name.caseInsensitiveCompare("resourcekey") == .orderedSame })?.value
+        let resourceKey: String? = (resourceKeyRaw?.range(of: "^[A-Za-z0-9_-]{1,200}$", options: .regularExpression) != nil) ? resourceKeyRaw : nil
         let path = url.path
+
         if let range = path.range(of: #"/folders/([A-Za-z0-9_-]{10,128})"#, options: .regularExpression) {
             let match = String(path[range]).replacingOccurrences(of: "/folders/", with: "")
-            return match
+            return (match, true, resourceKey)
+        }
+        if let range = path.range(of: #"/file/d/([A-Za-z0-9_-]{10,128})"#, options: .regularExpression) {
+            let match = String(path[range]).replacingOccurrences(of: "/file/d/", with: "")
+            return (match, false, resourceKey)
+        }
+        if let idQuery = components?.queryItems?.first(where: { $0.name == "id" })?.value,
+           idQuery.range(of: rawPattern, options: .regularExpression) != nil {
+            let isFolder = path.lowercased().contains("folder")
+            return (idQuery, isFolder, resourceKey)
         }
         return nil
+    }
+
+    public static func parseFolderID(from rawInput: String) -> String? {
+        parseLink(from: rawInput)?.id
     }
 
     public static func isExcludedPCFile(_ filename: String) -> Bool {
@@ -216,29 +232,42 @@ public enum ClassicDriveLinkParser {
     }
 
     public static func detectSystemHint(relativePath: String, filename: String) -> String {
-        let lower = (relativePath + "/" + filename).lowercased()
-        if lower.contains("ppsspp") || lower.contains("/psp/") || filename.lowercased().hasSuffix(".cso") { return "psp" }
-        if lower.contains("/nds/") || filename.lowercased().hasSuffix(".nds") { return "nds" }
-        if lower.contains("/3ds/") || filename.lowercased().hasSuffix(".3ds") || filename.lowercased().hasSuffix(".cia") { return "3ds" }
-        if lower.contains("/gba/") || filename.lowercased().hasSuffix(".gba") { return "gba" }
-        if lower.contains("/gbc/") || filename.lowercased().hasSuffix(".gbc") { return "gbc" }
-        if lower.contains("/gb/") || filename.lowercased().hasSuffix(".gb") { return "gb" }
-        if lower.contains("/snes/") || filename.lowercased().hasSuffix(".sfc") || filename.lowercased().hasSuffix(".smc") { return "snes" }
-        if lower.contains("/nes/") || filename.lowercased().hasSuffix(".nes") { return "nes" }
-        if lower.contains("/n64/") || filename.lowercased().hasSuffix(".z64") || filename.lowercased().hasSuffix(".n64") { return "n64" }
+        let lower = (relativePath + "/" + filename).lowercased().replacingOccurrences(of: "\\", with: "/")
+        let ext = (filename as NSString).pathExtension.lowercased()
+        if lower.contains("ppsspp") || lower.contains("/psp/") || lower.hasPrefix("psp/") || lower.contains("/playstation portable/") || lower.contains("/sony psp/") || ext == "cso" { return "psp" }
+        if lower.contains("/nds/") || ext == "nds" { return "nds" }
+        if lower.contains("/3ds/") || ["3ds", "3dsx", "z3dsx", "cci", "zcci", "cxi", "zcxi"].contains(ext) { return "3ds" }
+        if lower.contains("/gba/") || ext == "gba" { return "gba" }
+        if lower.contains("/gbc/") || ext == "gbc" { return "gbc" }
+        if lower.contains("/gb/") || ext == "gb" { return "gb" }
+        if lower.contains("/snes/") || ext == "sfc" || ext == "smc" { return "snes" }
+        if lower.contains("/nes/") || ext == "nes" { return "nes" }
+        if lower.contains("/n64/") || ["z64", "n64", "v64"].contains(ext) { return "n64" }
         if lower.contains("/ps1/") || lower.contains("/psx/") { return "ps1" }
-        if lower.contains("/dreamcast/") || filename.lowercased().hasSuffix(".cdi") { return "dreamcast" }
-        if lower.contains("/genesis/") || lower.contains("/megadrive/") || filename.lowercased().hasSuffix(".md") { return "genesis" }
+        if lower.contains("/gamecube/") || ["rvz", "gcz", "ciso", "gcm"].contains(ext) { return "gamecube" }
+        if lower.contains("/dreamcast/") || ext == "cdi" || ext == "gdi" { return "dreamcast" }
+        if lower.contains("/genesis/") || lower.contains("/megadrive/") || ["md", "gen", "smd"].contains(ext) { return "genesis" }
+        if lower.contains("/sms/") || ext == "sms" { return "sms" }
+        if lower.contains("/gg/") || ext == "gg" { return "gg" }
+        if lower.contains("/pce/") || ext == "pce" { return "pce" }
+        if lower.contains("/neogeo/") || ext == "neo" { return "neogeo" }
+        if lower.contains("/ws/") || ext == "ws" { return "ws" }
+        if lower.contains("/wsc/") || ext == "wsc" { return "wsc" }
+        if lower.contains("/atari2600/") || ext == "a26" { return "a2600" }
         return ""
     }
 
-    public static func directDownloadURL(fileID: String) -> URL {
+    public static func directDownloadURL(fileID: String, resourceKey: String? = nil) -> URL {
         var c = URLComponents(string: "https://drive.usercontent.google.com/download")!
-        c.queryItems = [
+        var items = [
             URLQueryItem(name: "id", value: fileID),
             URLQueryItem(name: "export", value: "download"),
             URLQueryItem(name: "confirm", value: "t")
         ]
+        if let rk = resourceKey, !rk.isEmpty {
+            items.append(URLQueryItem(name: "resourcekey", value: rk))
+        }
+        c.queryItems = items
         return c.url!
     }
 }
@@ -254,43 +283,81 @@ public enum ClassicDriveHtmlParser {
         }
     }
 
+    public struct DetailedParsedFolderPage: Equatable, Sendable {
+        public let subfolders: [(id: String, name: String, resourceKey: String?)]
+        public let files: [(id: String, name: String, resourceKey: String?, sizeBytes: Int64?)]
+
+        public static func == (lhs: DetailedParsedFolderPage, rhs: DetailedParsedFolderPage) -> Bool {
+            lhs.subfolders.elementsEqual(rhs.subfolders) { $0.id == $1.id && $0.name == $1.name && $0.resourceKey == $1.resourceKey } &&
+            lhs.files.elementsEqual(rhs.files) { $0.id == $1.id && $0.name == $1.name && $0.resourceKey == $1.resourceKey && $0.sizeBytes == $1.sizeBytes }
+        }
+    }
+
     public static func parseFolderHTML(_ html: String) -> ParsedFolderPage {
-        var folderMap: [String: String] = [:]
-        var fileMap: [String: (name: String, sizeBytes: Int64?)] = [:]
-
-        // Pattern 1: folder URLs in public Drive HTML view
-        let folderRegex = try? NSRegularExpression(
-            pattern: #"href="https://drive\.google\.com/drive(?:/u/\d+)?/folders/([A-Za-z0-9_-]{10,128})[^"]*"[^>]*>([^<]{1,180})</a>"#,
-            options: [.caseInsensitive]
+        let detailed = parseFolderHTMLDetailed(html)
+        return ParsedFolderPage(
+            subfolders: detailed.subfolders.map { (id: $0.id, name: $0.name) },
+            files: detailed.files.map { (id: $0.id, name: $0.name, sizeBytes: $0.sizeBytes) }
         )
-        if let regex = folderRegex {
+    }
+
+    public static func isServiceLoginHTML(_ html: String) -> Bool {
+        html.range(of: #"accounts\.google\.com/ServiceLogin"#, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+
+    public static func extractSingleFileTitle(from html: String) -> String? {
+        guard let titleRegex = try? NSRegularExpression(pattern: #"<title[^>]*>([\s\S]*?)</title>"#, options: [.caseInsensitive, .dotMatchesLineSeparators]) else {
+            return nil
+        }
+        let ns = html as NSString
+        guard let match = titleRegex.firstMatch(in: html, range: NSRange(location: 0, length: ns.length)) else {
+            return nil
+        }
+        let raw = stripTagsAndDecode(ns.substring(with: match.range(at: 1)))
+        let cleaned = raw.replacingOccurrences(of: #"\s*[-–]\s*Google Drive\s*$"#, with: "", options: [.regularExpression, .caseInsensitive])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? nil : cleaned
+    }
+
+    public static func parseFolderHTMLDetailed(_ html: String) -> DetailedParsedFolderPage {
+        var folderMap: [String: (name: String, resourceKey: String?)] = [:]
+        var fileMap: [String: (name: String, resourceKey: String?, sizeBytes: Int64?)] = [:]
+
+        // Primary parser matching Desktop (`src/classic-drive-service.js`): real Drive
+        // embeddedfolderview wraps names inside nested <div class="flip-entry-title"> tags within <a>.
+        let anchorRegex = try? NSRegularExpression(
+            pattern: #"<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)</a>"#,
+            options: [.caseInsensitive, .dotMatchesLineSeparators]
+        )
+        let flipTitleRegex = try? NSRegularExpression(
+            pattern: #"class=["'][^"']*flip-entry-title[^"']*["'][^>]*>([\s\S]*?)</div>"#,
+            options: [.caseInsensitive, .dotMatchesLineSeparators]
+        )
+        if let regex = anchorRegex {
             let ns = html as NSString
             for m in regex.matches(in: html, range: NSRange(location: 0, length: ns.length)) {
-                let id = ns.substring(with: m.range(at: 1))
-                let rawName = ns.substring(with: m.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines)
-                if !rawName.isEmpty {
-                    folderMap[id] = decodeHTMLEntities(rawName)
+                let rawHref = decodeHTMLEntities(ns.substring(with: m.range(at: 1))).trimmingCharacters(in: .whitespacesAndNewlines)
+                guard let link = ClassicDriveLinkParser.parseLink(from: rawHref) else { continue }
+                let innerHTML = ns.substring(with: m.range(at: 2))
+                var extracted = ""
+                if let titleRegex = flipTitleRegex,
+                   let tm = titleRegex.firstMatch(in: innerHTML, range: NSRange(location: 0, length: (innerHTML as NSString).length)) {
+                    extracted = stripTagsAndDecode((innerHTML as NSString).substring(with: tm.range(at: 1)))
+                }
+                if extracted.isEmpty {
+                    extracted = stripTagsAndDecode(innerHTML)
+                }
+                let cleanName = String(extracted.prefix(300)).trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !cleanName.isEmpty else { continue }
+                if link.isFolder {
+                    if folderMap[link.id] == nil { folderMap[link.id] = (cleanName, link.resourceKey) }
+                } else {
+                    if fileMap[link.id] == nil { fileMap[link.id] = (cleanName, link.resourceKey, nil) }
                 }
             }
         }
 
-        // Pattern 2: file links
-        let fileRegex = try? NSRegularExpression(
-            pattern: #"href="https://drive\.google\.com/file/d/([A-Za-z0-9_-]{10,128})/[^"]*"[^>]*>([^<]{1,220})</a>"#,
-            options: [.caseInsensitive]
-        )
-        if let regex = fileRegex {
-            let ns = html as NSString
-            for m in regex.matches(in: html, range: NSRange(location: 0, length: ns.length)) {
-                let id = ns.substring(with: m.range(at: 1))
-                let rawName = decodeHTMLEntities(ns.substring(with: m.range(at: 2)).trimmingCharacters(in: .whitespacesAndNewlines))
-                if !rawName.isEmpty {
-                    fileMap[id] = (rawName, nil)
-                }
-            }
-        }
-
-        // Pattern 3: data-id blocks / JSON entry fallback `[null,"ID"] ... title`
+        // Secondary fallback: data-id attributes with aria-label / data-tooltip
         let dataIdRegex = try? NSRegularExpression(
             pattern: #"data-id="([A-Za-z0-9_-]{10,128})"[^>]*?(?:data-target="([^"]*)")?[^>]*?>[\s\S]{0,600}?(?:aria-label|data-tooltip)="([^"]{1,220})""#,
             options: [.caseInsensitive]
@@ -300,33 +367,79 @@ public enum ClassicDriveHtmlParser {
             for m in regex.matches(in: html, range: NSRange(location: 0, length: ns.length)) {
                 let id = ns.substring(with: m.range(at: 1))
                 let target = m.range(at: 2).location != NSNotFound ? ns.substring(with: m.range(at: 2)).lowercased() : ""
-                let name = decodeHTMLEntities(ns.substring(with: m.range(at: 3)).trimmingCharacters(in: .whitespacesAndNewlines))
+                let name = stripTagsAndDecode(ns.substring(with: m.range(at: 3)))
                 guard !name.isEmpty else { continue }
                 if target == "folder" || (!name.contains(".") && !ClassicDriveLinkParser.isAcceptedClassicROM(name)) {
-                    if folderMap[id] == nil { folderMap[id] = name }
+                    if folderMap[id] == nil { folderMap[id] = (name, nil) }
                 } else if fileMap[id] == nil {
-                    fileMap[id] = (name, nil)
+                    fileMap[id] = (name, nil, nil)
                 }
             }
         }
 
-        let subfolders = folderMap.map { (id: $0.key, name: $0.value) }.sorted { $0.id < $1.id }
-        let files = fileMap.map { (id: $0.key, name: $0.value.name, sizeBytes: $0.value.sizeBytes) }.sorted { $0.id < $1.id }
-        return ParsedFolderPage(subfolders: subfolders, files: files)
+        let subfolders = folderMap.map { (id: $0.key, name: $0.value.name, resourceKey: $0.value.resourceKey) }.sorted { $0.id < $1.id }
+        let files = fileMap.map { (id: $0.key, name: $0.value.name, resourceKey: $0.value.resourceKey, sizeBytes: $0.value.sizeBytes) }.sorted { $0.id < $1.id }
+        return DetailedParsedFolderPage(subfolders: subfolders, files: files)
     }
 
-    private static func decodeHTMLEntities(_ text: String) -> String {
-        text.replacingOccurrences(of: "&amp;", with: "&")
-            .replacingOccurrences(of: "&quot;", with: "\"")
-            .replacingOccurrences(of: "&#39;", with: "'")
-            .replacingOccurrences(of: "&lt;", with: "<")
-            .replacingOccurrences(of: "&gt;", with: ">")
+    private static func stripTagsAndDecode(_ html: String) -> String {
+        let noTags = html.replacingOccurrences(of: #"<[^>]*>"#, with: "", options: .regularExpression)
+        return decodeHTMLEntities(noTags)
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func decodeHTMLEntities(_ text: String) -> String {
+        guard let regex = try? NSRegularExpression(
+            pattern: #"&#x([0-9a-fA-F]+);|&#(\d+);|&(amp|quot|apos|lt|gt|nbsp);"#,
+            options: [.caseInsensitive]
+        ) else {
+            return text
+        }
+        let ns = text as NSString
+        var out = ""
+        var lastEnd = 0
+        for m in regex.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+            if m.range.location > lastEnd {
+                out += ns.substring(with: NSRange(location: lastEnd, length: m.range.location - lastEnd))
+            }
+            if m.range(at: 1).location != NSNotFound,
+               let code = UInt32(ns.substring(with: m.range(at: 1)), radix: 16),
+               let scalar = UnicodeScalar(code) {
+                out.append(Character(scalar))
+            } else if m.range(at: 2).location != NSNotFound,
+                      let code = UInt32(ns.substring(with: m.range(at: 2))),
+                      let scalar = UnicodeScalar(code) {
+                out.append(Character(scalar))
+            } else if m.range(at: 3).location != NSNotFound {
+                switch ns.substring(with: m.range(at: 3)).lowercased() {
+                case "amp": out.append("&")
+                case "quot": out.append("\"")
+                case "apos": out.append("'")
+                case "lt": out.append("<")
+                case "gt": out.append(">")
+                case "nbsp": out.append(" ")
+                default: break
+                }
+            }
+            lastEnd = m.range.location + m.range.length
+        }
+        if lastEnd < ns.length {
+            out += ns.substring(from: lastEnd)
+        }
+        return out
     }
 }
 
 public protocol ClassicDriveHTTPTransport: Sendable {
     func fetchFolderPage(folderID: String, bearerToken: String?) async throws -> (statusCode: Int, body: Data)
     func downloadFile(url: URL, to destination: URL, bearerToken: String?, progress: @Sendable (Int64, Int64?) -> Void) async throws -> Int64
+}
+
+public extension ClassicDriveHTTPTransport {
+    func fetchFolderPage(folderID: String, bearerToken: String?, resourceKey: String?) async throws -> (statusCode: Int, body: Data) {
+        try await fetchFolderPage(folderID: folderID, bearerToken: bearerToken)
+    }
 }
 
 public final class URLSessionDriveTransport: ClassicDriveHTTPTransport, @unchecked Sendable {
@@ -338,12 +451,22 @@ public final class URLSessionDriveTransport: ClassicDriveHTTPTransport, @uncheck
     }
 
     public func fetchFolderPage(folderID: String, bearerToken: String?) async throws -> (statusCode: Int, body: Data) {
-        let urlString = "https://drive.google.com/embeddedfolderview?id=\(folderID)#list"
-        guard let url = URL(string: urlString), ClassicDriveLinkParser.isAllowedURL(url) else {
+        try await fetchFolderPage(folderID: folderID, bearerToken: bearerToken, resourceKey: nil)
+    }
+
+    public func fetchFolderPage(folderID: String, bearerToken: String?, resourceKey: String?) async throws -> (statusCode: Int, body: Data) {
+        var components = URLComponents(string: "https://drive.google.com/embeddedfolderview")!
+        var items = [URLQueryItem(name: "id", value: folderID)]
+        if let rk = resourceKey, !rk.isEmpty {
+            items.append(URLQueryItem(name: "resourcekey", value: rk))
+        }
+        components.queryItems = items
+        components.fragment = "list"
+        guard let url = components.url, ClassicDriveLinkParser.isAllowedURL(url) else {
             throw ClassicDriveError.disallowedHost
         }
         var request = URLRequest(url: url, timeoutInterval: 20)
-        request.setValue("BRUMCLASSICSMobile/0.31.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("BRUMCLASSICS", forHTTPHeaderField: "User-Agent")
         if let token = bearerToken, !token.isEmpty {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
@@ -361,11 +484,21 @@ public final class URLSessionDriveTransport: ClassicDriveHTTPTransport, @uncheck
         bearerToken: String?,
         progress: @Sendable (Int64, Int64?) -> Void
     ) async throws -> Int64 {
+        return try await performDownload(url: url, to: destination, bearerToken: bearerToken, allowConfirmRetry: true, progress: progress)
+    }
+
+    private func performDownload(
+        url: URL,
+        to destination: URL,
+        bearerToken: String?,
+        allowConfirmRetry: Bool,
+        progress: @Sendable (Int64, Int64?) -> Void
+    ) async throws -> Int64 {
         guard ClassicDriveLinkParser.isAllowedURL(url) else {
             throw ClassicDriveError.disallowedHost
         }
-        var request = URLRequest(url: url, timeoutInterval: 60)
-        request.setValue("BRUMCLASSICSMobile/0.31.0", forHTTPHeaderField: "User-Agent")
+        var request = URLRequest(url: url, timeoutInterval: 120)
+        request.setValue("BRUMCLASSICS", forHTTPHeaderField: "User-Agent")
         if let token = bearerToken, !token.isEmpty {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
@@ -374,13 +507,21 @@ public final class URLSessionDriveTransport: ClassicDriveHTTPTransport, @uncheck
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw ClassicDriveError.networkFailure("HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)")
         }
-        if let mime = http.mimeType?.lowercased(), mime.contains("text/html") {
-            throw ClassicDriveError.invalidDownloadPayload("Página HTML retornada em vez do arquivo ROM")
-        }
         let attrs = try FileManager.default.attributesOfItem(atPath: tempURL.path)
         let size = (attrs[.size] as? NSNumber)?.int64Value ?? 0
         guard size > 0 else {
             throw ClassicDriveError.invalidDownloadPayload("Arquivo vazio")
+        }
+        let mimeIsHTML = http.mimeType?.lowercased().contains("text/html") ?? false
+        let looksLikeHTML = mimeIsHTML || Self.fileStartsWithHTML(tempURL)
+        if looksLikeHTML {
+            if allowConfirmRetry, size <= 512 * 1024,
+               let html = try? String(contentsOf: tempURL, encoding: .utf8),
+               let confirmURL = Self.extractVirusWarningConfirmURL(from: html, baseURL: url),
+               ClassicDriveLinkParser.isAllowedURL(confirmURL) {
+                return try await performDownload(url: confirmURL, to: destination, bearerToken: bearerToken, allowConfirmRetry: false, progress: progress)
+            }
+            throw ClassicDriveError.invalidDownloadPayload("O Google Drive não liberou o arquivo. Confira o compartilhamento ou a cota.")
         }
         progress(size, size)
         try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -389,6 +530,45 @@ public final class URLSessionDriveTransport: ClassicDriveHTTPTransport, @uncheck
         }
         try FileManager.default.moveItem(at: tempURL, to: destination)
         return size
+    }
+
+    private static func fileStartsWithHTML(_ fileURL: URL) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: fileURL) else { return false }
+        defer { try? handle.close() }
+        guard let head = try? handle.read(upToCount: 512),
+              let snippet = String(data: head, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() else {
+            return false
+        }
+        return snippet.hasPrefix("<!doctype html") || snippet.hasPrefix("<html")
+    }
+
+    private static func extractVirusWarningConfirmURL(from html: String, baseURL: URL) -> URL? {
+        let formRegex = try? NSRegularExpression(pattern: #"<form[^>]*action=["']([^"']+)["'][^>]*>([\s\S]*?)</form>"#, options: [.caseInsensitive, .dotMatchesLineSeparators])
+        if let regex = formRegex,
+           let match = regex.firstMatch(in: html, range: NSRange(location: 0, length: (html as NSString).length)) {
+            let ns = html as NSString
+            let rawAction = ClassicDriveHtmlParser.decodeHTMLEntities(ns.substring(with: match.range(at: 1)))
+            let formBody = ns.substring(with: match.range(at: 2))
+            if var comp = URLComponents(string: rawAction) ?? URLComponents(url: baseURL, resolvingAgainstBaseURL: false) {
+                var queryItems = comp.queryItems ?? []
+                let inputRegex = try? NSRegularExpression(pattern: #"<input[^>]*name=["']([^"']+)["'][^>]*value=["']([^"']*)["']"#, options: [.caseInsensitive])
+                if let iRegex = inputRegex {
+                    let fns = formBody as NSString
+                    for im in iRegex.matches(in: formBody, range: NSRange(location: 0, length: fns.length)) {
+                        let name = fns.substring(with: im.range(at: 1))
+                        let value = ClassicDriveHtmlParser.decodeHTMLEntities(fns.substring(with: im.range(at: 2)))
+                        if !queryItems.contains(where: { $0.name == name }) {
+                            queryItems.append(URLQueryItem(name: name, value: value))
+                        }
+                    }
+                }
+                comp.queryItems = queryItems
+                if let url = comp.url, ClassicDriveLinkParser.isAllowedURL(url) {
+                    return url
+                }
+            }
+        }
+        return nil
     }
 }
 
@@ -492,16 +672,53 @@ public actor ClassicDriveCloudService {
     }
 
     public func startOrRefreshScan(folderURL: String) async throws -> ClassicDriveCheckpoint {
-        guard let folderID = ClassicDriveLinkParser.parseFolderID(from: folderURL) else {
+        guard let link = ClassicDriveLinkParser.parseLink(from: folderURL) else {
             throw ClassicDriveError.invalidFolderURL
         }
         let previousByID = Dictionary(uniqueKeysWithValues: checkpoint.items.map { ($0.id, $0) })
         let storage = checkpoint.storageDirectoryPath
         checkpoint = ClassicDriveCheckpoint()
         checkpoint.rootURL = folderURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        checkpoint.rootFolderID = folderID
+        checkpoint.rootFolderID = link.id
+        checkpoint.rootResourceKey = link.resourceKey
         checkpoint.storageDirectoryPath = storage
-        checkpoint.pendingFolders = [ClassicDriveFolderTask(id: folderID, relativePath: "", depth: 0)]
+        if !link.isFolder {
+            let token = ClassicDriveKeychainStore.loadToken()
+            let (status, body) = try await transport.fetchFolderPage(folderID: link.id, bearerToken: token, resourceKey: link.resourceKey)
+            if status == 401 || status == 403 {
+                throw ClassicDriveError.unauthorized
+            }
+            let html = String(data: body, encoding: .utf8) ?? ""
+            if ClassicDriveHtmlParser.isServiceLoginHTML(html) {
+                throw ClassicDriveError.unauthorized
+            }
+            let name = ClassicDriveHtmlParser.extractSingleFileTitle(from: html) ?? "Game_\(link.id).bin"
+            guard ClassicDriveLinkParser.isAcceptedClassicROM(name) else {
+                throw ClassicDriveError.invalidDownloadPayload("O link não aponta para um jogo clássico compatível.")
+            }
+            let prev = previousByID[link.id]
+            checkpoint.items = [ClassicDriveGameItem(
+                id: link.id,
+                name: name,
+                title: ROMTitleRules.clean(name),
+                relativePath: name,
+                folderID: link.id,
+                parentRelativePath: "",
+                sizeBytes: prev?.sizeBytes,
+                systemHint: ClassicDriveLinkParser.detectSystemHint(relativePath: name, filename: name),
+                downloadURL: ClassicDriveLinkParser.directDownloadURL(fileID: link.id, resourceKey: link.resourceKey).absoluteString,
+                downloadedLocalPath: prev?.downloadedLocalPath,
+                downloadedBytes: prev?.downloadedBytes ?? 0,
+                downloadStatus: prev?.downloadedLocalPath != nil ? "available" : "cloud",
+                downloadError: nil
+            )]
+            checkpoint.completed = true
+            checkpoint.totalFoldersRead = 1
+            checkpoint.updatedAt = Date()
+            try persist()
+            return checkpoint
+        }
+        checkpoint.pendingFolders = [ClassicDriveFolderTask(id: link.id, relativePath: "", depth: 0, resourceKey: link.resourceKey)]
         // Keep previous local items intact until scan finishes
         checkpoint.items = Array(previousByID.values)
         try persist()
@@ -532,7 +749,7 @@ public actor ClassicDriveCloudService {
             }
             let (status, body): (Int, Data)
             do {
-                (status, body) = try await transport.fetchFolderPage(folderID: folder.id, bearerToken: token)
+                (status, body) = try await transport.fetchFolderPage(folderID: folder.id, bearerToken: token, resourceKey: folder.resourceKey)
             } catch let driveErr as ClassicDriveError {
                 checkpoint.pendingFolders.insert(folder, at: 0)
                 checkpoint.lastError = driveErr.localizedDescription
@@ -560,14 +777,21 @@ public actor ClassicDriveCloudService {
                 throw err
             }
 
+            let parsed = ClassicDriveHtmlParser.parseFolderHTMLDetailed(html)
+            if ClassicDriveHtmlParser.isServiceLoginHTML(html) && parsed.subfolders.isEmpty && parsed.files.isEmpty {
+                checkpoint.pendingFolders.insert(folder, at: 0)
+                checkpoint.lastError = ClassicDriveError.unauthorized.localizedDescription
+                try? persist()
+                throw ClassicDriveError.unauthorized
+            }
+
             visited.insert(folder.id)
             foldersThisBatch += 1
             checkpoint.totalFoldersRead += 1
 
-            let parsed = ClassicDriveHtmlParser.parseFolderHTML(html)
             for sub in parsed.subfolders where !visited.contains(sub.id) {
                 let rel = folder.relativePath.isEmpty ? sub.name : "\(folder.relativePath)/\(sub.name)"
-                checkpoint.pendingFolders.append(ClassicDriveFolderTask(id: sub.id, relativePath: rel, depth: folder.depth + 1))
+                checkpoint.pendingFolders.append(ClassicDriveFolderTask(id: sub.id, relativePath: rel, depth: folder.depth + 1, resourceKey: sub.resourceKey))
             }
             for file in parsed.files where ClassicDriveLinkParser.isAcceptedClassicROM(file.name) {
                 seenFiles.insert(file.id)
@@ -583,7 +807,7 @@ public actor ClassicDriveCloudService {
                     parentRelativePath: folder.relativePath,
                     sizeBytes: file.sizeBytes ?? prev?.sizeBytes,
                     systemHint: ClassicDriveLinkParser.detectSystemHint(relativePath: rel, filename: file.name),
-                    downloadURL: ClassicDriveLinkParser.directDownloadURL(fileID: file.id).absoluteString,
+                    downloadURL: ClassicDriveLinkParser.directDownloadURL(fileID: file.id, resourceKey: file.resourceKey).absoluteString,
                     downloadedLocalPath: prev?.downloadedLocalPath,
                     downloadedBytes: prev?.downloadedBytes ?? 0,
                     downloadStatus: prev?.downloadedLocalPath != nil ? "available" : "cloud",
@@ -628,9 +852,10 @@ public actor ClassicDriveCloudService {
         }
 
         let storageDir = resolvedStorageDirectory()
-        try FileManager.default.createDirectory(at: storageDir, withIntermediateDirectories: true)
         let safeFile = (item.name as NSString).lastPathComponent
-        let dest = storageDir.appendingPathComponent("\(item.id)_\(safeFile)")
+        let itemDir = storageDir.appendingPathComponent(item.id, isDirectory: true)
+        try FileManager.default.createDirectory(at: itemDir, withIntermediateDirectories: true)
+        let dest = itemDir.appendingPathComponent(safeFile)
         let token = ClassicDriveKeychainStore.loadToken()
 
         checkpoint.items[index].downloadStatus = "downloading"

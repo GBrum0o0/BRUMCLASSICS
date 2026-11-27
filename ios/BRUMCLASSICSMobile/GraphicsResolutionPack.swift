@@ -141,7 +141,7 @@ public final class GraphicsResolutionPack {
         entry3D("saturn", "Sega Saturn", "4:3", maxMultiplier: 3, heavy: true),
         entry3D("dreamcast", "Dreamcast", "4:3", maxMultiplier: 4, heavy: false),
         entry3D("nds", "Nintendo DS", "4:3 (Dual)", handheld: true, maxMultiplier: 4, heavy: false),
-        entry3D("psp", "PlayStation Portable (PSP)", "16:9", handheld: true, maxMultiplier: 4, heavy: false),
+        entry3D("psp", "PlayStation Portable (PSP)", "16:9", handheld: true, maxMultiplier: 3, heavy: true),
         entry3D("n3ds", "Nintendo 3DS", "5:3 / 4:3", handheld: true, maxMultiplier: 3, heavy: true),
         entry3D("gamecube", "GameCube", "4:3", maxMultiplier: 3, heavy: true),
         entry3D("wii", "Nintendo Wii", "16:9", maxMultiplier: 3, heavy: true),

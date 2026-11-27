@@ -11,8 +11,8 @@ final class GraphicsResolutionPackTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(GraphicsResolutionPack.catalog.count, 32)
 
         let pspHigh = pack.resolve(systemID: "psp", hardwareTier: .high)
-        XCTAssertEqual(pspHigh.internalMultiplier, 3)
-        XCTAssertEqual(pspHigh.coreVariables["ppsspp_internal_resolution"], "1440x816")
+        XCTAssertEqual(pspHigh.internalMultiplier, 2)
+        XCTAssertEqual(pspHigh.coreVariables["ppsspp_internal_resolution"], "960x544")
         XCTAssertTrue(pspHigh.preserveAspectRatio)
 
         let pspLow = pack.resolve(systemID: "psp", hardwareTier: .low)
