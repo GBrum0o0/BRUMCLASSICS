@@ -1,4 +1,5 @@
 #include "PokemonFireRedAdapter.hpp"
+#include "PokemonPlatinumAdapter.hpp"
 
 #include <array>
 #include <cstdlib>
@@ -363,6 +364,131 @@ int main() {
         require(diff[1].nationalDexNumber == 25u && diff[1].isShiny && diff[1].storageSource == "pc_box" &&
                     diff[1].metLocationName == "Mt. Moon",
                 "Second diff event must be shiny box Pikachu at Mt. Moon");
+    }
+
+    // 7. Pokémon Platinum (CPUE) Gen 4 Adapter Tests
+    {
+        std::vector<uint8_t> platRom(0x200u, 0u);
+        std::memcpy(platRom.data(), "POKEMON PL\0\0", 12u);
+        std::memcpy(platRom.data() + 0x0Cu, "CPUE", 4u);
+        platRom[0x1Eu] = 1u;
+        PlatinumRomInfo platInfo = identifyPlatinumRom(platRom.data(), platRom.size());
+        require(platInfo.isPlatinum && platInfo.supportedRamLayout &&
+                    platInfo.gameCode == "CPUE" && platInfo.revision == 1u,
+                "identifyPlatinumRom must recognize CPUE header");
+
+        std::vector<uint8_t> wrongNdsRom = platRom;
+        std::memcpy(wrongNdsRom.data() + 0x0Cu, "ADAE", 4u);
+        PlatinumRomInfo diamondInfo = identifyPlatinumRom(wrongNdsRom.data(), wrongNdsRom.size());
+        require(!diamondInfo.isPlatinum && !diamondInfo.supportedRamLayout,
+                "identifyPlatinumRom must reject non-CPUE NDS ROMs");
+
+        // Verify Gen 4 PRNG decryption across all 24 block permutations
+        const uint32_t platOtId = 0x12345678u;
+        for (uint32_t perm = 0u; perm < 24u; ++perm) {
+            const uint32_t pid = (perm << 13u) | 0x0001u;
+            uint8_t raw136[136]{};
+            encodeGen4PokemonForTest(raw136, pid, platOtId, static_cast<uint16_t>(396u + (perm % 10u)), 16u /* Route 201 */);
+            DecodedGen4Pokemon dec = decodeGen4Pokemon(raw136);
+            require(dec.valid && dec.nationalDexNumber == static_cast<uint16_t>(396u + (perm % 10u)) &&
+                        dec.metLocationName == "Route 201" && !dec.isEgg,
+                    "Gen 4 136-byte decryption must unshuffle all 24 permutations cleanly");
+        }
+
+        // Gen 4 shiny vs corrupt vs out-of-range vs egg
+        {
+            uint8_t shinyRaw[136]{};
+            encodeGen4PokemonForTest(shinyRaw, 0x00020000u, 0x00000001u, 487u /* Giratina */, 85u /* Distortion World */);
+            DecodedGen4Pokemon shinyDec = decodeGen4Pokemon(shinyRaw);
+            require(shinyDec.valid && shinyDec.isShiny && shinyDec.nationalDexNumber == 487u &&
+                        shinyDec.metLocationName == "Distortion World",
+                    "Gen 4 shiny Giratina in Distortion World must decode accurately");
+
+            uint8_t eggRaw[136]{};
+            encodeGen4PokemonForTest(eggRaw, 0x00100008u, 0u, 175u, 4u, /*isEgg=*/true);
+            DecodedGen4Pokemon eggDec = decodeGen4Pokemon(eggRaw);
+            require(eggDec.valid && eggDec.isEgg, "Gen 4 egg flag must be identified");
+
+            uint8_t badSum[136]{};
+            encodeGen4PokemonForTest(badSum, 0x00100008u, 0u, 396u, 16u, false, /*corruptChecksum=*/true);
+            require(!decodeGen4Pokemon(badSum).valid, "Corrupted Gen 4 checksum must be rejected");
+
+            uint8_t badSpecies[136]{};
+            encodeGen4PokemonForTest(badSpecies, 0x00100008u, 0u, 650u /* > 493 */, 16u);
+            require(!decodeGen4Pokemon(badSpecies).valid, "Gen 4 species > 493 must be rejected");
+        }
+
+        // Live PlatinumCaptureTracker tests (3-frame stability, baseline suppression, boot/corrupt RAM ignored, wrong game rejected)
+        {
+            std::vector<uint8_t> ndsRam(0x400000u, 0u);
+            constexpr uint32_t kSaveOffset = 0x120000u; // 0x02120000 in 4 MiB NDS Main RAM
+            PlatinumRamLayout layout;
+            std::vector<NdsMemoryDescriptor> descs = {{ndsRam.data(), 0x02000000u, ndsRam.size()}};
+            std::vector<PlatinumCaptureEvent> platEvents;
+
+            // Wrong ROM tracker must ignore identical RAM cleanly
+            PlatinumCaptureTracker wrongTracker(diamondInfo, makeNdsDescriptorBusReader(descs),
+                                                [&](const PlatinumCaptureEvent &ev) { platEvents.push_back(ev); }, 1u, layout);
+            wrongTracker.doFrame();
+            require(!wrongTracker.isBaselineAnchored() && platEvents.empty(),
+                    "Wrong game code tracker must do nothing");
+
+            PlatinumCaptureTracker platTracker(platInfo, makeNdsDescriptorBusReader(descs),
+                                               [&](const PlatinumCaptureEvent &ev) { platEvents.push_back(ev); }, 1u, layout);
+
+            // Corrupt / zero boot RAM must never crash or anchor baseline
+            platTracker.doFrame();
+            platTracker.doFrame();
+            platTracker.doFrame();
+            require(!platTracker.isBaselineAnchored() && platEvents.empty(),
+                    "Zero/boot RAM must not anchor baseline");
+
+            // Initialize valid SaveData pointer + starter Chimchar (#390) in Party Slot 0
+            writeU32LE(ndsRam.data() + (layout.saveBlockPtrAddress - 0x02000000u), 0x02000000u + kSaveOffset);
+            writeU32LE(ndsRam.data() + kSaveOffset + layout.partyCountOffset, 1u);
+            encodeGen4PokemonForTest(ndsRam.data() + kSaveOffset + layout.partyArrayOffset,
+                                     0x00000020u, platOtId, 390u /* Chimchar */, 46u /* Lake Verity */);
+
+            platTracker.doFrame();
+            platTracker.doFrame();
+            require(!platTracker.isBaselineAnchored(), "Platinum baseline requires 3 stable scans");
+            platTracker.doFrame();
+            require(platTracker.isBaselineAnchored() && platEvents.empty(),
+                    "Platinum baseline must anchor on 3rd stable scan without emitting starter");
+
+            // Catch Starly (#396) in Route 201 into Party Slot 1 -> requires 3 stable frames
+            writeU32LE(ndsRam.data() + kSaveOffset + layout.partyCountOffset, 2u);
+            encodeGen4PokemonForTest(ndsRam.data() + kSaveOffset + layout.partyArrayOffset + 236u,
+                                     0x00000020u, 0u, 396u /* Starly */, 16u /* Route 201 */);
+            platTracker.doFrame();
+            platTracker.doFrame();
+            require(platEvents.empty(), "Starly capture must wait for 3rd stable scan");
+            platTracker.doFrame();
+            require(platEvents.size() == 1u && platEvents[0].nationalDexNumber == 396u &&
+                        !platEvents[0].isShiny && platEvents[0].metLocationName == "Route 201" &&
+                        platEvents[0].storageSource == "party" && platEvents[0].gameCode == "CPUE",
+                    "Starly capture must emit cleanly on 3rd stable scan");
+
+            // Corrupt Slot 1 checksum mid-play -> scan aborts safely without duplicate/crash
+            encodeGen4PokemonForTest(ndsRam.data() + kSaveOffset + layout.partyArrayOffset + 236u,
+                                     0x00000020u, 0u, 396u, 16u, false, /*corruptChecksum=*/true);
+            platTracker.doFrame();
+            require(platEvents.size() == 1u, "Corrupt RAM mid-session must be ignored safely");
+
+            // Restore Starly & place shiny Shinx (#403) in PC Box 0 -> emits after 3 stable scans
+            encodeGen4PokemonForTest(ndsRam.data() + kSaveOffset + layout.partyArrayOffset + 236u,
+                                     0x00000020u, 0u, 396u, 16u);
+            encodeGen4PokemonForTest(ndsRam.data() + kSaveOffset + layout.boxStorageOffset,
+                                     0x00020000u, 0x00000001u, 403u /* Shinx */, 17u /* Route 202 */);
+            platTracker.doFrame();
+            platTracker.doFrame();
+            require(platEvents.size() == 1u, "PC Box shiny Shinx waits 3 frames");
+            platTracker.doFrame();
+            require(platEvents.size() == 2u && platEvents[1].nationalDexNumber == 403u &&
+                        platEvents[1].isShiny && platEvents[1].metLocationName == "Route 202" &&
+                        platEvents[1].storageSource == "pc_box",
+                    "Shiny PC Box Shinx must be detected after 3 stable scans");
+        }
     }
 
     std::cout << "pokedex_tests passed (" << g_checks << " checks)\n";

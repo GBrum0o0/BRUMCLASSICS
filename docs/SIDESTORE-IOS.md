@@ -1,6 +1,6 @@
 # Atualizações no iPhone com SideStore
 
-O BRUMCLASSICS MÓVEL iOS oferece suporte a **atualizações diretamente no iPhone via SideStore**, mantendo também a instalação tradicional de `.ipa` via **Sideloadly**.
+O BRUMCLASSICS+ iOS oferece suporte a **atualizações diretamente no iPhone via SideStore**, mantendo também a instalação tradicional de `.ipa` via **Sideloadly**.
 
 ## Endereço oficial da fonte SideStore
 

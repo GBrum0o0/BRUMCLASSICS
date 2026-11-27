@@ -681,7 +681,7 @@ final class PocketTests: XCTestCase {
         XCTAssertEqual(GamingModePresentation.localAvailabilityLabel, "Disponível")
         XCTAssertEqual(GamingModePresentation.computerAvailabilityLabel, "No computador")
         for label in [GamingModePresentation.localAvailabilityLabel, GamingModePresentation.computerAvailabilityLabel] {
-            for forbidden in ["Brum Core", "BRUM Core", "mGBA", "PPSSPP", "SkyEmu", "RetroArch", "M.U.R.B"] {
+            for forbidden in ["Brum Core", "BRUM Core", "mGBA", "PPSSPP", "SkyEmu", "RetroArch", "M.U.R.B", "MURB Engine"] {
                 XCTAssertFalse(label.contains(forbidden))
             }
         }

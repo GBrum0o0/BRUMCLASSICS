@@ -142,7 +142,7 @@ public final class MobileUpdateManager {
                 if (!allowedGitHubUrl(url)) continue;
                 long size = asset.optLong("size", 0);
                 if (size < 1024 || size > MAX_APK_BYTES) continue;
-                best = new UpdateInfo(version, release.optString("body", "Nova versão do BRUMCLASSICS MOVEL."), url, digest.substring(7), size, "github", false);
+                best = new UpdateInfo(version, release.optString("body", "Nova versão do BRUMCLASSICS+."), url, digest.substring(7), size, "github", false);
             }
         }
         return best;

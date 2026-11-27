@@ -143,11 +143,13 @@
           "backends": [
             "melonds_libretro.dll"
           ],
-          "adapterId": "gen4-nds-planned",
-          "adapterImplemented": false,
-          "automatedValidationStatus": "planned_phase_4",
+          "adapterId": "platinum-nds-v1",
+          "adapterImplemented": true,
+          "automatedValidationStatus": "synthetic_adapter_fixtures_verified",
           "realRomBootAndCaptureVerified": false,
-          "status": "awaiting_adapter"
+          "interactiveCaptureVerified": false,
+          "interactivePlaythroughPendingUser": true,
+          "status": "implemented_awaiting_real_test"
         },
         {
           "gameKey": "pokemon-black2-nds",

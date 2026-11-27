@@ -1,4 +1,4 @@
-# BRUMCLASSICS MÓVEL para iOS
+# BRUMCLASSICS+ para iOS
 
 Versão 0.15.1: o BRUM Core integra também WonderSwan/Color, corrige áudio e torna encerramentos de núcleo visíveis. O app móvel é GPL-3.0-or-later; launcher de PC e marca mantêm licenças separadas. O IPA sem assinatura é anexado à versão `ios-v0.15.1` após validação no CI macOS.
 

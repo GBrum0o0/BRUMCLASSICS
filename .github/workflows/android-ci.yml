@@ -293,7 +293,7 @@ jobs:
             com.brumclassics.mobile.extensions.PokedexUniversalEngineTest; do
             java -cp "$RUNNER_TEMP/brum-tests" "$test"
           done
-          clang++ -std=c++17 -Wall -Wextra -Werror shared/brum-core/PokemonFireRedAdapter.cpp shared/brum-core/pokedex_tests.cpp -o "$RUNNER_TEMP/brum-pokedex-tests"
+          clang++ -std=c++17 -Wall -Wextra -Werror shared/brum-core/PokemonFireRedAdapter.cpp shared/brum-core/PokemonPlatinumAdapter.cpp shared/brum-core/pokedex_tests.cpp -o "$RUNNER_TEMP/brum-pokedex-tests"
           "$RUNNER_TEMP/brum-pokedex-tests"
       - name: Store Android build
         uses: actions/upload-artifact@v4
@@ -326,11 +326,11 @@ jobs:
           if [ -f "$NOTES_FILE" ]; then
             gh release create "$TAG" "$APK_OUT" SHA256SUMS.txt \
               --target "$GITHUB_SHA" \
-              --title "BRUMCLASSICS MÓVEL Android ${VERSION}" \
+              --title "BRUMCLASSICS+ Android ${VERSION}" \
               --notes-file "$NOTES_FILE"
           else
             gh release create "$TAG" "$APK_OUT" SHA256SUMS.txt \
               --target "$GITHUB_SHA" \
-              --title "BRUMCLASSICS MÓVEL Android ${VERSION}" \
-              --notes "Atualização BRUMCLASSICS MÓVEL Android ${VERSION}."
+              --title "BRUMCLASSICS+ Android ${VERSION}" \
+              --notes "Atualização BRUMCLASSICS+ Android ${VERSION}."
           fi

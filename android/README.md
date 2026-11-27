@@ -1,4 +1,4 @@
-# BRUMCLASSICS MÓVEL para Android
+# BRUMCLASSICS+ para Android
 
 Cliente Android nativo complementar ao BRUMCLASSICS. A versão atual é a **0.31.0** (`versionCode 43`) e requer Android 8.0/API 26 ou superior.
 

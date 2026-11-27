@@ -1249,7 +1249,7 @@ private struct GamingGameView: View {
                 MurbRemoteStore().remember(target.payload)
                 return (target, launch.message ?? "Jogo aberto no computador; joystick virtual ativo.", false)
             }
-            return (nil, (launch.message ?? "Jogo aberto no computador.") + " Conecte o Gamepad M.U.R.B pela tela seguinte.", true)
+            return (nil, (launch.message ?? "Jogo aberto no computador.") + " Conecte o Gamepad MURB pela tela seguinte.", true)
         case .failure(let error):
             return (nil, "Não foi possível abrir o modo Gamepad: \(error.localizedDescription)", false)
         }

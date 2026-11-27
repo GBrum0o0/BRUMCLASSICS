@@ -348,7 +348,7 @@ public final class MainActivity extends Activity {
                     String announced = getSharedPreferences("brum_mobile_updates", MODE_PRIVATE).getString("announced_version", "");
                     if (!update.version.equals(announced)) {
                         getSharedPreferences("brum_mobile_updates", MODE_PRIVATE).edit().putString("announced_version", update.version).apply();
-                        Toast.makeText(MainActivity.this, "BRUMCLASSICS MOVEL " + update.version + " disponível em Perfil.", Toast.LENGTH_LONG).show();
+                        Toast.makeText(MainActivity.this, "BRUMCLASSICS+ " + update.version + " disponível em Perfil.", Toast.LENGTH_LONG).show();
                     }
                     if ("profile".equals(currentScreen)) showProfile();
                 });
@@ -1760,7 +1760,7 @@ public final class MainActivity extends Activity {
             EditText uriOrIp = pairingField("murb://... ou IP do PC", prefs.getString("host", ""));
             EditText portField = pairingField("Porta", String.valueOf(prefs.getInt("port", 8089)));
             portField.setInputType(InputType.TYPE_CLASS_NUMBER);
-            EditText tokenField = pairingField("Token M.U.R.B", prefs.getString("token", ""));
+            EditText tokenField = pairingField("Token MURB", prefs.getString("token", ""));
             EditText sysField = pairingField("Sistema (ds, 3ds, wiiu, gamepad)", prefs.getString("sys", "ds"));
             panel.addView(uriOrIp, margins(-1, 0, -1, 8, 46));
             panel.addView(portField, margins(-1, 0, -1, 8, 46));
@@ -1768,7 +1768,7 @@ public final class MainActivity extends Activity {
             panel.addView(sysField, new LinearLayout.LayoutParams(-1, dp(46)));
             ScrollView scroll = new ScrollView(this);
             scroll.addView(panel);
-            AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Gamepad M.U.R.B para PC")
+            AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Gamepad MURB para PC")
                     .setView(scroll).setNegativeButton("Cancelar", null).setPositiveButton("Conectar", null).create();
             dialogRef[0] = dialog;
             dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
@@ -1798,7 +1798,7 @@ public final class MainActivity extends Activity {
         EditText uriOrIp = pairingField("murb://... ou IP do PC", prefs.getString("host", ""));
         EditText portField = pairingField("Porta", String.valueOf(prefs.getInt("port", 8089)));
         portField.setInputType(InputType.TYPE_CLASS_NUMBER);
-        EditText tokenField = pairingField("Token M.U.R.B", prefs.getString("token", ""));
+        EditText tokenField = pairingField("Token MURB", prefs.getString("token", ""));
         EditText sysField = pairingField("Sistema (ds, 3ds, wiiu, gamepad)", prefs.getString("sys", "ds"));
         panel.addView(uriOrIp, margins(-1, 0, -1, 8, 46));
         panel.addView(portField, margins(-1, 0, -1, 8, 46));
@@ -1806,7 +1806,7 @@ public final class MainActivity extends Activity {
         panel.addView(sysField, new LinearLayout.LayoutParams(-1, dp(46)));
         ScrollView scroll = new ScrollView(this);
         scroll.addView(panel);
-        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Gamepad M.U.R.B para PC")
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Gamepad MURB para PC")
                 .setView(scroll).setNegativeButton("Cancelar", null).setPositiveButton("Conectar", null).create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             String raw = uriOrIp.getText().toString().trim();
@@ -2936,7 +2936,7 @@ public final class MainActivity extends Activity {
         EditText hostField = pairingField("IP local do PC (ex.: 192.168.1.40)", savedHost);
         EditText portField = pairingField("Porta LAN", String.valueOf(savedPort > 0 ? savedPort : 8089));
         portField.setInputType(InputType.TYPE_CLASS_NUMBER);
-        EditText tokenField = pairingField("Token M.U.R.B (6+ caracteres)", savedToken);
+        EditText tokenField = pairingField("Token MURB (6+ caracteres)", savedToken);
         tokenField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         EditText sysField = pairingField("Sistema (gamepad, psp, ds, 3ds, wiiu)", savedSys);
 
@@ -3585,7 +3585,7 @@ public final class MainActivity extends Activity {
 
     private void launchGamepadOnPC(Game pcGame, String filename, String title, int players, String hybridMode, int myPlayerNumber, TextView statusTarget) {
         if (!"connected".equals(syncState)) {
-            Toast.makeText(this, "Computador offline. Abrindo conexão manual Gamepad M.U.R.B.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Computador offline. Abrindo conexão manual Gamepad MURB.", Toast.LENGTH_SHORT).show();
             showMurbRemoteDialog();
             return;
         }
@@ -3619,7 +3619,7 @@ public final class MainActivity extends Activity {
                     startActivity(com.brumclassics.mobile.murb.MurbRemoteGamepadActivity.intent(
                             MainActivity.this, host, port, token, sys, title, myPlayerNumber, p2Qr));
                 } else {
-                    if (statusTarget != null) statusTarget.setText("JOGO ABERTO · CONECTE VIA M.U.R.B MANUAL");
+                    if (statusTarget != null) statusTarget.setText("JOGO ABERTO · CONECTE VIA MURB MANUAL");
                     showMurbRemoteDialog();
                 }
             }
@@ -4570,7 +4570,7 @@ public final class MainActivity extends Activity {
         LinearLayout updateCard = column();
         updateCard.setPadding(dp(16), dp(16), dp(16), dp(16));
         updateCard.setBackground(background(SURFACE, 4, LINE, 1));
-        String updateHeading = mobileUpdate == null ? "BRUMCLASSICS MOVEL " + MobileUpdateManager.CURRENT_VERSION : "NOVA VERSÃO " + mobileUpdate.version;
+        String updateHeading = mobileUpdate == null ? "BRUMCLASSICS+ " + MobileUpdateManager.CURRENT_VERSION : "NOVA VERSÃO " + mobileUpdate.version;
         updateCard.addView(eyebrow("ATUALIZAÇÃO DO APLICATIVO"));
         updateCard.addView(text(updateHeading, 14, TEXT, true), margins(-1, 8, -1, 5));
         updateCard.addView(text(mobileUpdateDetail, 9, MUTED, false));
@@ -4590,7 +4590,7 @@ public final class MainActivity extends Activity {
         updateCard.addView(updateAction, margins(-1, 15, -1, 0, 46));
         updateCard.addView(text("O Android sempre pedirá sua confirmação antes de instalar. Biblioteca offline, capas e anotações permanecem no aparelho.", 7, MUTED, false), margins(-1, 10, -1, 0));
         page.addView(updateCard);
-        page.addView(text("BRUMCLASSICS MOVEL · " + MobileUpdateManager.DISPLAY_VERSION, 7, Color.rgb(66, 71, 80), true), margins(-1, 32, -1, 28));
+        page.addView(text("BRUMCLASSICS+ · " + MobileUpdateManager.DISPLAY_VERSION, 7, Color.rgb(66, 71, 80), true), margins(-1, 32, -1, 28));
         setScreen("profile", scroll);
     }
 

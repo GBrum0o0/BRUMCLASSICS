@@ -38,7 +38,7 @@ struct ProfileView: View {
                 NavigationLink { MomentsView() } label: { SettingsRow(icon: "photo.on.rectangle.angled", title: "BRUMMOMENTS", detail: "Galeria pessoal de capturas e locais") }
                 PersonalUpdateCard()
                 BrumCard { VStack(alignment: .leading, spacing: 10) { BrumSectionLabel(text: "PRIVACIDADE"); Text("O iPhone recebe apenas dados sanitizados da biblioteca. Senhas, tokens das lojas, executáveis, ROMs e caminhos privados não saem do computador.").font(.subheadline).foregroundStyle(BrumTheme.muted) } }
-                Text("BRUMCLASSICS MÓVEL PARA iOS · \(store.installedVersion)").font(.caption2.bold()).tracking(1.2).foregroundStyle(BrumTheme.muted).frame(maxWidth: .infinity)
+                Text("BRUMCLASSICS+ PARA iOS · \(store.installedVersion)").font(.caption2.bold()).tracking(1.2).foregroundStyle(BrumTheme.muted).frame(maxWidth: .infinity)
             }.padding(20)
         }
         .background(BrumTheme.background.ignoresSafeArea())

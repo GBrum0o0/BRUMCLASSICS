@@ -18,7 +18,7 @@ Ao ser executado, o launcher cria dados locais para configurações, biblioteca,
 
 O token temporário da Família Steam é armazenado somente no perfil local, protegido pela criptografia segura do Windows. Ele não é incluído nos logs, no APK ou nos pacotes públicos.
 
-## BRUMCLASSICS MOVEL
+## BRUMCLASSICS+
 
 O aplicativo móvel sincroniza pela rede local após pareamento explícito. Ele armazena no aparelho uma cópia offline da biblioteca, capas, conquistas e estatísticas sincronizadas. O usuário pode revogar o pareamento no launcher.
 

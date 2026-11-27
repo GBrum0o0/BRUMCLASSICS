@@ -1,6 +1,6 @@
 # BRUMCOMPANION — anotações e desempenho durante o jogo
 
-Requisitos recomendados: BRUMCLASSICS OFICIAL 1.52.0 e BRUMCLASSICS MOVEL 0.15.0. Consulte também o [guia móvel completo](MOVEL.md).
+Requisitos recomendados: BRUMCLASSICS OFICIAL 1.52.0 e BRUMCLASSICS+ 0.15.0. Consulte também o [guia móvel completo](MOVEL.md).
 
 ## Preparação
 

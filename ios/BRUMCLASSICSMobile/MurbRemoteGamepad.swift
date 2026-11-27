@@ -599,7 +599,7 @@ final class MurbRemoteSession: ObservableObject {
 
     private func connectSocket() {
         guard active, let streamURL = target.streamURL else {
-            state = .error("Endereço M.U.R.B inválido.")
+            state = .error("Endereço MURB inválido.")
             return
         }
         state = .connecting
@@ -717,7 +717,7 @@ struct MurbRemoteGamepadLauncherSheet: View {
         ("ds", "Nintendo DS (2ª tela + toque)"),
         ("3ds", "Nintendo 3DS (Circle Pad + 2ª tela)"),
         ("wiiu", "Nintendo Wii U (GamePad)"),
-        ("gamepad", "Controle Universal PC (M.U.R.B)")
+        ("gamepad", "Controle Universal PC (MURB)")
     ]
 
     var body: some View {
@@ -728,7 +728,7 @@ struct MurbRemoteGamepadLauncherSheet: View {
                         ExecutionBadge(kind: .dependsOnPC)
                         Text("Comunica pela rede local via WebSocket (porta 8089).").font(.caption).foregroundStyle(.secondary)
                     }
-                    Text("Use este modo quando um jogo estiver rodando no PC pela M.U.R.B Engine (ou como segunda tela interativa de DS/3DS).")
+                    Text("Use este modo quando um jogo estiver rodando no PC pela MURB Engine (ou como segunda tela interativa de DS/3DS).")
                         .font(.caption).foregroundStyle(.secondary)
                 }
 
@@ -758,7 +758,7 @@ struct MurbRemoteGamepadLauncherSheet: View {
                         Button {
                             launch(saved)
                         } label: {
-                            Label("Reconectar ao M.U.R.B PC", systemImage: "arrow.triangle.2.circlepath.circle.fill")
+                            Label("Reconectar ao MURB PC", systemImage: "arrow.triangle.2.circlepath.circle.fill")
                         }
                     }
                 }
@@ -767,7 +767,7 @@ struct MurbRemoteGamepadLauncherSheet: View {
                     Button {
                         scanning = true
                     } label: {
-                        Label("Ler QR Code M.U.R.B do PC", systemImage: "qrcode.viewfinder")
+                        Label("Ler QR Code MURB do PC", systemImage: "qrcode.viewfinder")
                     }
                     Text("No computador, abra a sessão com Gamepad Mobile ativado e aponte a câmera para o QR `murb://`.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -800,7 +800,7 @@ struct MurbRemoteGamepadLauncherSheet: View {
                     }
                 }
             }
-            .navigationTitle("Gamepad para PC (M.U.R.B)")
+            .navigationTitle("Gamepad para PC (MURB)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Fechar") { dismiss() } } }
             .onAppear {
@@ -820,7 +820,7 @@ struct MurbRemoteGamepadLauncherSheet: View {
                         if let parsed = MurbPairingPayload.parse(url) {
                             launch(parsed)
                         } else {
-                            error = "QR Code não reconhecido como sessão M.U.R.B."
+                            error = "QR Code não reconhecido como sessão MURB."
                         }
                     }, onError: { detail in
                         scanning = false
@@ -916,7 +916,7 @@ struct MurbRemoteGamepadView: View {
                             .fill(session.state == .connected ? BrumTheme.primary : .orange)
                             .frame(width: 8, height: 8)
                         Text(effectiveGameTitle.isEmpty
-                             ? "P\(effectivePlayer) · M.U.R.B \(session.activeSystem.uppercased()) · PC"
+                             ? "P\(effectivePlayer) · MURB \(session.activeSystem.uppercased()) · PC"
                              : "P\(effectivePlayer) · \(effectiveGameTitle)")
                             .font(.caption2.bold()).foregroundStyle(BrumTheme.text).lineLimit(1)
                         Text(telemetryText).font(.caption2.monospacedDigit()).foregroundStyle(BrumTheme.muted)
@@ -1047,7 +1047,7 @@ private struct MurbP2InviteSheet: View {
         NavigationStack {
             VStack(spacing: 16) {
                 Text("Convidar Jogador 2 no Wi-Fi").font(.headline.bold())
-                Text("No segundo celular, abra Controles → Gamepad M.U.R.B para PC e escaneie este QR ou digite os dados abaixo.")
+                Text("No segundo celular, abra Controles → Gamepad MURB para PC e escaneie este QR ou digite os dados abaixo.")
                     .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 if let image = qrImage(for: uriString) {
                     Image(uiImage: image)
@@ -1372,7 +1372,7 @@ private final class MurbRemotePadUIView: UIView {
                 ctx.strokeEllipse(in: CGRect(x: ripple.x - 16, y: ripple.y - 16, width: 32, height: 32))
             }
         } else if showControls {
-            let banner = "M.U.R.B GAMEPAD · \(MurbProtocol.displaySystemName(system).uppercased()) · PC" as NSString
+            let banner = "MURB GAMEPAD · \(MurbProtocol.displaySystemName(system).uppercased()) · PC" as NSString
             banner.draw(
                 at: CGPoint(x: max(16, bounds.midX - 140), y: bounds.midY - 8),
                 withAttributes: [.font: UIFont.monospacedSystemFont(ofSize: 12, weight: .bold),

@@ -1,11 +1,11 @@
 {
-  "version": "0.32.0",
-  "build": 65,
+  "version": "0.33.0",
+  "build": 66,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.32.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.33.0",
   "notes": [
-    "Corrige a varredura e o download pelo Google Drive no iOS e Android (parser de pastas aninhadas, resourcekey, links diretos e abertura imediata do jogo baixado).",
-    "Estabiliza o boot e a renderizacao GLES3/VAO do PSP (PPSSPP) no iOS com carregamento sincrono sem thread de 512 KB, FBO padrao corrigido e diagnostico GL.",
-    "Centraliza todos os atalhos de sessao (controles, opacidade/escala, slots, dimensao de tela, filtros ao vivo, 5x, diagnostico e sair) na logo translucida BRUMCLASSICS no topo da tela."
+    "Atualiza a nomenclatura oficial do aplicativo movel para BRUMCLASSICS+ e do motor de emulacao para MURB Engine, preservando identificador, saves e configuracoes.",
+    "Enriquece as 809 especies da Pokedex Universal (tipos, altura, peso e habilidades) com redacao estrita enquanto nao descobertas.",
+    "Adiciona suporte compartilhado em brum-core ao adaptador nativo Gen 4 Pokemon Platinum (CPUE)."
   ]
 }

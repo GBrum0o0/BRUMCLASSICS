@@ -1,4 +1,4 @@
-# BRUMCLASSICS MÓVEL Android 0.32.0 e iOS 0.22.0
+# BRUMCLASSICS+ Android 0.32.0 e iOS 0.22.0
 
 Jogos cadastrados no launcher como **não oficiais** são sincronizados como itens locais instalados. O aplicativo recebe somente a classificação e o SteamID de referência quando houver; o caminho do executável nunca sai do computador. B-CARD, anotações e BRUMCOMPANION continuam usando a identidade segura enviada pelo launcher.
 

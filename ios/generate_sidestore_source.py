@@ -223,8 +223,8 @@ def build_source_document(
         "name": OFFICIAL_SOURCE_NAME,
         "identifier": OFFICIAL_SOURCE_ID,
         "sourceURL": OFFICIAL_SOURCE_URL,
-        "subtitle": "Atualizações oficiais do BRUMCLASSICS Móvel para iPhone via SideStore.",
-        "description": "Fonte oficial do BRUMCLASSICS Móvel para iOS apontando exclusivamente para IPAs verificados nas releases ios-v* no GitHub.",
+        "subtitle": "Atualizações oficiais do BRUMCLASSICS+ para iPhone via SideStore.",
+        "description": "Fonte oficial do BRUMCLASSICS+ para iOS apontando exclusivamente para IPAs verificados nas releases ios-v* no GitHub.",
         "iconURL": OFFICIAL_ICON_URL,
         "website": OFFICIAL_WEBSITE,
         "tintColor": OFFICIAL_TINT,
@@ -293,7 +293,7 @@ def fetch_github_ios_releases() -> list[dict]:
             "version": meta["version"],
             "buildVersion": meta["buildVersion"],
             "date": str(release.get("published_at") or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")),
-            "localizedDescription": str(release.get("body") or f"BRUMCLASSICS MÓVEL iOS {meta['version']}").strip(),
+            "localizedDescription": str(release.get("body") or f"BRUMCLASSICS+ iOS {meta['version']}").strip(),
             "downloadURL": download_url,
             "size": meta["size"],
             "sha256": meta["sha256"],
@@ -353,7 +353,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.notes_file:
             notes = args.notes_file.read_text(encoding="utf-8").strip()
         if not notes:
-            notes = f"BRUMCLASSICS MÓVEL iOS {meta['version']} (build {meta['buildVersion']})."
+            notes = f"BRUMCLASSICS+ iOS {meta['version']} (build {meta['buildVersion']})."
         entry = {
             "version": meta["version"],
             "buildVersion": meta["buildVersion"],

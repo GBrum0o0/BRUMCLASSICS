@@ -1,4 +1,4 @@
-# PSP no Brum Classics Mobile
+# PSP no BRUMCLASSICS+
 
 O Gaming Mode executa PSP dentro do aplicativo, por meio do núcleo PPSSPP Libretro. Não abre um aplicativo externo. O código do PPSSPP é de terceiros e mantém sua autoria e licença.
 

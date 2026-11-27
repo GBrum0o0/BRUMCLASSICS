@@ -42,7 +42,7 @@ jobs:
         run: |
           clang++ -std=c++17 -Wall -Wextra -Werror shared/brum-core/tests.cpp -o "$RUNNER_TEMP/brum-core-tests"
           "$RUNNER_TEMP/brum-core-tests"
-          clang++ -std=c++17 -Wall -Wextra -Werror shared/brum-core/PokemonFireRedAdapter.cpp shared/brum-core/pokedex_tests.cpp -o "$RUNNER_TEMP/brum-pokedex-tests"
+          clang++ -std=c++17 -Wall -Wextra -Werror shared/brum-core/PokemonFireRedAdapter.cpp shared/brum-core/PokemonPlatinumAdapter.cpp shared/brum-core/pokedex_tests.cpp -o "$RUNNER_TEMP/brum-pokedex-tests"
           "$RUNNER_TEMP/brum-pokedex-tests"
           mkdir -p "$RUNNER_TEMP/ra_obj"
           RC_SRCS=(
@@ -122,7 +122,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: BRUMCLASSICS-IOS-TESTES-0.32.0
+          name: BRUMCLASSICS-IOS-TESTES-0.33.0
           path: ios/build/iOS-Tests.xcresult
           retention-days: 7
           if-no-files-found: warn
@@ -410,7 +410,7 @@ jobs:
           bash build-arcade-experimental.sh "$APP"
           /usr/libexec/PlistBuddy -c 'Add :BRUMExperimentalBackends bool true' "$APP/Info.plist"
           /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName BRUM Core Teste' "$APP/Info.plist"
-          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 65' "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 66' "$APP/Info.plist"
 
       - name: Empacotar IPA pessoal
         working-directory: ios
@@ -422,7 +422,7 @@ jobs:
       - name: Guardar build pessoal
         uses: actions/upload-artifact@v4
         with:
-          name: BRUMCLASSICS-MOVEL-IOS-${{ inputs.experimental && 'EXPERIMENTAL' || 'PESSOAL' }}-0.32.0
+          name: BRUMCLASSICS-MOVEL-IOS-${{ inputs.experimental && 'EXPERIMENTAL' || 'PESSOAL' }}-0.33.0
           path: |
             ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa
             ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa.sha256
@@ -445,7 +445,7 @@ jobs:
             gh release download "$TAG" --pattern "BRUMCLASSICS-MOVEL-IOS-${VERSION}.ipa" --dir "$EXISTING_IPA_DIR"
             cmp "ios/build/BRUMCLASSICS-MOVEL-IOS-${VERSION}.ipa" "$EXISTING_IPA_DIR/BRUMCLASSICS-MOVEL-IOS-${VERSION}.ipa"
           else
-            gh release create "$TAG" --target "$GITHUB_SHA" --title "BRUMCLASSICS MÓVEL iOS ${VERSION}" --notes-file "releases/ios-v${VERSION}/RELEASE-NOTES.md" --latest=false
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "BRUMCLASSICS+ iOS ${VERSION}" --notes-file "releases/ios-v${VERSION}/RELEASE-NOTES.md" --latest=false
             gh release upload "$TAG" ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa ios/build/BRUMCLASSICS-MOVEL-IOS-*.ipa.sha256 ios/build/IPA-VALIDATION.json
           fi
           IPA_FILE="ios/build/BRUMCLASSICS-MOVEL-IOS-${VERSION}.ipa"

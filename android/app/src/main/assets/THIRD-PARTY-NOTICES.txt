@@ -1,4 +1,4 @@
-BRUMCLASSICS MÓVEL — COMPONENTES DE TERCEIROS
+BRUMCLASSICS+ — COMPONENTES DE TERCEIROS
 
 mGBA Libretro core
 Copyright © mGBA authors and contributors.

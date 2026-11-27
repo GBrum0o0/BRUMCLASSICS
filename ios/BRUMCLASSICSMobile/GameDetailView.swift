@@ -48,7 +48,7 @@ struct GameDetailView: View {
                         GamingInfoItem(label: "Plataforma", value: game.platform),
                         GamingInfoItem(label: "Loja / Origem", value: game.store),
                         GamingInfoItem(label: "Tamanho", value: game.sizeBytes > 0 ? ByteCountFormatter.string(fromByteCount: game.sizeBytes, countStyle: .file) : ""),
-                        GamingInfoItem(label: "Execução", value: game.installed ? "Computador (B-CARD / Streaming / M.U.R.B)" : "Instalação não confirmada no PC")
+                        GamingInfoItem(label: "Execução", value: game.installed ? "Computador (B-CARD / Streaming / MURB Engine)" : "Instalação não confirmada no PC")
                     ])
                     HStack { Button(game.favorite ? "REMOVER FAVORITO" : "FAVORITAR") { Task { await store.setLibraryState(game: game, favorite: !game.favorite, wantToPlay: game.wantToPlay) } }; Button(game.wantToPlay ? "REMOVER DA LISTA" : "QUERO JOGAR") { Task { await store.setLibraryState(game: game, favorite: game.favorite, wantToPlay: !game.wantToPlay) } } }.font(.caption.bold()).foregroundStyle(BrumTheme.primary)
                     NotesSummary(notes: game.notes) { editNotes = true }

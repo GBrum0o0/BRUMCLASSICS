@@ -345,7 +345,7 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
     private void showP2Dialog() {
         MurbRemoteClient.PairingTarget target = MurbRemoteClient.parseUri(p2Uri);
         String msg = target != null
-            ? "No segundo celular, abra Controles → Gamepad M.U.R.B para PC e conecte:\n\nIP: " + target.host + "\nPorta: " + target.port + "\nToken: " + target.token + "\n\nLink: " + p2Uri
+            ? "No segundo celular, abra Controles → Gamepad MURB para PC e conecte:\n\nIP: " + target.host + "\nPorta: " + target.port + "\nToken: " + target.token + "\n\nLink: " + p2Uri
             : p2Uri;
         new AlertDialog.Builder(this)
             .setTitle("Convidar Jogador 2 (Wi-Fi)")
@@ -357,7 +357,7 @@ public final class MurbRemoteGamepadActivity extends Activity implements MurbRem
     private void updateStatusPill() {
         boolean online = client != null && client.isConnected();
         String dot = online ? "●" : "○";
-        String label = !gameTitle.isEmpty() ? gameTitle : (!pcName.isEmpty() ? pcName : "M.U.R.B " + system.toUpperCase(Locale.ROOT) + " · PC");
+        String label = !gameTitle.isEmpty() ? gameTitle : (!pcName.isEmpty() ? pcName : "MURB " + system.toUpperCase(Locale.ROOT) + " · PC");
         String prefix = dot + " P" + playerNumber + " · " + label;
         if (online && MurbRemoteClient.supportsDualScreen(system)) {
             statusPill.setText(String.format(Locale.US, "%s · %d FPS · %d ms", prefix, fps, lastRtt));
