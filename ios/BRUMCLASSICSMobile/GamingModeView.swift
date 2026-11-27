@@ -1532,18 +1532,6 @@ private struct GamingDriveDetailView: View {
     }
 }
 
-private struct GamingGameTile: View {
-    let game: Game
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            GameCoverView(game: game, cornerRadius: 11).aspectRatio(0.72, contentMode: .fit)
-            Text(game.platform.uppercased()).font(.caption2.bold()).tracking(1).foregroundStyle(BrumTheme.muted)
-            Text(game.title).font(.subheadline.bold()).foregroundStyle(BrumTheme.text).lineLimit(2).multilineTextAlignment(.leading)
-            Text(GamingModePresentation.computerAvailabilityLabel).font(.caption2.bold()).foregroundStyle(BrumTheme.muted)
-        }
-    }
-}
-
 private struct GamingGameView: View {
     @EnvironmentObject private var pocket: PocketClassicsStore
     @EnvironmentObject private var store: AppStore
