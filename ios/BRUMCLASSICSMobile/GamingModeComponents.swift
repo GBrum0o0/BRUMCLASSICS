@@ -14,9 +14,9 @@ struct TopBarIconBadge: View {
 
     var body: some View {
         Image(systemName: systemName)
-            .font(.system(size: 17, weight: .semibold))
+            .font(.system(size: 16, weight: .semibold))
             .foregroundStyle(highlighted ? BrumTheme.primary : BrumTheme.text)
-            .frame(width: 40, height: 40)
+            .frame(width: 38, height: 38)
             .background(BrumTheme.elevated, in: RoundedRectangle(cornerRadius: 9))
             .contentShape(Rectangle())
     }
@@ -39,7 +39,7 @@ struct TopControlAndSettingsActions: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             if showProfileButton {
                 icon("person.crop.circle", label: "Perfil") { activePanel = .profile }
                     .accessibilityIdentifier("\(identifierPrefix)-profile")
@@ -226,7 +226,7 @@ struct GamingHeader<Leading: View>: View {
     @ViewBuilder let leading: () -> Leading
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 6) {
             leading().foregroundStyle(BrumTheme.text)
             Spacer(minLength: 4)
             ConnectionDot(state: store.syncIndicatorState)

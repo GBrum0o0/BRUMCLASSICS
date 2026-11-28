@@ -283,7 +283,7 @@ int main() {
         require(events.size() == 2u, "Shiny Pikachu in PC Box must be detected");
         require(events[1].nationalDexNumber == 25u && events[1].isShiny &&
                     events[1].storageSource == "pc_box" &&
-                    events[1].metLocationName == "Mt. Moon",
+                    events[1].metLocationName == "Localização desconhecida",
                 "Shiny PC Box Pikachu must report shiny=true, pc_box, and unknown location fallback");
     }
 

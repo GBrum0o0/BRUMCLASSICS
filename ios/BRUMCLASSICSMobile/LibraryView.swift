@@ -65,7 +65,7 @@ struct PageHeader: View {
     var showsProfileButton: Bool = true
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 BrumLogo()
                 Spacer(minLength: 4)
                 TopControlAndSettingsActions(identifierPrefix: "page", showProfileButton: showsProfileButton)

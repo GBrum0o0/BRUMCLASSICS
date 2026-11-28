@@ -26,7 +26,7 @@ struct BrumLogo: View {
                     .tracking(1.1)
                     .foregroundStyle(BrumTheme.text)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.65)
+                    .minimumScaleFactor(0.55)
             }
         }
         .accessibilityElement(children: .ignore)

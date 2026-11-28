@@ -20,7 +20,7 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 28) {
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     BrumLogo()
                     Spacer(minLength: 4)
                     ConnectionDot(state: store.syncIndicatorState)

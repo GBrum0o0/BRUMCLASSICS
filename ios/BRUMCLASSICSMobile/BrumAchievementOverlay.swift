@@ -478,7 +478,9 @@ final class BrumAchievementCardView: UIView {
             }
         } else {
             DispatchQueue.main.async { [weak self] in
-                Self.activePresenter = self
+                MainActor.assumeIsolated {
+                    Self.activePresenter = self
+                }
             }
         }
     }
@@ -515,8 +517,10 @@ final class BrumAchievementCardView: UIView {
 
     @objc public func invalidate() {
         DispatchQueue.main.async { [weak self] in
-            if let self, Self.activePresenter === self {
-                Self.activePresenter = nil
+            MainActor.assumeIsolated {
+                if let self, Self.activePresenter === self {
+                    Self.activePresenter = nil
+                }
             }
             self?.dismissTimer?.invalidate()
             self?.dismissTimer = nil

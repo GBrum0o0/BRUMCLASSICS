@@ -77,7 +77,7 @@ final class AppStore: ObservableObject {
         )
     }
 
-    static func resolveSyncIndicatorState(
+    nonisolated static func resolveSyncIndicatorState(
         isPaired: Bool,
         connection: ConnectionState,
         isSyncing: Bool,

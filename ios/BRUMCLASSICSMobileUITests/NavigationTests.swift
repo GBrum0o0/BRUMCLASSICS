@@ -52,7 +52,7 @@ final class NavigationTests: XCTestCase {
         app.buttons["home-settings"].tap()
         XCTAssertTrue(app.buttons["gaming-mode-choose-rom-folder"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.textFields["gaming-mode-ra-username"].exists)
-        for _ in 0..<4 {
+        for _ in 0..<6 {
             if app.staticTexts["Ao iniciar um clássico"].exists && app.staticTexts["Ao iniciar um clássico"].isHittable { break }
             app.swipeUp()
         }
