@@ -1143,6 +1143,7 @@ struct PocketAchievementList: View {
 
 struct PocketSetupView: View {
     @EnvironmentObject private var pocket: PocketClassicsStore
+    var showAccountSection: Bool = true
     @State private var username = ""
     @State private var key = ""
     @State private var runtimePassword = ""
@@ -1164,42 +1165,44 @@ struct PocketSetupView: View {
                 Text("Settings → Audio: ajuste Volume Gain. Settings → Input → On-Screen Overlay: habilite os botões na tela; controles Bluetooth usam o mapeamento do RetroArch.")
                 Text("Antes de alterar um retroarch.cfg existente, copie-o no app Arquivos. O BRUMCLASSICS não sobrescreve suas preferências ou saves.")
             }
-            Section("3 · RetroAchievements") {
-                Text("A Web API Key consulta catálogo e progresso. Para desbloquear conquistas em tempo real dentro do BRUM Core, autentique abaixo — apenas o token de sessão é salvo no Keychain, nunca a senha.")
-                TextField("Usuário RetroAchievements", text: $username).textInputAutocapitalization(.never).autocorrectionDisabled()
-                SecureField("Web API Key", text: $key).textInputAutocapitalization(.never).autocorrectionDisabled()
-                Link("Obter minha Web API Key", destination: URL(string: "https://retroachievements.org/settings")!)
-                Button("Salvar Web API Key") { do { try pocket.configure(username: username, key: key); feedback = "Web API Key salva no Keychain." } catch { feedback = error.localizedDescription } }
-                SecureField("Senha RetroAchievements (não armazenada)", text: $runtimePassword).textInputAutocapitalization(.never).autocorrectionDisabled()
-                HStack {
-                    Button(authenticating ? "Autenticando..." : (runtimeTokenActive ? "Renovar token do runtime" : "Entrar para conquistas no jogo")) {
-                        let pass = runtimePassword
-                        runtimePassword = ""
-                        authenticating = true
-                        Task { @MainActor in
-                            defer { authenticating = false }
-                            do {
-                                try await pocket.authenticateRuntime(username: username, password: pass)
-                                runtimeTokenActive = true
-                                feedback = "Token de sessão RetroAchievements salvo com segurança no Keychain. Softcore ativo."
-                            } catch {
-                                feedback = error.localizedDescription
+            if showAccountSection {
+                Section("3 · RetroAchievements") {
+                    Text("A Web API Key consulta catálogo e progresso. Para desbloquear conquistas em tempo real dentro do BRUM Core, autentique abaixo — apenas o token de sessão é salvo no Keychain, nunca a senha.")
+                    TextField("Usuário RetroAchievements", text: $username).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    SecureField("Web API Key", text: $key).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    Link("Obter minha Web API Key", destination: URL(string: "https://retroachievements.org/settings")!)
+                    Button("Salvar Web API Key") { do { try pocket.configure(username: username, key: key); feedback = "Web API Key salva no Keychain." } catch { feedback = error.localizedDescription } }
+                    SecureField("Senha RetroAchievements (não armazenada)", text: $runtimePassword).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    HStack {
+                        Button(authenticating ? "Autenticando..." : (runtimeTokenActive ? "Renovar token do runtime" : "Entrar para conquistas no jogo")) {
+                            let pass = runtimePassword
+                            runtimePassword = ""
+                            authenticating = true
+                            Task { @MainActor in
+                                defer { authenticating = false }
+                                do {
+                                    try await pocket.authenticateRuntime(username: username, password: pass)
+                                    runtimeTokenActive = true
+                                    feedback = "Token de sessão RetroAchievements salvo com segurança no Keychain. Softcore ativo."
+                                } catch {
+                                    feedback = error.localizedDescription
+                                }
                             }
                         }
+                        .disabled(authenticating)
+                        if runtimeTokenActive {
+                            Button("Desconectar token") {
+                                try? pocket.clearRuntimeToken()
+                                runtimeTokenActive = false
+                                feedback = "Token do runtime removido do Keychain."
+                            }.foregroundStyle(.red)
+                        }
                     }
-                    .disabled(authenticating)
-                    if runtimeTokenActive {
-                        Button("Desconectar token") {
-                            try? pocket.clearRuntimeToken()
-                            runtimeTokenActive = false
-                            feedback = "Token do runtime removido do Keychain."
-                        }.foregroundStyle(.red)
-                    }
+                    Text("Status runtime: \(runtimeTokenActive ? "token ativo (Softcore)" : "não autenticado"). É necessário estar online para enviar e confirmar conquistas oficiais. Nintendo 3DS não possui suporte oficial RetroAchievements.")
                 }
-                Text("Status runtime: \(runtimeTokenActive ? "token ativo (Softcore)" : "não autenticado"). É necessário estar online para enviar e confirmar conquistas oficiais. Nintendo 3DS não possui suporte oficial RetroAchievements.")
-            }
-            Section("4 · Sincronização") {
-                Text("Em CLASSICS Everywhere, as ROMs de plataformas identificáveis abrem diretamente com o núcleo compatível. Atualizar vínculo continua disponível para formatos ambíguos e jogos já organizados em playlists. Para atualizar o PC, vincule o mesmo jogo e use a mesma conta; o launcher deve estar atualizado, aberto e na rede local. Não copiamos ROMs nem saves para o PC.")
+                Section("4 · Sincronização") {
+                    Text("Em CLASSICS Everywhere, as ROMs de plataformas identificáveis abrem diretamente com o núcleo compatível. Atualizar vínculo continua disponível para formatos ambíguos e jogos já organizados em playlists. Para atualizar o PC, vincule o mesmo jogo e use a mesma conta; o launcher deve estar atualizado, aberto e na rede local. Não copiamos ROMs nem saves para o PC.")
+                }
             }
             Section("5 · Horas offline do RetroArch") {
                 Text("Recomendado para tempo preciso: no RetroArch, use Settings → Playlists → Save runtime log (aggregate): ON. Em Settings → Directory → Runtime Logs, confira a pasta usada e feche o conteúdo após jogar.")

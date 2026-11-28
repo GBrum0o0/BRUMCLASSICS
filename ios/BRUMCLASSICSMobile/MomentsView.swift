@@ -9,7 +9,8 @@ struct MomentsView: View {
             if store.moments.isEmpty {
                 VStack(spacing: 12) { Image(systemName: "photo.on.rectangle.angled").font(.largeTitle).foregroundStyle(BrumTheme.muted); Text("Sua galeria está vazia").font(.headline); Text("Durante uma sessão, use o BRUMCOMPANION para capturar um momento.").font(.subheadline).foregroundStyle(BrumTheme.muted).multilineTextAlignment(.center) }.padding(50)
             } else {
-                LazyVGrid(columns: columns, spacing: 18) { ForEach(store.moments) { moment in MomentTile(moment: moment).onTapGesture { selected = moment } } }.padding(16)
+                LazyVGrid(columns: columns, spacing: 18) { ForEach(store.moments) { moment in MomentTile(moment: moment).onTapGesture { selected = moment } } }
+                    .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 32)
             }
         }.navigationTitle("BRUMMOMENTS").background(BrumTheme.background.ignoresSafeArea()).sheet(item: $selected) { MomentEditor(moment: $0) }
     }

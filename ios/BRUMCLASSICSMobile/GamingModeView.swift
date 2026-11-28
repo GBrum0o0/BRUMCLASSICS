@@ -180,7 +180,7 @@ struct GamingModeView: View {
                             }
                         }
                     }
-                }.padding(20).frame(maxWidth: 1200, alignment: .leading).frame(maxWidth: .infinity)
+                }.padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 32).frame(maxWidth: 1200, alignment: .leading).frame(maxWidth: .infinity)
             }
         }
         .background(BrumTheme.background.ignoresSafeArea())
@@ -1604,7 +1604,7 @@ private struct GamingROMDetailView: View {
                         Text(pocket.lastSaveSyncSummary).font(.caption).foregroundStyle(BrumTheme.muted)
                     }
                     if let message = pocket.message { Text(message).font(.caption).foregroundStyle(.orange) }
-                }.frame(maxWidth: 1000, alignment: .leading).padding(20).frame(maxWidth: .infinity)
+                }.frame(maxWidth: 1000, alignment: .leading).padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 32).frame(maxWidth: .infinity)
             }
         }.background(BrumTheme.background.ignoresSafeArea())
         .sheet(item: $associationTarget) { target in
@@ -1996,7 +1996,7 @@ private struct GamingDriveDetailView: View {
                         GamingInfoItem(label: "Pasta no Drive", value: currentItem.parentRelativePath.isEmpty ? "Raiz" : currentItem.parentRelativePath),
                         GamingInfoItem(label: "Tamanho", value: (currentItem.sizeBytes ?? 0) > 0 ? ByteCountFormatter.string(fromByteCount: currentItem.sizeBytes ?? 0, countStyle: .file) : "Calculado ao baixar")
                     ])
-                }.frame(maxWidth: 1000, alignment: .leading).padding(20).frame(maxWidth: .infinity)
+                }.frame(maxWidth: 1000, alignment: .leading).padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 32).frame(maxWidth: .infinity)
             }
         }
         .background(BrumTheme.background.ignoresSafeArea())
@@ -2248,7 +2248,7 @@ private struct GamingGameView: View {
                             if streaming?.network.remoteReady == true { Label("Acesso remoto protegido disponível", systemImage: "checkmark.shield.fill").font(.caption2.bold()).foregroundStyle(BrumTheme.primary) }
                         }
                     }
-                }.frame(maxWidth: 1000, alignment: .leading).padding(20).frame(maxWidth: .infinity)
+                }.frame(maxWidth: 1000, alignment: .leading).padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 32).frame(maxWidth: .infinity)
             }
         }.background(BrumTheme.background.ignoresSafeArea())
         .onAppear { GamingOrientation.request(.landscape) }

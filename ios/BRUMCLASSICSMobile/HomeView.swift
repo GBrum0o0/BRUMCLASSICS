@@ -20,23 +20,29 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 28) {
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     BrumLogo()
-                    Spacer()
-                    ConnectionDot(state: store.connection)
+                    Spacer(minLength: 4)
+                    ConnectionDot(state: store.syncIndicatorState)
+                    NavigationLink {
+                        ProfileView()
+                    } label: {
+                        TopBarIconBadge(systemName: "person.crop.circle")
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Perfil")
+                    .accessibilityIdentifier("profile-home-link")
                     TopControlAndSettingsActions(identifierPrefix: "home")
                 }.padding(.top, 8)
                 VStack(alignment: .leading, spacing: 8) {
                     Text(greeting).font(.system(size: 20, weight: .bold)).foregroundStyle(BrumTheme.primary)
                     Text("Sua biblioteca,\nem qualquer lugar.").font(.system(size: 40, weight: .black)).foregroundStyle(BrumTheme.text)
                 }
-                SyncStatusCard()
-                NavigationLink { NotificationsView() } label: {
-                    SettingsRow(icon: "bell.fill", title: "NOTIFICAÇÕES", detail: notificationDetail)
+                if BrumMobileFeatureFlags.showNotificationCenter {
+                    NavigationLink { NotificationsView() } label: {
+                        SettingsRow(icon: "bell.fill", title: "NOTIFICAÇÕES", detail: notificationDetail)
+                    }
                 }
-                NavigationLink { ProfileView() } label: {
-                    SettingsRow(icon: "person.crop.circle.fill", title: "PERFIL E CONFIGURAÇÕES", detail: "Pareamento, CLASSICS e preferências do aplicativo")
-                }.accessibilityIdentifier("profile-home-link")
                 if let active = store.activeGame, store.connection == .online {
                     Button { selection = 4 } label: { CompanionCard(game: active) }.buttonStyle(.plain)
                 }
@@ -49,7 +55,12 @@ struct HomeView: View {
                 GameStrip(title: "FAVORITOS", games: favorites, empty: "Marque jogos como favoritos no launcher ou no perfil do jogo.")
                 GameStrip(title: "QUERO JOGAR", games: wantToPlay, empty: "Sua lista Quero jogar aparecerá aqui.")
                 JourneyCard(games: store.snapshot.games)
-            }.padding(20).frame(maxWidth: 1100, alignment: .leading).frame(maxWidth: .infinity)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 36)
+            .frame(maxWidth: 1100, alignment: .leading)
+            .frame(maxWidth: .infinity)
         }
         .background(BrumTheme.background.ignoresSafeArea())
         .refreshable { await store.refresh() }
@@ -146,17 +157,41 @@ struct PocketFeaturedGameCard: View {
 }
 
 struct ConnectionDot: View {
-    let state: AppStore.ConnectionState
+    let state: AppStore.SyncIndicatorState
     var body: some View {
-        HStack(spacing: 6) { Circle().fill(color).frame(width: 7, height: 7); Text(label).font(.caption2.bold()).tracking(1).foregroundStyle(BrumTheme.muted) }
+        ZStack {
+            Circle()
+                .fill(color.opacity(0.24))
+                .frame(width: 16, height: 16)
+            Circle()
+                .fill(color)
+                .frame(width: 9, height: 9)
+        }
+        .frame(width: 22, height: 22)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(accessibilityValue)
+        .accessibilityIdentifier("sync-status-indicator")
     }
-    private var color: Color { state == .online ? BrumTheme.primary : .orange }
-    private var label: String {
+    private var color: Color {
         switch state {
-        case .online: return "CONECTADO"
-        case .connecting: return "SINCRONIZANDO"
-        case .offline: return "OFFLINE"
-        case .error: return "ERRO DE SINCRONIZAÇÃO"
+        case .synced: return BrumTheme.primary
+        case .syncing: return .orange
+        case .unsynced: return .red
+        }
+    }
+    private var accessibilityLabel: String {
+        switch state {
+        case .synced: return "Sincronizado com o computador"
+        case .syncing: return "Sincronizando com o computador"
+        case .unsynced: return "Não sincronizado com o computador"
+        }
+    }
+    private var accessibilityValue: String {
+        switch state {
+        case .synced: return "Sincronizado"
+        case .syncing: return "Em andamento"
+        case .unsynced: return "Não sincronizado"
         }
     }
 }

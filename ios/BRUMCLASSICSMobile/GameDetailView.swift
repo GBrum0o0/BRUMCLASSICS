@@ -54,7 +54,7 @@ struct GameDetailView: View {
                     NotesSummary(notes: game.notes) { editNotes = true }
                     if game.installed { Button("ABRIR B-CARD") { showBCard = true }.buttonStyle(PrimaryButtonStyle()) }
                     if game.achievementsAvailable || game.allowsManualAchievements { AchievementList(game: game) }
-                }.padding(20)
+                }.padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 32)
             }
             .background(BrumTheme.background.ignoresSafeArea())
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button { dismiss() } label: { Image(systemName: "xmark.circle.fill").font(.title2) } } }

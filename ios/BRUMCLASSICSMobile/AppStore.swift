@@ -5,6 +5,7 @@ import UIKit
 @MainActor
 final class AppStore: ObservableObject {
     enum ConnectionState: Equatable { case offline, connecting, online, error(String) }
+    enum SyncIndicatorState: Equatable { case synced, syncing, unsynced }
 
     @Published private(set) var snapshot = LibrarySnapshot.empty
     @Published private(set) var connection: ConnectionState = .offline
@@ -19,6 +20,9 @@ final class AppStore: ObservableObject {
     @Published private(set) var performanceReceivedUptime: TimeInterval?
     @Published private(set) var personalUpdate: PersonalUpdateState = .idle
     @Published private(set) var lastSuccessfulSyncAt: Date?
+    @Published private(set) var isSyncing = false
+    @Published private(set) var lastSyncFailed = false
+    @Published private(set) var pokedexSyncFailed = false
     @Published private(set) var activeRemoteGamepadSession: MurbRemoteLaunchTarget?
     @Published var selectedGame: Game?
     @Published var message: String?
@@ -50,6 +54,48 @@ final class AppStore: ObservableObject {
     var companionGame: Game? { guard let game = activeGame, game.notes.hasContent else { return nil }; return game }
     var canCaptureMoment: Bool { connection == .online && activeGame != nil && !capturingMoment }
     var syncSummary: MobileSyncSummary { .make(connection: connection, paired: isPaired, cachedGames: snapshot.games.count, pending: pendingCount, lastSuccess: lastSuccessfulSyncAt) }
+    var syncIndicatorState: SyncIndicatorState {
+        Self.resolveSyncIndicatorState(
+            isPaired: isPaired,
+            connection: connection,
+            isSyncing: isSyncing,
+            pendingCount: pendingCount,
+            conflictCount: noteConflicts.count,
+            lastSuccessfulSyncAt: lastSuccessfulSyncAt,
+            lastSyncFailed: lastSyncFailed || pokedexSyncFailed
+        )
+    }
+
+    static func resolveSyncIndicatorState(
+        isPaired: Bool,
+        connection: ConnectionState,
+        isSyncing: Bool,
+        pendingCount: Int,
+        conflictCount: Int,
+        lastSuccessfulSyncAt: Date?,
+        lastSyncFailed: Bool
+    ) -> SyncIndicatorState {
+        if isSyncing || connection == .connecting {
+            return .syncing
+        }
+        guard isPaired else {
+            return .unsynced
+        }
+        switch connection {
+        case .offline, .error:
+            return .unsynced
+        case .connecting:
+            return .syncing
+        case .online:
+            if lastSyncFailed || conflictCount > 0 || lastSuccessfulSyncAt == nil {
+                return .unsynced
+            }
+            if pendingCount > 0 {
+                return .syncing
+            }
+            return .synced
+        }
+    }
 
     func nativeSaveCatalog(for identity: CanonicalGameIdentity) async throws -> NativeSaveCandidatesResponse {
         guard connection == .online else { throw BridgeError.unreachable }
@@ -126,9 +172,11 @@ final class AppStore: ObservableObject {
             _ = try await bridge.syncPokedex(localDoc, platform: "ios")
             let remoteDoc = try await bridge.fetchPokedexState(platform: "ios")
             let merged = try PokedexUniversalStore.shared.mergeSyncPayload(remoteDoc, profileID: profileID)
+            pokedexSyncFailed = false
             NotificationCenter.default.post(name: .brumPokedexCollectionUpdated, object: nil)
             return "Pokédex sincronizada com o PC (\(merged.totalRecords) registros verificados)."
         } catch {
+            pokedexSyncFailed = true
             return "Coleção local preservada. Não foi possível sincronizar agora: \(error.localizedDescription)"
         }
     }
@@ -176,6 +224,8 @@ final class AppStore: ObservableObject {
 
     func pair(from url: URL) async {
         guard let payload = PairingPayload(url: url) else { message = BridgeError.invalidPairing.localizedDescription; return }
+        isSyncing = true
+        defer { isSyncing = false }
         connection = .connecting
         do {
             eventTask?.cancel(); eventTask = nil
@@ -185,10 +235,15 @@ final class AppStore: ObservableObject {
             self.configuration = configuration
             UserDefaults.standard.set(try JSONEncoder().encode(configuration), forKey: Self.configurationKey)
             connection = .online
+            lastSyncFailed = false
             await refresh()
             startRealtime()
             message = connection == .online ? "iPhone conectado e biblioteca sincronizada." : "iPhone pareado. Consulte o diagnóstico em Perfil para concluir a sincronização."
-        } catch { connection = .error(error.localizedDescription); message = error.localizedDescription }
+        } catch {
+            lastSyncFailed = true
+            connection = .error(error.localizedDescription)
+            message = error.localizedDescription
+        }
     }
 
     func disconnect() async {
@@ -198,16 +253,28 @@ final class AppStore: ObservableObject {
         SecureStore.remove(Self.tokenAccount)
         UserDefaults.standard.removeObject(forKey: Self.configurationKey)
         configuration = nil; connection = .offline
+        isSyncing = false
+        lastSyncFailed = false
+        pokedexSyncFailed = false
         realtimeWarning = nil
         await bridge.configure(nil, token: nil)
         message = "O pareamento foi removido. A biblioteca offline permanece neste iPhone."
     }
 
     func refresh() async {
-        guard isPaired else { connection = .offline; return }
+        guard isPaired else {
+            connection = .offline
+            isSyncing = false
+            return
+        }
         if let refreshTask { await refreshTask.value; return }
         refreshTask = Task { [weak self] in
             guard let self else { return }
+            self.isSyncing = true
+            defer {
+                self.isSyncing = false
+                self.refreshTask = nil
+            }
             if self.connection != .online { self.connection = .connecting }
             do {
                 await self.flushOutbox()
@@ -220,16 +287,17 @@ final class AppStore: ObservableObject {
                 await self.overlayPending()
                 try await self.saveOfflineSnapshot()
                 self.connection = .online
+                self.lastSyncFailed = false
                 self.lastSuccessfulSyncAt = Date()
                 UserDefaults.standard.set(self.lastSuccessfulSyncAt?.timeIntervalSince1970, forKey: Self.lastSyncKey)
                 self.prefetchAllArtwork()
                 _ = await self.syncPokedexWithLauncher(profileID: "primary")
                 await self.refreshActiveRemoteGamepad()
             } catch {
+                self.lastSyncFailed = true
                 self.connection = .error(error.localizedDescription)
                 self.activeRemoteGamepadSession = nil
             }
-            self.refreshTask = nil
         }
         await refreshTask?.value
     }

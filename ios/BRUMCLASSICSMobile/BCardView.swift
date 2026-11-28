@@ -12,7 +12,7 @@ struct BCardLibraryView: View {
                 Text("Envie um cartão ao computador para iniciar um jogo instalado.").foregroundStyle(BrumTheme.muted)
                 Picker("Categoria", selection: $segment) { Text("JOGOS").tag("Jogos"); Text("CLASSICS").tag("Classics") }.pickerStyle(.segmented)
                 LazyVGrid(columns: columns, spacing: 20) { ForEach(games) { game in Button { selected = game } label: { VStack(alignment: .leading) { GameCoverView(game: game).aspectRatio(0.72, contentMode: .fit); Text(game.title).font(.subheadline.bold()).foregroundStyle(BrumTheme.text).lineLimit(2) } }.buttonStyle(.plain) } }
-            }.padding(20)
+            }.padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 32)
         }.navigationTitle("B-CARD").background(BrumTheme.background.ignoresSafeArea()).fullScreenCover(item: $selected) { BCardView(game: $0) }
     }
 }
@@ -56,7 +56,7 @@ struct BCardView: View {
                 }
                 Spacer()
                 Text(sending ? "ENVIANDO…" : "DESLIZE PARA CIMA").font(.caption2.bold()).tracking(1.3).foregroundStyle(BrumTheme.muted)
-            }.padding(20)
+            }.padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 32)
         } }
         .onAppear { floating = true }
         .alert("Não foi possível enviar", isPresented: Binding(get: { sendError != nil }, set: { if !$0 { sendError = nil; dismiss() } })) { Button("Voltar à biblioteca") { sendError = nil; dismiss() } } message: { Text(sendError ?? "") }

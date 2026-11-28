@@ -76,8 +76,12 @@ struct AchievementsView: View {
                         }.frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-            }.padding(20)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 36)
         }
+        .scrollDismissesKeyboard(.interactively)
         .background(BrumTheme.background.ignoresSafeArea())
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Buscar jogo")
         .refreshable { await store.refresh(); await pocket.sync(launcher: store, force: true) }

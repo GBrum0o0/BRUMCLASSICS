@@ -8,9 +8,24 @@ private struct QRControlTargetBox: Identifiable {
     var id: String { "\(payload.host):\(payload.port):\(payload.token)" }
 }
 
+struct TopBarIconBadge: View {
+    let systemName: String
+    var highlighted: Bool = false
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(highlighted ? BrumTheme.primary : BrumTheme.text)
+            .frame(width: 40, height: 40)
+            .background(BrumTheme.elevated, in: RoundedRectangle(cornerRadius: 9))
+            .contentShape(Rectangle())
+    }
+}
+
 struct TopControlAndSettingsActions: View {
     @Environment(\.scenePhase) private var scenePhase
     let identifierPrefix: String
+    var showProfileButton: Bool = false
     @State private var controllers: [GCController] = []
     @State private var activePanel: Panel?
     @State private var showMurbRemote = false
@@ -19,12 +34,16 @@ struct TopControlAndSettingsActions: View {
     @State private var qrScanError = ""
 
     private enum Panel: String, Identifiable {
-        case settings, controllers
+        case profile, settings, controllers
         var id: String { rawValue }
     }
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
+            if showProfileButton {
+                icon("person.crop.circle", label: "Perfil") { activePanel = .profile }
+                    .accessibilityIdentifier("\(identifierPrefix)-profile")
+            }
             icon("gamecontroller", label: controllers.isEmpty ? "Controles" : "Controles conectados",
                  highlighted: !controllers.isEmpty) { activePanel = .controllers }
                 .accessibilityIdentifier("\(identifierPrefix)-controllers")
@@ -49,8 +68,10 @@ struct TopControlAndSettingsActions: View {
         .sheet(item: $activePanel) { panel in
             NavigationStack {
                 switch panel {
+                case .profile:
+                    ProfileView(showsCloseButton: true)
                 case .settings:
-                    GamingSettingsPanel()
+                    MobileSettingsView(showsCloseButton: true)
                 case .controllers:
                     controllerList
                 }
@@ -123,11 +144,7 @@ struct TopControlAndSettingsActions: View {
 
     private func icon(_ name: String, label: String, highlighted: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: name)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(highlighted ? BrumTheme.primary : BrumTheme.text)
-                .frame(width: 44, height: 44)
-                .background(BrumTheme.elevated, in: RoundedRectangle(cornerRadius: 9))
+            TopBarIconBadge(systemName: name, highlighted: highlighted)
         }.buttonStyle(.plain).accessibilityLabel(label)
     }
 
@@ -209,114 +226,15 @@ struct GamingHeader<Leading: View>: View {
     @ViewBuilder let leading: () -> Leading
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             leading().foregroundStyle(BrumTheme.text)
-            Spacer()
-            ConnectionDot(state: store.connection)
-            TopControlAndSettingsActions(identifierPrefix: "gaming-mode")
+            Spacer(minLength: 4)
+            ConnectionDot(state: store.syncIndicatorState)
+            TopControlAndSettingsActions(identifierPrefix: "gaming-mode", showProfileButton: true)
         }
-        .padding(.horizontal, 20).padding(.vertical, 4)
+        .padding(.horizontal, 20).padding(.vertical, 6)
         .background(BrumTheme.background)
         .overlay(alignment: .bottom) { Rectangle().fill(BrumTheme.line).frame(height: 1) }
-    }
-}
-
-private struct GamingSettingsPanel: View {
-    @EnvironmentObject private var pocket: PocketClassicsStore
-    @EnvironmentObject private var store: AppStore
-    @Environment(\.dismiss) private var dismiss
-    @AppStorage("BrumVirtualControlHapticsEnabled") private var virtualHaptics = true
-    @AppStorage("BrumAutoHidePadWithController") private var autoHidePadWithController = false
-    @AppStorage("BrumDefaultScreenFillEnabled") private var defaultFillDisplay = false
-    @AppStorage(PocketClassicsStore.autoSaveSyncKey) private var autoSaveSync = true
-    @State private var username = ""
-    @State private var key = ""
-    @State private var feedback = ""
-    @State private var savedAccount: String?
-    @State private var choosingROMFolder = false
-
-    var body: some View {
-        Form {
-            Section("Pasta de ROMs no celular") {
-                Button(pocket.romFolderConfigured ? "Alterar pasta de ROMs" : "Selecionar pasta de ROMs") {
-                    choosingROMFolder = true
-                }
-                .accessibilityIdentifier("gaming-mode-choose-rom-folder")
-                Text(pocket.romFolderConfigured
-                     ? "Pasta atual: \(pocket.romFolderName). Novas ROMs colocadas nela aparecem no Gaming Mode."
-                     : "Nenhuma pasta selecionada — toque acima para escolher onde colocar suas ROMs.")
-                    .font(.caption).foregroundStyle(.secondary)
-                if pocket.romFolderConfigured {
-                    Button("Verificar pasta agora") {
-                        Task { await pocket.refreshROMFolder() }
-                    }
-                    .disabled(pocket.busy)
-                }
-                if !pocket.romFolderStatus.isEmpty { Text(pocket.romFolderStatus).font(.caption).foregroundStyle(.secondary) }
-                if let message = pocket.message, !message.isEmpty { Text(message).font(.caption).foregroundStyle(.orange) }
-            }
-            Section("RetroAchievements") {
-                Text(savedAccount.map { "Conta configurada · \($0)" } ?? "Nenhuma conta configurada")
-                TextField("Usuário RetroAchievements", text: $username)
-                    .textInputAutocapitalization(.never).autocorrectionDisabled()
-                    .accessibilityIdentifier("gaming-mode-ra-username")
-                SecureField("Web API Key", text: $key)
-                    .textInputAutocapitalization(.never).autocorrectionDisabled()
-                    .accessibilityIdentifier("gaming-mode-ra-key")
-                Link("Obter minha Web API Key", destination: URL(string: "https://retroachievements.org/settings")!)
-                Button("Salvar conta") { save() }
-                Text("A chave permite consultar as conquistas da sua conta.")
-                    .font(.caption).foregroundStyle(.secondary)
-                if !feedback.isEmpty { Text(feedback).font(.caption) }
-            }
-            Section("Controles e tela") {
-                Toggle("Vibração tátil nos botões virtuais", isOn: $virtualHaptics)
-                Toggle("Ocultar controles na tela com joystick conectado", isOn: $autoHidePadWithController)
-                Toggle("Preencher tela por padrão ao iniciar jogo", isOn: $defaultFillDisplay)
-            }
-            Section("Launcher PC e sincronização") {
-                LabeledContent("Launcher PC", value: store.connection == .online ? "Conectado (\(store.configuration?.host ?? "LAN"))" : "Offline (biblioteca em cache)")
-                Toggle("Auto Save Sync com o PC (ao abrir/sair)", isOn: $autoSaveSync)
-                Button("Atualizar horas e conquistas") {
-                    Task { await pocket.sync(launcher: store, force: true) }
-                }.disabled(pocket.busy)
-                if !pocket.lastSaveSyncSummary.isEmpty {
-                    Text(pocket.lastSaveSyncSummary).font(.caption).foregroundStyle(.secondary)
-                }
-                if !pocket.status.isEmpty { Text(pocket.status).font(.caption).foregroundStyle(.secondary) }
-            }
-            Section("Biblioteca em nuvem") {
-                NavigationLink("Biblioteca em nuvem — Google Drive") {
-                    ClassicDriveCloudSettingsView()
-                }
-                .accessibilityIdentifier("gaming-mode-drive-settings")
-            }
-        }
-        .navigationTitle("Configurações")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Fechar") { dismiss() } } }
-        .onAppear {
-            savedAccount = pocket.credentials?.username
-            username = savedAccount ?? ""
-        }
-        .fileImporter(isPresented: $choosingROMFolder, allowedContentTypes: [.folder]) { result in
-            switch result {
-            case .success(let folder):
-                Task { await pocket.configureROMFolder(folder) }
-            case .failure(let error):
-                pocket.message = error.localizedDescription
-            }
-        }
-    }
-
-    private func save() {
-        do {
-            try pocket.configure(username: username, key: key)
-            savedAccount = pocket.credentials?.username
-            key = ""
-            feedback = "Conta salva neste iPhone."
-            Task { await pocket.sync(launcher: store, force: true) }
-        } catch { feedback = error.localizedDescription }
     }
 }
 

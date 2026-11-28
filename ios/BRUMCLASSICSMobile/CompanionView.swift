@@ -8,7 +8,7 @@ struct CompanionView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 PageHeader(kicker: "BRUMCOMPANION", title: "Sua segunda tela.", subtitle: "Consulte e atualize suas anotações sem interromper o jogo.")
-                ConnectionDot(state: store.connection)
+                ConnectionDot(state: store.syncIndicatorState)
                 if case .error(let detail) = store.connection { Text(detail).font(.caption).foregroundStyle(.orange) }
                 if let warning = store.realtimeWarning { Text(warning).font(.caption).foregroundStyle(BrumTheme.muted) }
                 PerformancePanel()
@@ -44,8 +44,14 @@ struct CompanionView: View {
                 }
                 if store.pendingCount > 0 { Text("\(store.pendingCount) alteração(ões) salva(s) no iPhone aguardando sincronização.").font(.caption).foregroundStyle(BrumTheme.primary) }
                 NavigationLink { MomentsView() } label: { SettingsRow(icon: "photo.on.rectangle.angled", title: "BRUMMOMENTS", detail: "Sua galeria pessoal, disponível offline") }
-            }.padding(20)
-        }.background(BrumTheme.background.ignoresSafeArea()).refreshable { await store.refresh() }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 36)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background(BrumTheme.background.ignoresSafeArea())
+        .refreshable { await store.refresh() }
     }
 }
 

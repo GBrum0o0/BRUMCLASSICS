@@ -43,8 +43,12 @@ struct LibraryView: View {
                 }
                 if games.isEmpty { VStack(spacing: 12) { Image(systemName: "magnifyingglass").font(.largeTitle).foregroundStyle(BrumTheme.muted); Text("Nenhum jogo encontrado").font(.headline).foregroundStyle(BrumTheme.text); Text("Altere os filtros ou sincronize novamente.").font(.subheadline).foregroundStyle(BrumTheme.muted) }.frame(maxWidth: .infinity).padding(.vertical, 70) }
                 else { LazyVGrid(columns: columns, spacing: 22) { ForEach(games) { GameTile(game: $0) } } }
-            }.padding(20)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 36)
         }
+        .scrollDismissesKeyboard(.interactively)
         .background(BrumTheme.background.ignoresSafeArea())
         .refreshable { await store.refresh() }
         .onReceive(NotificationCenter.default.publisher(for: .openGame)) { if let game = $0.object as? Game { store.selectedGame = game } }
@@ -58,5 +62,20 @@ struct FilterChip: View {
 
 struct PageHeader: View {
     let kicker: String; let title: String; let subtitle: String
-    var body: some View { VStack(alignment: .leading, spacing: 7) { HStack(spacing: 10) { BrumLogo(); Spacer(); TopControlAndSettingsActions(identifierPrefix: "page") }; Text(title).font(.system(size: 36, weight: .black)).foregroundStyle(BrumTheme.text).padding(.top, 18); HStack { Text(subtitle.uppercased()).font(.caption.bold()).tracking(1).foregroundStyle(BrumTheme.muted); Spacer(); Text(kicker).font(.caption2.bold()).tracking(1.7).foregroundStyle(BrumTheme.muted) } } }
+    var showsProfileButton: Bool = true
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 8) {
+                BrumLogo()
+                Spacer(minLength: 4)
+                TopControlAndSettingsActions(identifierPrefix: "page", showProfileButton: showsProfileButton)
+            }
+            Text(title).font(.system(size: 36, weight: .black)).foregroundStyle(BrumTheme.text).padding(.top, 18)
+            HStack {
+                Text(subtitle.uppercased()).font(.caption.bold()).tracking(1).foregroundStyle(BrumTheme.muted)
+                Spacer()
+                Text(kicker).font(.caption2.bold()).tracking(1.7).foregroundStyle(BrumTheme.muted)
+            }
+        }
+    }
 }

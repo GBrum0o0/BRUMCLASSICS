@@ -1,5 +1,9 @@
 import Foundation
 
+enum BrumMobileFeatureFlags {
+    static let showNotificationCenter = false
+}
+
 enum OfflineContentPreferences {
     static let covers = "offline_content_covers"
     static let activity = "offline_content_activity"
