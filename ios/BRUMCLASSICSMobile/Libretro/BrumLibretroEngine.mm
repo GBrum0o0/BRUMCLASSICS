@@ -355,7 +355,11 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     NSURL *_romURL;
     NSData *_romData;
     std::vector<brum_retro_memory_descriptor> _memoryDescriptors;
-    std::unique_ptr<brum::RetroAchievementsRuntime> _raRuntime;
+    std::shared_ptr<brum::RetroAchievementsRuntime> _raRuntime;
+    os_unfair_lock _raLock;
+    BOOL _raSessionStarted;
+    BOOL _hasCachedSerializeSize;
+    size_t _cachedSerializeSize;
     std::unique_ptr<brum::pokedex::FireRedCaptureTracker> _pokedexTracker;
     BrumAchievementOverlayPresenter *_achievementOverlay;
     NSString *_gameTitle;
@@ -457,6 +461,9 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
 - (void)updateN64CButtons;
 - (void)setVirtualButton:(UIButton *)button pressed:(BOOL)pressed;
 - (void)releaseVirtualControls;
+- (BOOL)hasTouchScreen;
+- (std::vector<brum_retro_memory_descriptor>)snapshotMemoryDescriptors;
+- (void)startRetroAchievementsSessionWithMemoryDescriptors:(std::vector<brum_retro_memory_descriptor>)descriptors romData:(NSData *)romData;
 @end
 
 static void *BrumLoadSymbol(void *handle, const char *name) {
@@ -866,7 +873,7 @@ static void BrumVideo(const void *data, unsigned width, unsigned height, size_t 
 
 static void BrumPushAudio(const int16_t *data, size_t frames) {
     BrumLibretroViewController *host = BrumCurrentHost;
-    if (!host || host->_fastForwardEnabled || !host->_audioRing || !data || !frames || frames > SIZE_MAX / 2) return;
+    if (!host || host->_paused || host->_stopped || host->_fastForwardEnabled || !host->_audioRing || !data || !frames || frames > SIZE_MAX / 2) return;
     os_unfair_lock_lock(&host->_audioLock);
     const size_t samples = frames * 2;
     host->_audioSamplesProduced += samples;
@@ -1092,8 +1099,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _screenFillsDisplay = [NSUserDefaults.standardUserDefaults boolForKey:@"BrumDefaultScreenFillEnabled"];
     _autoHideWithController = [NSUserDefaults.standardUserDefaults boolForKey:@"BrumAutoHidePadWithController"];
     _audioLock = OS_UNFAIR_LOCK_INIT;
+    _raLock = OS_UNFAIR_LOCK_INIT;
     _rgbColorSpace = CGColorSpaceCreateDeviceRGB();
-    _audioCapacity = 262144;
+    _audioCapacity = 32768;
     _audioRing = (int16_t *)calloc(_audioCapacity, sizeof(int16_t));
     // PSP uses 1024 for 1x/2x (up to 960x544); loadCore scales up to 2048 if higher res is requested.
     _hardwareSurfaceSize = [_emulatedSystemID isEqualToString:@"psp"] ? 1024 : 2048;
@@ -1524,16 +1532,28 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 
 - (BOOL)isPaused { return _paused; }
 
+- (BOOL)hasTouchScreen {
+    for (const auto& screen : _screenManager.screens) {
+        if (screen.touch) return YES;
+    }
+    return NO;
+}
+
 - (BrumBackendCapabilities)capabilities {
     if (!_gameLoaded || _stopped) return 0;
     BrumBackendCapabilities result = BrumBackendVideo | BrumBackendController | BrumBackendFastForward;
     if (_audioQueue) result |= BrumBackendAudio;
     if (_screenManager.screens.size() > 1) result |= BrumBackendMultipleScreens;
-    for (const auto& screen : _screenManager.screens) if (screen.touch) result |= BrumBackendTouch;
+    if ([self hasTouchScreen]) result |= BrumBackendTouch;
     if (_core.getMemoryData(BRUM_RETRO_MEMORY_SAVE_RAM) && _core.getMemorySize(BRUM_RETRO_MEMORY_SAVE_RAM)) result |= BrumBackendSave;
     // Do not probe serializeSize() before the first emulated frame: PPSSPP allocates
     // GPU state lazily on frame 1 and dereferences gpu inside DoState().
-    const size_t size = (_sessionFrames > 0 && _core.serializeSize) ? _core.serializeSize() : 0;
+    // Cache the probe once after frame 1 so UI checks never repeatedly pause EmuThread.
+    if (!_hasCachedSerializeSize && _sessionFrames > 0 && _core.serializeSize) {
+        _cachedSerializeSize = _core.serializeSize();
+        _hasCachedSerializeSize = YES;
+    }
+    const size_t size = _hasCachedSerializeSize ? _cachedSerializeSize : 0;
     if (size && size <= 64 * 1024 * 1024 && _core.serialize && _core.unserialize) result |= BrumBackendSaveState;
     return result;
 }
@@ -2145,7 +2165,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 }
 
 - (void)screenTouch:(UILongPressGestureRecognizer *)gesture {
-    if (_paused || !_frameWidth || !_frameHeight || !(self.capabilities & BrumBackendTouch)) {
+    if (_paused || !_frameWidth || !_frameHeight || ![self hasTouchScreen]) {
         _pointerPressed = NO;
         _pointerLatchFrames = 0;
         _pointerX = 0;
@@ -2567,7 +2587,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 }
 
 - (void)toggleDisplayMode {
-    if (self.capabilities & BrumBackendMultipleScreens) { [self showScreenMenu]; return; }
+    if (_screenManager.screens.size() > 1) { [self showScreenMenu]; return; }
     _screenFillsDisplay = !_screenFillsDisplay;
     [self updateDisplayModeButton];
     [self layoutScreens];
@@ -2643,7 +2663,11 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     if (!state || !expected || state.length != expected || [metadata[@"sizeBytes"] unsignedLongLongValue] != state.length || !_core.unserialize(state.bytes, state.length)) {
         [self showStateStatus:@"ESTADO INCOMPATÍVEL OU CORROMPIDO" error:YES]; return;
     }
-    if (_raRuntime) _raRuntime->reset();
+    std::shared_ptr<brum::RetroAchievementsRuntime> ra;
+    os_unfair_lock_lock(&_raLock);
+    ra = _raRuntime;
+    os_unfair_lock_unlock(&_raLock);
+    if (ra) ra->reset();
     if (_pokedexTracker) _pokedexTracker->reset();
     os_unfair_lock_lock(&_audioLock); _audioRead = 0; _audioWrite = 0; _audioCount = 0; os_unfair_lock_unlock(&_audioLock);
     [self showStateStatus:[NSString stringWithFormat:@"SLOT %ld CARREGADO", (long)slot] error:NO];
@@ -2885,15 +2909,10 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [_diagnostics enterStage:@"initialize_graphics"];
     if (![self initializeHardware:error]) return NO;
     [self restoreSaveRAM];
+    _raSessionStarted = NO;
     if (_romData && _romData.length > 0) {
-        [self startRetroAchievementsSession];
-    } else {
-        __weak BrumLibretroViewController *weakSelf = self;
-        dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
-            BrumLibretroViewController *strongSelf = weakSelf;
-            if (!strongSelf || strongSelf->_stopped) return;
-            [strongSelf startRetroAchievementsSession];
-        });
+        _raSessionStarted = YES;
+        [self startRetroAchievementsSessionWithMemoryDescriptors:[self snapshotMemoryDescriptors] romData:_romData];
     }
     [self startPokedexCaptureSession];
     brum_retro_system_av_info avInfo = {};
@@ -3008,7 +3027,11 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         _core.run();
         _input.tickLatches();
         if (!_pointerPressed && _pointerLatchFrames > 0) --_pointerLatchFrames;
-        if (_raRuntime) _raRuntime->doFrame();
+        std::shared_ptr<brum::RetroAchievementsRuntime> ra;
+        os_unfair_lock_lock(&_raLock);
+        ra = _raRuntime;
+        os_unfair_lock_unlock(&_raLock);
+        if (ra) ra->doFrame();
         if (_pokedexTracker) _pokedexTracker->doFrame();
         ++_sessionFrames;
         if (_performanceHUDEnabled) ++_measuredFrames;
@@ -3030,6 +3053,20 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     }
     if (!_readyDelivered && _presentedFrames > 0) {
         _readyDelivered = YES;
+        if (!_raSessionStarted) {
+            _raSessionStarted = YES;
+            const std::vector<brum_retro_memory_descriptor> descriptorsSnapshot = [self snapshotMemoryDescriptors];
+            __weak BrumLibretroViewController *weakSelf = self;
+            dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+                BrumLibretroViewController *strongSelf = weakSelf;
+                if (!strongSelf) return;
+                os_unfair_lock_lock(&strongSelf->_raLock);
+                const BOOL stoppedNow = strongSelf->_stopped;
+                os_unfair_lock_unlock(&strongSelf->_raLock);
+                if (stoppedNow) return;
+                [strongSelf startRetroAchievementsSessionWithMemoryDescriptors:descriptorsSnapshot romData:nil];
+            });
+        }
         [self captureDiagnosticsMetrics];
         [_diagnostics markRunning];
         if (_onReady) _onReady();
@@ -3054,7 +3091,11 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     }
 }
 
-- (void)startRetroAchievementsSession {
+- (std::vector<brum_retro_memory_descriptor>)snapshotMemoryDescriptors {
+    return _memoryDescriptors;
+}
+
+- (void)startRetroAchievementsSessionWithMemoryDescriptors:(std::vector<brum_retro_memory_descriptor>)descriptors romData:(NSData *)romData {
     const uint32_t consoleId = BrumRAConsoleIDForSystem(_emulatedSystemID);
     NSString *username = [BrumRASessionCredentials storedUsername];
     NSString *token = [BrumRASessionCredentials storedRuntimeToken];
@@ -3062,7 +3103,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 
     __weak BrumLibretroViewController *weakSelf = self;
     brum::RetroAchievementsCallbacks cb;
-    cb.userAgent = "BRUMCLASSICSMobile/0.24.0";
+    cb.userAgent = "BRUMCLASSICSMobile/0.37.0";
     cb.httpPost = [](const std::string &urlStr,
                      const std::string &postData,
                      const std::string &contentType,
@@ -3076,7 +3117,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url
                                                            cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
                                                        timeoutInterval:15.0];
-        [req setValue:@"BRUMCLASSICSMobile/0.24.0" forHTTPHeaderField:@"User-Agent"];
+        [req setValue:@"BRUMCLASSICSMobile/0.37.0" forHTTPHeaderField:@"User-Agent"];
         if (!postData.empty()) {
             req.HTTPMethod = @"POST";
             req.HTTPBody = [NSData dataWithBytes:postData.data() length:postData.size()];
@@ -3099,13 +3140,21 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     };
     cb.getCoreMemory = [weakSelf](uint32_t memId, void **outData, size_t *outSize) {
         BrumLibretroViewController *strongSelf = weakSelf;
-        if (!strongSelf || !strongSelf->_gameLoaded || strongSelf->_stopped || !strongSelf->_core.getMemoryData || !strongSelf->_core.getMemorySize) {
+        if (!strongSelf) {
+            *outData = nullptr;
+            *outSize = 0;
+            return;
+        }
+        os_unfair_lock_lock(&strongSelf->_raLock);
+        if (!strongSelf->_gameLoaded || strongSelf->_stopped || !strongSelf->_core.getMemoryData || !strongSelf->_core.getMemorySize) {
+            os_unfair_lock_unlock(&strongSelf->_raLock);
             *outData = nullptr;
             *outSize = 0;
             return;
         }
         *outData = strongSelf->_core.getMemoryData(memId);
         *outSize = strongSelf->_core.getMemorySize(memId);
+        os_unfair_lock_unlock(&strongSelf->_raLock);
     };
     cb.onConfirmedUnlock = [weakSelf](const brum::ConfirmedAchievementUnlock &unlock) {
         BrumLibretroViewController *strongSelf = weakSelf;
@@ -3132,12 +3181,12 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         });
     };
 
-    _raRuntime = std::make_unique<brum::RetroAchievementsRuntime>(std::move(cb));
-    _raRuntime->loginWithToken(username.UTF8String, token.UTF8String);
+    auto runtime = std::make_shared<brum::RetroAchievementsRuntime>(std::move(cb));
+    runtime->loginWithToken(username.UTF8String, token.UTF8String);
 
     std::vector<retro_memory_descriptor> mapped;
-    mapped.reserve(_memoryDescriptors.size());
-    for (const auto &d : _memoryDescriptors) {
+    mapped.reserve(descriptors.size());
+    for (const auto &d : descriptors) {
         retro_memory_descriptor item{};
         item.flags = d.flags;
         item.ptr = d.ptr;
@@ -3151,7 +3200,17 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     }
     retro_memory_map map{mapped.empty() ? nullptr : mapped.data(), (unsigned)mapped.size()};
     const char *romPath = _romURL.path.fileSystemRepresentation ?: "";
-    _raRuntime->startGame(consoleId, romPath, (const uint8_t *)_romData.bytes, (size_t)_romData.length, mapped.empty() ? nullptr : &map);
+    runtime->startGame(consoleId, romPath, (const uint8_t *)romData.bytes, (size_t)romData.length, mapped.empty() ? nullptr : &map);
+
+    os_unfair_lock_lock(&_raLock);
+    const BOOL stoppedNow = _stopped;
+    if (!stoppedNow) {
+        _raRuntime = std::move(runtime);
+    }
+    os_unfair_lock_unlock(&_raLock);
+    if (stoppedNow && runtime) {
+        runtime->unloadGame();
+    }
 }
 
 - (void)startPokedexCaptureSession {
@@ -3289,9 +3348,13 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 - (void)handleCoreShutdown {
     if (_stopped) return;
     [_displayLink invalidate]; _displayLink = nil;
-    if (_raRuntime) {
-        _raRuntime->unloadGame();
-        _raRuntime.reset();
+    std::shared_ptr<brum::RetroAchievementsRuntime> raToUnload;
+    os_unfair_lock_lock(&_raLock);
+    raToUnload = std::move(_raRuntime);
+    _raRuntime.reset();
+    os_unfair_lock_unlock(&_raLock);
+    if (raToUnload) {
+        raToUnload->unloadGame();
     }
     _pokedexTracker.reset();
     [_achievementOverlay invalidate];
@@ -3310,9 +3373,19 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 }
 
 - (void)stopCore {
-    if (_stopped) return;
+    std::shared_ptr<brum::RetroAchievementsRuntime> raToUnload;
+    os_unfair_lock_lock(&_raLock);
+    if (_stopped) {
+        os_unfair_lock_unlock(&_raLock);
+        return;
+    }
     _stopped = YES;
+    raToUnload = std::move(_raRuntime);
+    _raRuntime.reset();
+    os_unfair_lock_unlock(&_raLock);
     _hasPendingAVInfo = NO;
+    _hasCachedSerializeSize = NO;
+    _cachedSerializeSize = 0;
     _input.clear();
     [self releaseVirtualControls];
     [_primaryDPad reset];
@@ -3322,9 +3395,8 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [self captureDiagnosticsMetrics];
     [_diagnostics markStopped];
     [_displayLink invalidate]; _displayLink = nil;
-    if (_raRuntime) {
-        _raRuntime->unloadGame();
-        _raRuntime.reset();
+    if (raToUnload) {
+        raToUnload->unloadGame();
     }
     _pokedexTracker.reset();
     [_achievementOverlay invalidate];
@@ -3334,7 +3406,11 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     [self persistSaveRAM];
     if (_hardwareInitialized) [EAGLContext setCurrentContext:_hardwareContext];
     [self destroyHardware];
-    if (_gameLoaded) { _core.unloadGame(); _gameLoaded = NO; }
+    os_unfair_lock_lock(&_raLock);
+    const BOOL unloadGameNow = _gameLoaded;
+    _gameLoaded = NO;
+    os_unfair_lock_unlock(&_raLock);
+    if (unloadGameNow) { _core.unloadGame(); }
     if (_coreInitialized) { _core.deinitialize(); _coreInitialized = NO; }
     if (BrumCurrentHost == self) BrumCurrentHost = nil;
 }

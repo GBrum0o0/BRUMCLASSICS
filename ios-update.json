@@ -1,10 +1,11 @@
 {
-  "version": "0.36.0",
-  "build": 69,
+  "version": "0.37.0",
+  "build": 70,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.36.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.37.0",
   "notes": [
-    "Corrige travamentos constantes no PPSSPP com apresentação direta em OpenGL ES via CAEAGLLayer, espera de quadro não bloqueante, auto frameskip habilitado e redução do overhead de logs.",
-    "Corrige os controles do PPSSPP exibindo D-Pad e analógico simultaneamente, adicionando trava curta para toques rápidos e evitando travamento da fila de eventos táteis."
+    "Corrige congelamento permanente no PPSSPP ao tocar na tela ou abrir o menu rápido (evita pausar a thread de emulação com retro_serialize_size em cada verificação de capacidades).",
+    "Restaura opções críticas do PPSSPP no Libretro (ignora acessos de memória inválidos sem pausar a CPU, ativa software skinning e cache de fragmentos GL, limita auto frameskip a 1 quadro e protege leituras/escritas IR fora da RAM).",
+    "Corrige deadlock ao encerrar jogos no PPSSPP, sincroniza o runtime de RetroAchievements entre threads e evita lag acumulado no ring buffer de áudio."
   ]
 }

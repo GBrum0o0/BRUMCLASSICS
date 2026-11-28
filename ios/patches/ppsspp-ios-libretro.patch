@@ -113,6 +113,19 @@ index 519bfc6..23ca1b9 100644
  	VERBOSE_LOG(JIT, "ProtectMemoryPages: %p (%d) : r%d w%d x%d", ptr, (int)size,
  			(memProtFlags & MEM_PROT_READ) != 0, (memProtFlags & MEM_PROT_WRITE) != 0, (memProtFlags & MEM_PROT_EXEC) != 0);
  
+diff --git a/Core/HLE/sceDisplay.cpp b/Core/HLE/sceDisplay.cpp
+index f18a056..ea91c81 100644
+--- a/Core/HLE/sceDisplay.cpp
++++ b/Core/HLE/sceDisplay.cpp
+@@ -806,7 +806,7 @@ void __DisplayFlip(int cyclesLate) {
+ 
+ 		int maxFrameskip = 8;
+ 		int frameSkipNum = CalculateFrameSkip();
+-		if (throttle) {
++		if (throttle || (g_Config.bAutoFrameSkip && frameSkipNum > 0)) {
+ 			// 4 here means 1 drawn, 4 skipped - so 12 fps minimum.
+ 			maxFrameskip = frameSkipNum;
+ 		}
 diff --git a/Core/MemMap.cpp b/Core/MemMap.cpp
 index 9c7a2cc..00a9640 100644
 --- a/Core/MemMap.cpp
@@ -213,7 +226,7 @@ index 9c7a2cc..00a9640 100644
  	INFO_LOG(MEMMAP, "Memory system initialized. Base at %p (RAM at @ %p, uncached @ %p)",
  		base, m_pPhysicalRAM, m_pUncachedRAM);
 diff --git a/Core/MemMap.h b/Core/MemMap.h
-index 28c635c..4eb9b67 100644
+index 28c635c..ad6dad0 100644
 --- a/Core/MemMap.h
 +++ b/Core/MemMap.h
 @@ -84,7 +84,7 @@ extern u32 g_PSPModel;
@@ -225,6 +238,107 @@ index 28c635c..4eb9b67 100644
  #define MASKED_PSP_MEMORY
  #endif
  
+@@ -175,7 +175,23 @@ void WriteUnchecked_U16(const u16 _Data, const u32 _Address);
+ void WriteUnchecked_U32(const u32 _Data, const u32 _Address);
+ #else
+ 
++#if defined(IOS)
++inline bool IsFastMappedAddress(const u32 address) {
++	if (__builtin_expect((address & 0x3E000000) == 0x08000000, 1))
++		return true;
++	if ((address & 0x3F800000) == 0x04000000)
++		return true;
++	if ((address & 0xBFFF0000) == 0x00010000)
++		return (address & 0x0000FFFF) < SCRATCHPAD_SIZE;
++	return (address & 0x3F000000) >= 0x08000000 && (address & 0x3F000000) < 0x08000000 + g_MemorySize;
++}
++#endif
++
+ inline u32 ReadUnchecked_U32(const u32 address) {
++#if defined(IOS)
++	if (__builtin_expect(!IsFastMappedAddress(address), 0))
++		return 0;
++#endif
+ #ifdef MASKED_PSP_MEMORY
+ 	return *(u32_le *)(base + (address & MEMVIEW32_MASK));
+ #else
+@@ -184,6 +200,10 @@ inline u32 ReadUnchecked_U32(const u32 address) {
+ }
+ 
+ inline float ReadUnchecked_Float(const u32 address) {
++#if defined(IOS)
++	if (__builtin_expect(!IsFastMappedAddress(address), 0))
++		return 0.0f;
++#endif
+ #ifdef MASKED_PSP_MEMORY
+ 	return *(float *)(base + (address & MEMVIEW32_MASK));
+ #else
+@@ -192,6 +212,10 @@ inline float ReadUnchecked_Float(const u32 address) {
+ }
+ 
+ inline u16 ReadUnchecked_U16(const u32 address) {
++#if defined(IOS)
++	if (__builtin_expect(!IsFastMappedAddress(address), 0))
++		return 0;
++#endif
+ #ifdef MASKED_PSP_MEMORY
+ 	return *(u16_le *)(base + (address & MEMVIEW32_MASK));
+ #else
+@@ -200,6 +224,10 @@ inline u16 ReadUnchecked_U16(const u32 address) {
+ }
+ 
+ inline u8 ReadUnchecked_U8(const u32 address) {
++#if defined(IOS)
++	if (__builtin_expect(!IsFastMappedAddress(address), 0))
++		return 0;
++#endif
+ #ifdef MASKED_PSP_MEMORY
+ 	return (*(u8 *)(base + (address & MEMVIEW32_MASK)));
+ #else
+@@ -208,6 +236,10 @@ inline u8 ReadUnchecked_U8(const u32 address) {
+ }
+ 
+ inline void WriteUnchecked_U32(u32 data, u32 address) {
++#if defined(IOS)
++	if (__builtin_expect(!IsFastMappedAddress(address), 0))
++		return;
++#endif
+ #ifdef MASKED_PSP_MEMORY
+ 	*(u32_le *)(base + (address & MEMVIEW32_MASK)) = data;
+ #else
+@@ -216,6 +248,10 @@ inline void WriteUnchecked_U32(u32 data, u32 address) {
+ }
+ 
+ inline void WriteUnchecked_Float(float data, u32 address) {
++#if defined(IOS)
++	if (__builtin_expect(!IsFastMappedAddress(address), 0))
++		return;
++#endif
+ #ifdef MASKED_PSP_MEMORY
+ 	*(float *)(base + (address & MEMVIEW32_MASK)) = data;
+ #else
+@@ -224,6 +260,10 @@ inline void WriteUnchecked_Float(float data, u32 address) {
+ }
+ 
+ inline void WriteUnchecked_U16(u16 data, u32 address) {
++#if defined(IOS)
++	if (__builtin_expect(!IsFastMappedAddress(address), 0))
++		return;
++#endif
+ #ifdef MASKED_PSP_MEMORY
+ 	*(u16_le *)(base + (address & MEMVIEW32_MASK)) = data;
+ #else
+@@ -232,6 +272,10 @@ inline void WriteUnchecked_U16(u16 data, u32 address) {
+ }
+ 
+ inline void WriteUnchecked_U8(u8 data, u32 address) {
++#if defined(IOS)
++	if (__builtin_expect(!IsFastMappedAddress(address), 0))
++		return;
++#endif
+ #ifdef MASKED_PSP_MEMORY
+ 	(*(u8 *)(base + (address & MEMVIEW32_MASK))) = data;
+ #else
 diff --git a/Core/PSPLoaders.cpp b/Core/PSPLoaders.cpp
 index d72c648..2567099 100644
 --- a/Core/PSPLoaders.cpp
@@ -609,7 +723,7 @@ index 682adc0..5546ccc 100644
  	virtual const char *Ident() = 0;
  
 diff --git a/libretro/libretro.cpp b/libretro/libretro.cpp
-index 4518574..2cf4569 100644
+index 4518574..f3d572f 100644
 --- a/libretro/libretro.cpp
 +++ b/libretro/libretro.cpp
 @@ -4,7 +4,11 @@
@@ -668,7 +782,30 @@ index 4518574..2cf4569 100644
  }
  
  void retro_set_audio_sample_batch(retro_audio_sample_batch_t cb) { audio_batch_cb = cb; }
-@@ -338,7 +356,9 @@ void retro_init(void) {
+@@ -325,6 +343,22 @@ void retro_init(void) {
+ 
+ 	g_Config.iFirmwareVersion = PSP_DEFAULT_FIRMWARE;
+ 	g_Config.iPSPModel = PSP_MODEL_SLIM;
++#if defined(IOS)
++	// g_Config.Load("") is disabled in libretro; restore critical PPSSPP defaults
++	// so bad memory accesses never trigger CORE_STEPPING and GPU caches stay active.
++	g_Config.bIgnoreBadMemAccess = true;
++	g_Config.bSoftwareSkinning = true;
++	g_Config.bFragmentTestCache = true;
++	g_Config.bVendorBugChecksEnabled = true;
++	g_Config.bHighQualityDepth = true;
++	g_Config.bHideSlowWarnings = true;
++	g_Config.bHideStateWarnings = true;
++	g_Config.iBufFilter = SCALE_LINEAR;
++	g_Config.bEncryptSave = true;
++	g_Config.bSavedataUpgrade = true;
++	g_Config.iInflightFrames = 3;
++	g_Config.bSeparateSASThread = false;
++#endif
+ 
+ 	LogManager::Init();
+ 
+@@ -338,7 +372,9 @@ void retro_init(void) {
  		logman->RemoveListener(logman->GetDebuggerListener());
  		logman->ChangeFileLog(nullptr);
  		logman->AddListener(printfLogger);
@@ -679,7 +816,7 @@ index 4518574..2cf4569 100644
  		logman->SetAllLogLevels(LogTypes::LINFO);
  #endif
  	}
-@@ -385,7 +405,17 @@ namespace Libretro {
+@@ -385,7 +421,17 @@ namespace Libretro {
  bool useEmuThread = false;
  std::atomic<EmuThreadState> emuThreadState(EmuThreadState::DISABLED);
  
@@ -697,7 +834,7 @@ index 4518574..2cf4569 100644
  static void EmuFrame() {
  	ctx->SetRenderTarget();
  	if (ctx->GetDrawContext()) {
-@@ -431,17 +461,28 @@ static void EmuThreadFunc() {
+@@ -431,43 +477,68 @@ static void EmuThreadFunc() {
  }
  
  void EmuThreadStart() {
@@ -727,7 +864,11 @@ index 4518574..2cf4569 100644
  		return;
  	}
  
-@@ -452,8 +493,15 @@ void EmuThreadStop() {
+ 	emuThreadState = EmuThreadState::QUIT_REQUESTED;
++	coreState = CORE_POWERDOWN;
+ 
+ 	while (ctx->ThreadFrame()) {
+ 		// Need to keep eating frames to allow the EmuThread to exit correctly.
  		continue;
  	}
  
@@ -743,7 +884,32 @@ index 4518574..2cf4569 100644
  	ctx->ThreadEnd();
  }
  
-@@ -570,6 +618,15 @@ bool retro_load_game(const struct retro_game_info *game) {
+ void EmuThreadPause() {
+-	if (emuThreadState != EmuThreadState::RUNNING) {
++	if (emuThreadState != EmuThreadState::RUNNING && emuThreadState != EmuThreadState::START_REQUESTED) {
+ 		return;
+ 	}
+ 
+ 	emuThreadState = EmuThreadState::PAUSE_REQUESTED;
+ 
+-	ctx->ThreadFrame(); // Eat 1 frame
+-
+-	while (emuThreadState != EmuThreadState::PAUSED) {
+-		sleep_ms(1);
++	while (emuThreadState != EmuThreadState::PAUSED && emuThreadState != EmuThreadState::STOPPED) {
++#if defined(IOS)
++		if (!ctx->ThreadFrameTimed(5)) {
++			sleep_ms(1);
++		}
++#else
++		if (!ctx->ThreadFrame()) {
++			sleep_ms(1);
++		}
++#endif
+ 	}
+ }
+ 
+@@ -570,6 +641,15 @@ bool retro_load_game(const struct retro_game_info *game) {
  	coreParam.cpuCore = CPUCore::JIT;
  	check_variables(coreParam);
  
@@ -759,7 +925,7 @@ index 4518574..2cf4569 100644
  #if 0
  	g_Config.bVertexDecoderJit = (coreParam.cpuCore == CPU_JIT) ? true : false;
  #endif
-@@ -686,13 +743,19 @@ void retro_run(void) {
+@@ -686,13 +766,19 @@ void retro_run(void) {
  			return;
  		}
  
@@ -769,7 +935,7 @@ index 4518574..2cf4569 100644
  		}
  
 +#if defined(IOS)
-+		if (!ctx->ThreadFrameTimed(12)) {
++		if (!ctx->ThreadFrameTimed(15)) {
 +			return;
 +		}
 +#else
@@ -780,7 +946,7 @@ index 4518574..2cf4569 100644
  	} else {
  		EmuFrame();
  	}
-@@ -716,6 +779,9 @@ struct SaveStart {
+@@ -716,16 +802,28 @@ struct SaveStart {
  } // namespace SaveState
  
  size_t retro_serialize_size(void) {
@@ -788,9 +954,19 @@ index 4518574..2cf4569 100644
 +		return 0;
 +
  	// TODO: Libretro API extension to use the savestate queue
++	const bool wasRunning = useEmuThread &&
++		(emuThreadState == EmuThreadState::RUNNING || emuThreadState == EmuThreadState::START_REQUESTED);
  	if (useEmuThread) {
  		EmuThreadPause();
-@@ -726,6 +792,9 @@ size_t retro_serialize_size(void) {
+ 	}
+ 
+ 	SaveState::SaveStart state;
+-	return (CChunkFileReader::MeasurePtr(state) + 0x800000) & ~0x7FFFFF; // We don't unpause intentionally
++	size_t measured = (CChunkFileReader::MeasurePtr(state) + 0x800000) & ~0x7FFFFF;
++	if (wasRunning) {
++		EmuThreadStart();
++	}
++	return measured;
  }
  
  bool retro_serialize(void *data, size_t size) {
@@ -800,7 +976,7 @@ index 4518574..2cf4569 100644
  	// TODO: Libretro API extension to use the savestate queue
  	if (useEmuThread) {
  		EmuThreadPause(); // Does nothing if already paused
-@@ -744,6 +813,9 @@ bool retro_serialize(void *data, size_t size) {
+@@ -744,6 +842,9 @@ bool retro_serialize(void *data, size_t size) {
  }
  
  bool retro_unserialize(const void *data, size_t size) {

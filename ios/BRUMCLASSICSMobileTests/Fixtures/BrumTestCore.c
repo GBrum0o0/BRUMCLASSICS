@@ -10,6 +10,7 @@ static brum_retro_input_poll_t input_poll;
 static brum_retro_input_state_t input_state;
 static unsigned char mode;
 static unsigned frames_run = 0;
+static unsigned serialize_size_calls = 0;
 
 unsigned retro_api_version(void) { return BRUM_RETRO_API_VERSION; }
 void retro_set_environment(brum_retro_environment_t callback) { environment = callback; }
@@ -52,6 +53,7 @@ bool retro_load_game(const brum_retro_game_info *game) {
         if (!environment(BRUM_RETRO_ENVIRONMENT_GET_JIT_CAPABLE, &jitCapable) || jitCapable) return false;
     }
     frames_run = 0;
+    serialize_size_calls = 0;
     if (mode == 'R') {
         brum_retro_log_callback log = {0};
         if (environment(BRUM_RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log)) log.log(3, "probe: rejected content");
@@ -86,8 +88,13 @@ void retro_run(void) {
 void *retro_get_memory_data(unsigned id) { (void)id; return NULL; }
 size_t retro_get_memory_size(unsigned id) { (void)id; return 0; }
 size_t retro_serialize_size(void) {
+    serialize_size_calls++;
     if (mode == 'P') {
         if (frames_run == 0) __builtin_trap();
+        return 1024;
+    }
+    if (mode == 'C') {
+        if (frames_run == 0 || serialize_size_calls > 1) __builtin_trap();
         return 1024;
     }
     return 0;

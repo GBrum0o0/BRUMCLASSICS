@@ -228,4 +228,19 @@ final class BrumCoreStartupTests: XCTestCase {
             XCTAssertEqual(ready(), 1, controller.diagnosticsReport)
         }
     }
+
+    @MainActor func testTouchAndRepeatedCapabilityQueriesDoNotRepeatedlyProbeSerializeSize() throws {
+        try withProbe(mode: 67, systemID: "psx") { controller, ready, _ in
+            controller.runFrame()
+            XCTAssertEqual(ready(), 1, controller.diagnosticsReport)
+            controller.perform(Selector(("toggleDisplayMode")))
+            let firstCaps = controller.capabilities
+            let secondCaps = controller.capabilities
+            XCTAssertTrue(firstCaps.contains(.saveState))
+            XCTAssertEqual(firstCaps, secondCaps)
+            controller.perform(Selector(("toggleDisplayMode")))
+            Thread.sleep(forTimeInterval: 0.02)
+            controller.runFrame()
+        }
+    }
 }
