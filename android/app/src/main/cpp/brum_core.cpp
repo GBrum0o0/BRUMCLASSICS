@@ -635,7 +635,7 @@ public:
                 if (!desc.ptr || desc.len == 0) continue;
                 const size_t addr = static_cast<size_t>(gbaAddress);
                 if (addr >= desc.start && addr <= desc.start + desc.len && length <= (desc.start + desc.len - addr)) {
-                    std::memcpy(outBuffer, static_cast<const uint8_t *>(desc.ptr) + (addr - desc.start), length);
+                    std::memcpy(outBuffer, static_cast<const uint8_t *>(desc.ptr) + desc.offset + (addr - desc.start), length);
                     return true;
                 }
             }

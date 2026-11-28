@@ -283,8 +283,128 @@ int main() {
         require(events.size() == 2u, "Shiny Pikachu in PC Box must be detected");
         require(events[1].nationalDexNumber == 25u && events[1].isShiny &&
                     events[1].storageSource == "pc_box" &&
-                    events[1].metLocationName == "Localização desconhecida",
+                    events[1].metLocationName == "Mt. Moon",
                 "Shiny PC Box Pikachu must report shiny=true, pc_box, and unknown location fallback");
+    }
+
+    // 5b. Pre-Pokédex starter & Evolution (Normal and Shiny independence) FireRed tests
+    {
+        std::vector<uint8_t> ewram(0x40000u, 0u);
+        std::vector<uint8_t> iwram(0x8000u, 0u);
+
+        constexpr uint32_t kSb2Offset = 0x03B000u;
+        constexpr uint32_t kStorageOffset = 0x029000u;
+        writeU32LE(iwram.data() + 0x500Cu, 0x02000000u + kSb2Offset);
+        writeU32LE(iwram.data() + 0x5010u, 0x02000000u + kStorageOffset);
+
+        uint8_t *sb2 = ewram.data() + kSb2Offset;
+        sb2[0] = 0xCCu; // Valid player name after New Game start
+        const uint32_t trainerId = 0x00123456u;
+        writeU32LE(sb2 + 0x00Au, trainerId);
+        ewram[0x024029u] = 0u; // Before choosing starter in Oak's Lab
+
+        // Also test non-zero descriptor offset in makeDescriptorBusReader
+        std::vector<uint8_t> prefixedEwram(0x100u + ewram.size(), 0u);
+        std::vector<GbaMemoryDescriptor> offsetDescs = {
+            {prefixedEwram.data(), 0x02000000u, ewram.size(), 0x100u},
+            {iwram.data(), 0x03000000u, iwram.size(), 0u},
+        };
+        auto syncEwram = [&]() {
+            std::memcpy(prefixedEwram.data() + 0x100u, ewram.data(), ewram.size());
+        };
+        syncEwram();
+
+        std::vector<FireRedCaptureEvent> starterEvents;
+        FireRedCaptureTracker tracker(
+            {true, true, "POKEMON FIRE", "BPRE", 0},
+            makeDescriptorBusReader(offsetDescs),
+            [&](const FireRedCaptureEvent &ev) { starterEvents.push_back(ev); },
+            1u);
+
+        // Baseline anchors with empty party while owned52 is all zero
+        tracker.doFrame();
+        tracker.doFrame();
+        require(tracker.isBaselineAnchored(), "New Game baseline must anchor cleanly with 0 party Pokemon");
+        require(starterEvents.empty(), "Empty New Game party must emit 0 events");
+
+        // Foreign OT in pre-Pokédex phase without owned bit must be ignored
+        ewram[0x024029u] = 1u;
+        encodeBoxPokemonForTest(ewram.data() + 0x024284u, 0x00000008u, 0x99999999u, 150u /* Mewtwo */, 0x58u);
+        syncEwram();
+        tracker.doFrame();
+        tracker.doFrame();
+        require(starterEvents.empty(), "Foreign OT mon without pokedex.owned bit must never trigger capture");
+
+        // Player chooses Squirtle (#007) in Oak's Lab BEFORE receiving the Pokédex (owned52 still all 0!)
+        const uint32_t squirtlePid = 0x10200008u; // 0x1020 ^ 0x0008 = 0x1028; with trainerId 0x00123456 -> normal
+        encodeBoxPokemonForTest(ewram.data() + 0x024284u, squirtlePid, trainerId, 7u /* Squirtle */, 0x58u /* Pallet Town */);
+        syncEwram();
+        tracker.doFrame();
+        require(starterEvents.empty(), "Starter waits for 2-scan stability");
+        tracker.doFrame();
+        require(starterEvents.size() == 1u && starterEvents[0].nationalDexNumber == 7u &&
+                    !starterEvents[0].isShiny && starterEvents[0].metLocationName == "Pallet Town",
+                "Normal Squirtle starter must be detected immediately before receiving Pokedex");
+
+        // Receiving the Pokédex later and setting owned bit #007 must NOT duplicate Squirtle
+        setOwnedBit(sb2 + 0x028u, 7u);
+        syncEwram();
+        tracker.doFrame();
+        tracker.doFrame();
+        require(starterEvents.size() == 1u, "Setting owned bit after pre-Pokedex starter must never duplicate");
+
+        // Catch Normal Pidgey (#016) -> then evolve same PID/OT into Normal Pidgeotto (#017)
+        const uint32_t pidgeyPid = 0x20000008u; // (tid^sid = 0x3444) ^ (0x2000^0x0008) >= 8 -> normal
+        ewram[0x024029u] = 2u;
+        encodeBoxPokemonForTest(ewram.data() + 0x024284u + 100u, pidgeyPid, trainerId, 16u /* Pidgey */, 0x65u /* Route 1 */);
+        setOwnedBit(sb2 + 0x028u, 16u);
+        syncEwram();
+        tracker.doFrame();
+        tracker.doFrame();
+        require(starterEvents.size() == 2u && starterEvents[1].nationalDexNumber == 16u && !starterEvents[1].isShiny,
+                "Captured normal Pidgey must be detected");
+
+        // Evolve Pidgey -> Pidgeotto (same PID/OT, species becomes 17, owned bit 17 set)
+        encodeBoxPokemonForTest(ewram.data() + 0x024284u + 100u, pidgeyPid, trainerId, 17u /* Pidgeotto */, 0x65u /* Route 1 */);
+        setOwnedBit(sb2 + 0x028u, 17u);
+        syncEwram();
+        tracker.doFrame();
+        tracker.doFrame();
+        require(starterEvents.size() == 3u && starterEvents[2].nationalDexNumber == 17u && !starterEvents[2].isShiny,
+                "Evolving Pidgey into Pidgeotto (same PID/OT, new species) must detect Pidgeotto");
+
+        // Catch Shiny Rattata (#019) -> evolve same shiny PID/OT into Shiny Raticate (#020)
+        // Compute shiny PID matching trainerId: tid^sid = 0x0012 ^ 0x3456 = 0x3444 -> pid = 0x00003444 makes xor == 0 < 8
+        const uint32_t shinyPid = (trainerId & 0xFFFFu) ^ ((trainerId >> 16u) & 0xFFFFu);
+        ewram[0x024029u] = 3u;
+        encodeBoxPokemonForTest(ewram.data() + 0x024284u + 200u, shinyPid, trainerId, 19u /* Rattata */, 0x65u);
+        setOwnedBit(sb2 + 0x028u, 19u);
+        syncEwram();
+        tracker.doFrame();
+        tracker.doFrame();
+        require(starterEvents.size() == 4u && starterEvents[3].nationalDexNumber == 19u && starterEvents[3].isShiny,
+                "Shiny Rattata capture must be detected with isShiny=true");
+
+        encodeBoxPokemonForTest(ewram.data() + 0x024284u + 200u, shinyPid, trainerId, 20u /* Raticate */, 0x65u);
+        setOwnedBit(sb2 + 0x028u, 20u);
+        syncEwram();
+        tracker.doFrame();
+        tracker.doFrame();
+        require(starterEvents.size() == 5u && starterEvents[4].nationalDexNumber == 20u && starterEvents[4].isShiny,
+                "Shiny Rattata evolving into Shiny Raticate must detect Raticate with isShiny=true");
+
+        // Verify save inspection & diff also support pre-Pokédex Squirtle starter
+        std::array<uint8_t, 80> squirtleRaw{};
+        encodeBoxPokemonForTest(squirtleRaw.data(), squirtlePid, trainerId, 7u, 0x58u);
+        std::vector<uint8_t> saveEmpty(0x20000u, 0xFFu);
+        buildSyntheticFireRedSaveSlot(saveEmpty.data(), 1u, trainerId, {}, {}, {});
+        std::vector<uint8_t> saveWithStarter(0x20000u, 0xFFu);
+        buildSyntheticFireRedSaveSlot(saveWithStarter.data(), 2u, trainerId, {}, {squirtleRaw}, {});
+        auto emptySnap = inspectFireRedSave128K(saveEmpty.data(), saveEmpty.size());
+        auto starterSnap = inspectFireRedSave128K(saveWithStarter.data(), saveWithStarter.size());
+        auto starterDiff = diffFireRedSaveSnapshots(emptySnap, starterSnap, "BPRE", 0u);
+        require(starterDiff.size() == 1u && starterDiff[0].nationalDexNumber == 7u && !starterDiff[0].isShiny,
+                "Pre-Pokedex starter must also be detected across 128K save snapshots");
     }
 
     // Incomplete RAM snapshots must neither anchor old captures nor bridge debounce gaps.

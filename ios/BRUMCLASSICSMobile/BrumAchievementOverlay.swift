@@ -216,6 +216,13 @@ final class BrumAchievementOverlayCoordinator: ObservableObject {
         pumpNext()
     }
 
+    func enqueuePreferringActiveEmulator(_ payload: BrumAchievementOverlayPayload) {
+        if BrumAchievementOverlayPresenter.presentOnActiveEmulatorIfAvailable(payload) {
+            return
+        }
+        enqueue(payload)
+    }
+
     func resetForTesting() {
         activeTask?.cancel()
         activeTask = nil
@@ -420,11 +427,11 @@ final class BrumAchievementCardView: UIView {
         badgeLoadTask = nil
         if payload.pokedexNationalDexNumber > 0 {
             let mode: PokedexSpriteRenderMode = payload.isShinyDiscovery ? .shiny : .normal
-            badgeImageView.image = nil
+            badgeImageView.image = BrumCartridgeBrandMark.makeImage(size: CGSize(width: 44, height: 44))
             accessibilityIdentifier = payload.eventID
             let currentEvent = payload.eventID
             badgeLoadTask = PokedexPixelSprite.load(for: payload.pokedexNationalDexNumber, mode: mode) { [weak self] image in
-                guard let self, self.accessibilityIdentifier == currentEvent else { return }
+                guard let self, self.accessibilityIdentifier == currentEvent, let image else { return }
                 self.badgeImageView.image = image
             }
             return
@@ -455,46 +462,36 @@ final class BrumAchievementCardView: UIView {
 
 /// Objective-C++ callable host presenter attached directly on BrumLibretroViewController or any UIViewController.
 @objc public final class BrumAchievementOverlayPresenter: NSObject {
+    @MainActor private static weak var activePresenter: BrumAchievementOverlayPresenter?
     private weak var hostView: UIView?
     private var card: BrumAchievementCardView?
     private var queue: [BrumAchievementOverlayPayload] = []
     private var dismissTimer: Timer?
     private var showing = false
-    private var pokedexObserver: NSObjectProtocol?
 
     @objc public init(hostView: UIView) {
         self.hostView = hostView
         super.init()
-        pokedexObserver = NotificationCenter.default.addObserver(
-            forName: .brumPokedexCaptureDetected,
-            object: nil,
-            queue: .main
-        ) { [weak self] note in
-            let info = note.userInfo ?? [:]
-            let dex = (info["nationalDexNumber"] as? NSNumber)?.intValue ?? 0
-            let isShiny = (info["isShiny"] as? NSNumber)?.boolValue ?? false
-            let location = (info["captureLocation"] as? String) ?? PokedexUniversalStore.unknownLocation
-            let gameTitle = (info["gameTitle"] as? String) ?? "Pokémon FireRed Version"
-            let gameID = (info["canonicalGameID"] as? String) ?? ""
-            let systemID = (info["systemID"] as? String) ?? "gba"
-            guard BrumExtensionRegistry.shared.isEnabled(BrumExtensionManifest.pokedexUniversal.id, profileID: "primary"),
-                  (1...809).contains(dex),
-                  let res = try? PokedexUniversalStore.shared.recordCapture(
-                      ownerProfileId: "primary",
-                      nationalDexNumber: dex,
-                      isShiny: isShiny,
-                      gameTitle: gameTitle,
-                      gameId: gameID,
-                      systemId: systemID,
-                      capturedAt: nil,
-                      captureLocation: location
-                  ) else { return }
-            NotificationCenter.default.post(name: .brumPokedexCollectionUpdated, object: nil)
-            if res.recorded, let notification = res.notification {
-                let payload = BrumAchievementOverlayPayload.fromPokedexDiscovery(notification)
-                self?.enqueueOnMain(payload)
+        if Thread.isMainThread {
+            MainActor.assumeIsolated {
+                Self.activePresenter = self
+            }
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                Self.activePresenter = self
             }
         }
+    }
+
+    @MainActor
+    static func presentOnActiveEmulatorIfAvailable(_ payload: BrumAchievementOverlayPayload) -> Bool {
+        guard let presenter = activePresenter,
+              let host = presenter.hostView,
+              host.window != nil else {
+            return false
+        }
+        presenter.enqueueOnMain(payload)
+        return true
     }
 
     @objc public func enqueueUnlock(eventID: String,
@@ -517,11 +514,10 @@ final class BrumAchievementCardView: UIView {
     }
 
     @objc public func invalidate() {
-        if let pokedexObserver {
-            NotificationCenter.default.removeObserver(pokedexObserver)
-            self.pokedexObserver = nil
-        }
         DispatchQueue.main.async { [weak self] in
+            if let self, Self.activePresenter === self {
+                Self.activePresenter = nil
+            }
             self?.dismissTimer?.invalidate()
             self?.dismissTimer = nil
             self?.queue.removeAll()

@@ -17,6 +17,7 @@ struct GbaMemoryDescriptor {
     const void *ptr = nullptr;
     std::size_t start = 0;
     std::size_t len = 0;
+    std::size_t offset = 0;
 };
 
 using GbaBusReadFn = std::function<bool(uint32_t gbaAddress, uint8_t *outBuffer, std::size_t length)>;

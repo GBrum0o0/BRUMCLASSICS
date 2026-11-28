@@ -233,6 +233,7 @@ enum PokedexDisplayTab: String, CaseIterable, Identifiable {
 extension Notification.Name {
     static let brumPokedexCaptureDetected = Notification.Name("BrumPokedexCaptureDetectedNotification")
     static let brumPokedexCollectionUpdated = Notification.Name("BrumPokedexCollectionUpdatedNotification")
+    static let brumPokedexNeedsSync = Notification.Name("BrumPokedexNeedsSyncNotification")
 }
 
 @MainActor
@@ -368,9 +369,11 @@ final class PokedexUniversalCoordinator: ObservableObject {
         if isShiny {
             selectedTab = .shinies
         }
+        NotificationCenter.default.post(name: .brumPokedexCollectionUpdated, object: nil)
         if result.recorded, let notification = result.notification {
+            NotificationCenter.default.post(name: .brumPokedexNeedsSync, object: nil)
             let popup = BrumAchievementOverlayPayload.fromPokedexDiscovery(notification)
-            BrumAchievementOverlayCoordinator.shared.enqueue(popup)
+            BrumAchievementOverlayCoordinator.shared.enqueuePreferringActiveEmulator(popup)
         }
     }
 

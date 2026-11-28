@@ -350,4 +350,99 @@ final class PokedexUniversalTests: XCTestCase {
         XCTAssertEqual(overlayPayload.pokedexNationalDexNumber, 25)
         XCTAssertTrue(overlayPayload.isShinyDiscovery)
     }
+
+    @MainActor
+    func testStarterEvolutionNormalShinyIndependenceNoDuplicatesAndPersistence() throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PokedexStarterEvolutionTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+
+        let registry = BrumExtensionRegistry(storageRoot: tempRoot)
+        _ = try registry.register(.pokedexUniversal)
+        let store = PokedexUniversalStore(registry: registry, deviceID: "iphone-starter-test")
+        var events: [PokedexDiscoveryEvent] = []
+        store.onDiscovery = { events.append($0) }
+        let coordinator = PokedexUniversalCoordinator(store: store, profileID: "gusta")
+
+        // 1. Starter Squirtle (#007 normal) chosen -> must register, reveal, and emit discovery popup once
+        coordinator.handleDetectedCapture(
+            nationalDexNumber: 7,
+            isShiny: false,
+            gameTitle: "Pokémon FireRed Version",
+            gameID: "firered-1",
+            systemID: "gba",
+            captureLocation: "Pallet Town"
+        )
+        XCTAssertEqual(events.count, 1)
+        XCTAssertEqual(events[0].nationalDexNumber, 7)
+        XCTAssertEqual(events[0].isShiny, false)
+        XCTAssertEqual(coordinator.projectedView.summary.normalDiscovered, 1)
+        XCTAssertEqual(coordinator.selectedDexNumber, 7)
+
+        // Duplicate Squirtle event (e.g. after receiving Oak's Pokédex) must not emit or overwrite
+        coordinator.handleDetectedCapture(
+            nationalDexNumber: 7,
+            isShiny: false,
+            gameTitle: "Pokémon FireRed Version",
+            gameID: "firered-1",
+            systemID: "gba",
+            captureLocation: "Route 1"
+        )
+        XCTAssertEqual(events.count, 1)
+
+        // 2. Capture normal Pidgey (#016), then evolve to normal Pidgeotto (#017)
+        coordinator.handleDetectedCapture(
+            nationalDexNumber: 16,
+            isShiny: false,
+            gameTitle: "Pokémon FireRed Version",
+            gameID: "firered-1",
+            systemID: "gba",
+            captureLocation: "Route 1"
+        )
+        coordinator.handleDetectedCapture(
+            nationalDexNumber: 17,
+            isShiny: false,
+            gameTitle: "Pokémon FireRed Version",
+            gameID: "firered-1",
+            systemID: "gba",
+            captureLocation: "Route 1"
+        )
+        XCTAssertEqual(events.count, 3)
+        XCTAssertEqual(events[2].nationalDexNumber, 17)
+        XCTAssertFalse(events[2].isShiny)
+        let afterNormalEvo = try store.projectedView(profileID: "gusta", platform: "ios")
+        XCTAssertTrue(try XCTUnwrap(afterNormalEvo.tabs.pokemon.first(where: { $0.nationalDexNumber == 16 })).discovered)
+        XCTAssertTrue(try XCTUnwrap(afterNormalEvo.tabs.pokemon.first(where: { $0.nationalDexNumber == 17 })).discovered)
+        XCTAssertFalse(try XCTUnwrap(afterNormalEvo.tabs.shinies.first(where: { $0.nationalDexNumber == 17 })).discovered)
+
+        // 3. Shiny Rattata (#019) evolving into Shiny Raticate (#020) must unlock shiny ONLY (normal remains silhouette)
+        coordinator.handleDetectedCapture(
+            nationalDexNumber: 19,
+            isShiny: true,
+            gameTitle: "Pokémon FireRed Version",
+            gameID: "firered-1",
+            systemID: "gba",
+            captureLocation: "Route 2"
+        )
+        coordinator.handleDetectedCapture(
+            nationalDexNumber: 20,
+            isShiny: true,
+            gameTitle: "Pokémon FireRed Version",
+            gameID: "firered-1",
+            systemID: "gba",
+            captureLocation: "Route 2"
+        )
+        XCTAssertEqual(events.count, 5)
+        XCTAssertEqual(events[4].nationalDexNumber, 20)
+        XCTAssertTrue(events[4].isShiny)
+
+        // 4. Reload from isolated disk storage (simulating app restart) and verify permanence & strict isolation
+        let reloadedStore = PokedexUniversalStore(registry: BrumExtensionRegistry(storageRoot: tempRoot), deviceID: "iphone-starter-test")
+        let persistedView = try reloadedStore.projectedView(profileID: "gusta", platform: "ios")
+        XCTAssertEqual(persistedView.summary.normalDiscovered, 3) // #7, #16, #17
+        XCTAssertEqual(persistedView.summary.shinyDiscovered, 2)  // #19, #20
+        XCTAssertFalse(try XCTUnwrap(persistedView.tabs.pokemon.first(where: { $0.nationalDexNumber == 19 })).discovered)
+        XCTAssertFalse(try XCTUnwrap(persistedView.tabs.pokemon.first(where: { $0.nationalDexNumber == 20 })).discovered)
+        XCTAssertTrue(try XCTUnwrap(persistedView.tabs.shinies.first(where: { $0.nationalDexNumber == 20 })).discovered)
+    }
 }

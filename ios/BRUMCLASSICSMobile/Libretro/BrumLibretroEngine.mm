@@ -3215,9 +3215,21 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 
 - (void)startPokedexCaptureSession {
     _pokedexTracker.reset();
-    if (!_romData || _romData.length < 0xC0) return;
-    const auto romInfo = brum::pokedex::identifyFireRedRom((const uint8_t *)_romData.bytes, (size_t)_romData.length);
+    NSData *headerData = _romData;
+    if ((!headerData || headerData.length < 0xC0) && _romURL) {
+        NSFileHandle *handle = [NSFileHandle fileHandleForReadingFromURL:_romURL error:nil];
+        if (handle) {
+            headerData = [handle readDataOfLength:0x200];
+            [handle closeFile];
+        }
+    }
+    if (!headerData || headerData.length < 0xC0) return;
+    const auto romInfo = brum::pokedex::identifyFireRedRom((const uint8_t *)headerData.bytes, (size_t)headerData.length);
     if (!romInfo.isFireRed || !romInfo.supportedRamLayout) return;
+
+    [_diagnostics recordMessage:[NSString stringWithFormat:@"Pokédex FireRed ativa (%s rev %u)",
+                                 romInfo.gameCode.c_str(), (unsigned)romInfo.revision]
+                          level:0];
 
     __weak BrumLibretroViewController *weakSelf = self;
     auto busReader = [weakSelf](uint32_t gbaAddress, uint8_t *outBuffer, size_t length) -> bool {
@@ -3227,7 +3239,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
             if (!desc.ptr || desc.len == 0) continue;
             const size_t addr = (size_t)gbaAddress;
             if (addr >= desc.start && addr <= desc.start + desc.len && length <= (desc.start + desc.len - addr)) {
-                memcpy(outBuffer, (const uint8_t *)desc.ptr + (addr - desc.start), length);
+                memcpy(outBuffer, (const uint8_t *)desc.ptr + desc.offset + (addr - desc.start), length);
                 return true;
             }
         }
@@ -3237,6 +3249,11 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
             if (sysRam && sysSize >= 0x40000 && gbaAddress >= 0x02000000u && gbaAddress < 0x02040000u &&
                 length <= (size_t)(0x02040000u - gbaAddress)) {
                 memcpy(outBuffer, (const uint8_t *)sysRam + (gbaAddress - 0x02000000u), length);
+                return true;
+            }
+            if (sysRam && sysSize >= 0x48000 && gbaAddress >= 0x03000000u && gbaAddress < 0x03008000u &&
+                length <= (size_t)(0x03008000u - gbaAddress)) {
+                memcpy(outBuffer, (const uint8_t *)sysRam + 0x40000u + (gbaAddress - 0x03000000u), length);
                 return true;
             }
         }

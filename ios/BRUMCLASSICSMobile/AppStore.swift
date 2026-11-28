@@ -34,6 +34,7 @@ final class AppStore: ObservableObject {
     private var eventTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
     private var artworkTask: Task<Void, Never>?
+    private var pokedexSyncObserver: NSObjectProtocol?
     private var artworkSignature = ""
     private var flushing = false
     private var appActive = true
@@ -46,6 +47,16 @@ final class AppStore: ObservableObject {
         OfflineContentPreferences.registerDefaults()
         images.countLimit = 80
         _ = PokedexUniversalCoordinator.shared
+        pokedexSyncObserver = NotificationCenter.default.addObserver(
+            forName: .brumPokedexNeedsSync,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.isPaired, self.connection == .online else { return }
+                _ = await self.syncPokedexWithLauncher(profileID: "primary")
+            }
+        }
         Task { await restore() }
     }
 
@@ -611,7 +622,7 @@ final class AppStore: ObservableObject {
                 NotificationCenter.default.post(name: .brumPokedexCollectionUpdated, object: nil)
             }
             if newPokedexDiscovery, let payload = BrumAchievementOverlayPayload.fromPokedexBridgeEvent(event) {
-                BrumAchievementOverlayCoordinator.shared.enqueue(payload)
+                BrumAchievementOverlayCoordinator.shared.enqueuePreferringActiveEmulator(payload)
             }
             return
         }

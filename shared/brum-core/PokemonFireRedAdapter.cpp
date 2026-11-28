@@ -446,6 +446,34 @@ bool isPokedexOwnedBitSet(const uint8_t owned52[52], uint16_t nationalDexNumber)
     return ((owned52[byteIndex] >> bitOffset) & 0x01u) != 0u;
 }
 
+bool hasAnyOwnedBit(const uint8_t owned52[52]) {
+    if (!owned52) {
+        return false;
+    }
+    for (std::size_t i = 0; i < 52u; ++i) {
+        if (owned52[i] != 0u) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// FireRed grants the starter before the player receives the Pokédex (all owned bits are 0).
+// Accepting party/storage mons owned by trainerId in that pre-Pokédex phase detects starters
+// immediately without relaxing owned-bit verification once the Pokédex is active.
+bool isConfirmedPlayerPokemon(const DecodedGen3Pokemon &decoded,
+                              uint32_t trainerId,
+                              const uint8_t owned52[52],
+                              bool prePokedexPhase) {
+    if (!decoded.valid) {
+        return false;
+    }
+    if (isPokedexOwnedBitSet(owned52, decoded.nationalDexNumber)) {
+        return true;
+    }
+    return prePokedexPhase && trainerId != 0u && decoded.otId == trainerId;
+}
+
 DecodedGen3Pokemon decodeBoxPokemon(const uint8_t raw80[80]) {
     DecodedGen3Pokemon out{};
     if (!raw80) {
@@ -570,7 +598,7 @@ GbaBusReadFn makeDescriptorBusReader(const std::vector<GbaMemoryDescriptor> &des
             const std::size_t addr = static_cast<std::size_t>(gbaAddress);
             if (addr >= desc.start && addr <= desc.start + desc.len && length <= (desc.start + desc.len - addr)) {
                 const auto *base = static_cast<const uint8_t *>(desc.ptr);
-                std::memcpy(outBuffer, base + (addr - desc.start), length);
+                std::memcpy(outBuffer, base + desc.offset + (addr - desc.start), length);
                 return true;
             }
         }
@@ -654,6 +682,7 @@ FireRedSaveSnapshot inspectFireRedSave128K(const uint8_t *saveData, std::size_t 
     result.saveCounter = bestCounter;
     result.trainerId = trainerId;
     std::memcpy(result.pokedexOwned.data(), saveBlock2 + kSaveBlock2PokedexOwnedOffset, 52u);
+    const bool prePokedexPhase = !hasAnyOwnedBit(result.pokedexOwned.data());
 
     std::vector<uint8_t> saveBlock1(kSectorDataSize * 4u, 0u);
     for (std::size_t i = 0; i < 4u; ++i) {
@@ -664,7 +693,7 @@ FireRedSaveSnapshot inspectFireRedSave128K(const uint8_t *saveData, std::size_t 
         for (uint8_t i = 0; i < partyCount; ++i) {
             const uint8_t *monPtr = saveBlock1.data() + kSaveBlock1PartyOffset + static_cast<std::size_t>(i) * kPartyPokemonSize;
             DecodedGen3Pokemon decoded = decodeBoxPokemon(monPtr);
-            if (decoded.valid && isPokedexOwnedBitSet(result.pokedexOwned.data(), decoded.nationalDexNumber)) {
+            if (isConfirmedPlayerPokemon(decoded, trainerId, result.pokedexOwned.data(), prePokedexPhase)) {
                 result.partyPokemon.push_back(std::move(decoded));
             }
         }
@@ -679,7 +708,7 @@ FireRedSaveSnapshot inspectFireRedSave128K(const uint8_t *saveData, std::size_t 
         const std::size_t offset = kPokemonStorageBoxesOffset + i * kBoxPokemonSize;
         if (offset + kBoxPokemonSize <= storageBlock.size()) {
             DecodedGen3Pokemon decoded = decodeBoxPokemon(storageBlock.data() + offset);
-            if (decoded.valid && isPokedexOwnedBitSet(result.pokedexOwned.data(), decoded.nationalDexNumber)) {
+            if (isConfirmedPlayerPokemon(decoded, trainerId, result.pokedexOwned.data(), prePokedexPhase)) {
                 result.boxPokemon.push_back(std::move(decoded));
             }
         }
@@ -831,6 +860,7 @@ void FireRedCaptureTracker::performScan() {
         return;
     }
     const uint8_t *owned52 = sb2Header + kSaveBlock2PokedexOwnedOffset;
+    const bool prePokedexPhase = !hasAnyOwnedBit(owned52);
 
     uint8_t partyCount = 0u;
     if (!busReader_(kEwramPlayerPartyCount, &partyCount, 1u) || partyCount > 6u) {
@@ -852,7 +882,7 @@ void FireRedCaptureTracker::performScan() {
         for (uint8_t slot = 0u; slot < partyCount; ++slot) {
             const uint8_t *monRaw = partyBuf + static_cast<std::size_t>(slot) * kPartyPokemonSize;
             DecodedGen3Pokemon decoded = decodeBoxPokemon(monRaw);
-            if (!decoded.valid || !isPokedexOwnedBitSet(owned52, decoded.nationalDexNumber)) {
+            if (!isConfirmedPlayerPokemon(decoded, trainerId, owned52, prePokedexPhase)) {
                 continue;
             }
             const uint64_t key = instanceKey(decoded.personality, decoded.otId, decoded.nationalDexNumber);
@@ -892,7 +922,7 @@ void FireRedCaptureTracker::performScan() {
             return;
             }
             DecodedGen3Pokemon decoded = decodeBoxPokemon(boxMonRaw);
-            if (!decoded.valid || !isPokedexOwnedBitSet(owned52, decoded.nationalDexNumber)) {
+            if (!isConfirmedPlayerPokemon(decoded, trainerId, owned52, prePokedexPhase)) {
                 continue;
             }
             const uint64_t key = instanceKey(decoded.personality, decoded.otId, decoded.nationalDexNumber);
