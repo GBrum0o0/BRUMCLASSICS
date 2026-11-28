@@ -14,14 +14,23 @@ enum BrumTheme {
 struct BrumLogo: View {
     var compact = false
     var body: some View {
-        HStack(spacing: 9) {
+        HStack(spacing: 8) {
             ZStack {
                 RoundedRectangle(cornerRadius: 4).stroke(BrumTheme.primary, lineWidth: 3)
                 Rectangle().fill(BrumTheme.primary).frame(height: 4).offset(y: 13)
                 HStack(spacing: 3) { ForEach(0..<4, id: \.self) { _ in Rectangle().fill(BrumTheme.primary).frame(width: 3, height: 6) } }.offset(y: 18)
-            }.frame(width: 38, height: 32)
-            if !compact { Text("BRUMCLASSICS").font(.system(size: 18, weight: .black, design: .rounded)).tracking(1.4).foregroundStyle(BrumTheme.text) }
-        }.accessibilityElement(children: .ignore).accessibilityLabel("BRUMCLASSICS")
+            }.frame(width: 34, height: 28)
+            if !compact {
+                Text("BRUMCLASSICS")
+                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .tracking(1.1)
+                    .foregroundStyle(BrumTheme.text)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("BRUMCLASSICS")
     }
 }
 

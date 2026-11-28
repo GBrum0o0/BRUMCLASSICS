@@ -91,13 +91,15 @@ struct GamingModeView: View {
             }
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 18) {
-                    HStack(spacing: 16) {
-                        libraryTab("JOGADOS RECENTEMENTE", selected: activeSection == .recent) { activeSection = .recent }
-                            .accessibilityIdentifier("gaming-mode-recent")
-                        libraryTab("BIBLIOTECA", selected: activeSection == .library) { activeSection = .library }
-                            .accessibilityIdentifier("gaming-mode-library")
-                        libraryTab("EXTENSÕES", selected: activeSection == .extensions) { activeSection = .extensions }
-                            .accessibilityIdentifier("gaming-mode-extensions")
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            libraryTab("JOGADOS RECENTEMENTE", selected: activeSection == .recent) { activeSection = .recent }
+                                .accessibilityIdentifier("gaming-mode-recent")
+                            libraryTab("BIBLIOTECA", selected: activeSection == .library) { activeSection = .library }
+                                .accessibilityIdentifier("gaming-mode-library")
+                            libraryTab("EXTENSÕES", selected: activeSection == .extensions) { activeSection = .extensions }
+                                .accessibilityIdentifier("gaming-mode-extensions")
+                        }
                     }
                     if let activeRemote = store.activeRemoteGamepadSession {
                         BrumCard {
@@ -285,7 +287,10 @@ struct GamingModeView: View {
 
     private func libraryTab(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title).font(.subheadline.weight(.semibold))
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(selected ? BrumTheme.primary : BrumTheme.text)
                 .padding(.horizontal, 12).frame(minHeight: 44)
                 .background(selected ? BrumTheme.primary.opacity(0.12) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
