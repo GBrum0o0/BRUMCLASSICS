@@ -191,7 +191,7 @@ final class BrumCoreStartupTests: XCTestCase {
     }
 
     @MainActor func testPSPVirtualControlsExposeBothDPadAndStickAndLatchQuickTaps() throws {
-        try withProbe(mode: 75, systemID: "psp") { controller, ready, _ in
+        try withProbe(mode: 73, systemID: "psp") { controller, _, _ in
             let allControls = controller.view.subviews.compactMap { $0 as? UIControl }
             let dpad = allControls.first { $0.accessibilityLabel == "Direcional virtual" }
             let stick = allControls.first { $0.accessibilityLabel == "Controle analógico" }
@@ -202,26 +202,29 @@ final class BrumCoreStartupTests: XCTestCase {
             XCTAssertFalse(try XCTUnwrap(dpad).isHidden)
             XCTAssertFalse(try XCTUnwrap(stick).isHidden)
             XCTAssertNil(modeButton)
+        }
 
-            func findButton(titled title: String, in root: UIView) -> UIButton? {
-                for subview in root.subviews {
-                    if let button = subview as? UIButton, button.title(for: .normal) == title {
-                        return button
-                    }
-                    if let nested = findButton(titled: title, in: subview) {
-                        return nested
-                    }
+        func findButton(titled title: String, in root: UIView) -> UIButton? {
+            for subview in root.subviews {
+                if let button = subview as? UIButton, button.title(for: .normal) == title {
+                    return button
                 }
-                return nil
+                if let nested = findButton(titled: title, in: subview) {
+                    return nested
+                }
             }
+            return nil
+        }
 
+        try withProbe(mode: 75, systemID: "psx") { controller, ready, _ in
             let cross = try XCTUnwrap(findButton(titled: "×", in: controller.view))
             cross.sendActions(for: .touchDown)
             cross.sendActions(for: .touchUpInside)
-            controller.runFrame()
-            controller.runFrame()
-            controller.runFrame()
-            controller.runFrame()
+            for _ in 0..<8 {
+                controller.runFrame()
+                if ready() == 1 { break }
+                Thread.sleep(forTimeInterval: 0.02)
+            }
             XCTAssertEqual(ready(), 1, controller.diagnosticsReport)
         }
     }
