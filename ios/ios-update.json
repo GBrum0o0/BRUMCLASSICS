@@ -1,11 +1,10 @@
 {
-  "version": "0.35.0",
-  "build": 68,
+  "version": "0.36.0",
+  "build": 69,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.35.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.36.0",
   "notes": [
-    "Reformula completamente a Pokédex Kanto G1 em carcaça física 3D articulada (fechada na aba Extensões e aberta horizontalmente), com silhuetas pretas puras e coleção Normal/Shiny independente.",
-    "Simplifica o MyBrumControl no Gaming Mode para um ícone direto de leitor QR Code ao lado das configurações.",
-    "Elimina jogos duplicados entre celular, computador e Google Drive por identificação canônica por console, serial e multidisco."
+    "Corrige travamentos constantes no PPSSPP com apresentação direta em OpenGL ES via CAEAGLLayer, espera de quadro não bloqueante, auto frameskip habilitado e redução do overhead de logs.",
+    "Corrige os controles do PPSSPP exibindo D-Pad e analógico simultaneamente, adicionando trava curta para toques rápidos e evitando travamento da fila de eventos táteis."
   ]
 }

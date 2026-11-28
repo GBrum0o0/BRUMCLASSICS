@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 5f8082b59..b48720b14 100644
+index 5f8082b..b48720b 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -25,7 +25,7 @@ endif()
@@ -49,7 +49,7 @@ index 5f8082b59..b48720b14 100644
  	file(GLOB IOSAssets ios/assets/*.png)
  	list(REMOVE_ITEM IOSAssets ${CMAKE_CURRENT_SOURCE_DIR}/ios/assets/Default-568h@2x.png)
 diff --git a/Common/MemArenaDarwin.cpp b/Common/MemArenaDarwin.cpp
-index 593bb1495..a7a374d93 100644
+index 593bb14..a7a374d 100644
 --- a/Common/MemArenaDarwin.cpp
 +++ b/Common/MemArenaDarwin.cpp
 @@ -36,7 +36,8 @@
@@ -85,7 +85,7 @@ index 593bb1495..a7a374d93 100644
  }
  
 diff --git a/Common/MemoryUtil.cpp b/Common/MemoryUtil.cpp
-index 519bfc6bd..23ca1b9c2 100644
+index 519bfc6..23ca1b9 100644
 --- a/Common/MemoryUtil.cpp
 +++ b/Common/MemoryUtil.cpp
 @@ -118,6 +118,11 @@ static void *SearchForFreeMem(size_t size) {
@@ -114,7 +114,7 @@ index 519bfc6bd..23ca1b9c2 100644
  			(memProtFlags & MEM_PROT_READ) != 0, (memProtFlags & MEM_PROT_WRITE) != 0, (memProtFlags & MEM_PROT_EXEC) != 0);
  
 diff --git a/Core/MemMap.cpp b/Core/MemMap.cpp
-index 9c7a2cce1..00a96403e 100644
+index 9c7a2cc..00a9640 100644
 --- a/Core/MemMap.cpp
 +++ b/Core/MemMap.cpp
 @@ -117,7 +117,7 @@ static MemoryView views[] =
@@ -213,7 +213,7 @@ index 9c7a2cce1..00a96403e 100644
  	INFO_LOG(MEMMAP, "Memory system initialized. Base at %p (RAM at @ %p, uncached @ %p)",
  		base, m_pPhysicalRAM, m_pUncachedRAM);
 diff --git a/Core/MemMap.h b/Core/MemMap.h
-index 28c635c18..4eb9b6706 100644
+index 28c635c..4eb9b67 100644
 --- a/Core/MemMap.h
 +++ b/Core/MemMap.h
 @@ -84,7 +84,7 @@ extern u32 g_PSPModel;
@@ -226,6 +226,7 @@ index 28c635c18..4eb9b6706 100644
  #endif
  
 diff --git a/Core/PSPLoaders.cpp b/Core/PSPLoaders.cpp
+index d72c648..2567099 100644
 --- a/Core/PSPLoaders.cpp
 +++ b/Core/PSPLoaders.cpp
 @@ -291,6 +291,24 @@ bool Load_PSP_ISO(FileLoader *fileLoader, std::string *error_string) {
@@ -253,7 +254,8 @@ diff --git a/Core/PSPLoaders.cpp b/Core/PSPLoaders.cpp
  	loadingThread = std::thread([bootpath] {
  		setCurrentThreadName("ExecLoader");
  		PSP_LoadingLock guard;
-@@ -424,5 +442,22 @@ bool Load_PSP_ELF_PBP(FileLoader *fileLoader, std::string *error_string) {
+@@ -423,6 +441,23 @@ bool Load_PSP_ELF_PBP(FileLoader *fileLoader, std::string *error_string) {
+ 
  	PSPLoaders_Shutdown();
  	// Note: See Load_PSP_ISO for notes about this thread.
 +#if defined(IOS)
@@ -277,7 +279,7 @@ diff --git a/Core/PSPLoaders.cpp b/Core/PSPLoaders.cpp
  		setCurrentThreadName("ExecLoader");
  		PSP_LoadingLock guard;
 diff --git a/Core/System.cpp b/Core/System.cpp
-index eff04fbea..b09cb92cf 100644
+index eff04fb..b09cb92 100644
 --- a/Core/System.cpp
 +++ b/Core/System.cpp
 @@ -237,6 +237,11 @@ void CPU_Init() {
@@ -293,7 +295,7 @@ index eff04fbea..b09cb92cf 100644
  
  	host->AttemptLoadSymbolMap();
 diff --git a/GPU/Common/DrawEngineCommon.cpp b/GPU/Common/DrawEngineCommon.cpp
-index 8b6638ed7..176790cab 100644
+index 8b6638e..176790c 100644
 --- a/GPU/Common/DrawEngineCommon.cpp
 +++ b/GPU/Common/DrawEngineCommon.cpp
 @@ -34,7 +34,11 @@ enum {
@@ -320,10 +322,10 @@ index 8b6638ed7..176790cab 100644
  	dec_ = nullptr;
  	decoderMap_.Iterate([&](const uint32_t vtype, VertexDecoder *decoder) {
 diff --git a/GPU/Common/DrawEngineCommon.h b/GPU/Common/DrawEngineCommon.h
-index ac735f90c..0bd67cd0a 100644
+index ac735f9..0bd67cd 100644
 --- a/GPU/Common/DrawEngineCommon.h
 +++ b/GPU/Common/DrawEngineCommon.h
-@@ -92,7 +92,7 @@ class DrawEngineCommon {
+@@ -92,7 +92,7 @@ public:
  	virtual void Resized();
  
  	bool IsCodePtrVertexDecoder(const u8 *ptr) const {
@@ -333,10 +335,10 @@ index ac735f90c..0bd67cd0a 100644
  	int GetNumDrawCalls() const {
  		return numDrawCalls;
 diff --git a/GPU/GLES/DrawEngineGLES.cpp b/GPU/GLES/DrawEngineGLES.cpp
-index 2f272def8..536665286 100644
+index 2f272de..5366652 100644
 --- a/GPU/GLES/DrawEngineGLES.cpp
 +++ b/GPU/GLES/DrawEngineGLES.cpp
-@@ -651,7 +651,7 @@ void DrawEngineGLES::DoFlush() {
+@@ -651,7 +651,7 @@ rotateVBO:
  }
  
  bool DrawEngineGLES::IsCodePtrVertexDecoder(const u8 *ptr) const {
@@ -346,7 +348,7 @@ index 2f272def8..536665286 100644
  
  void TessellationDataTransferGLES::SendDataToShader(const SimpleVertex *const *points, int size_u, int size_v, u32 vertType, const Spline::Weight2D &weights) {
 diff --git a/ext/native/thin3d/GLQueueRunner.cpp b/ext/native/thin3d/GLQueueRunner.cpp
-index 2ea228fcd..5484cc6e4 100644
+index 2ea228f..a6ef93e 100644
 --- a/ext/native/thin3d/GLQueueRunner.cpp
 +++ b/ext/native/thin3d/GLQueueRunner.cpp
 @@ -15,7 +15,7 @@
@@ -439,8 +441,69 @@ index 2ea228fcd..5484cc6e4 100644
  	CHECK_GL_ERROR_IF_DEBUG();
  }
  
+diff --git a/ext/native/thin3d/GLRenderManager.cpp b/ext/native/thin3d/GLRenderManager.cpp
+index 670021c..58165fc 100644
+--- a/ext/native/thin3d/GLRenderManager.cpp
++++ b/ext/native/thin3d/GLRenderManager.cpp
+@@ -1,4 +1,5 @@
+ #include <cassert>
++#include <chrono>
+ 
+ #include "GLRenderManager.h"
+ #include "gfx_es2/gpu_features.h"
+@@ -164,23 +165,37 @@ void GLRenderManager::ThreadEnd() {
+ }
+ 
+ bool GLRenderManager::ThreadFrame() {
++	return ThreadFrameTimed(-1);
++}
++
++bool GLRenderManager::ThreadFrameTimed(int timeoutMs) {
+ 	std::unique_lock<std::mutex> lock(mutex_);
+ 	if (!run_)
+ 		return false;
+ 
++	const bool useTimeout = timeoutMs >= 0;
++	const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(useTimeout ? timeoutMs : 0);
++
+ 	// In case of syncs or other partial completion, we keep going until we complete a frame.
+ 	do {
+ 		if (nextFrame) {
+ 			threadFrame_++;
+ 			if (threadFrame_ >= inflightFrames_)
+ 				threadFrame_ = 0;
++			nextFrame = false;
+ 		}
+ 		FrameData &frameData = frameData_[threadFrame_];
+ 		{
+ 			std::unique_lock<std::mutex> lock(frameData.pull_mutex);
+ 			while (!frameData.readyForRun && run_) {
+ 				VLOG("PULL: Waiting for frame[%d].readyForRun", threadFrame_);
+-				frameData.pull_condVar.wait(lock);
++				if (useTimeout) {
++					if (frameData.pull_condVar.wait_until(lock, deadline) == std::cv_status::timeout && !frameData.readyForRun) {
++						return false;
++					}
++				} else {
++					frameData.pull_condVar.wait(lock);
++				}
+ 			}
+ 			if (!frameData.readyForRun && !run_) {
+ 				// This means we're out of frames to render and run_ is false, so bail.
+diff --git a/ext/native/thin3d/GLRenderManager.h b/ext/native/thin3d/GLRenderManager.h
+index 377344b..b3ac040 100644
+--- a/ext/native/thin3d/GLRenderManager.h
++++ b/ext/native/thin3d/GLRenderManager.h
+@@ -376,6 +376,7 @@ public:
+ 	void ThreadStart(Draw::DrawContext *draw);
+ 	void ThreadEnd();
+ 	bool ThreadFrame();  // Returns false to request exiting the loop.
++	bool ThreadFrameTimed(int timeoutMs);
+ 
+ 	// Makes sure that the GPU has caught up enough that we can start writing buffers of this frame again.
+ 	void BeginFrame();
 diff --git a/libretro/CMakeLists.txt b/libretro/CMakeLists.txt
-index b590cc25d..e1b15f187 100644
+index b590cc2..e1b15f1 100644
 --- a/libretro/CMakeLists.txt
 +++ b/libretro/CMakeLists.txt
 @@ -20,7 +20,7 @@ if(ANDROID)
@@ -453,7 +516,7 @@ index b590cc25d..e1b15f187 100644
  endif()
  target_link_libraries(ppsspp_libretro ${LinkCommon})
 diff --git a/libretro/LibretroGLContext.cpp b/libretro/LibretroGLContext.cpp
-index c8260650c..b7ba43298 100644
+index c826065..b7ba432 100644
 --- a/libretro/LibretroGLContext.cpp
 +++ b/libretro/LibretroGLContext.cpp
 @@ -28,6 +28,7 @@ void LibretroGLContext::CreateDrawContext() {
@@ -465,10 +528,10 @@ index c8260650c..b7ba43298 100644
  
  void LibretroGLContext::DestroyDrawContext() {
 diff --git a/libretro/LibretroGLContext.h b/libretro/LibretroGLContext.h
-index b85c8affb..6757cf532 100644
+index b85c8af..b3dc6f0 100644
 --- a/libretro/LibretroGLContext.h
 +++ b/libretro/LibretroGLContext.h
-@@ -27,7 +27,10 @@ class LibretroGLContext : public LibretroHWRenderContext {
+@@ -27,7 +27,14 @@ public:
  	}
  
  	void ThreadStart() override { renderManager_->ThreadStart(draw_); }
@@ -477,11 +540,15 @@ index b85c8affb..6757cf532 100644
 +		SetRenderTarget();
 +		return renderManager_->ThreadFrame();
 +	}
++	bool ThreadFrameTimed(int timeoutMs) override {
++		SetRenderTarget();
++		return renderManager_->ThreadFrameTimed(timeoutMs);
++	}
  	void ThreadEnd() override { renderManager_->ThreadEnd(); }
  	void StopThread() override {
  		renderManager_->WaitUntilQueueIdle();
 diff --git a/libretro/LibretroGraphicsContext.cpp b/libretro/LibretroGraphicsContext.cpp
-index 508353f6b..076012228 100644
+index 508353f..0760122 100644
 --- a/libretro/LibretroGraphicsContext.cpp
 +++ b/libretro/LibretroGraphicsContext.cpp
 @@ -7,6 +7,7 @@
@@ -529,8 +596,20 @@ index 508353f6b..076012228 100644
  
  void LibretroGraphicsContext::LostBackbuffer() { draw_->HandleEvent(Draw::Event::LOST_BACKBUFFER, -1, -1); }
  
+diff --git a/libretro/LibretroGraphicsContext.h b/libretro/LibretroGraphicsContext.h
+index 682adc0..5546ccc 100644
+--- a/libretro/LibretroGraphicsContext.h
++++ b/libretro/LibretroGraphicsContext.h
+@@ -15,6 +15,7 @@ public:
+ 
+ 	virtual bool Init() = 0;
+ 	virtual void SetRenderTarget() {}
++	virtual bool ThreadFrameTimed(int timeoutMs) { (void)timeoutMs; return ThreadFrame(); }
+ 	virtual GPUCore GetGPUCore() = 0;
+ 	virtual const char *Ident() = 0;
+ 
 diff --git a/libretro/libretro.cpp b/libretro/libretro.cpp
-index 45185748c..4d9b687c1 100644
+index 4518574..2cf4569 100644
 --- a/libretro/libretro.cpp
 +++ b/libretro/libretro.cpp
 @@ -4,7 +4,11 @@
@@ -576,8 +655,7 @@ index 45185748c..4d9b687c1 100644
  	}
  
  	if (ppsspp_texture_scaling_type.Update(&g_Config.iTexScalingType) && gpu) {
-@@ -301,5 +313,11 @@ static void check_variables(CoreParameter &coreParam) {
- 
+@@ -302,6 +314,12 @@ static void check_variables(CoreParameter &coreParam) {
  	if (ppsspp_texture_scaling_level.Update(&g_Config.iTexScalingLevel) && gpu) {
  		gpu->ClearCacheNextFrame();
  	}
@@ -588,7 +666,20 @@ index 45185748c..4d9b687c1 100644
 +	g_Config.bFastMemory = false;
 +#endif
  }
-@@ -385,7 +403,17 @@ namespace Libretro {
+ 
+ void retro_set_audio_sample_batch(retro_audio_sample_batch_t cb) { audio_batch_cb = cb; }
+@@ -338,7 +356,9 @@ void retro_init(void) {
+ 		logman->RemoveListener(logman->GetDebuggerListener());
+ 		logman->ChangeFileLog(nullptr);
+ 		logman->AddListener(printfLogger);
+-#if 1
++#if defined(IOS)
++		logman->SetAllLogLevels(LogTypes::LWARNING);
++#elif 1
+ 		logman->SetAllLogLevels(LogTypes::LINFO);
+ #endif
+ 	}
+@@ -385,7 +405,17 @@ namespace Libretro {
  bool useEmuThread = false;
  std::atomic<EmuThreadState> emuThreadState(EmuThreadState::DISABLED);
  
@@ -606,7 +697,7 @@ index 45185748c..4d9b687c1 100644
  static void EmuFrame() {
  	ctx->SetRenderTarget();
  	if (ctx->GetDrawContext()) {
-@@ -431,17 +453,28 @@ static void EmuThreadFunc() {
+@@ -431,17 +461,28 @@ static void EmuThreadFunc() {
  }
  
  void EmuThreadStart() {
@@ -636,7 +727,7 @@ index 45185748c..4d9b687c1 100644
  		return;
  	}
  
-@@ -452,8 +485,15 @@ void EmuThreadStop() {
+@@ -452,8 +493,15 @@ void EmuThreadStop() {
  		continue;
  	}
  
@@ -652,11 +743,12 @@ index 45185748c..4d9b687c1 100644
  	ctx->ThreadEnd();
  }
  
-@@ -570,6 +610,14 @@ bool retro_load_game(const struct retro_game_info *game) {
+@@ -570,6 +618,15 @@ bool retro_load_game(const struct retro_game_info *game) {
  	coreParam.cpuCore = CPUCore::JIT;
  	check_variables(coreParam);
  
 +#if defined(IOS)
++	coreParam.printfEmuLog = false;
 +	// BRUM iOS: sideloaded IPA builds run without executable JIT memory; IR_JIT runs via pure IRInterpret.
 +	coreParam.cpuCore = CPUCore::IR_JIT;
 +	g_Config.iCpuCore = (int)CPUCore::IR_JIT;
@@ -667,7 +759,7 @@ index 45185748c..4d9b687c1 100644
  #if 0
  	g_Config.bVertexDecoderJit = (coreParam.cpuCore == CPU_JIT) ? true : false;
  #endif
-@@ -686,7 +734,7 @@ void retro_run(void) {
+@@ -686,13 +743,19 @@ void retro_run(void) {
  			return;
  		}
  
@@ -676,7 +768,19 @@ index 45185748c..4d9b687c1 100644
  			EmuThreadStart();
  		}
  
-@@ -716,6 +764,9 @@ struct SaveStart {
++#if defined(IOS)
++		if (!ctx->ThreadFrameTimed(12)) {
++			return;
++		}
++#else
+ 		if (!ctx->ThreadFrame()) {
+ 			return;
+ 		}
++#endif
+ 	} else {
+ 		EmuFrame();
+ 	}
+@@ -716,6 +779,9 @@ struct SaveStart {
  } // namespace SaveState
  
  size_t retro_serialize_size(void) {
@@ -686,7 +790,7 @@ index 45185748c..4d9b687c1 100644
  	// TODO: Libretro API extension to use the savestate queue
  	if (useEmuThread) {
  		EmuThreadPause();
-@@ -726,6 +777,9 @@ size_t retro_serialize_size(void) {
+@@ -726,6 +792,9 @@ size_t retro_serialize_size(void) {
  }
  
  bool retro_serialize(void *data, size_t size) {
@@ -696,7 +800,7 @@ index 45185748c..4d9b687c1 100644
  	// TODO: Libretro API extension to use the savestate queue
  	if (useEmuThread) {
  		EmuThreadPause(); // Does nothing if already paused
-@@ -744,6 +798,9 @@ bool retro_serialize(void *data, size_t size) {
+@@ -744,6 +813,9 @@ bool retro_serialize(void *data, size_t size) {
  }
  
  bool retro_unserialize(const void *data, size_t size) {

@@ -6,6 +6,8 @@
 static brum_retro_environment_t environment;
 static brum_retro_video_refresh_t video;
 static brum_retro_audio_sample_batch_t audio;
+static brum_retro_input_poll_t input_poll;
+static brum_retro_input_state_t input_state;
 static unsigned char mode;
 static unsigned frames_run = 0;
 
@@ -14,8 +16,8 @@ void retro_set_environment(brum_retro_environment_t callback) { environment = ca
 void retro_set_video_refresh(brum_retro_video_refresh_t callback) { video = callback; }
 void retro_set_audio_sample_batch(brum_retro_audio_sample_batch_t callback) { audio = callback; }
 void retro_set_audio_sample(brum_retro_audio_sample_t callback) { (void)callback; }
-void retro_set_input_poll(brum_retro_input_poll_t callback) { (void)callback; }
-void retro_set_input_state(brum_retro_input_state_t callback) { (void)callback; }
+void retro_set_input_poll(brum_retro_input_poll_t callback) { input_poll = callback; }
+void retro_set_input_state(brum_retro_input_state_t callback) { input_state = callback; }
 void retro_init(void) {
     unsigned pixelFormat = BRUM_RETRO_PIXEL_FORMAT_XRGB8888;
     environment(BRUM_RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &pixelFormat);
@@ -37,6 +39,12 @@ bool retro_load_game(const brum_retro_game_info *game) {
         brum_retro_variable option = {"ppsspp_cpu_core", NULL};
         if (!environment(BRUM_RETRO_ENVIRONMENT_GET_VARIABLE, &option) ||
             !option.value || strcmp(option.value, "IR jit") != 0) return false;
+        brum_retro_variable autoSkip = {"ppsspp_auto_frameskip", NULL};
+        if (!environment(BRUM_RETRO_ENVIRONMENT_GET_VARIABLE, &autoSkip) ||
+            !autoSkip.value || strcmp(autoSkip.value, "enabled") != 0) return false;
+        brum_retro_variable frameSkip = {"ppsspp_frameskip", NULL};
+        if (!environment(BRUM_RETRO_ENVIRONMENT_GET_VARIABLE, &frameSkip) ||
+            !frameSkip.value || strcmp(frameSkip.value, "1") != 0) return false;
         brum_retro_variable citraJit = {"citra_use_cpu_jit", NULL};
         if (!environment(BRUM_RETRO_ENVIRONMENT_GET_VARIABLE, &citraJit) ||
             !citraJit.value || strcmp(citraJit.value, "disabled") != 0) return false;
@@ -58,6 +66,16 @@ void retro_run(void) {
         environment(BRUM_RETRO_ENVIRONMENT_SET_MESSAGE_EXT, &message);
         environment(BRUM_RETRO_ENVIRONMENT_SHUTDOWN, NULL);
         return;
+    }
+    if (mode == 'K') {
+        if (input_poll) input_poll();
+        int16_t cross = input_state ? input_state(0, BRUM_RETRO_DEVICE_JOYPAD, 0, BRUM_RETRO_DEVICE_ID_JOYPAD_B) : 0;
+        if (frames_run < 3) {
+            if (!cross) return;
+            frames_run++;
+            return;
+        }
+        if (cross) return;
     }
     const uint32_t pixels[4] = {0x123456, 0x654321, 0xabcdef, 0xfedcba};
     const int16_t samples[8] = {100, -100, 200, -200, 300, -300, 400, -400};

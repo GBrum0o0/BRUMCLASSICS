@@ -64,7 +64,7 @@ final class BrumCoreStartupTests: XCTestCase {
     }
 
     @MainActor
-    private func withProbe(mode: UInt8, filenameExtension: String = "brumtest", body: (BrumLibretroViewController, () -> Int, () -> Int) throws -> Void) throws {
+    private func withProbe(mode: UInt8, filenameExtension: String = "brumtest", systemID: String = "gba", body: (BrumLibretroViewController, () -> Int, () -> Int) throws -> Void) throws {
         let rom = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension(filenameExtension)
         try Data([mode]).write(to: rom)
         defer { try? FileManager.default.removeItem(at: rom) }
@@ -77,7 +77,7 @@ final class BrumCoreStartupTests: XCTestCase {
         var ready = 0
         var exited = 0
         let controller = BrumLibretroViewController(romurl: rom, title: "probe", canonicalGameID: "probe",
-            systemID: "gba", contentSHA256: String(repeating: "a", count: 64), coreID: "startup-probe", coreVersion: "1",
+            systemID: systemID, contentSHA256: String(repeating: "a", count: 64), coreID: "startup-probe", coreVersion: "1",
             coreDisplayName: "Startup probe", coreLibraryName: relativeLibrary, retroAchievementsGameID: 0,
             saveIdentifier: "probe", legacySaveBasename: "probe", onReady: { ready += 1 }, onExit: { exited += 1 })
         controller.loadViewIfNeeded()
@@ -188,5 +188,41 @@ final class BrumCoreStartupTests: XCTestCase {
         try Data([0x43, 0x49, 0x53, 0x4F, 0x09, 0x0A, 0x0B]).write(to: csoURL)
         let modified = try ROMContentInspector.inspect(url: csoURL, filename: "demo.cso")
         XCTAssertNotEqual(first.contentSHA256, modified.contentSHA256)
+    }
+
+    @MainActor func testPSPVirtualControlsExposeBothDPadAndStickAndLatchQuickTaps() throws {
+        try withProbe(mode: 75, systemID: "psp") { controller, ready, _ in
+            let allControls = controller.view.subviews.compactMap { $0 as? UIControl }
+            let dpad = allControls.first { $0.accessibilityLabel == "Direcional virtual" }
+            let stick = allControls.first { $0.accessibilityLabel == "Controle analógico" }
+            let modeButton = controller.view.subviews.compactMap { $0 as? UIButton }
+                .first { $0.accessibilityLabel == "Alternar analógico e direcional digital" }
+            XCTAssertNotNil(dpad)
+            XCTAssertNotNil(stick)
+            XCTAssertFalse(try XCTUnwrap(dpad).isHidden)
+            XCTAssertFalse(try XCTUnwrap(stick).isHidden)
+            XCTAssertNil(modeButton)
+
+            func findButton(titled title: String, in root: UIView) -> UIButton? {
+                for subview in root.subviews {
+                    if let button = subview as? UIButton, button.title(for: .normal) == title {
+                        return button
+                    }
+                    if let nested = findButton(titled: title, in: subview) {
+                        return nested
+                    }
+                }
+                return nil
+            }
+
+            let cross = try XCTUnwrap(findButton(titled: "×", in: controller.view))
+            cross.sendActions(for: .touchDown)
+            cross.sendActions(for: .touchUpInside)
+            controller.runFrame()
+            controller.runFrame()
+            controller.runFrame()
+            controller.runFrame()
+            XCTAssertEqual(ready(), 1, controller.diagnosticsReport)
+        }
     }
 }

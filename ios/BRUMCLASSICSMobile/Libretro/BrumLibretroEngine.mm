@@ -391,6 +391,12 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
     GLuint _hardwareColorTexture;
     GLuint _hardwareDepthStencil;
     GLsizei _hardwareSurfaceSize;
+    CAEAGLLayer *_hardwareDisplayLayer;
+    GLuint _hardwareDisplayFramebuffer;
+    GLuint _hardwareDisplayRenderbuffer;
+    GLint _hardwareDisplayWidth;
+    GLint _hardwareDisplayHeight;
+    BOOL _hardwareDisplayReady;
     BOOL _hardwarePending;
     BOOL _hardwareInitialized;
     uint64_t _videoCallbackCount;
@@ -418,6 +424,8 @@ static __weak BrumLibretroViewController *BrumCurrentHost;
 - (BOOL)startAudio:(double)sampleRate error:(NSError **)error;
 - (void)applyPendingAVInfo;
 - (void)configureDisplayCadence:(double)framesPerSecond;
+- (BOOL)ensureHardwareDisplayDrawable;
+- (BOOL)presentHardwareFrameDirectWidth:(unsigned)width height:(unsigned)height;
 - (void)presentFrame:(CGImageRef)image;
 - (void)layoutScreens;
 - (brum::Rect)availableGameRect;
@@ -486,7 +494,7 @@ static uint32_t BrumRAConsoleIDForSystem(NSString *systemID) {
 }
 
 static void BrumCoreLog(int level, const char *format, ...) {
-    if (!format) return;
+    if (!format || level < 2) return;
     char message[2048];
     va_list arguments; va_start(arguments, format);
     vsnprintf(message, sizeof(message), format, arguments);
@@ -697,14 +705,6 @@ static void BrumVideo(const void *data, unsigned width, unsigned height, size_t 
     }
     const CFTimeInterval started = host->_performanceHUDEnabled ? CACurrentMediaTime() : 0;
     if (width > 4096 || height > 4096) return;
-    const size_t bytesPerPixel = host->_pixelFormat == BRUM_RETRO_PIXEL_FORMAT_XRGB8888 ? 4 : 2;
-    if (data != BrumHardwareFrameBuffer && (pitch < (size_t)width * bytesPerPixel || pitch > SIZE_MAX / height)) return;
-    host->_frameWidth = width;
-    host->_frameHeight = height;
-    const NSUInteger byteCount = (NSUInteger)width * height * 4;
-    uint32_t *target = (uint32_t *)malloc(byteCount);
-    if (!target) return;
-    NSData *pixels = [NSData dataWithBytesNoCopy:target length:byteCount freeWhenDone:YES];
     if (data == BrumHardwareFrameBuffer) {
         if (!host->_hardwareInitialized) return;
         if (width > (unsigned)host->_hardwareSurfaceSize || height > (unsigned)host->_hardwareSurfaceSize) {
@@ -713,6 +713,23 @@ static void BrumVideo(const void *data, unsigned width, unsigned height, size_t 
             }
             return;
         }
+        host->_frameWidth = width;
+        host->_frameHeight = height;
+        if ([host presentHardwareFrameDirectWidth:width height:height]) {
+            if (host->_performanceHUDEnabled) host->_hostVideoSeconds += CACurrentMediaTime() - started;
+            return;
+        }
+    } else {
+        const size_t bytesPerPixel = host->_pixelFormat == BRUM_RETRO_PIXEL_FORMAT_XRGB8888 ? 4 : 2;
+        if (pitch < (size_t)width * bytesPerPixel || pitch > SIZE_MAX / height) return;
+        host->_frameWidth = width;
+        host->_frameHeight = height;
+    }
+    const NSUInteger byteCount = (NSUInteger)width * height * 4;
+    uint32_t *target = (uint32_t *)malloc(byteCount);
+    if (!target) return;
+    NSData *pixels = [NSData dataWithBytesNoCopy:target length:byteCount freeWhenDone:YES];
+    if (data == BrumHardwareFrameBuffer) {
         while (glGetError() != GL_NO_ERROR) {}
         GLint prevFramebuffer = 0;
         GLint prevReadFramebuffer = 0, prevDrawFramebuffer = 0, prevReadBuffer = GL_COLOR_ATTACHMENT0;
@@ -1043,12 +1060,17 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _variables[@"ppsspp_cpu_core"] = @"IR jit";
     _variables[@"ppsspp_internal_resolution"] = @"480x272";
     _variables[@"ppsspp_rendering_mode"] = @"buffered";
-    _variables[@"ppsspp_auto_frameskip"] = @"disabled";
-    _variables[@"ppsspp_frameskip"] = @"0";
+    _variables[@"ppsspp_auto_frameskip"] = @"enabled";
+    _variables[@"ppsspp_frameskip"] = @"1";
     _variables[@"ppsspp_fast_memory"] = @"disabled";
     _variables[@"ppsspp_audio_latency"] = @"medium";
     _variables[@"ppsspp_gpu_hardware_transform"] = @"enabled";
     _variables[@"ppsspp_block_transfer_gpu"] = @"enabled";
+    _variables[@"ppsspp_vertex_cache"] = @"enabled";
+    _variables[@"ppsspp_unsafe_func_replacements"] = @"enabled";
+    _variables[@"ppsspp_io_timing_method"] = @"Fast";
+    _variables[@"ppsspp_texture_anisotropic_filtering"] = @"off";
+    _variables[@"ppsspp_texture_scaling_level"] = @"1";
     _variables[@"system_core_override"] = @"Automatic";
     _variables[@"system_gb_bios_enable"] = @"ON";
     _variables[@"system_gba_bios_enable"] = @"ON";
@@ -1282,6 +1304,23 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     _hardwareInitialized = YES;
+    if (api >= kEAGLRenderingAPIOpenGLES3 && _screen.layer) {
+        _hardwareDisplayLayer = [CAEAGLLayer layer];
+        _hardwareDisplayLayer.opaque = YES;
+        _hardwareDisplayLayer.contentsScale = MIN(UIScreen.mainScreen.scale, 2.0);
+        _hardwareDisplayLayer.drawableProperties = @{
+            kEAGLDrawablePropertyRetainedBacking: @NO,
+            kEAGLDrawablePropertyColorFormat: kEAGLColorFormatRGBA8
+        };
+        _hardwareDisplayLayer.hidden = YES;
+        if (_singleScreenLayer) {
+            [_screen.layer insertSublayer:_hardwareDisplayLayer above:_singleScreenLayer];
+        } else {
+            [_screen.layer addSublayer:_hardwareDisplayLayer];
+        }
+        glGenFramebuffers(1, &_hardwareDisplayFramebuffer);
+        glGenRenderbuffers(1, &_hardwareDisplayRenderbuffer);
+    }
     const char *glVendor = (const char *)glGetString(GL_VENDOR);
     const char *glRenderer = (const char *)glGetString(GL_RENDERER);
     const char *glVersion = (const char *)glGetString(GL_VERSION);
@@ -1297,6 +1336,21 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 - (void)destroyHardware {
     if (_hardwareContext) [EAGLContext setCurrentContext:_hardwareContext];
     if (_hardwareInitialized && _hardwareCallback.context_destroy) _hardwareCallback.context_destroy();
+    if (_hardwareDisplayRenderbuffer) {
+        glBindRenderbuffer(GL_RENDERBUFFER, _hardwareDisplayRenderbuffer);
+        if (_hardwareContext) [_hardwareContext renderbufferStorage:GL_RENDERBUFFER fromDrawable:nil];
+        glDeleteRenderbuffers(1, &_hardwareDisplayRenderbuffer);
+    }
+    if (_hardwareDisplayFramebuffer) glDeleteFramebuffers(1, &_hardwareDisplayFramebuffer);
+    if (_hardwareDisplayLayer) {
+        [_hardwareDisplayLayer removeFromSuperlayer];
+        _hardwareDisplayLayer = nil;
+    }
+    _hardwareDisplayFramebuffer = 0;
+    _hardwareDisplayRenderbuffer = 0;
+    _hardwareDisplayWidth = 0;
+    _hardwareDisplayHeight = 0;
+    _hardwareDisplayReady = NO;
     if (_hardwareDepthStencil) glDeleteRenderbuffers(1, &_hardwareDepthStencil);
     if (_hardwareColorTexture) glDeleteTextures(1, &_hardwareColorTexture);
     if (_hardwareFramebuffer) glDeleteFramebuffers(1, &_hardwareFramebuffer);
@@ -1521,7 +1575,8 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         [self persistSaveRAM];
         return;
     }
-    _virtualStick.enabled = !_dpadMode;
+    const BOOL isPSP = [_emulatedSystemID isEqualToString:@"psp"];
+    _virtualStick.enabled = (isPSP || !_dpadMode) && !_controlsHidden;
     _rightVirtualStick.enabled = YES;
     if (!_audioQueue) return;
     NSError *error = nil;
@@ -1632,6 +1687,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _touchReticle.backgroundColor = [UIColor colorWithRed:0.62 green:1 blue:0.23 alpha:0.18];
     _touchReticle.userInteractionEnabled = NO;
     _touchReticle.hidden = YES;
+    _touchReticle.layer.zPosition = 3;
     [_screen addSubview:_touchReticle];
 
     _exitFallbackButton = [self controlButton:@"←  SAIR" identifier:-1];
@@ -1692,6 +1748,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     const BOOL is3DS = [_emulatedSystemID isEqualToString:@"3ds"];
     const BOOL isSega = [@[@"md", @"segacd", @"32x"] containsObject:_emulatedSystemID];
     const BOOL isSaturn = [_emulatedSystemID isEqualToString:@"saturn"];
+    const BOOL isPSP = [_emulatedSystemID isEqualToString:@"psp"];
     const BOOL hasAnalogPad = profile && profile->leftStick;
     UIView *up = hasAnalogPad ? [self analogPad] : [self directionPad];
     UIView *actions = profile ? [self profileActionPad:profile->face] : [UIView new];
@@ -1777,20 +1834,24 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     }
     if (hasAnalogPad) {
         _digitalPad = [self directionPad];
-        _digitalPad.hidden = YES;
+        _digitalPad.hidden = !isPSP;
         [self.view addSubview:_digitalPad];
-        _padModeButton = [UIButton buttonWithType:UIButtonTypeSystem];
-        _padModeButton.translatesAutoresizingMaskIntoConstraints = NO;
-        [_padModeButton setTitle:@"D-PAD" forState:UIControlStateNormal];
-        [_padModeButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
-        _padModeButton.titleLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightBold];
-        _padModeButton.backgroundColor = [UIColor colorWithWhite:0.1 alpha:0.82];
-        _padModeButton.layer.cornerRadius = 12;
-        _padModeButton.accessibilityLabel = @"Alternar analógico e direcional digital";
-        _padModeButton.accessibilityValue = @"Analógico ativo";
-        [_padModeButton addTarget:self action:@selector(toggleAnalogPadMode) forControlEvents:UIControlEventTouchUpInside];
-        [self.view addSubview:_padModeButton];
-        [_padOverlayViews addObject:_padModeButton];
+        if (isPSP) {
+            [_padOverlayViews addObject:_digitalPad];
+        } else {
+            _padModeButton = [UIButton buttonWithType:UIButtonTypeSystem];
+            _padModeButton.translatesAutoresizingMaskIntoConstraints = NO;
+            [_padModeButton setTitle:@"D-PAD" forState:UIControlStateNormal];
+            [_padModeButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+            _padModeButton.titleLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightBold];
+            _padModeButton.backgroundColor = [UIColor colorWithWhite:0.1 alpha:0.82];
+            _padModeButton.layer.cornerRadius = 12;
+            _padModeButton.accessibilityLabel = @"Alternar analógico e direcional digital";
+            _padModeButton.accessibilityValue = @"Analógico ativo";
+            [_padModeButton addTarget:self action:@selector(toggleAnalogPadMode) forControlEvents:UIControlEventTouchUpInside];
+            [self.view addSubview:_padModeButton];
+            [_padOverlayViews addObject:_padModeButton];
+        }
     }
 
     UILayoutGuide *safe = self.view.safeAreaLayoutGuide;
@@ -1810,34 +1871,42 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         [_statusLabel.trailingAnchor constraintLessThanOrEqualToAnchor:safe.trailingAnchor constant:-24],
         [_screen.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor], [_screen.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
         [_screen.topAnchor constraintEqualToAnchor:self.view.topAnchor], [_screen.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
-        [up.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:26], [up.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-24],
+        [up.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:isPSP ? 24 : 26], [up.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:isPSP ? -14 : -24],
         [actions.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-30], [actions.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-36],
         [menu.centerXAnchor constraintEqualToAnchor:safe.centerXAnchor], [menu.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-16],
-        [leftShoulder.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:18], [leftShoulder.topAnchor constraintEqualToAnchor:safe.topAnchor constant:44],
-        [rightShoulder.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-18], [rightShoulder.topAnchor constraintEqualToAnchor:safe.topAnchor constant:44]
+        [leftShoulder.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:18], [leftShoulder.topAnchor constraintEqualToAnchor:safe.topAnchor constant:isPSP ? 16 : 44],
+        [rightShoulder.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-18], [rightShoulder.topAnchor constraintEqualToAnchor:safe.topAnchor constant:isPSP ? 16 : 44]
     ]];
     if (hasAnalogPad) {
-        [NSLayoutConstraint activateConstraints:@[
-            [_digitalPad.centerXAnchor constraintEqualToAnchor:up.centerXAnchor],
-            [_digitalPad.centerYAnchor constraintEqualToAnchor:up.centerYAnchor],
-            [_padModeButton.leadingAnchor constraintEqualToAnchor:up.leadingAnchor],
-            [_padModeButton.bottomAnchor constraintEqualToAnchor:up.topAnchor constant:-8],
-            [_padModeButton.widthAnchor constraintEqualToConstant:66],
-            [_padModeButton.heightAnchor constraintEqualToConstant:32]
-        ]];
+        if (isPSP) {
+            [NSLayoutConstraint activateConstraints:@[
+                [_digitalPad.centerXAnchor constraintEqualToAnchor:up.centerXAnchor],
+                [_digitalPad.bottomAnchor constraintEqualToAnchor:up.topAnchor constant:-8]
+            ]];
+        } else {
+            [NSLayoutConstraint activateConstraints:@[
+                [_digitalPad.centerXAnchor constraintEqualToAnchor:up.centerXAnchor],
+                [_digitalPad.centerYAnchor constraintEqualToAnchor:up.centerYAnchor],
+                [_padModeButton.leadingAnchor constraintEqualToAnchor:up.leadingAnchor],
+                [_padModeButton.bottomAnchor constraintEqualToAnchor:up.topAnchor constant:-8],
+                [_padModeButton.widthAnchor constraintEqualToConstant:66],
+                [_padModeButton.heightAnchor constraintEqualToConstant:32]
+            ]];
+        }
     }
     [self refreshVideoFilterPresentation];
     [self applyVirtualControlsStyle];
   }
 
 - (UIButton *)controlButton:(NSString *)text identifier:(NSInteger)identifier {
-    UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
     button.translatesAutoresizingMaskIntoConstraints = NO;
     button.multipleTouchEnabled = YES;
     button.exclusiveTouch = NO;
     button.tag = identifier;
     [button setTitle:text forState:UIControlStateNormal];
     [button setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+    [button setTitleColor:UIColor.blackColor forState:UIControlStateSelected];
     button.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightBlack];
     button.backgroundColor = [UIColor colorWithWhite:0.1 alpha:0.82];
     button.layer.cornerRadius = 18;
@@ -1857,20 +1926,32 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 - (BrumVirtualDPad *)directionPad {
     BrumVirtualDPad *pad = [[BrumVirtualDPad alloc] initWithFrame:CGRectZero];
     pad.translatesAutoresizingMaskIntoConstraints = NO;
+    pad.multipleTouchEnabled = YES;
     [pad addTarget:self action:@selector(dpadChanged:) forControlEvents:UIControlEventValueChanged];
     [pad addTarget:self action:@selector(dpadTouchDown:) forControlEvents:UIControlEventTouchDown];
     if (!_primaryDPad) _primaryDPad = pad;
     else _secondaryDPad = pad;
-    [pad.widthAnchor constraintEqualToConstant:166].active = YES; [pad.heightAnchor constraintEqualToConstant:132].active = YES;
+    const BOOL isPSP = [_emulatedSystemID isEqualToString:@"psp"];
+    [pad.widthAnchor constraintEqualToConstant:isPSP ? 132 : 166].active = YES;
+    [pad.heightAnchor constraintEqualToConstant:isPSP ? 116 : 132].active = YES;
     return pad;
 }
 
 - (void)dpadChanged:(BrumVirtualDPad *)pad {
     const uint8_t mask = _paused ? 0 : pad.mask;
-    _input.set(brum::InputSource::virtualPad, BRUM_RETRO_DEVICE_ID_JOYPAD_UP, (mask & brum::up) != 0);
-    _input.set(brum::InputSource::virtualPad, BRUM_RETRO_DEVICE_ID_JOYPAD_DOWN, (mask & brum::down) != 0);
-    _input.set(brum::InputSource::virtualPad, BRUM_RETRO_DEVICE_ID_JOYPAD_LEFT, (mask & brum::left) != 0);
-    _input.set(brum::InputSource::virtualPad, BRUM_RETRO_DEVICE_ID_JOYPAD_RIGHT, (mask & brum::right) != 0);
+    const uint8_t dirs[4] = {brum::up, brum::down, brum::left, brum::right};
+    const unsigned ids[4] = {
+        BRUM_RETRO_DEVICE_ID_JOYPAD_UP,
+        BRUM_RETRO_DEVICE_ID_JOYPAD_DOWN,
+        BRUM_RETRO_DEVICE_ID_JOYPAD_LEFT,
+        BRUM_RETRO_DEVICE_ID_JOYPAD_RIGHT
+    };
+    for (int i = 0; i < 4; ++i) {
+        const BOOL pressed = (mask & dirs[i]) != 0;
+        const BOOL wasPressed = _input.pressed(ids[i]);
+        _input.set(brum::InputSource::virtualPad, ids[i], pressed);
+        if (pressed && !wasPressed) _input.latchButton(ids[i], 3);
+    }
 }
 
 - (void)dpadTouchDown:(BrumVirtualDPad *)pad {
@@ -1880,8 +1961,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 - (BrumVirtualStick *)analogPad {
     _virtualStick = [[BrumVirtualStick alloc] initWithFrame:CGRectZero];
     _virtualStick.translatesAutoresizingMaskIntoConstraints = NO;
-    [_virtualStick.widthAnchor constraintEqualToConstant:146].active = YES;
-    [_virtualStick.heightAnchor constraintEqualToConstant:146].active = YES;
+    const CGFloat size = [_emulatedSystemID isEqualToString:@"psp"] ? 110 : 146;
+    [_virtualStick.widthAnchor constraintEqualToConstant:size].active = YES;
+    [_virtualStick.heightAnchor constraintEqualToConstant:size].active = YES;
     [_virtualStick addTarget:self action:@selector(virtualStickChanged:) forControlEvents:UIControlEventValueChanged];
     return _virtualStick;
 }
@@ -2001,8 +2083,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 }
 
 - (void)virtualStickChanged:(BrumVirtualStick *)stick {
-    [self setAnalogStick:0 axis:0 value:_dpadMode ? 0 : stick.horizontal source:BrumInputVirtualPad];
-    [self setAnalogStick:0 axis:1 value:_dpadMode ? 0 : stick.vertical source:BrumInputVirtualPad];
+    const BOOL ignoreStick = _dpadMode && ![_emulatedSystemID isEqualToString:@"psp"];
+    [self setAnalogStick:0 axis:0 value:ignoreStick ? 0 : stick.horizontal source:BrumInputVirtualPad];
+    [self setAnalogStick:0 axis:1 value:ignoreStick ? 0 : stick.vertical source:BrumInputVirtualPad];
 }
 
 - (void)rightVirtualStickChanged:(BrumVirtualStick *)stick {
@@ -2107,6 +2190,9 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
 - (void)setButton:(NSUInteger)button source:(BrumInputSource)source pressed:(BOOL)pressed {
     if (button >= 16 || source > BrumInputRemote || (_paused && pressed)) return;
     _input.set(static_cast<brum::InputSource>(source), (unsigned)button, pressed);
+    if (source == BrumInputVirtualPad && pressed) {
+        _input.latchButton((unsigned)button, 3);
+    }
 }
 
 - (void)releaseInputSource:(BrumInputSource)source {
@@ -2156,6 +2242,128 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     }
 }
 
+- (BOOL)ensureHardwareDisplayDrawable {
+    if (!_hardwareInitialized || !_hardwareContext || _hardwareContext.API < kEAGLRenderingAPIOpenGLES3 ||
+        !_hardwareDisplayLayer || !_hardwareDisplayFramebuffer || !_hardwareDisplayRenderbuffer) {
+        return NO;
+    }
+    const CGSize size = _hardwareDisplayLayer.bounds.size;
+    if (size.width < 1.0 || size.height < 1.0) return NO;
+    const CGFloat scale = _hardwareDisplayLayer.contentsScale >= 1.0 ? _hardwareDisplayLayer.contentsScale : 1.0;
+    const GLint expectedW = (GLint)llround(size.width * scale);
+    const GLint expectedH = (GLint)llround(size.height * scale);
+    if (_hardwareDisplayReady && _hardwareDisplayWidth == expectedW && _hardwareDisplayHeight == expectedH) {
+        return YES;
+    }
+    GLint prevReadFBO = 0, prevDrawFBO = 0, prevRenderbuffer = 0;
+    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevReadFBO);
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevDrawFBO);
+    glGetIntegerv(GL_RENDERBUFFER_BINDING, &prevRenderbuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, _hardwareDisplayFramebuffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, _hardwareDisplayRenderbuffer);
+    BOOL attached = [_hardwareContext renderbufferStorage:GL_RENDERBUFFER fromDrawable:_hardwareDisplayLayer];
+    GLint rbW = 0, rbH = 0;
+    if (attached) {
+        glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_WIDTH, &rbW);
+        glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_HEIGHT, &rbH);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, _hardwareDisplayRenderbuffer);
+    }
+    _hardwareDisplayWidth = rbW;
+    _hardwareDisplayHeight = rbH;
+    _hardwareDisplayReady = attached && rbW > 0 && rbH > 0 &&
+        glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+    glBindRenderbuffer(GL_RENDERBUFFER, (GLuint)prevRenderbuffer);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)prevReadFBO);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)prevDrawFBO);
+    return _hardwareDisplayReady;
+}
+
+- (BOOL)presentHardwareFrameDirectWidth:(unsigned)width height:(unsigned)height {
+    if (_screenProfileWidth != _frameWidth || _screenProfileHeight != _frameHeight) {
+        _screenProfileWidth = _frameWidth;
+        _screenProfileHeight = _frameHeight;
+        _screenManager.screens = brum::libretroScreens(_coreID.UTF8String, _frameWidth, _frameHeight);
+        [self updateDisplayModeButton];
+        [self layoutScreens];
+    }
+    NSString *activeFilter = self.videoFilterMode ?: @"none";
+    const BOOL usesCPUShader = [activeFilter isEqualToString:@"cas_sharpen"] ||
+        [activeFilter isEqualToString:@"edge_upscale_2x"] ||
+        [activeFilter isEqualToString:@"sharp_bilinear"];
+    const BOOL canDirectPresent = _hardwareInitialized && _hardwareContext &&
+        _hardwareContext.API >= kEAGLRenderingAPIOpenGLES3 &&
+        _hardwareDisplayLayer && _hardwareDisplayFramebuffer && _hardwareDisplayRenderbuffer &&
+        _screenManager.screens.size() == 1 && _singleViewport.valid() && !usesCPUShader;
+    if (!canDirectPresent) {
+        if (_hardwareDisplayLayer && !_hardwareDisplayLayer.hidden) {
+            [CATransaction begin];
+            [CATransaction setDisableActions:YES];
+            _hardwareDisplayLayer.hidden = YES;
+            _singleScreenLayer.hidden = (_screenManager.screens.size() != 1);
+            [CATransaction commit];
+        }
+        return NO;
+    }
+    if (_hardwareDisplayLayer.hidden || !_singleScreenLayer.hidden) {
+        [CATransaction begin];
+        [CATransaction setDisableActions:YES];
+        _singleScreenLayer.hidden = YES;
+        _hardwareDisplayLayer.hidden = NO;
+        [CATransaction commit];
+    }
+    if (![self ensureHardwareDisplayDrawable]) {
+        [CATransaction begin];
+        [CATransaction setDisableActions:YES];
+        _hardwareDisplayLayer.hidden = YES;
+        _singleScreenLayer.hidden = NO;
+        [CATransaction commit];
+        return NO;
+    }
+    while (glGetError() != GL_NO_ERROR) {}
+    GLint prevReadFBO = 0, prevDrawFBO = 0, prevReadBuffer = GL_COLOR_ATTACHMENT0, prevRenderbuffer = 0;
+    const GLboolean hadScissor = glIsEnabled(GL_SCISSOR_TEST);
+    GLboolean prevColorMask[4] = {GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE};
+    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevReadFBO);
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevDrawFBO);
+    glGetIntegerv(GL_READ_BUFFER, &prevReadBuffer);
+    glGetIntegerv(GL_RENDERBUFFER_BINDING, &prevRenderbuffer);
+    glGetBooleanv(GL_COLOR_WRITEMASK, prevColorMask);
+    if (hadScissor) glDisable(GL_SCISSOR_TEST);
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, _hardwareFramebuffer);
+    glReadBuffer(GL_COLOR_ATTACHMENT0);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _hardwareDisplayFramebuffer);
+    const GLenum blitFilter = ([activeFilter isEqualToString:@"none"] && _integerScalingEnabled) ? GL_NEAREST : GL_LINEAR;
+    const GLint dstY0 = _hardwareCallback.bottom_left_origin ? 0 : _hardwareDisplayHeight;
+    const GLint dstY1 = _hardwareCallback.bottom_left_origin ? _hardwareDisplayHeight : 0;
+    glBlitFramebuffer(0, 0, (GLint)width, (GLint)height,
+                      0, dstY0, _hardwareDisplayWidth, dstY1,
+                      GL_COLOR_BUFFER_BIT, blitFilter);
+    const GLenum blitErr = glGetError();
+    BOOL presented = NO;
+    if (blitErr == GL_NO_ERROR) {
+        glBindRenderbuffer(GL_RENDERBUFFER, _hardwareDisplayRenderbuffer);
+        presented = [_hardwareContext presentRenderbuffer:GL_RENDERBUFFER];
+    }
+    glColorMask(prevColorMask[0], prevColorMask[1], prevColorMask[2], prevColorMask[3]);
+    if (hadScissor) glEnable(GL_SCISSOR_TEST);
+    glReadBuffer((GLenum)prevReadBuffer);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)prevReadFBO);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)prevDrawFBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, (GLuint)prevRenderbuffer);
+    if (!presented) {
+        [CATransaction begin];
+        [CATransaction setDisableActions:YES];
+        _hardwareDisplayLayer.hidden = YES;
+        _singleScreenLayer.hidden = NO;
+        [CATransaction commit];
+        return NO;
+    }
+    ++_presentedFrames;
+    ++_nonBlackFrameCount;
+    return YES;
+}
+
 - (void)presentFrame:(CGImageRef)image {
     if (_screenProfileWidth != _frameWidth || _screenProfileHeight != _frameHeight) {
         _screenProfileWidth = _frameWidth;
@@ -2166,6 +2374,10 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     }
     if (_screenManager.screens.size() == 1) {
         for (CALayer *layer in _screenLayers) layer.hidden = YES;
+        if (_hardwareDisplayLayer && !_hardwareDisplayLayer.hidden) {
+            _hardwareDisplayLayer.hidden = YES;
+            _singleScreenLayer.hidden = NO;
+        }
         _singleScreenLayer.contents = (__bridge id)image;
         return;
     }
@@ -2179,6 +2391,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         addedLayers = YES;
     }
     _singleScreenLayer.hidden = YES;
+    if (_hardwareDisplayLayer) _hardwareDisplayLayer.hidden = YES;
     if (addedLayers) [self layoutScreens];
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
@@ -2218,17 +2431,28 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
             _screenFillsDisplay ? brum::ScaleMode::crop : brum::ScaleMode::fit);
         [CATransaction begin];
         [CATransaction setDisableActions:YES];
-        _singleScreenLayer.hidden = !_singleViewport.valid();
-        _singleScreenLayer.frame = CGRectMake(_singleViewport.frame.x, _singleViewport.frame.y,
-                                               _singleViewport.frame.width, _singleViewport.frame.height);
+        const BOOL showSingle = _singleViewport.valid();
+        const BOOL directActive = _hardwareDisplayLayer && !_hardwareDisplayLayer.hidden && showSingle;
+        _singleScreenLayer.hidden = !showSingle || directActive;
+        const CGRect targetFrame = CGRectMake(_singleViewport.frame.x, _singleViewport.frame.y,
+                                              _singleViewport.frame.width, _singleViewport.frame.height);
+        _singleScreenLayer.frame = targetFrame;
+        if (_hardwareDisplayLayer) {
+            if (!CGSizeEqualToSize(_hardwareDisplayLayer.bounds.size, targetFrame.size)) {
+                _hardwareDisplayReady = NO;
+            }
+            _hardwareDisplayLayer.frame = targetFrame;
+            if (!showSingle) _hardwareDisplayLayer.hidden = YES;
+        }
         if (_scanlineOverlayLayer) {
-            _scanlineOverlayLayer.hidden = _singleScreenLayer.hidden;
-            _scanlineOverlayLayer.frame = _singleScreenLayer.frame;
+            _scanlineOverlayLayer.hidden = !showSingle;
+            _scanlineOverlayLayer.frame = targetFrame;
         }
         [CATransaction commit];
         return;
     }
     _singleScreenLayer.hidden = YES;
+    if (_hardwareDisplayLayer) _hardwareDisplayLayer.hidden = YES;
     if (!_layoutManuallyChosen) {
         _screenManager.layout = _screen.bounds.size.width > _screen.bounds.size.height
             ? brum::Layout::horizontal : brum::Layout::vertical;
@@ -2314,9 +2538,13 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     for (UIView *control in _padOverlayViews) {
         control.hidden = nextHidden;
     }
-    if (_digitalPad) _digitalPad.hidden = nextHidden || !_dpadMode;
+    const BOOL isPSP = [_emulatedSystemID isEqualToString:@"psp"];
+    if (_digitalPad) _digitalPad.hidden = nextHidden || (!isPSP && !_dpadMode);
     if (_padModeButton) _padModeButton.hidden = nextHidden;
-    if (_virtualStick) _virtualStick.hidden = nextHidden || _dpadMode;
+    if (_virtualStick) {
+        _virtualStick.hidden = nextHidden || (!isPSP && _dpadMode);
+        _virtualStick.enabled = !nextHidden && !_paused && (isPSP || !_dpadMode);
+    }
     [self applyVirtualControlsStyle];
     [self layoutScreens];
 }
@@ -2451,7 +2679,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
         [self toggleControlsVisibility];
         if (!wasPaused) [self resume];
     }]];
-    if (_digitalPad) {
+    if (_padModeButton) {
         NSString *stickLabel = _dpadMode ? @"Controle esquerdo: Analógico" : @"Controle esquerdo: D-Pad";
         [menu addAction:[UIAlertAction actionWithTitle:stickLabel style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
             [self toggleAnalogPadMode];
@@ -2778,6 +3006,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     for (NSUInteger frame = 0; frame < frameCount; frame++) {
         _suppressVideo = frame + 1 < frameCount;
         _core.run();
+        _input.tickLatches();
         if (!_pointerPressed && _pointerLatchFrames > 0) --_pointerLatchFrames;
         if (_raRuntime) _raRuntime->doFrame();
         if (_pokedexTracker) _pokedexTracker->doFrame();
@@ -2788,7 +3017,7 @@ static void BrumAudioQueueOutput(void *context, AudioQueueRef queue, AudioQueueB
     _suppressVideo = NO;
     if (_shutdownRequested) { [self handleCoreShutdown]; return; }
     [self applyPendingAVInfo];
-    if (_sessionFrames == 120 && _nonBlackFrameCount == 0 && [_emulatedSystemID isEqualToString:@"psp"]) {
+    if (_videoCallbackCount == 120 && _nonBlackFrameCount == 0 && [_emulatedSystemID isEqualToString:@"psp"]) {
         os_unfair_lock_lock(&_audioLock);
         const uint64_t producedNow = _audioSamplesProduced;
         os_unfair_lock_unlock(&_audioLock);

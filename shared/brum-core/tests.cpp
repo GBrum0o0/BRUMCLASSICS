@@ -228,6 +228,31 @@ int main() {
     input.setAxis(InputSource::virtualPad, 0, 0, partial.x);
     input.setAxis(InputSource::virtualPad, 0, 1, diagonal.y);
     check(input.analog(0, 0) > 0 && input.analog(0, 1) < 0);
+
+    // Virtual button tap latch preserves brief down+up taps for 2 polls, then releases cleanly.
+    input.clear();
+    input.set(InputSource::virtualPad, 0, true);
+    input.latchButton(0, 2);
+    input.set(InputSource::virtualPad, 0, false);
+    check(input.pressed(0));
+    input.tickLatches();
+    check(input.pressed(0));
+    input.tickLatches();
+    check(!input.pressed(0));
+    // Holding virtualPad keeps the latch alive until released.
+    input.set(InputSource::virtualPad, 3, true);
+    input.latchButton(3, 2);
+    input.tickLatches();
+    input.tickLatches();
+    check(input.pressed(3));
+    input.set(InputSource::virtualPad, 3, false);
+    check(input.pressed(3));
+    input.release(InputSource::virtualPad);
+    check(!input.pressed(3));
+    input.latchButton(1, 2);
+    check(input.pressed(1));
+    input.clear();
+    check(!input.pressed(1));
     FrameCadence cadence;
     cadence.setRate(75);
     unsigned frames = 0;
