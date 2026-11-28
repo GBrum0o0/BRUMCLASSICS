@@ -44,6 +44,7 @@ struct CompanionView: View {
                 }
                 if store.pendingCount > 0 { Text("\(store.pendingCount) alteração(ões) salva(s) no iPhone aguardando sincronização.").font(.caption).foregroundStyle(BrumTheme.primary) }
                 NavigationLink { MomentsView() } label: { SettingsRow(icon: "photo.on.rectangle.angled", title: "BRUMMOMENTS", detail: "Sua galeria pessoal, disponível offline") }
+                    .accessibilityIdentifier("companion-moments-link")
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)

@@ -1,17 +1,66 @@
 import XCTest
 
 final class NavigationTests: XCTestCase {
-    func testProfileMovedInsideHome() {
+    func testProfileAndSettingsSeparatedAndHomeScrollReachesJourney() {
         let app = XCUIApplication(); app.launch()
-        let link = app.buttons["profile-home-link"]
-        XCTAssertTrue(link.waitForExistence(timeout: 15))
-        if !link.isHittable { app.swipeUp() }
-        link.tap()
-        XCTAssertTrue(app.buttons["mobile-settings-link"].waitForExistence(timeout: 5))
+        let profileLink = app.buttons["profile-home-link"]
+        XCTAssertTrue(profileLink.waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["home-controllers"].exists)
+        XCTAssertTrue(app.buttons["home-qr-control"].exists)
+        XCTAssertTrue(app.buttons["home-settings"].exists)
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "sync-status-indicator").firstMatch.exists)
+
+        // Indicador sem textos visíveis, sem card de sincronização e sem central de notificações visível no Início
+        XCTAssertFalse(app.staticTexts["CONECTADO"].exists)
+        XCTAssertFalse(app.staticTexts["OFFLINE"].exists)
+        XCTAssertFalse(app.staticTexts["SINCRONIZANDO"].exists)
+        XCTAssertFalse(app.staticTexts["Tudo sincronizado"].exists)
+        XCTAssertFalse(app.staticTexts["NOTIFICAÇÕES"].exists)
+
+        // Rolar até Minha Jornada sem ficar preso atrás da barra inferior
+        for _ in 0..<5 {
+            if app.staticTexts["MINHA JORNADA"].exists && app.staticTexts["MINHA JORNADA"].isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(app.staticTexts["MINHA JORNADA"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["MINHA JORNADA"].isHittable)
+
+        for _ in 0..<6 {
+            if profileLink.exists && profileLink.isHittable { break }
+            app.swipeDown()
+        }
+        XCTAssertTrue(profileLink.waitForExistence(timeout: 5))
+        profileLink.tap()
+        for _ in 0..<4 {
+            if app.buttons["profile-ra-link"].exists && app.buttons["profile-ra-link"].isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(app.buttons["profile-ra-link"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["profile-drive-link"].exists)
+        XCTAssertFalse(app.buttons["mobile-settings-link"].exists)
+
+        // Verificar conta RetroAchievements dentro do Perfil
+        app.buttons["profile-ra-link"].tap()
+        XCTAssertTrue(app.textFields["gaming-mode-ra-username"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.secureTextFields["gaming-mode-ra-key"].exists)
         app.navigationBars.buttons.firstMatch.tap()
-        XCTAssertTrue(app.buttons["main-tab-0"].exists)
+        XCTAssertTrue(app.buttons["profile-ra-link"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(app.buttons["main-tab-0"].waitForExistence(timeout: 5))
+
+        // Abrir Configurações técnicas separadamente pelo ícone de engrenagem
+        app.buttons["home-settings"].tap()
+        XCTAssertTrue(app.buttons["gaming-mode-choose-rom-folder"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.textFields["gaming-mode-ra-username"].exists)
+        for _ in 0..<4 {
+            if app.staticTexts["Ao iniciar um clássico"].exists && app.staticTexts["Ao iniciar um clássico"].isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(app.staticTexts["Ao iniciar um clássico"].waitForExistence(timeout: 5))
+        app.navigationBars["Configurações"].buttons["Fechar"].tap()
     }
-    func testGamingModeAndCompanionWithoutRemoteControls() {
+
+    func testGamingModeExtensionsQRAndCompanionWithoutStatsChartRegression() {
         let app = XCUIApplication()
         app.launch()
         for tab in ["main-tab-0", "main-tab-1", "gaming-mode-tab", "main-tab-3", "main-tab-4"] {
@@ -22,6 +71,7 @@ final class NavigationTests: XCTestCase {
         XCTAssertTrue(app.buttons["gaming-mode-library"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["gaming-mode-extensions"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["gaming-mode-qr-control"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["gaming-mode-profile"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["gaming-mode-mybrumcontrol"].exists)
         app.buttons["gaming-mode-extensions"].tap()
         XCTAssertTrue(app.buttons["pokedex-open-device"].waitForExistence(timeout: 5))
@@ -34,9 +84,7 @@ final class NavigationTests: XCTestCase {
         app.navigationBars["Controles"].buttons["Fechar"].tap()
         app.buttons["gaming-mode-settings"].tap()
         XCTAssertTrue(app.buttons["gaming-mode-choose-rom-folder"].waitForExistence(timeout: 5))
-        if !app.textFields["gaming-mode-ra-username"].exists { app.swipeUp() }
-        XCTAssertTrue(app.textFields["gaming-mode-ra-username"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.secureTextFields["gaming-mode-ra-key"].exists)
+        XCTAssertFalse(app.textFields["gaming-mode-ra-username"].exists)
         app.navigationBars["Configurações"].buttons["Fechar"].tap()
         XCTAssertFalse(app.buttons["main-tab-0"].exists)
 
@@ -48,22 +96,26 @@ final class NavigationTests: XCTestCase {
         app.buttons["gaming-mode-exit"].tap()
         XCTAssertTrue(app.buttons["main-tab-3"].waitForExistence(timeout: 5))
         app.buttons["main-tab-3"].tap()
-        XCTAssertTrue(app.staticTexts["Estatísticas"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Conquistas"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Estatísticas"].exists)
+        XCTAssertFalse(app.staticTexts["DISTRIBUIÇÃO POR PLATAFORMA"].exists)
         app.buttons["main-tab-4"].tap()
         XCTAssertTrue(app.staticTexts["Sua segunda tela."].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["DESLIGAR"].exists)
         XCTAssertFalse(app.buttons["SUSPENDER"].exists)
         XCTAssertFalse(app.staticTexts["PESQUISA NO LIVING ROOM"].exists)
         XCTAssertTrue(app.staticTexts["FPS"].exists)
-        if !app.buttons["companion-capture"].isHittable { app.swipeUp() }
+        for _ in 0..<4 {
+            if app.buttons["companion-capture"].isHittable { break }
+            app.swipeUp()
+        }
         XCTAssertTrue(app.buttons["companion-capture"].exists)
         XCTAssertFalse(app.buttons["companion-capture"].isEnabled)
-        app.buttons["main-tab-0"].tap()
-        let profile = app.buttons["profile-home-link"]
-        if !profile.isHittable { app.swipeUp() }
-        profile.tap()
-        app.buttons["mobile-settings-link"].tap()
-        if !app.staticTexts["Ao iniciar um clássico"].waitForExistence(timeout: 2) { app.swipeUp() }
-        XCTAssertTrue(app.staticTexts["Ao iniciar um clássico"].waitForExistence(timeout: 5))
+        for _ in 0..<4 {
+            if app.buttons["companion-moments-link"].exists && app.buttons["companion-moments-link"].isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(app.buttons["companion-moments-link"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["companion-moments-link"].isHittable)
     }
 }

@@ -302,4 +302,110 @@ final class MobileExperienceTests: XCTestCase {
         let snapFF7DeletedLocal = GamingModeCatalog.buildSnapshot(local: [], records: [], computer: [], cloud: [driveOnly, driveOnlyDisc2])
         XCTAssertEqual(snapFF7DeletedLocal.library.map(\.id), ["drive:drv-ff7-1"])
     }
+
+    func testSyncIndicatorStateReflectsRealSyncGreenOrangeRed() {
+        let syncedAt = Date(timeIntervalSince1970: 1_700_000_000)
+
+        // Verde: pareado, online, sem pendências, sem conflitos, sem falha e última sincronização concluída
+        XCTAssertEqual(
+            AppStore.resolveSyncIndicatorState(
+                isPaired: true,
+                connection: .online,
+                isSyncing: false,
+                pendingCount: 0,
+                conflictCount: 0,
+                lastSuccessfulSyncAt: syncedAt,
+                lastSyncFailed: false
+            ),
+            .synced
+        )
+
+        // Laranja: sincronizando / conectando / fila pendente aguardando envio online
+        XCTAssertEqual(
+            AppStore.resolveSyncIndicatorState(
+                isPaired: true,
+                connection: .connecting,
+                isSyncing: false,
+                pendingCount: 0,
+                conflictCount: 0,
+                lastSuccessfulSyncAt: syncedAt,
+                lastSyncFailed: false
+            ),
+            .syncing
+        )
+        XCTAssertEqual(
+            AppStore.resolveSyncIndicatorState(
+                isPaired: true,
+                connection: .online,
+                isSyncing: true,
+                pendingCount: 0,
+                conflictCount: 0,
+                lastSuccessfulSyncAt: syncedAt,
+                lastSyncFailed: false
+            ),
+            .syncing
+        )
+        XCTAssertEqual(
+            AppStore.resolveSyncIndicatorState(
+                isPaired: true,
+                connection: .online,
+                isSyncing: false,
+                pendingCount: 2,
+                conflictCount: 0,
+                lastSuccessfulSyncAt: syncedAt,
+                lastSyncFailed: false
+            ),
+            .syncing
+        )
+
+        // Vermelho: não pareado, offline, erro, conflito ou falha de sincronização (mesmo com rede conectada)
+        XCTAssertEqual(
+            AppStore.resolveSyncIndicatorState(
+                isPaired: false,
+                connection: .offline,
+                isSyncing: false,
+                pendingCount: 0,
+                conflictCount: 0,
+                lastSuccessfulSyncAt: nil,
+                lastSyncFailed: false
+            ),
+            .unsynced
+        )
+        XCTAssertEqual(
+            AppStore.resolveSyncIndicatorState(
+                isPaired: true,
+                connection: .offline,
+                isSyncing: false,
+                pendingCount: 0,
+                conflictCount: 0,
+                lastSuccessfulSyncAt: syncedAt,
+                lastSyncFailed: false
+            ),
+            .unsynced
+        )
+        XCTAssertEqual(
+            AppStore.resolveSyncIndicatorState(
+                isPaired: true,
+                connection: .online,
+                isSyncing: false,
+                pendingCount: 0,
+                conflictCount: 1,
+                lastSuccessfulSyncAt: syncedAt,
+                lastSyncFailed: false
+            ),
+            .unsynced
+        )
+        XCTAssertEqual(
+            AppStore.resolveSyncIndicatorState(
+                isPaired: true,
+                connection: .online,
+                isSyncing: false,
+                pendingCount: 0,
+                conflictCount: 0,
+                lastSuccessfulSyncAt: syncedAt,
+                lastSyncFailed: true
+            ),
+            .unsynced
+        )
+    }
 }

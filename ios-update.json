@@ -1,11 +1,11 @@
 {
-  "version": "0.37.0",
-  "build": 70,
+  "version": "0.38.0",
+  "build": 71,
   "minimumIos": "16.0",
-  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.37.0",
+  "buildUrl": "https://github.com/GBrum0o0/BRUMCLASSICS/releases/tag/ios-v0.38.0",
   "notes": [
-    "Corrige congelamento permanente no PPSSPP ao tocar na tela ou abrir o menu rápido (evita pausar a thread de emulação com retro_serialize_size em cada verificação de capacidades).",
-    "Restaura opções críticas do PPSSPP no Libretro (ignora acessos de memória inválidos sem pausar a CPU, ativa software skinning e cache de fragmentos GL, limita auto frameskip a 1 quadro e protege leituras/escritas IR fora da RAM).",
-    "Corrige deadlock ao encerrar jogos no PPSSPP, sincroniza o runtime de RetroAchievements entre threads e evita lag acumulado no ring buffer de áudio."
+    "Protege a exibição de Extensões e ícones superiores contra cortes horizontais e valida a presença do leitor QR Code do MyBrumControl.",
+    "Simplifica o indicador de sincronização (apenas símbolo verde/laranja/vermelho ligado ao estado real), remove o card 'Tudo sincronizado' da tela inicial, oculta temporariamente a central de notificações e retira a seção Estatísticas/gráfico da interface.",
+    "Separa Perfil (identidade, PC, RetroAchievements, Google Drive e vínculos) das Configurações técnicas (ícone próprio de Perfil no topo), corrige a rolagem até 'Minha Jornada' / 'Companion' e corrige a detecção de Pokémon iniciais, evoluções e pop-up na Pokédex Universal."
   ]
 }

@@ -125,6 +125,19 @@ if (!source.includes('IntegratedEmulatorView(rom: rom, returnsToPortrait: false)
 const homeSource = fs.readFileSync(path.join(app, 'HomeView.swift'), 'utf8');
 if (homeSource.includes('classics-everywhere-link') || homeSource.includes('NavigationLink { BCardLibraryView()')) throw new Error('Início ainda expõe atalhos removidos de B-CARD ou CLASSICS Everywhere.');
 if (!homeSource.includes('profile-home-link')) throw new Error('Perfil precisa estar acessível pelo Início.');
+const homeBody = homeSource.split('struct HomeView: View')[1]?.split('struct SyncStatusCard: View')[0] || '';
+if (homeBody.includes('SyncStatusCard()')) throw new Error('Área de sincronização (SyncStatusCard) deve permanecer removida da tela inicial.');
+if (!homeBody.includes('BrumMobileFeatureFlags.showNotificationCenter')) throw new Error('Central de notificações deve estar protegida por feature flag na tela inicial.');
+const dotSource = homeSource.split('struct ConnectionDot: View')[1]?.split('struct FeaturedGameCard: View')[0] || '';
+if (!dotSource.includes('SyncIndicatorState') || dotSource.includes('"CONECTADO"') || dotSource.includes('"ERRO DE SINCRONIZAÇÃO"')) {
+  throw new Error('Indicador de sincronização deve usar apenas símbolo visual sem textos na UI.');
+}
+const rootSource = fs.readFileSync(path.join(app, 'BRUMCLASSICSMobileApp.swift'), 'utf8');
+if (rootSource.includes('case 3: NavigationStack { StatsView() }')) throw new Error('Seção Estatísticas deve estar ocultada na interface principal.');
+const overlaySource = fs.readFileSync(path.join(app, 'BrumAchievementOverlay.swift'), 'utf8');
+if (!overlaySource.includes('presentOnActiveEmulatorIfAvailable')) throw new Error('Popup de descoberta da Pokédex deve priorizar o emulador ativo.');
+const adapterSource = fs.readFileSync(path.join(root, '../shared/brum-core/PokemonFireRedAdapter.cpp'), 'utf8');
+if (!adapterSource.includes('isConfirmedPlayerPokemon')) throw new Error('Detecção de Pokémon iniciais e evoluções no FireRed está incompleta.');
 
 if (!source.includes('SecureStore.write')) throw new Error('Token não está protegido pelo Keychain.');
 if (!source.includes('SHA256.hash(data: data)')) throw new Error('Certificate pinning ausente.');
